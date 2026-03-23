@@ -205,6 +205,12 @@ body{
 }
 .meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .time-chip{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px;font-weight:500}
+.cal-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
+.cal-badge.synced{background:#dcfce7;color:#16a34a}
+.cal-badge.pending{background:#fef9c3;color:#b45309}
+.date-block{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.date-main{font-size:15px;font-weight:700;color:var(--text)}
+.date-sub{font-size:11px;color:var(--muted);margin-top:1px}
 .cat-sel{
   background:var(--bg);border:1px solid var(--border);
   color:var(--text);font-size:12px;font-weight:600;
@@ -487,23 +493,50 @@ function detectTime(text){
   const bump=d=>{const r=new Date(now);r.setDate(r.getDate()+d);r.setHours(9,0,0,0);return r};
   const setH=(h,m=0)=>{
     const r=new Date(now);r.setHours(h,m,0,0);
-    if(r<=now)r.setDate(r.getDate()+1); // אם השעה עברה — קבע למחר
+    if(r<=now)r.setDate(r.getDate()+1);
     return r;
   };
+
+  // ימים יחסיים
   if(text.includes('מחרתיים'))return bump(2);
   if(text.includes('מחר'))return bump(1);
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
   if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
-  // זיהוי שעה ספציפית — בדיקה לפני מילות מפתח כלליות
-  // תואם: "לשעה 16:30", "בשעה 16", "שעה 17:30", "ב-16:00", "ב16"
+
+  // מילות שעה בעברית — בסדר מארוך לקצר למניעת התנגשויות
+  const isMorning=text.includes('בוקר');
+  const isNight=text.includes('לילה');
+  const wordMap=[
+    ['שתים עשרה',12],['שתיים עשרה',12],
+    ['אחת עשרה',11],['אחד עשר',11],
+    ['עשר',isNight?22:10],
+    ['תשע',isNight?21:9],
+    ['שמונה',isNight?20:8],
+    ['שבע',19],['שש',18],['חמש',17],
+    ['ארבע',16],['שלוש',15],
+    ['שתיים',14],['שתים',14],
+    ['אחת',13],['אחד',13]
+  ];
+  for(const[word,h] of wordMap){
+    if(text.includes(word)){
+      // תיקון לבוקר: אם ציין בוקר ושעה היא צהריים+ החסר 12
+      const hour=isMorning&&h>12?h-12:h;
+      return setH(hour,0);
+    }
+  }
+
+  // שעה מספרית — לפני מילות מפתח כלליות
   const explicit=text.match(/(?:[בל]שעה?\s*|ב-)(\d{1,2})(?::(\d{2}))?/)||
                  text.match(/\b(\d{1,2}):(\d{2})\b/);
   if(explicit)return setH(+explicit[1],+(explicit[2]||0));
-  // מילות מפתח כלליות (כשאין שעה ספציפית)
-  if(text.includes('בבוקר')||text.includes('בוקר'))return setH(9);
+
+  // מילות מפתח זמן כלליות
+  if(isMorning)return setH(9);
   if(text.includes('בצהריים')||text.includes('צהריים'))return setH(13);
+  if(text.includes('אחר הצהריים'))return setH(15);
   if(text.includes('הערב')||text.includes('בערב')||text.includes('ערב'))return setH(20);
-  if(text.includes('בלילה')||text.includes('לילה'))return setH(22);
+  if(isNight)return setH(22);
+
   return new Date(now.getTime()+3600000);
 }
 
@@ -598,14 +631,24 @@ function render(){
   el.innerHTML=list.map(task=>{
     const cat=CATS[task.category]||CATS['כללי'];
     const dt=new Date(task.datetime);
-    const time=dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})+' · '+dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
+    const timeStr=dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',hour12:false});
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-    const dtLocal=new Date(task.datetime).toISOString().slice(0,16);
+    const dtLocal=dt.toISOString().slice(0,16);
+    const calBadge=task.calendarEventId
+      ?`<span class="cal-badge synced">📅 מסונכרן</span>`
+      :`<span class="cal-badge pending">📅 ממתין</span>`;
     return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
   <div class="task-txt">${esc(task.text)}</div>
+  <div class="date-block">
+    <div>
+      <div class="date-main">🕐 ${timeStr}</div>
+      <div class="date-sub">${dateStr}</div>
+    </div>
+    ${calBadge}
+  </div>
   <div class="meta">
     <select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select>
-    <span class="time-chip">⏰ ${time}</span>
   </div>
   <div class="actions">
     <button class="act" onclick="toggleDone(${task.id})">${task.completed?'↩':'✅'}</button>
