@@ -5,31 +5,28 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>VoiceTask</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#7c3aed">
+<meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="VoiceTask">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.9.6/lottie.min.js" crossorigin="anonymous"></script>
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#07070f;--surface:#0f0f1a;--card:#14141f;--card-hover:#1a1a2a;
-  --border:rgba(255,255,255,0.07);
-  --accent:#7c3aed;--accent2:#a78bfa;--accent3:#c4b5fd;
-  --text:#eeeeff;--muted:#55546e;
-  --success:#34d399;--danger:#f87171;--warn:#fbbf24;
-  --r:14px;--r-sm:9px;
+  --bg:#f2f2f7;--surface:#ffffff;
+  --border:#e5e5ea;--border2:#d1d1d6;
+  --text:#1a1a1a;--muted:#8a8a8e;--muted2:#c7c7cc;
+  --r:18px;--r-sm:12px;
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
 }
 html{height:100%;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 body{
-  font-family:-apple-system,'Segoe UI',Arial,sans-serif;
+  font-family:-apple-system,'SF Pro Display','Segoe UI',Arial,sans-serif;
   background:var(--bg);color:var(--text);
   min-height:100svh;max-width:480px;margin:0 auto;
-  padding:0 0 calc(100px + var(--sab));
+  padding:0 0 calc(110px + var(--sab));
   padding-left:var(--sal);padding-right:var(--sar);
   direction:rtl;overflow-x:hidden;
   overscroll-behavior-y:none;-webkit-user-select:none;user-select:none;
@@ -38,228 +35,243 @@ body{
 /* ── Header ── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:calc(16px + var(--sat)) 20px 14px;
-  background:rgba(7,7,15,0.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;
+  padding:calc(18px + var(--sat)) 24px 16px;
+  background:rgba(242,242,247,0.88);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  position:sticky;top:0;z-index:20;
 }
-.logo{
-  font-size:20px;font-weight:800;letter-spacing:-0.5px;
-  background:linear-gradient(135deg,#c4b5fd,#60a5fa);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
+.logo{font-size:21px;font-weight:800;letter-spacing:-0.6px;color:var(--text)}
 .badge{
-  font-size:11px;font-weight:600;color:var(--accent3);
-  background:rgba(124,58,237,0.15);border:1px solid rgba(167,139,250,0.2);
-  padding:4px 10px;border-radius:20px;letter-spacing:0.3px;
+  font-size:12px;font-weight:600;color:var(--muted);
+  background:var(--surface);border:1.5px solid var(--border);
+  padding:5px 13px;border-radius:20px;
 }
 
-/* ── Mic Section ── */
+/* ── Mic section ── */
 .mic-wrap{
   display:flex;flex-direction:column;align-items:center;
-  padding:24px 20px 18px;gap:14px;
+  padding:36px 20px 24px;gap:22px;
 }
 
+/* ── Blob ── */
 .vis-wrap{
   position:relative;width:280px;height:280px;
+  border-radius:60% 40% 30% 70% / 60% 30% 70% 40%;
+  background:linear-gradient(135deg,#93c5fd 0%,#818cf8 35%,#c4b5fd 65%,#67e8f9 100%);
+  background-size:300% 300%;
+  animation:morph 9s ease-in-out infinite,grad-idle 7s ease infinite;
+  cursor:pointer;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
+  box-shadow:0 28px 72px rgba(96,165,250,.38),0 8px 28px rgba(129,140,248,.22);
+  transition:box-shadow .6s ease;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  will-change:border-radius;
+}
+.vis-wrap.rec{
+  background:linear-gradient(135deg,#fca5a5 0%,#f87171 30%,#fb923c 65%,#fbbf24 100%);
+  animation:morph-fast 1.6s ease-in-out infinite,grad-rec 2s ease infinite;
+  box-shadow:0 28px 72px rgba(248,113,113,.42),0 8px 28px rgba(251,146,60,.28);
+}
+@keyframes morph{
+  0%,100%{border-radius:60% 40% 30% 70% / 60% 30% 70% 40%}
+  20%  {border-radius:30% 60% 70% 40% / 50% 60% 30% 60%}
+  40%  {border-radius:50% 60% 30% 40% / 40% 50% 60% 50%}
+  60%  {border-radius:35% 55% 60% 45% / 55% 35% 65% 40%}
+  80%  {border-radius:40% 60% 50% 30% / 60% 40% 50% 40%}
+}
+@keyframes morph-fast{
+  0%,100%{border-radius:40% 60% 60% 40% / 40% 60% 40% 60%}
+  33%   {border-radius:60% 40% 40% 60% / 60% 40% 60% 40%}
+  66%   {border-radius:50% 50% 30% 70% / 30% 70% 50% 50%}
+}
+@keyframes grad-idle{
+  0%  {background-position:0% 50%}
+  50% {background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+@keyframes grad-rec{
+  0%  {background-position:0% 50%}
+  50% {background-position:100% 50%}
+  100%{background-position:0% 50%}
 }
 
-/* Lottie containers */
-#lottieIdle,#lottieRec{
-  position:absolute;inset:0;
-  transition:opacity .45s ease;
-  pointer-events:none;
-}
-#lottieRec{opacity:0}
-.vis-wrap.rec #lottieIdle{opacity:0}
-.vis-wrap.rec #lottieRec{opacity:1}
+/* Lottie — hidden, not used */
+#lottieIdle,#lottieRec{display:none}
 
-/* Real-time canvas on top of Lottie when recording */
+/* Canvas overlay on blob */
 #vis{
-  position:absolute;inset:0;border-radius:50%;
-  opacity:0;transition:opacity .5s ease;pointer-events:none;
+  position:absolute;inset:0;
+  opacity:0;transition:opacity .5s;pointer-events:none;
 }
 .vis-wrap.rec #vis{opacity:1}
 
-/* Center glow orb */
-.glow-orb{
-  position:absolute;width:140px;height:140px;border-radius:50%;
-  background:radial-gradient(circle,rgba(124,58,237,.22) 0%,transparent 70%);
-  pointer-events:none;transition:opacity .4s;
-  animation:orb-pulse 4s ease-in-out infinite;
-}
-.vis-wrap.rec .glow-orb{
-  background:radial-gradient(circle,rgba(239,68,68,.18) 0%,transparent 70%);
-}
-@keyframes orb-pulse{
-  0%,100%{transform:scale(1);opacity:.7}
-  50%{transform:scale(1.15);opacity:1}
-}
-
-/* Mic button */
+/* Center icon inside blob */
 .mic-btn{
-  position:relative;z-index:5;
-  width:112px;height:112px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(145deg,#8b5cf6,#4f46e5);
-  box-shadow:0 0 0 8px rgba(139,92,246,.08),0 0 40px rgba(124,58,237,.35),0 6px 20px rgba(0,0,0,.5);
+  position:relative;z-index:5;pointer-events:none;
+  width:80px;height:80px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.22);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   display:flex;align-items:center;justify-content:center;
-  font-size:42px;
-  transition:transform .12s ease,box-shadow .3s ease,background .3s ease;
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  font-size:34px;
+  transition:transform .15s ease,background .4s;
+  box-shadow:0 4px 20px rgba(0,0,0,.08);
 }
-.mic-btn:active{transform:scale(.91)}
-.mic-btn.rec{
-  background:linear-gradient(145deg,#f43f5e,#b91c1c);
-  box-shadow:0 0 0 8px rgba(244,63,94,.1),0 0 40px rgba(239,68,68,.45),0 6px 20px rgba(0,0,0,.5);
-  animation:btn-beat .9s ease-in-out infinite alternate;
-}
-@keyframes btn-beat{
-  from{transform:scale(1)}
-  to{transform:scale(1.06)}
-}
+.mic-btn.rec{background:rgba(255,255,255,.14);transform:scale(1.08)}
+.vis-wrap:active .mic-btn{transform:scale(.9)}
 
-/* Mic label */
+/* Status label */
 .mic-label{
-  font-size:13px;color:var(--muted);letter-spacing:.3px;height:18px;
-  transition:color .3s,opacity .3s;font-weight:500;
+  font-size:16px;color:var(--muted);font-weight:500;letter-spacing:-.2px;
+  transition:color .3s;
 }
-.mic-label.rec{color:#f87171;font-weight:700}
+.mic-label.rec{color:#ef4444;font-weight:700}
 
-/* Transcript / Edit box */
+/* ── Transcript edit ── */
 .transcript{
   width:calc(100% - 40px);max-width:400px;
-  display:none;animation:fade-in .2s ease;
+  display:none;animation:fade-in .25s ease;
 }
-.transcript.on{display:flex;flex-direction:column;gap:8px}
+.transcript.on{display:flex;flex-direction:column;gap:10px}
 .transcript-preview{
-  background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.18);
-  border-radius:var(--r);padding:12px 16px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 16px;
   font-size:15px;line-height:1.6;color:var(--muted);
 }
 .transcript-edit{
-  background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.35);
-  border-radius:var(--r);padding:12px 16px;
+  background:var(--surface);border:2px solid var(--text);
+  border-radius:var(--r);padding:14px 16px;
   font-size:15px;line-height:1.6;color:var(--text);
   resize:none;width:100%;font-family:inherit;direction:rtl;
-  outline:none;min-height:72px;
+  outline:none;min-height:80px;
   -webkit-user-select:text;user-select:text;
 }
-.transcript-edit:focus{border-color:var(--accent2)}
+.transcript-edit:focus{border-color:#818cf8}
 .transcript-actions{display:flex;gap:8px}
 .t-save{
-  flex:1;padding:10px;border-radius:var(--r-sm);
-  background:var(--accent);color:#fff;border:none;
-  font-size:14px;font-weight:700;cursor:pointer;
+  flex:1;padding:14px;border-radius:50px;
+  background:var(--text);color:#fff;border:none;
+  font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:transform .12s,opacity .2s;
 }
+.t-save:active{transform:scale(.96);opacity:.85}
 .t-cancel{
-  padding:10px 16px;border-radius:var(--r-sm);
-  background:rgba(255,255,255,.07);color:var(--muted);border:none;
-  font-size:14px;cursor:pointer;
+  padding:14px 20px;border-radius:50px;
+  background:var(--surface);color:var(--muted);
+  border:1.5px solid var(--border);
+  font-size:15px;cursor:pointer;font-family:inherit;
+  transition:transform .12s;
 }
-@keyframes fade-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.t-cancel:active{transform:scale(.96)}
+@keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ── Filters ── */
-.filters{display:flex;gap:7px;overflow-x:auto;padding:0 20px 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters{
+  display:flex;gap:8px;overflow-x:auto;
+  padding:4px 20px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
 .filters::-webkit-scrollbar{display:none}
 .f-btn{
-  flex-shrink:0;padding:8px 16px;border-radius:22px;
-  border:1px solid var(--border);background:transparent;
-  color:var(--muted);font-size:13px;cursor:pointer;
+  flex-shrink:0;padding:9px 18px;border-radius:50px;
+  border:1.5px solid var(--border);background:var(--surface);
+  color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;
   transition:all .18s;font-family:inherit;
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:36px;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:38px;
 }
-.f-btn.on{background:rgba(124,58,237,.2);border-color:rgba(167,139,250,.4);color:var(--accent3);font-weight:600}
+.f-btn.on{background:var(--text);border-color:var(--text);color:#fff;font-weight:600}
 
 /* ── Section header ── */
 .sec{display:flex;justify-content:space-between;align-items:center;padding:0 20px 10px}
-.sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
-.sec-btn{font-size:12px;color:var(--danger);background:none;border:none;cursor:pointer;font-family:inherit;opacity:.7;padding:4px 0;min-height:36px;touch-action:manipulation}
+.sec-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.sec-btn{font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;min-height:36px;touch-action:manipulation;font-weight:500}
 
 /* ── Task List ── */
-.list{display:flex;flex-direction:column;gap:9px;padding:0 20px}
+.list{display:flex;flex-direction:column;gap:10px;padding:0 20px}
 
 /* ── Task Card ── */
 .card{
-  background:color-mix(in srgb, var(--cc, var(--accent)) 8%, var(--card));
-  border:1px solid color-mix(in srgb, var(--cc, var(--accent)) 25%, var(--border));
+  background:var(--surface);
+  border:1px solid var(--border);
   border-radius:var(--r);
-  padding:15px 16px 13px;position:relative;overflow:hidden;
+  border-right:4px solid var(--cc,#818cf8);
+  padding:16px;position:relative;
   animation:slide .28s cubic-bezier(.25,.46,.45,.94);transition:opacity .25s;
 }
-.card::after{content:'';position:absolute;right:0;top:14px;bottom:14px;width:4px;border-radius:2px;background:var(--cc,var(--accent))}
-@keyframes slide{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
-.card.done{opacity:.4}
+@keyframes slide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.card.done{opacity:.45}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
-.task-txt{font-size:15px;line-height:1.55;font-weight:500;margin-bottom:10px;padding-left:8px;-webkit-user-select:text;user-select:text}
+.task-txt{
+  font-size:15px;line-height:1.55;font-weight:600;color:var(--text);
+  margin-bottom:10px;-webkit-user-select:text;user-select:text;
+}
 .meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.time-chip{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:3px}
+.time-chip{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px;font-weight:500}
 .cat-sel{
-  background:rgba(124,58,237,.12);border:1px solid rgba(167,139,250,.2);
-  color:var(--accent3);font-size:11px;font-weight:600;
-  border-radius:20px;padding:4px 12px;font-family:inherit;cursor:pointer;
-  outline:none;-webkit-appearance:none;appearance:none;min-height:28px;
+  background:var(--bg);border:1px solid var(--border);
+  color:var(--text);font-size:12px;font-weight:600;
+  border-radius:20px;padding:5px 12px;font-family:inherit;cursor:pointer;
+  outline:none;-webkit-appearance:none;appearance:none;min-height:30px;
 }
 .actions{display:flex;gap:7px;justify-content:flex-end}
 .act{
-  width:42px;height:42px;border-radius:var(--r-sm);border:1px solid var(--border);
-  background:var(--surface);font-size:16px;cursor:pointer;
+  width:38px;height:38px;border-radius:50%;
+  border:1.5px solid var(--border);background:var(--bg);
+  font-size:15px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:transform .1s,background .15s;
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
-.act:active{transform:scale(.82)}
+.act:active{transform:scale(.82);background:var(--border)}
 
 /* ── Install bar ── */
 .install-bar{
   position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;
-  background:var(--card);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);
-  padding:12px 16px;display:none;align-items:center;gap:10px;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:50;max-width:448px;margin:0 auto;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;display:none;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto;
 }
 .install-bar.on{display:flex}
-.install-bar span{flex:1;font-size:13px;font-weight:600}
-.install-bar button{padding:7px 14px;border-radius:10px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation}
-.btn-install{background:var(--accent);color:white}
+.install-bar span{flex:1;font-size:13px;font-weight:600;color:var(--text)}
+.install-bar button{padding:8px 16px;border-radius:50px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation}
+.btn-install{background:var(--text);color:white}
 .btn-dismiss{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
 
 /* ── Empty / Toast ── */
 .empty{text-align:center;padding:52px 20px;color:var(--muted)}
-.empty i{font-size:48px;display:block;margin-bottom:14px;opacity:.35}
+.empty i{font-size:48px;display:block;margin-bottom:14px;opacity:.4}
 .empty p{font-size:14px;line-height:1.7}
 .toast{
-  position:fixed;bottom:calc(24px + var(--sab));left:50%;
+  position:fixed;bottom:calc(28px + var(--sab));left:50%;
   transform:translateX(-50%) translateY(120px);
-  background:var(--card);border:1px solid rgba(167,139,250,.2);color:var(--text);
-  padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:99;
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;
+  background:var(--text);color:#fff;
+  padding:12px 26px;border-radius:50px;font-size:14px;font-weight:600;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:99;
+  transition:transform .32s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;
 }
 .toast.on{transform:translateX(-50%) translateY(0)}
-.divider{height:1px;background:var(--border);margin:0 20px 14px}
+.divider{height:1px;background:var(--border);margin:4px 20px 14px}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="logo">VoiceTask ✦</div>
+  <div class="logo">VoiceTask</div>
   <div class="badge" id="badge">0 פעילות</div>
 </div>
 
 <div class="mic-wrap">
-  <div class="vis-wrap" id="visWrap">
-    <div class="glow-orb"></div>
+  <div class="vis-wrap" id="visWrap" onclick="toggle()">
+    <canvas id="vis" width="280" height="280"></canvas>
+    <div class="mic-btn" id="micBtn">🎤</div>
     <div id="lottieIdle"></div>
     <div id="lottieRec"></div>
-    <canvas id="vis" width="280" height="280"></canvas>
-    <button class="mic-btn" id="micBtn" onclick="toggle()" aria-label="הקלטה קולית">🎤</button>
   </div>
   <div class="mic-label" id="micLbl">לחץ לדיבור</div>
   <div class="transcript" id="transcript">
     <div class="transcript-preview" id="transcriptPreview"></div>
-    <textarea class="transcript-edit" id="transcriptEdit" rows="3"></textarea>
+    <textarea class="transcript-edit" id="transcriptEdit" rows="3" placeholder="ערוך את הטקסט..."></textarea>
     <div class="transcript-actions">
-      <button class="t-save" onclick="confirmTask()">✅ שמור</button>
-      <button class="t-cancel" onclick="cancelTask()">✕ בטל</button>
+      <button class="t-save" onclick="confirmTask()">שמור משימה</button>
+      <button class="t-cancel" onclick="cancelTask()">בטל</button>
     </div>
   </div>
 </div>
@@ -287,54 +299,6 @@ body{
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Lottie Animation Data ─────────────────────────────────────────────────────
-
-// Helper: single expanding ring layer
-function mkRing(ind, color, delay, op) {
-  return {
-    ddd:0,ind,ty:4,nm:"r"+ind,sr:1,bm:0,ao:0,ip:0,op,st:0,
-    ks:{
-      o:{a:1,k:[
-        {t:0,s:[delay>0?0:55],i:{x:[.5],y:[1]},o:{x:[.5],y:[0]}},
-        delay>0 ? {t:delay,s:[55],i:{x:[.5],y:[1]},o:{x:[.5],y:[0]}} : null,
-        {t:op-1,s:[0]}
-      ].filter(Boolean)},
-      r:{a:0,k:0},
-      p:{a:0,k:[140,140,0]},
-      a:{a:0,k:[0,0,0]},
-      s:{a:1,k:[
-        {t:delay>0?delay:0,s:[25,25,100],e:[195,195,100],i:{x:[.4,.4,.4],y:[1,1,1]},o:{x:[.6,.6,.6],y:[0,0,0]}},
-        {t:op,s:[195,195,100]}
-      ]}
-    },
-    shapes:[{ty:"gr",nm:"g",it:[
-      {ty:"el",nm:"e",d:1,s:{a:0,k:[72,72]},p:{a:0,k:[0,0]}},
-      {ty:"st",nm:"s",c:{a:0,k:color},o:{a:0,k:100},w:{a:0,k:2},lc:1,lj:1,ml:4,bm:0},
-      {ty:"tr",p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100},sk:{a:0,k:0},sa:{a:0,k:0},nm:"tr"}
-    ]}]
-  };
-}
-
-const IDLE_ANIM = {
-  v:"5.9.0",fr:30,ip:0,op:105,w:280,h:280,nm:"idle",ddd:0,assets:[],
-  layers:[
-    mkRing(1,[0.50,0.30,0.95,1],  0,  105),
-    mkRing(2,[0.64,0.43,0.97,1], 26,  105),
-    mkRing(3,[0.73,0.56,0.98,1], 52,  105),
-    mkRing(4,[0.82,0.68,0.99,1], 78,  105)
-  ]
-};
-
-// Recording: fast red rings
-const REC_ANIM = {
-  v:"5.9.0",fr:30,ip:0,op:50,w:280,h:280,nm:"rec",ddd:0,assets:[],
-  layers:[
-    mkRing(1,[0.96,0.26,0.21,1],  0, 50),
-    mkRing(2,[0.98,0.43,0.27,1], 16, 50),
-    mkRing(3,[0.99,0.62,0.25,1], 32, 50)
-  ]
-};
-
 // ── App State ─────────────────────────────────────────────────────────────────
 const CATS = {
   אישי:   {kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'],c:'#34d399'},
@@ -342,65 +306,47 @@ const CATS = {
   כללי:   {kw:[],c:'#fbbf24'}
 };
 
-let tasks=[JSON.parse(localStorage.getItem('vt2')||'[]')].flat();
-tasks = JSON.parse(localStorage.getItem('vt2')||'[]');
+let tasks = JSON.parse(localStorage.getItem('vt2')||'[]');
 let rec=null,live=false,filter='all',deferredPrompt=null;
-let idleAnim=null,recAnim=null;
-
-// ── Lottie Init ───────────────────────────────────────────────────────────────
-function initLottie() {
-  if (typeof lottie === 'undefined') return;
-  idleAnim = lottie.loadAnimation({
-    container: document.getElementById('lottieIdle'),
-    renderer: 'svg', loop: true, autoplay: true,
-    animationData: IDLE_ANIM
-  });
-  recAnim = lottie.loadAnimation({
-    container: document.getElementById('lottieRec'),
-    renderer: 'svg', loop: true, autoplay: false,
-    animationData: REC_ANIM
-  });
-}
 
 // ── Audio Visualizer ──────────────────────────────────────────────────────────
 const canvas=document.getElementById('vis'),vctx=canvas.getContext('2d');
 const CX=140,CY=140;
 let audioCtx=null,analyser=null,animId=null,stream=null;
 
-async function startVis() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 128;
+async function startVis(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=128;
     audioCtx.createMediaStreamSource(stream).connect(analyser);
     drawVis();
-  } catch(e) {}
+  }catch(e){}
 }
 
-function drawVis() {
-  const buf=new Uint8Array(analyser.frequencyBinCount),BARS=56,R=66;
-  function frame() {
+function drawVis(){
+  const buf=new Uint8Array(analyser.frequencyBinCount),BARS=56,R=62;
+  function frame(){
     animId=requestAnimationFrame(frame);
     analyser.getByteFrequencyData(buf);
     vctx.clearRect(0,0,280,280);
     for(let i=0;i<BARS;i++){
       const ang=(i/BARS)*Math.PI*2-Math.PI/2;
       const raw=buf[Math.floor(i*buf.length/BARS)]/255;
-      const v=raw*raw, h=v*52+3;
+      const v=raw*raw, h=v*55+4;
       const c=Math.cos(ang),s=Math.sin(ang);
-      const hue=340+v*40; // red → orange range
       vctx.beginPath();
       vctx.moveTo(CX+c*R,CY+s*R);
       vctx.lineTo(CX+c*(R+h),CY+s*(R+h));
-      vctx.strokeStyle=`hsla(${hue},90%,${60+v*20}%,${v*.7+.4})`;
-      vctx.lineWidth=2.5;vctx.lineCap='round';vctx.stroke();
+      vctx.strokeStyle=`rgba(255,255,255,${v*.65+.18})`;
+      vctx.lineWidth=2.8;vctx.lineCap='round';vctx.stroke();
     }
   }
   frame();
 }
 
-function stopVis() {
+function stopVis(){
   if(animId){cancelAnimationFrame(animId);animId=null}
   if(audioCtx){audioCtx.close();audioCtx=null}
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
@@ -446,7 +392,6 @@ async function start(){
   rec=rec||initRec();if(!rec)return;
   try{rec.start()}catch(e){return}
   live=true;setUI(true);
-  if(recAnim){recAnim.goToAndPlay(0,true)}
   setTimeout(()=>{if(live)startVis()},300);
 }
 
@@ -455,7 +400,6 @@ function stop(){
   try{rec.stop()}catch(e){}
   rec=null;
   stopVis();
-  if(recAnim)recAnim.stop();
   setUI(false);
 }
 
@@ -522,13 +466,12 @@ const USER_EMAIL  = localStorage.getItem('vt_email') || 'fayna007@gmail.com';
 
 function addTask(text){
   if(!text.trim())return;
-  const task = {
-    id: Date.now(),
-    text: text.trim(),
-    category: detectCat(text),
-    datetime: detectTime(text).toISOString(),
-    createdAt: new Date().toISOString(),
-    completed: false
+  const task={
+    id:Date.now(),text:text.trim(),
+    category:detectCat(text),
+    datetime:detectTime(text).toISOString(),
+    createdAt:new Date().toISOString(),
+    completed:false
   };
   tasks.unshift(task);
   save();render();toast('✅ משימה נוספה');vibrate([10,30,10]);
@@ -537,16 +480,13 @@ function addTask(text){
 }
 
 function sendToN8n(task){
-  fetch(N8N_WEBHOOK, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'bypass-tunnel-authorization': 'true'
-    },
-    body: JSON.stringify({ ...task, email: USER_EMAIL })
+  fetch(N8N_WEBHOOK,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','bypass-tunnel-authorization':'true'},
+    body:JSON.stringify({...task,email:USER_EMAIL})
   })
-  .then(r => r.ok && toast('🤖 n8n קיבל את המשימה'))
-  .catch(() => {}); // שקט בשגיאת רשת
+  .then(r=>r.ok&&toast('🤖 n8n קיבל את המשימה'))
+  .catch(()=>{});
 }
 
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
@@ -561,7 +501,7 @@ function updateBadge(){document.getElementById('badge').textContent=tasks.filter
 function render(){
   const el=document.getElementById('list');
   const list=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
-  if(!list.length){el.innerHTML=`<div class="empty"><i>🎯</i><p>אין משימות כאן.<br>לחץ על המיקרופון ודבר!</p></div>`;return}
+  if(!list.length){el.innerHTML=`<div class="empty"><i>🎯</i><p>אין משימות כאן.<br>לחץ על הבועה ודבר!</p></div>`;return}
   el.innerHTML=list.map(task=>{
     const cat=CATS[task.category]||CATS['כללי'];
     const dt=new Date(task.datetime);
@@ -602,9 +542,6 @@ function toast(msg){
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 render();updateBadge();
-// Init Lottie after DOM ready (script loaded in head)
-if(typeof lottie!=='undefined') initLottie();
-else window.addEventListener('load',initLottie);
 </script>
 </body>
 </html>
