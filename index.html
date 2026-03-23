@@ -653,7 +653,7 @@ function render(){
     const cat=CATS[task.category]||CATS['כללי'];
     const dt=new Date(task.datetime);
     const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
-    const timeStr=dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',hour12:false});
+    const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
     const dtLocal=dt.toISOString().slice(0,16);
     const calBadge=task.calendarEventId
@@ -691,7 +691,7 @@ function render(){
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
-function wa(id){const t=tasks.find(x=>x.id===id);if(!t)return;window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleString('he-IL')}`),'_blank')}
+function wa(id){const t=tasks.find(x=>x.id===id);if(!t)return;window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleDateString('he-IL')+' '+new Date(t.datetime).getHours().toString().padStart(2,'0')+':'+new Date(t.datetime).getMinutes().toString().padStart(2,'0')}`),'_blank')}
 function cal(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   const s=new Date(t.datetime),e=new Date(s.getTime()+3600000);
