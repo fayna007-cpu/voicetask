@@ -115,7 +115,7 @@
       "position": [1340, 420],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ eventId: $('גוגל קלנדר').item.json.id, status: 'created' }) }}"
+        "responseBody": "={{ JSON.stringify({ eventId: $json.id, status: 'created' }) }}"
       }
     },
     {
@@ -147,10 +147,10 @@
       "main": [[{ "node": "גוגל קלנדר", "type": "main", "index": 0 }]]
     },
     "גוגל קלנדר": {
-      "main": [[{ "node": "שליחת מייל", "type": "main", "index": 0 }]]
-    },
-    "שליחת מייל": {
-      "main": [[{ "node": "תשובה - יצירה", "type": "main", "index": 0 }]]
+      "main": [[
+        { "node": "שליחת מייל", "type": "main", "index": 0 },
+        { "node": "תשובה - יצירה", "type": "main", "index": 0 }
+      ]]
     }
   },
   "active": false,

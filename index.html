@@ -490,28 +490,34 @@ function detectCat(text){
 
 function detectTime(text){
   const now=new Date();
-  const bump=d=>{const r=new Date(now);r.setDate(r.getDate()+d);r.setHours(9,0,0,0);return r};
-  const setH=(h,m=0)=>{
-    const r=new Date(now);r.setHours(h,m,0,0);
-    if(r<=now)r.setDate(r.getDate()+1);
-    return r;
-  };
 
-  // ימים יחסיים
-  if(text.includes('מחרתיים'))return bump(2);
-  if(text.includes('מחר'))return bump(1);
+  // שלב 1: קביעת תאריך בסיס
+  let days=0;
+  if(text.includes('מחרתיים'))days=2;
+  else if(text.includes('מחר'))days=1;
+  const base=new Date(now);
+  base.setDate(base.getDate()+days);
+
+  // שלב 2: זמנים יחסיים (ללא תאריך)
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
   if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
 
-  // מילות שעה בעברית — בסדר מארוך לקצר למניעת התנגשויות
+  const setH=(h,m=0)=>{
+    base.setHours(h,m,0,0);
+    // אם אין יום מפורש והשעה עברה — קדם ליום הבא
+    if(days===0&&base<=now)base.setDate(base.getDate()+1);
+    return new Date(base);
+  };
+
+  // שלב 3: זיהוי שעה — מילות מפתח עבריות (מהארוך לקצר)
   const isMorning=text.includes('בוקר');
-  const isNight=text.includes('לילה');
+  const isNight  =text.includes('לילה');
   const wordMap=[
     ['שתים עשרה',12],['שתיים עשרה',12],
     ['אחת עשרה',11],['אחד עשר',11],
     ['עשר',isNight?22:10],
-    ['תשע',isNight?21:9],
-    ['שמונה',isNight?20:8],
+    ['תשע',isNight?21:21],
+    ['שמונה',isNight?20:20],
     ['שבע',19],['שש',18],['חמש',17],
     ['ארבע',16],['שלוש',15],
     ['שתיים',14],['שתים',14],
@@ -519,24 +525,25 @@ function detectTime(text){
   ];
   for(const[word,h] of wordMap){
     if(text.includes(word)){
-      // תיקון לבוקר: אם ציין בוקר ושעה היא צהריים+ החסר 12
       const hour=isMorning&&h>12?h-12:h;
       return setH(hour,0);
     }
   }
 
-  // שעה מספרית — לפני מילות מפתח כלליות
+  // שלב 4: שעה מספרית (16:00 / ב16 / לשעה 16)
   const explicit=text.match(/(?:[בל]שעה?\s*|ב-)(\d{1,2})(?::(\d{2}))?/)||
                  text.match(/\b(\d{1,2}):(\d{2})\b/);
   if(explicit)return setH(+explicit[1],+(explicit[2]||0));
 
-  // מילות מפתח זמן כלליות
-  if(isMorning)return setH(9);
-  if(text.includes('בצהריים')||text.includes('צהריים'))return setH(13);
-  if(text.includes('אחר הצהריים'))return setH(15);
-  if(text.includes('הערב')||text.includes('בערב')||text.includes('ערב'))return setH(20);
-  if(isNight)return setH(22);
+  // שלב 5: מילות מפתח כלליות
+  if(isMorning)                                                return setH(9);
+  if(text.includes('צהריים'))                                  return setH(13);
+  if(text.includes('אחר הצהריים'))                             return setH(15);
+  if(text.includes('ערב')||text.includes('הערב'))              return setH(20);
+  if(isNight)                                                   return setH(22);
 
+  // ברירת מחדל: אם ציין מחר/מחרתיים בלי שעה — 09:00; אחרת שעה מעכשיו
+  if(days>0)return setH(9);
   return new Date(now.getTime()+3600000);
 }
 
