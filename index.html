@@ -180,11 +180,13 @@ body{
 
 /* ── Task Card ── */
 .card{
-  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  background:color-mix(in srgb, var(--cc, var(--accent)) 8%, var(--card));
+  border:1px solid color-mix(in srgb, var(--cc, var(--accent)) 25%, var(--border));
+  border-radius:var(--r);
   padding:15px 16px 13px;position:relative;overflow:hidden;
   animation:slide .28s cubic-bezier(.25,.46,.45,.94);transition:opacity .25s;
 }
-.card::after{content:'';position:absolute;right:0;top:14px;bottom:14px;width:3px;border-radius:2px;background:var(--cc,var(--accent))}
+.card::after{content:'';position:absolute;right:0;top:14px;bottom:14px;width:4px;border-radius:2px;background:var(--cc,var(--accent))}
 @keyframes slide{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 .card.done{opacity:.4}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}

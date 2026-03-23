@@ -1,0 +1,98 @@
+{
+  "name": "VoiceTask - אוטומציה קולית",
+  "nodes": [
+    {
+      "id": "node-webhook",
+      "name": "קבלת משימה",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "webhookId": "voicetask-webhook",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "voicetask",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "node-code",
+      "name": "עיבוד נתונים",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300],
+      "parameters": {
+        "jsCode": "try {\n  const task = $input.first().json.body ?? $input.first().json;\n\n  const defaultDatetime = () => {\n    const d = new Date();\n    d.setDate(d.getDate() + 1);\n    d.setHours(9, 0, 0, 0);\n    return d.toISOString();\n  };\n\n  const addHour = (dt) =>\n    new Date(new Date(dt).getTime() + 3600000).toISOString();\n\n  const detectCategory = (text) => {\n    if (!text) return 'כללי';\n    const work     = ['לקוח','פגישה','עבודה','מייל','פרויקט','דוח','ישיבה','זום'];\n    const personal = ['לקנות','בית','משפחה','ילדים','אוכל','רופא','קניות'];\n    if (work.some(k => text.includes(k)))     return 'מקצועי';\n    if (personal.some(k => text.includes(k))) return 'אישי';\n    return 'כללי';\n  };\n\n  const datetime = task.datetime || defaultDatetime();\n\n  const out = {\n    text:        task.text     || '',\n    category:    task.category || detectCategory(task.text),\n    datetime,\n    endDatetime: addHour(datetime),\n    createdAt:   task.createdAt || new Date().toISOString(),\n    completed:   task.completed || false,\n    email:       task.email    || ''\n  };\n\n  return [{ json: out }];\n\n} catch (err) {\n  throw new Error('שגיאה בעיבוד נתונים: ' + err.message);\n}"
+      }
+    },
+    {
+      "id": "node-calendar",
+      "name": "גוגל קלנדר",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [740, 300],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_CALENDAR_CREDENTIAL_ID",
+          "name": "Google Calendar account"
+        }
+      },
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendar": {
+          "mode": "list",
+          "value": "primary"
+        },
+        "start": "={{ $json.datetime }}",
+        "end": "={{ $json.endDatetime }}",
+        "additionalFields": {
+          "summary": "={{ $json.text }}",
+          "description": "=קטגוריה: {{ $json.category }}\nנוצר ב: {{ new Date($json.createdAt).toLocaleString('he-IL') }}\n\nנוצר מ-VoiceTask 🎤"
+        }
+      }
+    },
+    {
+      "id": "node-gmail",
+      "name": "שליחת מייל",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1000, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('עיבוד נתונים').item.json.email }}",
+        "subject": "=📅 נוסף לגוגל קלנדר: {{ $('עיבוד נתונים').item.json.text }}",
+        "emailType": "html",
+        "message": "=<div dir=\"rtl\" style=\"font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#f9f9fb;border-radius:12px;overflow:hidden\">\n  <div style=\"background:#7c3aed;padding:24px 28px\">\n    <h2 style=\"color:white;margin:0;font-size:20px\">📅 המשימה נוספה לגוגל קלנדר!</h2>\n  </div>\n  <div style=\"padding:24px 28px\">\n    <table style=\"width:100%;border-collapse:collapse\">\n      <tr><td style=\"padding:8px 0;color:#555;width:100px\"><b>משימה</b></td><td style=\"padding:8px 0;font-size:16px\">{{ $('עיבוד נתונים').item.json.text }}</td></tr>\n      <tr><td style=\"padding:8px 0;color:#555\"><b>קטגוריה</b></td><td style=\"padding:8px 0\">{{ $('עיבוד נתונים').item.json.category }}</td></tr>\n      <tr><td style=\"padding:8px 0;color:#555\"><b>תאריך</b></td><td style=\"padding:8px 0\">{{ new Date($('עיבוד נתונים').item.json.datetime).toLocaleString('he-IL') }}</td></tr>\n      <tr><td style=\"padding:8px 0;color:#555\"><b>מזהה אירוע</b></td><td style=\"padding:8px 0;font-size:12px;color:#888\">{{ $json.id }}</td></tr>\n    </table>\n  </div>\n  <div style=\"padding:16px 28px;background:#f0edff\">\n    <a href=\"{{ $json.htmlLink }}\" style=\"background:#7c3aed;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold\">פתח באירוע בקאלנדר ←</a>\n  </div>\n  <div style=\"padding:12px 28px;background:#f0edff;font-size:12px;color:#888\">נשלח אוטומטית מ-VoiceTask 🤖</div>\n</div>"
+      }
+    }
+  ],
+  "connections": {
+    "קבלת משימה": {
+      "main": [[
+        { "node": "עיבוד נתונים", "type": "main", "index": 0 }
+      ]]
+    },
+    "עיבוד נתונים": {
+      "main": [[
+        { "node": "גוגל קלנדר", "type": "main", "index": 0 }
+      ]]
+    },
+    "גוגל קלנדר": {
+      "main": [[
+        { "node": "שליחת מייל", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
