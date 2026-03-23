@@ -462,11 +462,37 @@ function detectTime(text){
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
+const N8N_WEBHOOK = 'https://voicetask-n8n.loca.lt/webhook/voicetask';
+const USER_EMAIL  = localStorage.getItem('vt_email') || '';
+
 function addTask(text){
   if(!text.trim())return;
-  tasks.unshift({id:Date.now(),text:text.trim(),category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false});
+  const task = {
+    id: Date.now(),
+    text: text.trim(),
+    category: detectCat(text),
+    datetime: detectTime(text).toISOString(),
+    createdAt: new Date().toISOString(),
+    completed: false
+  };
+  tasks.unshift(task);
   save();render();toast('✅ משימה נוספה');vibrate([10,30,10]);
   setTimeout(hideTranscript,1500);
+  // שליחה אוטומטית ל-n8n
+  sendToN8n(task);
+}
+
+function sendToN8n(task){
+  fetch(N8N_WEBHOOK, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'bypass-tunnel-authorization': 'true'
+    },
+    body: JSON.stringify({ ...task, email: USER_EMAIL })
+  })
+  .then(r => r.ok && toast('🤖 n8n קיבל את המשימה'))
+  .catch(() => {}); // שקט בשגיאת רשת
 }
 
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
