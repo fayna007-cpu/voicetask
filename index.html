@@ -125,16 +125,37 @@ body{
 }
 .mic-label.rec{color:#f87171;font-weight:700}
 
-/* Transcript */
+/* Transcript / Edit box */
 .transcript{
   width:calc(100% - 40px);max-width:400px;
+  display:none;animation:fade-in .2s ease;
+}
+.transcript.on{display:flex;flex-direction:column;gap:8px}
+.transcript-preview{
   background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.18);
   border-radius:var(--r);padding:12px 16px;
+  font-size:15px;line-height:1.6;color:var(--muted);
+}
+.transcript-edit{
+  background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.35);
+  border-radius:var(--r);padding:12px 16px;
   font-size:15px;line-height:1.6;color:var(--text);
-  display:none;animation:fade-in .2s ease;
+  resize:none;width:100%;font-family:inherit;direction:rtl;
+  outline:none;min-height:72px;
   -webkit-user-select:text;user-select:text;
 }
-.transcript.on{display:block}
+.transcript-edit:focus{border-color:var(--accent2)}
+.transcript-actions{display:flex;gap:8px}
+.t-save{
+  flex:1;padding:10px;border-radius:var(--r-sm);
+  background:var(--accent);color:#fff;border:none;
+  font-size:14px;font-weight:700;cursor:pointer;
+}
+.t-cancel{
+  padding:10px 16px;border-radius:var(--r-sm);
+  background:rgba(255,255,255,.07);color:var(--muted);border:none;
+  font-size:14px;cursor:pointer;
+}
 @keyframes fade-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
 /* ── Filters ── */
@@ -231,7 +252,14 @@ body{
     <button class="mic-btn" id="micBtn" onclick="toggle()" aria-label="הקלטה קולית">🎤</button>
   </div>
   <div class="mic-label" id="micLbl">לחץ לדיבור</div>
-  <div class="transcript" id="transcript"></div>
+  <div class="transcript" id="transcript">
+    <div class="transcript-preview" id="transcriptPreview"></div>
+    <textarea class="transcript-edit" id="transcriptEdit" rows="3"></textarea>
+    <div class="transcript-actions">
+      <button class="t-save" onclick="confirmTask()">✅ שמור</button>
+      <button class="t-cancel" onclick="cancelTask()">✕ בטל</button>
+    </div>
+  </div>
 </div>
 
 <div class="filters">
@@ -397,8 +425,8 @@ function initRec(){
   const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=true;
   r.onresult=e=>{
     const txt=[...e.results].map(x=>x[0].transcript).join('');
-    showTranscript(txt);
-    if(e.results[e.results.length-1].isFinal)addTask(txt);
+    if(e.results[e.results.length-1].isFinal){showEditTranscript(txt);}
+    else{showTranscript(txt);}
   };
   r.onerror=e=>{stop();if(e.error!=='no-speech')toast('שגיאה: '+e.error)};
   r.onend=stop;
@@ -431,8 +459,27 @@ function setUI(on){
   document.getElementById('micLbl').textContent=on?'⬤  מאזין...':'לחץ לדיבור';
 }
 
-function showTranscript(t){const el=document.getElementById('transcript');el.textContent=t;el.classList.add('on')}
-function hideTranscript(){document.getElementById('transcript').classList.remove('on')}
+function showTranscript(t){
+  document.getElementById('transcriptPreview').textContent=t;
+  document.getElementById('transcript').classList.add('on');
+}
+function showEditTranscript(t){
+  document.getElementById('transcriptPreview').textContent='';
+  document.getElementById('transcriptEdit').value=t;
+  document.getElementById('transcript').classList.add('on');
+  setTimeout(()=>document.getElementById('transcriptEdit').focus(),50);
+}
+function hideTranscript(){
+  document.getElementById('transcript').classList.remove('on');
+  document.getElementById('transcriptPreview').textContent='';
+  document.getElementById('transcriptEdit').value='';
+}
+function confirmTask(){
+  const txt=document.getElementById('transcriptEdit').value.trim();
+  if(txt)addTask(txt);
+  else hideTranscript();
+}
+function cancelTask(){hideTranscript();}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&live)stop()});
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
