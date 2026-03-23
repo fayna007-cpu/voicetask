@@ -221,6 +221,45 @@ body{
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .act:active{transform:scale(.82);background:var(--border)}
+.act.danger{border-color:#fecaca;color:#ef4444}
+.act.danger:active{background:#fee2e2}
+
+/* ── Inline edit form ── */
+.card-edit{
+  display:none;margin-top:12px;padding-top:12px;
+  border-top:1px solid var(--border);
+  flex-direction:column;gap:8px;
+  animation:fade-in .2s ease;
+}
+.card-edit.on{display:flex}
+.edit-txt{
+  background:var(--bg);border:1.5px solid var(--border2);
+  border-radius:var(--r-sm);padding:10px 12px;
+  font-size:14px;line-height:1.5;color:var(--text);
+  resize:none;width:100%;font-family:inherit;direction:rtl;
+  outline:none;min-height:60px;
+  -webkit-user-select:text;user-select:text;
+}
+.edit-txt:focus{border-color:#818cf8}
+.edit-dt{
+  background:var(--bg);border:1.5px solid var(--border2);
+  border-radius:var(--r-sm);padding:9px 12px;
+  font-size:13px;color:var(--text);font-family:inherit;
+  outline:none;width:100%;
+}
+.edit-dt:focus{border-color:#818cf8}
+.edit-actions{display:flex;gap:7px}
+.edit-save{
+  flex:1;padding:10px;border-radius:50px;
+  background:var(--text);color:#fff;border:none;
+  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+}
+.edit-cancel{
+  padding:10px 16px;border-radius:50px;
+  background:transparent;color:var(--muted);
+  border:1.5px solid var(--border);
+  font-size:13px;cursor:pointer;font-family:inherit;
+}
 
 /* ── Install bar ── */
 .install-bar{
@@ -446,17 +485,25 @@ function detectCat(text){
 function detectTime(text){
   const now=new Date();
   const bump=d=>{const r=new Date(now);r.setDate(r.getDate()+d);r.setHours(9,0,0,0);return r};
-  const setH=(h,m=0)=>{const r=new Date(now);r.setHours(h,m,0,0);if(r<now)r.setDate(r.getDate()+1);return r};
+  const setH=(h,m=0)=>{
+    const r=new Date(now);r.setHours(h,m,0,0);
+    if(r<=now)r.setDate(r.getDate()+1); // אם השעה עברה — קבע למחר
+    return r;
+  };
   if(text.includes('מחרתיים'))return bump(2);
   if(text.includes('מחר'))return bump(1);
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
   if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
-  if(text.includes('בבוקר'))return setH(9);
-  if(text.includes('בצהריים'))return setH(13);
-  if(text.includes('הערב')||text.includes('בערב'))return setH(18);
-  if(text.includes('בלילה'))return setH(22);
-  const hm=text.match(/(?:ב-?|בשעה\s*)(\d{1,2})(?::(\d{2}))?/);
-  if(hm)return setH(+hm[1],+(hm[2]||0));
+  // זיהוי שעה ספציפית — בדיקה לפני מילות מפתח כלליות
+  // תואם: "לשעה 16:30", "בשעה 16", "שעה 17:30", "ב-16:00", "ב16"
+  const explicit=text.match(/(?:[בל]שעה?\s*|ב-)(\d{1,2})(?::(\d{2}))?/)||
+                 text.match(/\b(\d{1,2}):(\d{2})\b/);
+  if(explicit)return setH(+explicit[1],+(explicit[2]||0));
+  // מילות מפתח כלליות (כשאין שעה ספציפית)
+  if(text.includes('בבוקר')||text.includes('בוקר'))return setH(9);
+  if(text.includes('בצהריים')||text.includes('צהריים'))return setH(13);
+  if(text.includes('הערב')||text.includes('בערב')||text.includes('ערב'))return setH(20);
+  if(text.includes('בלילה')||text.includes('לילה'))return setH(22);
   return new Date(now.getTime()+3600000);
 }
 
@@ -482,17 +529,63 @@ function addTask(text){
 function sendToN8n(task){
   fetch(N8N_WEBHOOK,{
     method:'POST',
-    headers:{'Content-Type':'application/json','bypass-tunnel-authorization':'true'},
-    body:JSON.stringify({...task,email:USER_EMAIL})
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({...task,email:USER_EMAIL,action:'create'})
   })
-  .then(r=>r.ok&&toast('🤖 n8n קיבל את המשימה'))
+  .then(r=>r.json().catch(()=>null).then(data=>{
+    if(data&&data.eventId){
+      const t=tasks.find(x=>x.id===task.id);
+      if(t){t.calendarEventId=data.eventId;save();}
+    }
+    toast('🤖 n8n קיבל את המשימה');
+  }))
   .catch(()=>{});
+}
+
+function deleteFromCalendar(task){
+  if(!task.calendarEventId)return;
+  fetch(N8N_WEBHOOK,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'delete',calendarEventId:task.calendarEventId,email:USER_EMAIL})
+  }).catch(()=>{});
 }
 
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
-function del(id){tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render()}
+function del(id){
+  const t=tasks.find(x=>x.id===id);
+  if(t)deleteFromCalendar(t);
+  tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();
+  toast('🗑 משימה נמחקה');
+}
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
+
+function editTask(id){
+  const el=document.getElementById('edit-'+id);
+  if(el)el.classList.toggle('on');
+}
+function saveEdit(id){
+  const t=tasks.find(x=>x.id===id);
+  if(!t)return;
+  const txt=document.getElementById('etxt-'+id).value.trim();
+  const dt=document.getElementById('edt-'+id).value;
+  if(!txt)return;
+  // מחק אירוע קיים בקאלנדר
+  if(t.calendarEventId)deleteFromCalendar(t);
+  t.text=txt;
+  t.category=detectCat(txt);
+  if(dt)t.datetime=new Date(dt).toISOString();
+  t.calendarEventId=null;
+  save();render();
+  // צור אירוע חדש
+  sendToN8n(t);
+  toast('✏️ משימה עודכנה');
+}
+function cancelEdit(id){
+  const el=document.getElementById('edit-'+id);
+  if(el)el.classList.remove('on');
+}
 function clearDone(){tasks=tasks.filter(x=>!x.completed);save();render();toast('🗑 הושלמו נוקו')}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render()}
 function updateBadge(){document.getElementById('badge').textContent=tasks.filter(t=>!t.completed).length+' פעילות'}
@@ -507,6 +600,7 @@ function render(){
     const dt=new Date(task.datetime);
     const time=dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})+' · '+dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
+    const dtLocal=new Date(task.datetime).toISOString().slice(0,16);
     return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
   <div class="task-txt">${esc(task.text)}</div>
   <div class="meta">
@@ -515,9 +609,18 @@ function render(){
   </div>
   <div class="actions">
     <button class="act" onclick="toggleDone(${task.id})">${task.completed?'↩':'✅'}</button>
+    <button class="act" onclick="editTask(${task.id})">✏️</button>
     <button class="act" onclick="wa(${task.id})">💬</button>
     <button class="act" onclick="cal(${task.id})">📅</button>
-    <button class="act" onclick="del(${task.id})">🗑</button>
+    <button class="act danger" onclick="del(${task.id})">🗑</button>
+  </div>
+  <div class="card-edit" id="edit-${task.id}">
+    <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
+    <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
+    <div class="edit-actions">
+      <button class="edit-save" onclick="saveEdit(${task.id})">שמור שינויים</button>
+      <button class="edit-cancel" onclick="cancelEdit(${task.id})">בטל</button>
+    </div>
   </div>
 </div>`;
   }).join('');
