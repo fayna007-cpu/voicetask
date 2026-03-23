@@ -428,7 +428,12 @@ function initRec(){
     if(e.results[e.results.length-1].isFinal){showEditTranscript(txt);}
     else{showTranscript(txt);}
   };
-  r.onerror=e=>{stop();if(e.error!=='no-speech')toast('שגיאה: '+e.error)};
+  r.onerror=e=>{
+    stop();
+    if(e.error==='not-allowed')toast('⛔ אנא אשר גישה למיקרופון');
+    else if(e.error==='audio-capture')toast('🎤 מיקרופון לא זמין');
+    else if(e.error!=='no-speech')toast('שגיאה: '+e.error);
+  };
   r.onend=stop;
   return r;
 }
@@ -440,12 +445,13 @@ async function start(){
   try{rec.start()}catch(e){return}
   live=true;setUI(true);
   if(recAnim){recAnim.goToAndPlay(0,true)}
-  await startVis();
+  setTimeout(()=>{if(live)startVis()},300);
 }
 
 function stop(){
   if(!live)return;live=false;
   try{rec.stop()}catch(e){}
+  rec=null;
   stopVis();
   if(recAnim)recAnim.stop();
   setUI(false);
@@ -524,8 +530,7 @@ function addTask(text){
   };
   tasks.unshift(task);
   save();render();toast('✅ משימה נוספה');vibrate([10,30,10]);
-  setTimeout(hideTranscript,1500);
-  // שליחה אוטומטית ל-n8n
+  hideTranscript();
   sendToN8n(task);
 }
 
