@@ -565,10 +565,28 @@ function detectTime(text){
 const N8N_WEBHOOK = 'https://guyfs.app.n8n.cloud/webhook/voicetask';
 const USER_EMAIL  = localStorage.getItem('vt_email') || 'fayna007@gmail.com';
 
+function to24hText(text){
+  const morning=text.includes('בוקר');
+  // HH:MM patterns: 4:30 → 16:30
+  text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>{
+    h=+h;
+    if(h>=1&&h<=9&&!morning)h+=12;
+    return h.toString().padStart(2,'0')+':'+m;
+  });
+  // bare digit after ב/ל/שעה: ב-4 / בשעה 4 → ב-16
+  text=text.replace(/(ב-?|בשעה?\s*)(\d{1,2})(?![:0-9])/g,(full,pre,h)=>{
+    h=+h;
+    if(h>=1&&h<=9&&!morning)h+=12;
+    return pre+h;
+  });
+  return text;
+}
+
 function addTask(text){
   if(!text.trim())return;
+  const normalized=to24hText(text.trim());
   const task={
-    id:Date.now(),text:text.trim(),
+    id:Date.now(),text:normalized,
     category:detectCat(text),
     datetime:detectTime(text).toISOString(),
     createdAt:new Date().toISOString(),
