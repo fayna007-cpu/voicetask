@@ -491,58 +491,72 @@ function detectCat(text){
 function detectTime(text){
   const now=new Date();
 
-  // שלב 1: קביעת תאריך בסיס
+  // ─── תאריך בסיס ───────────────────────────────────────
   let days=0;
   if(text.includes('מחרתיים'))days=2;
   else if(text.includes('מחר'))days=1;
   const base=new Date(now);
   base.setDate(base.getDate()+days);
 
-  // שלב 2: זמנים יחסיים (ללא תאריך)
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
-  if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
+  if(text.includes('עוד שעה'))   return new Date(now.getTime()+3600000);
+
+  const isMorning=text.includes('בוקר');
+  const isNight  =text.includes('לילה');
 
   const setH=(h,m=0)=>{
     base.setHours(h,m,0,0);
-    // אם אין יום מפורש והשעה עברה — קדם ליום הבא
     if(days===0&&base<=now)base.setDate(base.getDate()+1);
     return new Date(base);
   };
 
-  // שלב 3: זיהוי שעה — מילות מפתח עבריות (מהארוך לקצר)
-  const isMorning=text.includes('בוקר');
-  const isNight  =text.includes('לילה');
-  const wordMap=[
-    ['שתים עשרה',12],['שתיים עשרה',12],
-    ['אחת עשרה',11],['אחד עשר',11],
-    ['עשר',isNight?22:10],
-    ['תשע',isNight?21:21],
-    ['שמונה',isNight?20:20],
-    ['שבע',19],['שש',18],['חמש',17],
-    ['ארבע',16],['שלוש',15],
-    ['שתיים',14],['שתים',14],
-    ['אחת',13],['אחד',13]
-  ];
-  for(const[word,h] of wordMap){
-    if(text.includes(word)){
-      const hour=isMorning&&h>12?h-12:h;
-      return setH(hour,0);
+  // ─── מילות שעה בעברית: מחפש את ה-OCCURRENCE הראשון בטקסט ───
+  const wordHours={
+    'שתים עשרה':12,'שתיים עשרה':12,
+    'אחת עשרה':11,'אחד עשר':11,
+    'עשר':isNight?22:10,
+    'תשע':isMorning?9:21,
+    'שמונה':isMorning?8:20,
+    'שבע':isMorning?7:19,
+    'שש':isMorning?6:18,
+    'חמש':isMorning?5:17,
+    'ארבע':isMorning?4:16,
+    'שלוש':isMorning?3:15,
+    'שתיים':isMorning?2:14,'שתים':isMorning?2:14,
+    'אחת':isMorning?1:13,'אחד':isMorning?1:13
+  };
+  let firstIdx=Infinity,firstH=null,firstM=0;
+  for(const[word,h] of Object.entries(wordHours)){
+    const idx=text.indexOf(word);
+    if(idx!==-1&&idx<firstIdx){
+      firstIdx=idx;
+      firstH=h;
+      // בדוק "וחצי" / "ורבע" מיד אחרי המילה
+      const after=text.slice(idx+word.length,idx+word.length+8);
+      firstM=after.includes('וחצי')?30:after.includes('ורבע')?15:0;
     }
   }
+  if(firstH!==null)return setH(firstH,firstM);
 
-  // שלב 4: שעה מספרית (16:00 / ב16 / לשעה 16)
-  const explicit=text.match(/(?:[בל]שעה?\s*|ב-)(\d{1,2})(?::(\d{2}))?/)||
-                 text.match(/\b(\d{1,2}):(\d{2})\b/);
-  if(explicit)return setH(+explicit[1],+(explicit[2]||0));
+  // ─── שעה מספרית: "בשעה 4", "ב4", "16:30" ───────────────
+  const numRe=text.match(/(?:[בל]שעה?\s*|ב-?)(\d{1,2})(?::(\d{2}))?/)||
+              text.match(/\b(\d{1,2}):(\d{2})\b/);
+  if(numRe){
+    let h=+numRe[1], m=+(numRe[2]||0);
+    // ספרה 1-9 בלי בוקר = שעת אחה"צ (ברירת מחדל בישראל)
+    if(h>=1&&h<=9&&!isMorning)h+=12;
+    // "וחצי" בסביבת המספר
+    if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,+(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}
+    return setH(h,m);
+  }
 
-  // שלב 5: מילות מפתח כלליות
-  if(isMorning)                                                return setH(9);
-  if(text.includes('צהריים'))                                  return setH(13);
-  if(text.includes('אחר הצהריים'))                             return setH(15);
-  if(text.includes('ערב')||text.includes('הערב'))              return setH(20);
-  if(isNight)                                                   return setH(22);
+  // ─── מילות זמן כלליות ────────────────────────────────────
+  if(isMorning)                             return setH(9);
+  if(text.includes('צהריים'))               return setH(13);
+  if(text.includes('אחר הצהריים'))          return setH(15);
+  if(text.includes('ערב')||text.includes('הערב')) return setH(20);
+  if(isNight)                               return setH(22);
 
-  // ברירת מחדל: אם ציין מחר/מחרתיים בלי שעה — 09:00; אחרת שעה מעכשיו
   if(days>0)return setH(9);
   return new Date(now.getTime()+3600000);
 }
