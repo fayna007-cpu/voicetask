@@ -4,13 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>VoiceTask</title>
-
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#7c3aed">
 <link rel="apple-touch-icon" href="icon.svg">
-
-<!-- iOS PWA -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VoiceTask">
@@ -19,50 +15,28 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
-  --bg:#07070f;
-  --surface:#0f0f1a;
-  --card:#14141f;
-  --card-hover:#1a1a2a;
+  --bg:#07070f;--surface:#0f0f1a;--card:#14141f;--card-hover:#1a1a2a;
   --border:rgba(255,255,255,0.07);
-  --accent:#7c3aed;
-  --accent2:#a78bfa;
-  --accent3:#c4b5fd;
+  --accent:#7c3aed;--accent2:#a78bfa;--accent3:#c4b5fd;
   --glow:rgba(124,58,237,0.25);
-  --text:#eeeeff;
-  --muted:#55546e;
-  --success:#34d399;
-  --danger:#f87171;
-  --warn:#fbbf24;
-  --r:14px;
-  --r-sm:9px;
-  --sat:env(safe-area-inset-top,0px);
-  --sab:env(safe-area-inset-bottom,0px);
-  --sal:env(safe-area-inset-left,0px);
-  --sar:env(safe-area-inset-right,0px);
+  --text:#eeeeff;--muted:#55546e;
+  --success:#34d399;--danger:#f87171;--warn:#fbbf24;
+  --r:14px;--r-sm:9px;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
 }
 
-html{
-  height:100%;
-  -webkit-font-smoothing:antialiased;
-  -webkit-text-size-adjust:100%;
-  text-size-adjust:100%;
-}
+html{height:100%;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 
 body{
   font-family:-apple-system,'Segoe UI',Arial,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  min-height:100svh;
-  max-width:480px;
-  margin:0 auto;
+  background:var(--bg);color:var(--text);
+  min-height:100svh;max-width:480px;margin:0 auto;
   padding:0 0 calc(100px + var(--sab));
-  padding-left:var(--sal);
-  padding-right:var(--sar);
-  direction:rtl;
-  overflow-x:hidden;
+  padding-left:var(--sal);padding-right:var(--sar);
+  direction:rtl;overflow-x:hidden;
   overscroll-behavior-y:none;
-  -webkit-user-select:none;
-  user-select:none;
+  -webkit-user-select:none;user-select:none;
 }
 
 /* ── Header ── */
@@ -70,82 +44,106 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   padding:calc(16px + var(--sat)) 20px 14px;
   background:rgba(7,7,15,0.88);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   border-bottom:1px solid var(--border);
   position:sticky;top:0;z-index:20;
 }
-
 .logo{
   font-size:20px;font-weight:800;letter-spacing:-0.5px;
   background:linear-gradient(135deg,#c4b5fd,#60a5fa);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
 }
-
 .badge{
-  font-size:11px;font-weight:600;
-  color:var(--accent3);
+  font-size:11px;font-weight:600;color:var(--accent3);
   background:rgba(124,58,237,0.15);
   border:1px solid rgba(167,139,250,0.2);
-  padding:4px 10px;border-radius:20px;
-  letter-spacing:0.3px;
+  padding:4px 10px;border-radius:20px;letter-spacing:0.3px;
 }
 
-/* ── Mic ── */
+/* ── Mic Section ── */
 .mic-wrap{
   display:flex;flex-direction:column;align-items:center;
-  padding:32px 20px 22px;gap:16px;
+  padding:28px 20px 20px;gap:14px;
 }
 
-.ring-wrap{
-  position:relative;width:120px;height:120px;
+/* Visualizer container */
+.vis-wrap{
+  position:relative;
+  width:270px;height:270px;
   display:flex;align-items:center;justify-content:center;
 }
 
-.ring-wrap::before,.ring-wrap::after{
-  content:'';position:absolute;inset:0;
-  border-radius:50%;border:1.5px solid var(--accent);opacity:0;
+/* Canvas for real-time audio */
+#vis{
+  position:absolute;inset:0;
+  border-radius:50%;
+  opacity:0;transition:opacity .4s ease;
 }
-.ring-wrap.rec::before{animation:ring 1.6s ease-out infinite}
-.ring-wrap.rec::after{animation:ring 1.6s ease-out infinite .8s}
+.vis-wrap.rec #vis{opacity:1}
 
-@keyframes ring{
-  0%{inset:8px;opacity:.55}
-  100%{inset:-28px;opacity:0}
+/* Idle ambient glow */
+.orb{
+  position:absolute;
+  width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,58,237,.18) 0%,transparent 70%);
+  animation:orb-breathe 4s ease-in-out infinite;
+  transition:opacity .4s;
+}
+.vis-wrap.rec .orb{opacity:0}
+
+@keyframes orb-breathe{
+  0%,100%{transform:scale(1);opacity:.6}
+  50%{transform:scale(1.2);opacity:1}
 }
 
+/* Idle rings */
+.idle-ring{
+  position:absolute;border-radius:50%;
+  border:1px solid rgba(124,58,237,.25);
+  animation:ring-drift 4s ease-out infinite;
+  transition:opacity .4s;
+}
+.ir1{width:155px;height:155px;animation-delay:0s}
+.ir2{width:195px;height:195px;animation-delay:1.3s}
+.ir3{width:240px;height:240px;animation-delay:2.6s}
+
+@keyframes ring-drift{
+  0%{transform:scale(.85);opacity:.5}
+  100%{transform:scale(1.05);opacity:0}
+}
+
+.vis-wrap.rec .idle-ring{opacity:0}
+
+/* Mic button */
 .mic-btn{
-  width:120px;height:120px;border-radius:50%;border:none;cursor:pointer;
+  position:relative;z-index:2;
+  width:110px;height:110px;border-radius:50%;border:none;cursor:pointer;
   background:linear-gradient(145deg,#8b5cf6,#4f46e5);
-  box-shadow:0 8px 40px rgba(124,58,237,0.4),0 2px 8px rgba(0,0,0,0.5);
+  box-shadow:0 0 40px rgba(124,58,237,.4),0 8px 20px rgba(0,0,0,.5);
   display:flex;align-items:center;justify-content:center;
-  font-size:42px;
-  transition:transform .12s ease,box-shadow .2s;
-  -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
-  position:relative;z-index:1;
+  font-size:40px;
+  transition:transform .12s ease,box-shadow .25s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .mic-btn:active{transform:scale(.91)}
 .mic-btn.rec{
-  background:linear-gradient(145deg,#ef4444,#b91c1c);
-  box-shadow:0 8px 40px rgba(239,68,68,0.45),0 2px 8px rgba(0,0,0,0.5);
-  animation:beat 1s ease-in-out infinite alternate;
+  background:linear-gradient(145deg,#f43f5e,#b91c1c);
+  box-shadow:0 0 40px rgba(244,63,94,.45),0 8px 20px rgba(0,0,0,.5);
 }
-@keyframes beat{from{transform:scale(1)}to{transform:scale(1.06)}}
 
+/* Mic label */
 .mic-label{
   font-size:14px;color:var(--muted);letter-spacing:.3px;
-  height:20px;transition:color .25s;font-weight:500;
+  height:20px;transition:color .3s;font-weight:500;
 }
 .mic-label.rec{color:#f87171;font-weight:700}
 
-/* ── Transcript ── */
+/* Transcript */
 .transcript{
   width:calc(100% - 40px);max-width:400px;
   background:rgba(167,139,250,.07);
   border:1px solid rgba(167,139,250,.18);
-  border-radius:var(--r);
-  padding:12px 16px;
+  border-radius:var(--r);padding:12px 16px;
   font-size:15px;line-height:1.6;color:var(--text);
   display:none;animation:fade-in .2s ease;
   -webkit-user-select:text;user-select:text;
@@ -160,15 +158,12 @@ body{
   -webkit-overflow-scrolling:touch;
 }
 .filters::-webkit-scrollbar{display:none}
-
 .f-btn{
   flex-shrink:0;padding:8px 16px;border-radius:22px;
   border:1px solid var(--border);background:transparent;
   color:var(--muted);font-size:13px;cursor:pointer;
   transition:all .18s;font-family:inherit;
-  -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
-  min-height:36px;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:36px;
 }
 .f-btn.on{
   background:rgba(124,58,237,.2);
@@ -177,106 +172,64 @@ body{
 }
 
 /* ── Section header ── */
-.sec{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:0 20px 10px;
-}
+.sec{display:flex;justify-content:space-between;align-items:center;padding:0 20px 10px}
 .sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
-.sec-btn{
-  font-size:12px;color:var(--danger);background:none;border:none;
-  cursor:pointer;font-family:inherit;opacity:.7;
-  padding:4px 0;min-height:36px;
-  touch-action:manipulation;
-}
+.sec-btn{font-size:12px;color:var(--danger);background:none;border:none;cursor:pointer;font-family:inherit;opacity:.7;padding:4px 0;min-height:36px;touch-action:manipulation}
 
 /* ── Task List ── */
 .list{display:flex;flex-direction:column;gap:9px;padding:0 20px}
 
 /* ── Task Card ── */
 .card{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:var(--r);
-  padding:15px 16px 13px;
-  position:relative;overflow:hidden;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:15px 16px 13px;position:relative;overflow:hidden;
   animation:slide .28s cubic-bezier(.25,.46,.45,.94);
-  transition:opacity .25s,transform .15s;
+  transition:opacity .25s;
 }
 .card::after{
-  content:'';position:absolute;
-  right:0;top:14px;bottom:14px;
-  width:3px;border-radius:2px;
-  background:var(--cc,var(--accent));
+  content:'';position:absolute;right:0;top:14px;bottom:14px;
+  width:3px;border-radius:2px;background:var(--cc,var(--accent));
 }
-@keyframes slide{
-  from{opacity:0;transform:translateY(-10px)}
-  to{opacity:1;transform:none}
-}
+@keyframes slide{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 
 .card.done{opacity:.4}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
-
-.task-txt{
-  font-size:15px;line-height:1.55;font-weight:500;
-  margin-bottom:10px;padding-left:8px;
-  -webkit-user-select:text;user-select:text;
-}
-
+.task-txt{font-size:15px;line-height:1.55;font-weight:500;margin-bottom:10px;padding-left:8px;-webkit-user-select:text;user-select:text}
 .meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-
 .time-chip{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:3px}
-
 .cat-sel{
-  background:rgba(124,58,237,.12);
-  border:1px solid rgba(167,139,250,.2);
-  color:var(--accent3);
-  font-size:11px;font-weight:600;
-  border-radius:20px;padding:4px 12px;
-  font-family:inherit;cursor:pointer;
-  outline:none;-webkit-appearance:none;appearance:none;
-  min-height:28px;
+  background:rgba(124,58,237,.12);border:1px solid rgba(167,139,250,.2);
+  color:var(--accent3);font-size:11px;font-weight:600;
+  border-radius:20px;padding:4px 12px;font-family:inherit;cursor:pointer;
+  outline:none;-webkit-appearance:none;appearance:none;min-height:28px;
 }
-
 .actions{display:flex;gap:7px;justify-content:flex-end}
-
 .act{
   width:42px;height:42px;border-radius:var(--r-sm);
-  border:1px solid var(--border);
-  background:var(--surface);
+  border:1px solid var(--border);background:var(--surface);
   font-size:16px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:transform .1s,background .15s;
-  -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .act:active{transform:scale(.82)}
 
-/* ── Install banner ── */
+/* ── Install bar ── */
 .install-bar{
   position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;
-  background:var(--card);
-  border:1px solid rgba(167,139,250,.25);
-  border-radius:var(--r);
-  padding:12px 16px;
-  display:none;align-items:center;gap:10px;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);
-  z-index:50;animation:fade-in .3s ease;
-  max-width:448px;margin:0 auto;
+  background:var(--card);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);
+  padding:12px 16px;display:none;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:50;
+  max-width:448px;margin:0 auto;animation:fade-in .3s ease;
 }
 .install-bar.on{display:flex}
 .install-bar span{flex:1;font-size:13px;font-weight:600;color:var(--text)}
-.install-bar button{
-  padding:7px 14px;border-radius:10px;border:none;
-  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
-  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
-}
-.install-bar .btn-install{background:var(--accent);color:white}
-.install-bar .btn-dismiss{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
+.install-bar button{padding:7px 14px;border-radius:10px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation}
+.btn-install{background:var(--accent);color:white}
+.btn-dismiss{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
 
 /* ── Empty ── */
-.empty{
-  text-align:center;padding:52px 20px;color:var(--muted);
-}
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
 .empty i{font-size:48px;display:block;margin-bottom:14px;opacity:.35}
 .empty p{font-size:14px;line-height:1.7}
 
@@ -284,13 +237,9 @@ body{
 .toast{
   position:fixed;bottom:calc(24px + var(--sab));left:50%;
   transform:translateX(-50%) translateY(120px);
-  background:var(--card);
-  border:1px solid rgba(167,139,250,.2);
-  color:var(--text);
-  padding:11px 24px;border-radius:30px;
-  font-size:13px;font-weight:600;
-  box-shadow:0 8px 32px rgba(0,0,0,.5);
-  z-index:99;
+  background:var(--card);border:1px solid rgba(167,139,250,.2);color:var(--text);
+  padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:99;
   transition:transform .3s cubic-bezier(.34,1.56,.64,1);
   pointer-events:none;white-space:nowrap;
 }
@@ -307,7 +256,15 @@ body{
 </div>
 
 <div class="mic-wrap">
-  <div class="ring-wrap" id="ring">
+  <div class="vis-wrap" id="visWrap">
+    <!-- Idle ambient -->
+    <div class="orb"></div>
+    <div class="idle-ring ir1"></div>
+    <div class="idle-ring ir2"></div>
+    <div class="idle-ring ir3"></div>
+    <!-- Real-time audio canvas -->
+    <canvas id="vis" width="270" height="270"></canvas>
+    <!-- Mic button -->
     <button class="mic-btn" id="micBtn" onclick="toggle()" aria-label="הקלטה קולית">🎤</button>
   </div>
   <div class="mic-label" id="micLbl">לחץ לדיבור</div>
@@ -331,7 +288,6 @@ body{
 
 <div class="list" id="list"></div>
 
-<!-- PWA install banner -->
 <div class="install-bar" id="installBar">
   <span>📲 הוסף למסך הבית</span>
   <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
@@ -348,30 +304,85 @@ const CATS = {
   כללי:   { kw:[], c:'#fbbf24' }
 };
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 let tasks  = JSON.parse(localStorage.getItem('vt2') || '[]');
 let rec    = null;
 let live   = false;
 let filter = 'all';
 let deferredPrompt = null;
 
-// ── PWA: Service Worker ───────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+// ── Visualizer ───────────────────────────────────────────────────────────────
+const canvas = document.getElementById('vis');
+const ctx    = canvas.getContext('2d');
+const CX = 135, CY = 135;  // center
+let audioCtx = null, analyser = null, animId = null, stream = null;
+
+async function startVis() {
+  try {
+    stream   = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 128;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    drawVis();
+  } catch(e) { /* fallback: CSS animation only */ }
 }
 
-// ── PWA: Install prompt ───────────────────────────────────────────────────────
+function drawVis() {
+  const buf  = new Uint8Array(analyser.frequencyBinCount);
+  const BARS = 56;
+  const R    = 68; // inner radius — just outside mic btn (55px)
+
+  function frame() {
+    animId = requestAnimationFrame(frame);
+    analyser.getByteFrequencyData(buf);
+    ctx.clearRect(0, 0, 270, 270);
+
+    for (let i = 0; i < BARS; i++) {
+      const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
+      const raw   = buf[Math.floor(i * buf.length / BARS)] / 255;
+      const val   = raw * raw; // square for more dramatic response
+      const h     = val * 48 + 3;
+      const cos   = Math.cos(angle), sin = Math.sin(angle);
+
+      const x1 = CX + cos * R,       y1 = CY + sin * R;
+      const x2 = CX + cos * (R + h), y2 = CY + sin * (R + h);
+
+      // Hue shifts 260→320 (purple→pink) based on amplitude
+      const hue = 260 + val * 60;
+      const lum = 55 + val * 25;
+      const a   = val * 0.7 + 0.35;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `hsla(${hue},80%,${lum}%,${a})`;
+      ctx.lineWidth   = 2.5;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+    }
+  }
+  frame();
+}
+
+function stopVis() {
+  if (animId)  { cancelAnimationFrame(animId); animId = null; }
+  if (audioCtx){ audioCtx.close(); audioCtx = null; }
+  if (stream)  { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  ctx.clearRect(0, 0, 270, 270);
+}
+
+// ── PWA ───────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
+  e.preventDefault(); deferredPrompt = e;
   document.getElementById('installBar').classList.add('on');
 });
-
 window.addEventListener('appinstalled', () => {
   document.getElementById('installBar').classList.remove('on');
   toast('🎉 האפליקציה הותקנה!');
 });
-
 function installApp() {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
@@ -380,68 +391,60 @@ function installApp() {
     document.getElementById('installBar').classList.remove('on');
   });
 }
-
-function dismissInstall() {
-  document.getElementById('installBar').classList.remove('on');
-}
+function dismissInstall() { document.getElementById('installBar').classList.remove('on'); }
 
 // ── Voice ────────────────────────────────────────────────────────────────────
 function initRec() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { toast('הדפדפן לא תומך בזיהוי קול 😕'); return null; }
   const r = new SR();
-  r.lang = 'he-IL';
-  r.continuous = false;
-  r.interimResults = true;
+  r.lang = 'he-IL'; r.continuous = false; r.interimResults = true;
   r.onresult = e => {
     const txt = [...e.results].map(x => x[0].transcript).join('');
     showTranscript(txt);
     if (e.results[e.results.length - 1].isFinal) addTask(txt);
   };
   r.onerror = e => { stop(); if (e.error !== 'no-speech') toast('שגיאה: ' + e.error); };
-  r.onend = stop;
+  r.onend   = stop;
   return r;
 }
 
-function toggle() {
-  vibrate(10);
-  live ? stop() : start();
-}
+function toggle() { vibrate(10); live ? stop() : start(); }
 
-function start() {
+async function start() {
   rec = rec || initRec();
   if (!rec) return;
   try { rec.start(); } catch(e) { return; }
   live = true;
   setUI(true);
+  await startVis();
 }
 
 function stop() {
   if (!live) return;
   live = false;
   try { rec.stop(); } catch(e) {}
+  stopVis();
   setUI(false);
 }
 
 function setUI(on) {
   document.getElementById('micBtn').className   = 'mic-btn' + (on ? ' rec' : '');
   document.getElementById('micBtn').textContent = on ? '⏹' : '🎤';
-  document.getElementById('ring').className     = 'ring-wrap' + (on ? ' rec' : '');
+  document.getElementById('visWrap').className  = 'vis-wrap' + (on ? ' rec' : '');
   document.getElementById('micLbl').className   = 'mic-label' + (on ? ' rec' : '');
   document.getElementById('micLbl').textContent = on ? '⬤  מאזין...' : 'לחץ לדיבור';
 }
 
 function showTranscript(t) {
   const el = document.getElementById('transcript');
-  el.textContent = t;
-  el.classList.add('on');
+  el.textContent = t; el.classList.add('on');
 }
 function hideTranscript() { document.getElementById('transcript').classList.remove('on'); }
 
-// Stop if user switches tab/app
 document.addEventListener('visibilitychange', () => { if (document.hidden && live) stop(); });
 
-// ── Parsing ──────────────────────────────────────────────────────────────────
+// ── Parsing ───────────────────────────────────────────────────────────────────
 function detectCat(text) {
   for (const [name, { kw }] of Object.entries(CATS)) {
     if (name === 'כללי') continue;
@@ -451,79 +454,60 @@ function detectCat(text) {
 }
 
 function detectTime(text) {
-  const now = new Date();
-  const bump = (d) => { const r = new Date(now); r.setDate(r.getDate() + d); r.setHours(9,0,0,0); return r; };
-  const setH = (h, m=0) => { const r = new Date(now); r.setHours(h,m,0,0); if(r<now) r.setDate(r.getDate()+1); return r; };
+  const now  = new Date();
+  const bump = d => { const r = new Date(now); r.setDate(r.getDate()+d); r.setHours(9,0,0,0); return r; };
+  const setH = (h,m=0) => { const r = new Date(now); r.setHours(h,m,0,0); if(r<now) r.setDate(r.getDate()+1); return r; };
 
-  if (text.includes('מחרתיים'))      return bump(2);
-  if (text.includes('מחר'))          return bump(1);
-  if (text.includes('עוד שעתיים'))   return new Date(now.getTime() + 7200000);
-  if (text.includes('עוד שעה'))      return new Date(now.getTime() + 3600000);
-  if (text.includes('בבוקר'))        return setH(9);
-  if (text.includes('בצהריים'))      return setH(13);
+  if (text.includes('מחרתיים'))    return bump(2);
+  if (text.includes('מחר'))        return bump(1);
+  if (text.includes('עוד שעתיים')) return new Date(now.getTime()+7200000);
+  if (text.includes('עוד שעה'))    return new Date(now.getTime()+3600000);
+  if (text.includes('בבוקר'))      return setH(9);
+  if (text.includes('בצהריים'))    return setH(13);
   if (text.includes('הערב') || text.includes('בערב')) return setH(18);
-  if (text.includes('בלילה'))        return setH(22);
+  if (text.includes('בלילה'))      return setH(22);
 
   const hm = text.match(/(?:ב-?|בשעה\s*)(\d{1,2})(?::(\d{2}))?/);
-  if (hm) return setH(+hm[1], +(hm[2] || 0));
+  if (hm) return setH(+hm[1], +(hm[2]||0));
 
-  return new Date(now.getTime() + 3600000);
+  return new Date(now.getTime()+3600000);
 }
 
-// ── Tasks ────────────────────────────────────────────────────────────────────
+// ── Tasks ─────────────────────────────────────────────────────────────────────
 function addTask(text) {
   if (!text.trim()) return;
-  tasks.unshift({
-    id: Date.now(),
-    text: text.trim(),
-    category: detectCat(text),
-    datetime: detectTime(text).toISOString(),
-    createdAt: new Date().toISOString(),
-    completed: false
-  });
-  save(); render();
-  toast('✅ משימה נוספה');
-  vibrate([10, 30, 10]);
+  tasks.unshift({ id:Date.now(), text:text.trim(), category:detectCat(text), datetime:detectTime(text).toISOString(), createdAt:new Date().toISOString(), completed:false });
+  save(); render(); toast('✅ משימה נוספה'); vibrate([10,30,10]);
   setTimeout(hideTranscript, 1500);
 }
 
 function save() { localStorage.setItem('vt2', JSON.stringify(tasks)); updateBadge(); }
 
 function toggleDone(id) {
-  const t = tasks.find(x => x.id === id);
+  const t = tasks.find(x => x.id===id);
   if (t) { t.completed = !t.completed; vibrate(8); save(); render(); }
 }
-
-function del(id) {
-  tasks = tasks.filter(x => x.id !== id);
-  vibrate(15); save(); render();
-}
-
-function setCat(id, cat) {
-  const t = tasks.find(x => x.id === id);
-  if (t) { t.category = cat; save(); render(); }
-}
-
-function clearDone() { tasks = tasks.filter(x => !x.completed); save(); render(); toast('🗑 הושלמו נוקו'); }
+function del(id)      { tasks = tasks.filter(x => x.id!==id); vibrate(15); save(); render(); }
+function setCat(id,c) { const t=tasks.find(x=>x.id===id); if(t){t.category=c;save();render();} }
+function clearDone()  { tasks=tasks.filter(x=>!x.completed); save(); render(); toast('🗑 הושלמו נוקו'); }
 
 function setFilter(f, btn) {
   filter = f;
   document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  render();
+  btn.classList.add('on'); render();
 }
 
 function updateBadge() {
-  document.getElementById('badge').textContent = tasks.filter(t => !t.completed).length + ' פעילות';
+  document.getElementById('badge').textContent = tasks.filter(t=>!t.completed).length + ' פעילות';
 }
 
-// ── Render ───────────────────────────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────────────────────────
 function render() {
-  const el = document.getElementById('list');
+  const el   = document.getElementById('list');
   const list =
-    filter === 'all'  ? tasks.filter(t => !t.completed) :
-    filter === 'done' ? tasks.filter(t =>  t.completed) :
-    tasks.filter(t => t.category === filter && !t.completed);
+    filter==='all'  ? tasks.filter(t=>!t.completed) :
+    filter==='done' ? tasks.filter(t=> t.completed) :
+    tasks.filter(t=>t.category===filter && !t.completed);
 
   if (!list.length) {
     el.innerHTML = `<div class="empty"><i>🎯</i><p>אין משימות כאן.<br>לחץ על המיקרופון ודבר!</p></div>`;
@@ -535,10 +519,7 @@ function render() {
     const dt   = new Date(task.datetime);
     const time = dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})
                + ' · ' + dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-    const opts = Object.keys(CATS).map(c =>
-      `<option value="${c}"${c===task.category?' selected':''}>${c}</option>`
-    ).join('');
-
+    const opts = Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
     return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
   <div class="task-txt">${esc(task.text)}</div>
   <div class="meta">
@@ -555,34 +536,25 @@ function render() {
   }).join('');
 }
 
-// ── Integrations ─────────────────────────────────────────────────────────────
+// ── Integrations ──────────────────────────────────────────────────────────────
 function wa(id) {
-  const t = tasks.find(x => x.id === id);
-  if (!t) return;
-  const msg = `📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleString('he-IL')}`;
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleString('he-IL')}`), '_blank');
 }
-
 function cal(id) {
-  const t = tasks.find(x => x.id === id);
-  if (!t) return;
-  const s = new Date(t.datetime);
-  const e = new Date(s.getTime() + 3600000);
-  const f = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
-  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${f(s)}/${f(e)}`, '_blank');
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  const s=new Date(t.datetime), e=new Date(s.getTime()+3600000);
+  const f=d=>d.toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${f(s)}/${f(e)}`,'_blank');
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function vibrate(p) { try { navigator.vibrate && navigator.vibrate(p); } catch(e) {} }
-
+function vibrate(p) { try{ navigator.vibrate&&navigator.vibrate(p); }catch(e){} }
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('on');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('on'), 2400);
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('on');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),2400);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
