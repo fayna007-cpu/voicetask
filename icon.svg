@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#g)"/>
+  <!-- mic body -->
+  <rect x="196" y="96" width="120" height="200" rx="60" fill="white"/>
+  <!-- arc -->
+  <path d="M152 272 C152 372 360 372 360 272" fill="none" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- stem -->
+  <line x1="256" y1="370" x2="256" y2="420" stroke="white" stroke-width="30" stroke-linecap="round"/>
+  <!-- base -->
+  <line x1="190" y1="420" x2="322" y2="420" stroke="white" stroke-width="30" stroke-linecap="round"/>
+  <!-- sparkle -->
+  <circle cx="380" cy="120" r="18" fill="white" opacity=".9"/>
+  <circle cx="380" cy="120" r="9" fill="#8b5cf6"/>
+</svg>

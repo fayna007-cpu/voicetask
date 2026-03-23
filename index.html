@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>VoiceTask</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<link rel="apple-touch-icon" href="icon.svg">
+
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VoiceTask">
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#07070f;
+  --surface:#0f0f1a;
+  --card:#14141f;
+  --card-hover:#1a1a2a;
+  --border:rgba(255,255,255,0.07);
+  --accent:#7c3aed;
+  --accent2:#a78bfa;
+  --accent3:#c4b5fd;
+  --glow:rgba(124,58,237,0.25);
+  --text:#eeeeff;
+  --muted:#55546e;
+  --success:#34d399;
+  --danger:#f87171;
+  --warn:#fbbf24;
+  --r:14px;
+  --r-sm:9px;
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
+  --sar:env(safe-area-inset-right,0px);
+}
+
+html{
+  height:100%;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+
+body{
+  font-family:-apple-system,'Segoe UI',Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100svh;
+  max-width:480px;
+  margin:0 auto;
+  padding:0 0 calc(100px + var(--sab));
+  padding-left:var(--sal);
+  padding-right:var(--sar);
+  direction:rtl;
+  overflow-x:hidden;
+  overscroll-behavior-y:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+/* ── Header ── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(16px + var(--sat)) 20px 14px;
+  background:rgba(7,7,15,0.88);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;
+}
+
+.logo{
+  font-size:20px;font-weight:800;letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#c4b5fd,#60a5fa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+
+.badge{
+  font-size:11px;font-weight:600;
+  color:var(--accent3);
+  background:rgba(124,58,237,0.15);
+  border:1px solid rgba(167,139,250,0.2);
+  padding:4px 10px;border-radius:20px;
+  letter-spacing:0.3px;
+}
+
+/* ── Mic ── */
+.mic-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  padding:32px 20px 22px;gap:16px;
+}
+
+.ring-wrap{
+  position:relative;width:120px;height:120px;
+  display:flex;align-items:center;justify-content:center;
+}
+
+.ring-wrap::before,.ring-wrap::after{
+  content:'';position:absolute;inset:0;
+  border-radius:50%;border:1.5px solid var(--accent);opacity:0;
+}
+.ring-wrap.rec::before{animation:ring 1.6s ease-out infinite}
+.ring-wrap.rec::after{animation:ring 1.6s ease-out infinite .8s}
+
+@keyframes ring{
+  0%{inset:8px;opacity:.55}
+  100%{inset:-28px;opacity:0}
+}
+
+.mic-btn{
+  width:120px;height:120px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(145deg,#8b5cf6,#4f46e5);
+  box-shadow:0 8px 40px rgba(124,58,237,0.4),0 2px 8px rgba(0,0,0,0.5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:42px;
+  transition:transform .12s ease,box-shadow .2s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  position:relative;z-index:1;
+}
+.mic-btn:active{transform:scale(.91)}
+.mic-btn.rec{
+  background:linear-gradient(145deg,#ef4444,#b91c1c);
+  box-shadow:0 8px 40px rgba(239,68,68,0.45),0 2px 8px rgba(0,0,0,0.5);
+  animation:beat 1s ease-in-out infinite alternate;
+}
+@keyframes beat{from{transform:scale(1)}to{transform:scale(1.06)}}
+
+.mic-label{
+  font-size:14px;color:var(--muted);letter-spacing:.3px;
+  height:20px;transition:color .25s;font-weight:500;
+}
+.mic-label.rec{color:#f87171;font-weight:700}
+
+/* ── Transcript ── */
+.transcript{
+  width:calc(100% - 40px);max-width:400px;
+  background:rgba(167,139,250,.07);
+  border:1px solid rgba(167,139,250,.18);
+  border-radius:var(--r);
+  padding:12px 16px;
+  font-size:15px;line-height:1.6;color:var(--text);
+  display:none;animation:fade-in .2s ease;
+  -webkit-user-select:text;user-select:text;
+}
+.transcript.on{display:block}
+@keyframes fade-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ── Filters ── */
+.filters{
+  display:flex;gap:7px;overflow-x:auto;
+  padding:0 20px 14px;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.filters::-webkit-scrollbar{display:none}
+
+.f-btn{
+  flex-shrink:0;padding:8px 16px;border-radius:22px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--muted);font-size:13px;cursor:pointer;
+  transition:all .18s;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  min-height:36px;
+}
+.f-btn.on{
+  background:rgba(124,58,237,.2);
+  border-color:rgba(167,139,250,.4);
+  color:var(--accent3);font-weight:600;
+}
+
+/* ── Section header ── */
+.sec{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 20px 10px;
+}
+.sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.sec-btn{
+  font-size:12px;color:var(--danger);background:none;border:none;
+  cursor:pointer;font-family:inherit;opacity:.7;
+  padding:4px 0;min-height:36px;
+  touch-action:manipulation;
+}
+
+/* ── Task List ── */
+.list{display:flex;flex-direction:column;gap:9px;padding:0 20px}
+
+/* ── Task Card ── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:15px 16px 13px;
+  position:relative;overflow:hidden;
+  animation:slide .28s cubic-bezier(.25,.46,.45,.94);
+  transition:opacity .25s,transform .15s;
+}
+.card::after{
+  content:'';position:absolute;
+  right:0;top:14px;bottom:14px;
+  width:3px;border-radius:2px;
+  background:var(--cc,var(--accent));
+}
+@keyframes slide{
+  from{opacity:0;transform:translateY(-10px)}
+  to{opacity:1;transform:none}
+}
+
+.card.done{opacity:.4}
+.card.done .task-txt{text-decoration:line-through;color:var(--muted)}
+
+.task-txt{
+  font-size:15px;line-height:1.55;font-weight:500;
+  margin-bottom:10px;padding-left:8px;
+  -webkit-user-select:text;user-select:text;
+}
+
+.meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+
+.time-chip{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:3px}
+
+.cat-sel{
+  background:rgba(124,58,237,.12);
+  border:1px solid rgba(167,139,250,.2);
+  color:var(--accent3);
+  font-size:11px;font-weight:600;
+  border-radius:20px;padding:4px 12px;
+  font-family:inherit;cursor:pointer;
+  outline:none;-webkit-appearance:none;appearance:none;
+  min-height:28px;
+}
+
+.actions{display:flex;gap:7px;justify-content:flex-end}
+
+.act{
+  width:42px;height:42px;border-radius:var(--r-sm);
+  border:1px solid var(--border);
+  background:var(--surface);
+  font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .1s,background .15s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.act:active{transform:scale(.82)}
+
+/* ── Install banner ── */
+.install-bar{
+  position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;
+  background:var(--card);
+  border:1px solid rgba(167,139,250,.25);
+  border-radius:var(--r);
+  padding:12px 16px;
+  display:none;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  z-index:50;animation:fade-in .3s ease;
+  max-width:448px;margin:0 auto;
+}
+.install-bar.on{display:flex}
+.install-bar span{flex:1;font-size:13px;font-weight:600;color:var(--text)}
+.install-bar button{
+  padding:7px 14px;border-radius:10px;border:none;
+  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+.install-bar .btn-install{background:var(--accent);color:white}
+.install-bar .btn-dismiss{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
+
+/* ── Empty ── */
+.empty{
+  text-align:center;padding:52px 20px;color:var(--muted);
+}
+.empty i{font-size:48px;display:block;margin-bottom:14px;opacity:.35}
+.empty p{font-size:14px;line-height:1.7}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:calc(24px + var(--sab));left:50%;
+  transform:translateX(-50%) translateY(120px);
+  background:var(--card);
+  border:1px solid rgba(167,139,250,.2);
+  color:var(--text);
+  padding:11px 24px;border-radius:30px;
+  font-size:13px;font-weight:600;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  z-index:99;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;white-space:nowrap;
+}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+.divider{height:1px;background:var(--border);margin:0 20px 14px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">VoiceTask ✦</div>
+  <div class="badge" id="badge">0 פעילות</div>
+</div>
+
+<div class="mic-wrap">
+  <div class="ring-wrap" id="ring">
+    <button class="mic-btn" id="micBtn" onclick="toggle()" aria-label="הקלטה קולית">🎤</button>
+  </div>
+  <div class="mic-label" id="micLbl">לחץ לדיבור</div>
+  <div class="transcript" id="transcript"></div>
+</div>
+
+<div class="filters">
+  <button class="f-btn on" onclick="setFilter('all',this)">הכל</button>
+  <button class="f-btn" onclick="setFilter('אישי',this)">👤 אישי</button>
+  <button class="f-btn" onclick="setFilter('מקצועי',this)">💼 מקצועי</button>
+  <button class="f-btn" onclick="setFilter('כללי',this)">📌 כללי</button>
+  <button class="f-btn" onclick="setFilter('done',this)">✅ הושלמו</button>
+</div>
+
+<div class="divider"></div>
+
+<div class="sec">
+  <span class="sec-title">משימות</span>
+  <button class="sec-btn" onclick="clearDone()">נקה הושלמו</button>
+</div>
+
+<div class="list" id="list"></div>
+
+<!-- PWA install banner -->
+<div class="install-bar" id="installBar">
+  <span>📲 הוסף למסך הבית</span>
+  <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
+  <button class="btn-install" onclick="installApp()">התקן</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const CATS = {
+  אישי:   { kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'], c:'#34d399' },
+  מקצועי: { kw:['לקוח','פגישה','עבודה','מייל','פרויקט','דוח','משרד','שיחה','זום','ישיבה'], c:'#818cf8' },
+  כללי:   { kw:[], c:'#fbbf24' }
+};
+
+// ── State ────────────────────────────────────────────────────────────────────
+let tasks  = JSON.parse(localStorage.getItem('vt2') || '[]');
+let rec    = null;
+let live   = false;
+let filter = 'all';
+let deferredPrompt = null;
+
+// ── PWA: Service Worker ───────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ── PWA: Install prompt ───────────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBar').classList.add('on');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBar').classList.remove('on');
+  toast('🎉 האפליקציה הותקנה!');
+});
+
+function installApp() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('installBar').classList.remove('on');
+  });
+}
+
+function dismissInstall() {
+  document.getElementById('installBar').classList.remove('on');
+}
+
+// ── Voice ────────────────────────────────────────────────────────────────────
+function initRec() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('הדפדפן לא תומך בזיהוי קול 😕'); return null; }
+  const r = new SR();
+  r.lang = 'he-IL';
+  r.continuous = false;
+  r.interimResults = true;
+  r.onresult = e => {
+    const txt = [...e.results].map(x => x[0].transcript).join('');
+    showTranscript(txt);
+    if (e.results[e.results.length - 1].isFinal) addTask(txt);
+  };
+  r.onerror = e => { stop(); if (e.error !== 'no-speech') toast('שגיאה: ' + e.error); };
+  r.onend = stop;
+  return r;
+}
+
+function toggle() {
+  vibrate(10);
+  live ? stop() : start();
+}
+
+function start() {
+  rec = rec || initRec();
+  if (!rec) return;
+  try { rec.start(); } catch(e) { return; }
+  live = true;
+  setUI(true);
+}
+
+function stop() {
+  if (!live) return;
+  live = false;
+  try { rec.stop(); } catch(e) {}
+  setUI(false);
+}
+
+function setUI(on) {
+  document.getElementById('micBtn').className   = 'mic-btn' + (on ? ' rec' : '');
+  document.getElementById('micBtn').textContent = on ? '⏹' : '🎤';
+  document.getElementById('ring').className     = 'ring-wrap' + (on ? ' rec' : '');
+  document.getElementById('micLbl').className   = 'mic-label' + (on ? ' rec' : '');
+  document.getElementById('micLbl').textContent = on ? '⬤  מאזין...' : 'לחץ לדיבור';
+}
+
+function showTranscript(t) {
+  const el = document.getElementById('transcript');
+  el.textContent = t;
+  el.classList.add('on');
+}
+function hideTranscript() { document.getElementById('transcript').classList.remove('on'); }
+
+// Stop if user switches tab/app
+document.addEventListener('visibilitychange', () => { if (document.hidden && live) stop(); });
+
+// ── Parsing ──────────────────────────────────────────────────────────────────
+function detectCat(text) {
+  for (const [name, { kw }] of Object.entries(CATS)) {
+    if (name === 'כללי') continue;
+    if (kw.some(k => text.includes(k))) return name;
+  }
+  return 'כללי';
+}
+
+function detectTime(text) {
+  const now = new Date();
+  const bump = (d) => { const r = new Date(now); r.setDate(r.getDate() + d); r.setHours(9,0,0,0); return r; };
+  const setH = (h, m=0) => { const r = new Date(now); r.setHours(h,m,0,0); if(r<now) r.setDate(r.getDate()+1); return r; };
+
+  if (text.includes('מחרתיים'))      return bump(2);
+  if (text.includes('מחר'))          return bump(1);
+  if (text.includes('עוד שעתיים'))   return new Date(now.getTime() + 7200000);
+  if (text.includes('עוד שעה'))      return new Date(now.getTime() + 3600000);
+  if (text.includes('בבוקר'))        return setH(9);
+  if (text.includes('בצהריים'))      return setH(13);
+  if (text.includes('הערב') || text.includes('בערב')) return setH(18);
+  if (text.includes('בלילה'))        return setH(22);
+
+  const hm = text.match(/(?:ב-?|בשעה\s*)(\d{1,2})(?::(\d{2}))?/);
+  if (hm) return setH(+hm[1], +(hm[2] || 0));
+
+  return new Date(now.getTime() + 3600000);
+}
+
+// ── Tasks ────────────────────────────────────────────────────────────────────
+function addTask(text) {
+  if (!text.trim()) return;
+  tasks.unshift({
+    id: Date.now(),
+    text: text.trim(),
+    category: detectCat(text),
+    datetime: detectTime(text).toISOString(),
+    createdAt: new Date().toISOString(),
+    completed: false
+  });
+  save(); render();
+  toast('✅ משימה נוספה');
+  vibrate([10, 30, 10]);
+  setTimeout(hideTranscript, 1500);
+}
+
+function save() { localStorage.setItem('vt2', JSON.stringify(tasks)); updateBadge(); }
+
+function toggleDone(id) {
+  const t = tasks.find(x => x.id === id);
+  if (t) { t.completed = !t.completed; vibrate(8); save(); render(); }
+}
+
+function del(id) {
+  tasks = tasks.filter(x => x.id !== id);
+  vibrate(15); save(); render();
+}
+
+function setCat(id, cat) {
+  const t = tasks.find(x => x.id === id);
+  if (t) { t.category = cat; save(); render(); }
+}
+
+function clearDone() { tasks = tasks.filter(x => !x.completed); save(); render(); toast('🗑 הושלמו נוקו'); }
+
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  render();
+}
+
+function updateBadge() {
+  document.getElementById('badge').textContent = tasks.filter(t => !t.completed).length + ' פעילות';
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const el = document.getElementById('list');
+  const list =
+    filter === 'all'  ? tasks.filter(t => !t.completed) :
+    filter === 'done' ? tasks.filter(t =>  t.completed) :
+    tasks.filter(t => t.category === filter && !t.completed);
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty"><i>🎯</i><p>אין משימות כאן.<br>לחץ על המיקרופון ודבר!</p></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(task => {
+    const cat  = CATS[task.category] || CATS['כללי'];
+    const dt   = new Date(task.datetime);
+    const time = dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})
+               + ' · ' + dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    const opts = Object.keys(CATS).map(c =>
+      `<option value="${c}"${c===task.category?' selected':''}>${c}</option>`
+    ).join('');
+
+    return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
+  <div class="task-txt">${esc(task.text)}</div>
+  <div class="meta">
+    <select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select>
+    <span class="time-chip">⏰ ${time}</span>
+  </div>
+  <div class="actions">
+    <button class="act" onclick="toggleDone(${task.id})">${task.completed?'↩':'✅'}</button>
+    <button class="act" onclick="wa(${task.id})">💬</button>
+    <button class="act" onclick="cal(${task.id})">📅</button>
+    <button class="act" onclick="del(${task.id})">🗑</button>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// ── Integrations ─────────────────────────────────────────────────────────────
+function wa(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const msg = `📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleString('he-IL')}`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function cal(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const s = new Date(t.datetime);
+  const e = new Date(s.getTime() + 3600000);
+  const f = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${f(s)}/${f(e)}`, '_blank');
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function vibrate(p) { try { navigator.vibrate && navigator.vibrate(p); } catch(e) {} }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+render(); updateBadge();
+</script>
+</body>
+</html>
