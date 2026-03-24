@@ -833,21 +833,10 @@ function addTask(text){
 }
 async function syncTask(task){
   if(!gAuth?.email)return;
-  try{
-    const res=await fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...task,email:gAuth.email,action:'create'})});
-    if(res.ok){
-      const d=await res.json();
-      if(d.eventId){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=d.eventId;save();render();}toast('נוסף לגוגל קאלנדר');}
-      else toast('⚠️ סנכרון קאלנדר נכשל');
-    }else{toast('⚠️ שגיאת שרת n8n');}
-  }catch(e){toast('⚠️ לא ניתן להתחבר ל-n8n');}
+  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})}).catch(()=>{});
 }
-async function deleteFromCalendar(task){
-  if(!task.calendarEventId||!gAuth?.email)return;
-  try{await fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({calendarEventId:task.calendarEventId,email:gAuth.email,action:'delete'})});}catch(e){}
-}
+async function deleteFromCalendar(task){}
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
 async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה')}
