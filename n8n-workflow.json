@@ -156,7 +156,7 @@
       "position": [1560, 540],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\"status\": \"created\"}"
+        "responseBody": "={{ JSON.stringify({status:'created',eventId:$('גוגל קלנדר').item.json.id||''}) }}"
       }
     },
     {
