@@ -11,13 +11,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="VoiceTask">
 <script src="https://accounts.google.com/gsi/client" async></script>
-
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f0f0f5;--surface:#ffffff;
+  --bg:#f0f0f5;--surface:#fff;
   --border:#e4e4e9;--border2:#d0d0d8;
-  --text:#0a0a0a;--muted:#7a7a82;--muted2:#c0c0c8;
+  --text:#0a0a0a;--muted:#7a7a82;
   --accent:#6366f1;--accent2:#818cf8;
   --r:20px;--r-sm:14px;
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
@@ -33,49 +32,53 @@ body{
   direction:rtl;overflow-x:hidden;
   overscroll-behavior-y:none;-webkit-user-select:none;user-select:none;
 }
-
-/* ── SVG Icon helper ── */
 .ico{display:block;flex-shrink:0}
 
-/* ── Login Screen ── */
+/* ── Login ── */
 #loginScreen{
-  position:fixed;inset:0;z-index:200;
-  background:#fff;
+  position:fixed;inset:0;z-index:200;background:#fff;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:40px 32px;
 }
 #loginScreen.hidden{display:none}
-.login-blob{
-  width:160px;height:160px;flex-shrink:0;
-  border-radius:60% 40% 30% 70% / 60% 30% 70% 40%;
-  background:linear-gradient(135deg,#93c5fd 0%,#818cf8 35%,#c4b5fd 65%,#67e8f9 100%);
-  background-size:300% 300%;
-  animation:morph 9s ease-in-out infinite,grad-idle 7s ease infinite;
+.login-orb{
+  width:140px;height:140px;border-radius:50%;
+  background:conic-gradient(from 0deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
+  animation:orb-spin 4s linear infinite;
   display:flex;align-items:center;justify-content:center;
-  font-size:64px;margin-bottom:32px;
-  box-shadow:0 20px 60px rgba(99,102,241,.3);
+  margin-bottom:32px;
+  box-shadow:0 20px 60px rgba(99,102,241,.35);
+  position:relative;
 }
+.login-orb::after{
+  content:'🎤';font-size:48px;
+  position:absolute;
+  width:116px;height:116px;border-radius:50%;
+  background:radial-gradient(circle at 38% 35%,rgba(255,255,255,.5) 0%,transparent 55%),
+             conic-gradient(from 180deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
+  display:flex;align-items:center;justify-content:center;
+  animation:orb-spin 4s linear infinite reverse;
+}
+@keyframes orb-spin{to{transform:rotate(360deg)}}
 .login-title{font-size:34px;font-weight:800;color:#0a0a0a;margin-bottom:10px;letter-spacing:-1px;text-align:center}
 .login-sub{font-size:15px;color:#7a7a82;margin-bottom:48px;text-align:center;line-height:1.7;max-width:280px}
 .google-btn{
   display:flex;align-items:center;gap:12px;
   padding:15px 32px;border-radius:50px;
-  background:#fff;color:#0a0a0a;
-  border:2px solid #e4e4e9;
+  background:#fff;color:#0a0a0a;border:2px solid #e4e4e9;
   font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;
   box-shadow:0 4px 24px rgba(0,0,0,.08);
-  transition:transform .12s,box-shadow .2s;
-  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
 }
 .google-btn:active{transform:scale(.96)}
 .google-icon{width:22px;height:22px;flex-shrink:0}
-.login-terms{margin-top:20px;font-size:12px;color:#c0c0c8;text-align:center;line-height:1.6;max-width:260px}
+.login-terms{margin-top:20px;font-size:12px;color:#c0c0c8;text-align:center;max-width:260px}
 
 /* ── Header ── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
   padding:calc(16px + var(--sat)) 20px 14px;
-  background:rgba(240,240,245,0.9);
+  background:rgba(240,240,245,.92);
   backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
   position:sticky;top:0;z-index:20;
   border-bottom:1px solid rgba(228,228,233,.6);
@@ -87,141 +90,180 @@ body{
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 12px rgba(99,102,241,.3);
 }
-.logo{font-size:19px;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+.logo{font-size:19px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
 .header-right{display:flex;align-items:center;gap:9px}
-.badge{
-  font-size:12px;font-weight:700;color:var(--muted);
-  background:var(--surface);border:1.5px solid var(--border);
-  padding:5px 12px;border-radius:20px;letter-spacing:.2px;
-}
+.badge{font-size:12px;font-weight:700;color:var(--muted);background:var(--surface);border:1.5px solid var(--border);padding:5px 12px;border-radius:20px}
 .user-chip{
   display:flex;align-items:center;gap:7px;
   background:var(--surface);border:1.5px solid var(--border);
   border-radius:50px;padding:4px 12px 4px 4px;
-  cursor:pointer;touch-action:manipulation;
-  -webkit-tap-highlight-color:transparent;transition:background .15s;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s;
 }
 .user-chip:active{background:var(--bg)}
 .user-avatar{width:27px;height:27px;border-radius:50%;object-fit:cover}
-.user-initials{
-  width:27px;height:27px;border-radius:50%;
-  background:linear-gradient(135deg,var(--accent),#67e8f9);
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#fff;flex-shrink:0;
-}
+.user-initials{width:27px;height:27px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#67e8f9);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
 .user-name-chip{font-size:12px;font-weight:600;color:var(--text);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ── Mic section ── */
-.mic-wrap{
-  display:flex;flex-direction:column;align-items:center;
-  padding:32px 20px 20px;gap:20px;
-}
-
-/* ── Blob ── */
-.vis-wrap{
-  position:relative;width:260px;height:260px;
-  border-radius:60% 40% 30% 70% / 60% 30% 70% 40%;
-  background:linear-gradient(135deg,#93c5fd 0%,#818cf8 35%,#c4b5fd 65%,#67e8f9 100%);
-  background-size:300% 300%;
-  animation:morph 9s ease-in-out infinite,grad-idle 7s ease infinite;
-  cursor:pointer;overflow:hidden;
+/* ── Mic button (tap to open Siri) ── */
+.mic-wrap{display:flex;flex-direction:column;align-items:center;padding:28px 20px 16px;gap:14px}
+.tap-orb{
+  width:110px;height:110px;border-radius:50%;
+  background:conic-gradient(from 0deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
+  animation:orb-spin 6s linear infinite;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 24px 64px rgba(99,102,241,.32),0 8px 24px rgba(129,140,248,.18);
-  transition:box-shadow .6s ease;
+  cursor:pointer;position:relative;
+  box-shadow:0 16px 48px rgba(99,102,241,.28);
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-  will-change:border-radius;
+  transition:transform .15s,box-shadow .3s;
 }
-.vis-wrap.rec{
-  background:linear-gradient(135deg,#fca5a5 0%,#f87171 30%,#fb923c 65%,#fbbf24 100%);
-  animation:morph-fast 1.6s ease-in-out infinite,grad-rec 2s ease infinite;
-  box-shadow:0 24px 64px rgba(248,113,113,.38),0 8px 24px rgba(251,146,60,.24);
-}
-@keyframes morph{
-  0%,100%{border-radius:60% 40% 30% 70% / 60% 30% 70% 40%}
-  20%{border-radius:30% 60% 70% 40% / 50% 60% 30% 60%}
-  40%{border-radius:50% 60% 30% 40% / 40% 50% 60% 50%}
-  60%{border-radius:35% 55% 60% 45% / 55% 35% 65% 40%}
-  80%{border-radius:40% 60% 50% 30% / 60% 40% 50% 40%}
-}
-@keyframes morph-fast{
-  0%,100%{border-radius:40% 60% 60% 40% / 40% 60% 40% 60%}
-  33%{border-radius:60% 40% 40% 60% / 60% 40% 60% 40%}
-  66%{border-radius:50% 50% 30% 70% / 30% 70% 50% 50%}
-}
-@keyframes grad-idle{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-@keyframes grad-rec{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-
-#lottieIdle,#lottieRec{display:none}
-#vis{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none}
-.vis-wrap.rec #vis{opacity:1}
-
-.mic-btn{
-  position:relative;z-index:5;pointer-events:none;
-  width:76px;height:76px;border-radius:50%;border:none;
-  background:rgba(255,255,255,.2);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+.tap-orb:active{transform:scale(.93)}
+.tap-orb-inner{
+  width:90px;height:90px;border-radius:50%;
+  background:radial-gradient(circle at 38% 35%,rgba(255,255,255,.45) 0%,transparent 55%),
+             conic-gradient(from 180deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
+  animation:orb-spin 6s linear infinite reverse;
   display:flex;align-items:center;justify-content:center;
-  transition:transform .15s ease,background .4s;
-  box-shadow:0 4px 20px rgba(0,0,0,.1);
 }
-.mic-btn.rec{background:rgba(255,255,255,.14);transform:scale(1.08)}
-.vis-wrap:active .mic-btn{transform:scale(.88)}
-.mic-btn svg{filter:drop-shadow(0 2px 4px rgba(0,0,0,.15))}
+.tap-lbl{font-size:14px;color:var(--muted);font-weight:600;letter-spacing:-.1px}
 
-.mic-label{
-  font-size:15px;color:var(--muted);font-weight:600;letter-spacing:-.1px;
-  transition:color .3s;display:flex;align-items:center;gap:7px;
+/* ── Siri Overlay ── */
+#siriOverlay{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;
+  pointer-events:none;opacity:0;
+  transition:opacity .35s ease;
 }
-.mic-label.rec{color:#ef4444;font-weight:700}
-.rec-dot{
-  width:8px;height:8px;border-radius:50%;background:#ef4444;
-  animation:pulse-dot 1s ease infinite;display:none;
+#siriOverlay.on{opacity:1;pointer-events:all}
+.siri-bg{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,.82);
+  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
 }
-.mic-label.rec .rec-dot{display:block}
-@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.siri-content{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-end;
+  height:100%;
+  padding-bottom:calc(48px + var(--sab));
+}
 
-/* ── Transcript ── */
-.transcript{
-  width:calc(100% - 40px);max-width:400px;
-  display:none;animation:fade-in .25s ease;
+/* Transcript text in overlay */
+.siri-text{
+  width:100%;max-width:340px;
+  min-height:64px;
+  text-align:center;
+  font-size:22px;font-weight:700;color:#fff;
+  letter-spacing:-.3px;line-height:1.4;
+  margin-bottom:20px;
+  padding:0 24px;
+  transition:opacity .2s;
 }
-.transcript.on{display:flex;flex-direction:column;gap:10px}
-.transcript-preview{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r);padding:14px 16px;
-  font-size:15px;line-height:1.6;color:var(--muted);
+.siri-text.muted{color:rgba(255,255,255,.45);font-size:16px;font-weight:500}
+
+/* Commands hint */
+.siri-hints{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:8px;
+  margin-bottom:32px;padding:0 20px;
+  max-width:380px;
 }
-.transcript-edit{
-  background:var(--surface);border:2px solid var(--text);
-  border-radius:var(--r);padding:14px 16px;
-  font-size:15px;line-height:1.6;color:var(--text);
+.siri-hint-chip{
+  font-size:12px;font-weight:600;color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);
+  border-radius:50px;padding:5px 12px;
+}
+
+/* Siri waveform bars */
+.siri-wave{
+  display:flex;align-items:center;gap:4px;
+  height:56px;margin-bottom:36px;
+}
+.siri-bar{
+  width:4px;border-radius:4px;
+  background:linear-gradient(to top,#818cf8,#c084fc,#38bdf8);
+  transform-origin:bottom;
+  animation:bar-idle 1.8s ease-in-out infinite;
+  height:8px;
+}
+@keyframes bar-idle{0%,100%{height:8px;opacity:.4}50%{height:20px;opacity:.7}}
+.siri-wave.speaking .siri-bar{animation:bar-speak var(--d,.6s) ease-in-out infinite alternate}
+@keyframes bar-speak{from{height:6px}to{height:var(--h,40px)}}
+
+/* Siri orb */
+.siri-orb{
+  width:170px;height:170px;border-radius:50%;
+  position:relative;margin-bottom:40px;
+  animation:orb-breathe 2.2s ease-in-out infinite;
+}
+@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.siri-orb.speaking{animation:orb-pulse .5s ease-in-out infinite alternate}
+@keyframes orb-pulse{from{transform:scale(1)}to{transform:scale(1.09)}}
+.siri-orb-spin{
+  position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#ec4899,#c084fc);
+  animation:orb-spin 3s linear infinite;
+}
+.siri-orb-inner{
+  position:absolute;inset:5px;border-radius:50%;
+  background:radial-gradient(circle at 38% 35%,rgba(255,255,255,.45) 0%,transparent 55%),
+             conic-gradient(from 200deg,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc,#818cf8);
+  animation:orb-spin 3s linear infinite reverse;
+}
+.siri-orb-glow{
+  position:absolute;inset:-20px;border-radius:50%;
+  background:radial-gradient(circle,rgba(129,140,248,.35) 0%,transparent 70%);
+  animation:glow-pulse 2s ease-in-out infinite;
+}
+@keyframes glow-pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}}
+
+/* Siri cancel button */
+.siri-cancel{
+  display:flex;align-items:center;justify-content:center;
+  width:56px;height:56px;border-radius:50%;
+  background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);
+  color:#fff;font-size:14px;font-weight:600;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:background .15s,transform .1s;
+  margin-bottom:8px;
+}
+.siri-cancel:active{background:rgba(255,255,255,.22);transform:scale(.93)}
+
+/* Transcript confirm sheet (slides up after final result) */
+.siri-confirm{
+  position:absolute;bottom:0;left:0;right:0;
+  background:#1a1a1a;
+  border-radius:24px 24px 0 0;
+  padding:20px 20px calc(24px + var(--sab));
+  transform:translateY(100%);
+  transition:transform .36s cubic-bezier(.34,1.56,.64,1);
+  display:flex;flex-direction:column;gap:12px;
+}
+.siri-confirm.on{transform:translateY(0)}
+.siri-confirm-edit{
+  background:#2a2a2a;border:1.5px solid #3a3a3a;
+  border-radius:14px;padding:12px 14px;
+  font-size:16px;line-height:1.5;color:#fff;
   resize:none;width:100%;font-family:inherit;direction:rtl;
-  outline:none;min-height:80px;
+  outline:none;min-height:70px;
   -webkit-user-select:text;user-select:text;
 }
-.transcript-edit:focus{border-color:var(--accent)}
-.transcript-actions{display:flex;gap:8px}
-.t-save{
+.siri-confirm-edit:focus{border-color:#818cf8}
+.siri-confirm-actions{display:flex;gap:8px}
+.siri-confirm-save{
   flex:1;padding:14px;border-radius:50px;
-  background:var(--text);color:#fff;border:none;
+  background:linear-gradient(135deg,#818cf8,#c084fc);color:#fff;border:none;
   font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
-  transition:transform .12s,opacity .2s;
+  transition:opacity .15s;
 }
-.t-save:active{transform:scale(.96);opacity:.85}
-.t-cancel{
+.siri-confirm-save:active{opacity:.8}
+.siri-confirm-cancel{
   padding:14px 20px;border-radius:50px;
-  background:var(--surface);color:var(--muted);
-  border:1.5px solid var(--border);
-  font-size:15px;cursor:pointer;font-family:inherit;transition:transform .12s;
+  background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);
+  border:1.5px solid rgba(255,255,255,.12);
+  font-size:15px;cursor:pointer;font-family:inherit;
 }
-.t-cancel:active{transform:scale(.96)}
-@keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ── Quick Actions ── */
-.quick-wrap{
-  display:flex;gap:8px;overflow-x:auto;
-  padding:0 20px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;
-}
+.quick-wrap{display:flex;gap:8px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .quick-wrap::-webkit-scrollbar{display:none}
 .quick-btn{
   flex-shrink:0;display:flex;align-items:center;gap:6px;
@@ -229,17 +271,13 @@ body{
   border:1.5px solid var(--border);background:var(--surface);
   color:var(--text);font-size:13px;font-weight:600;cursor:pointer;
   transition:all .16s;font-family:inherit;
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-  white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;white-space:nowrap;
 }
 .quick-btn:active{transform:scale(.94);background:var(--bg)}
-.quick-btn svg{opacity:.6}
+.quick-btn svg{opacity:.55}
 
 /* ── Filters ── */
-.filters{
-  display:flex;gap:7px;overflow-x:auto;
-  padding:14px 20px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;
-}
+.filters{display:flex;gap:7px;overflow-x:auto;padding:14px 20px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .filters::-webkit-scrollbar{display:none}
 .f-btn{
   flex-shrink:0;padding:8px 16px;border-radius:50px;
@@ -250,25 +288,18 @@ body{
 }
 .f-btn.on{background:var(--text);border-color:var(--text);color:#fff;font-weight:700}
 
-/* ── Section header ── */
+/* ── Section ── */
 .sec{display:flex;justify-content:space-between;align-items:center;padding:0 20px 10px}
 .sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px}
-.sec-btn{
-  display:flex;align-items:center;gap:5px;
-  font-size:12px;color:#ef4444;background:none;border:none;
-  cursor:pointer;font-family:inherit;padding:4px 0;min-height:36px;
-  touch-action:manipulation;font-weight:600;
-}
+.sec-btn{display:flex;align-items:center;gap:5px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;min-height:36px;touch-action:manipulation;font-weight:600}
 
 /* ── Task List ── */
 .list{display:flex;flex-direction:column;gap:10px;padding:0 20px}
 
-/* ── Task Card ── */
+/* ── Card ── */
 .card{
-  background:var(--surface);
-  border:1px solid rgba(228,228,233,.8);
-  border-radius:var(--r);
-  border-right:3px solid var(--cc,var(--accent));
+  background:var(--surface);border:1px solid rgba(228,228,233,.8);
+  border-radius:var(--r);border-right:3px solid var(--cc,var(--accent));
   padding:16px;position:relative;
   animation:slide .28s cubic-bezier(.25,.46,.45,.94);
   box-shadow:0 2px 16px rgba(0,0,0,.05);
@@ -278,107 +309,48 @@ body{
 @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .card.done{opacity:.4}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
-
-.task-txt{
-  font-size:15px;line-height:1.55;font-weight:600;color:var(--text);
-  margin-bottom:10px;-webkit-user-select:text;user-select:text;
-}
-
-/* Date block */
-.date-block{
-  background:var(--bg);border-radius:var(--r-sm);
-  padding:8px 12px;margin-bottom:10px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.date-time-wrap{display:flex;align-items:baseline;gap:6px}
+.task-txt{font-size:15px;line-height:1.55;font-weight:600;color:var(--text);margin-bottom:10px;-webkit-user-select:text;user-select:text}
+.date-block{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .date-main{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
 .date-sub{font-size:11px;color:var(--muted);margin-top:1px}
-
-/* Cal badge */
-.cal-badge{
-  font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
-  display:inline-flex;align-items:center;gap:4px;
-}
+.cal-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
 .cal-badge.synced{background:#dcfce7;color:#16a34a}
 .cal-badge.pending{background:#fef9c3;color:#b45309}
-.cal-badge svg{opacity:.8}
-
-/* Meta row */
 .meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.cat-sel{
-  background:var(--bg);border:1px solid var(--border);
-  color:var(--text);font-size:12px;font-weight:600;
-  border-radius:20px;padding:5px 12px;font-family:inherit;cursor:pointer;
-  outline:none;-webkit-appearance:none;appearance:none;min-height:30px;
-}
-
-/* Action buttons */
+.cat-sel{background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;border-radius:20px;padding:5px 12px;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;min-height:30px}
 .actions{display:flex;gap:6px;justify-content:flex-end}
 .act{
   width:36px;height:36px;border-radius:50%;
-  border:1.5px solid var(--border);
-  background:var(--bg);
-  color:var(--muted);
+  border:1.5px solid var(--border);background:var(--bg);color:var(--muted);
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:transform .1s,background .15s,color .15s,border-color .15s;
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .act:active{transform:scale(.8)}
-.act.done-btn:active,.act.done-btn:hover{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
-.act.edit-btn:active,.act.edit-btn:hover{background:#ede9fe;border-color:#ddd6fe;color:var(--accent)}
-.act.wa-btn:active,.act.wa-btn:hover{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
-.act.cal-btn:active,.act.cal-btn:hover{background:#dbeafe;border-color:#bfdbfe;color:#2563eb}
+.act.done-btn:active{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
+.act.edit-btn:active{background:#ede9fe;border-color:#ddd6fe;color:var(--accent)}
+.act.wa-btn:active{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
+.act.cal-btn:active{background:#dbeafe;border-color:#bfdbfe;color:#2563eb}
 .act.del-btn{border-color:#fecaca;color:#f87171}
-.act.del-btn:active,.act.del-btn:hover{background:#fee2e2;color:#ef4444}
-.act.call-btn:active,.act.call-btn:hover{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
-
-/* Inline edit */
-.card-edit{
-  display:none;margin-top:12px;padding-top:12px;
-  border-top:1px solid var(--border);
-  flex-direction:column;gap:8px;animation:fade-in .2s ease;
-}
+.act.del-btn:active{background:#fee2e2;color:#ef4444}
+.act.call-btn:active{background:#dcfce7;border-color:#bbf7d0;color:#16a34a}
+.card-edit{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-direction:column;gap:8px;animation:fade-in .2s ease}
 .card-edit.on{display:flex}
-.edit-txt{
-  background:var(--bg);border:1.5px solid var(--border2);
-  border-radius:var(--r-sm);padding:10px 12px;
-  font-size:14px;line-height:1.5;color:var(--text);
-  resize:none;width:100%;font-family:inherit;direction:rtl;
-  outline:none;min-height:60px;-webkit-user-select:text;user-select:text;
-}
+.edit-txt{background:var(--bg);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;font-size:14px;line-height:1.5;color:var(--text);resize:none;width:100%;font-family:inherit;direction:rtl;outline:none;min-height:60px;-webkit-user-select:text;user-select:text}
 .edit-txt:focus{border-color:var(--accent)}
-.edit-dt{
-  background:var(--bg);border:1.5px solid var(--border2);
-  border-radius:var(--r-sm);padding:9px 12px;
-  font-size:13px;color:var(--text);font-family:inherit;outline:none;width:100%;
-}
+.edit-dt{background:var(--bg);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;width:100%}
 .edit-dt:focus{border-color:var(--accent)}
 .edit-actions{display:flex;gap:7px}
-.edit-save{
-  flex:1;padding:10px;border-radius:50px;
-  background:var(--text);color:#fff;border:none;
-  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
-}
-.edit-cancel{
-  padding:10px 16px;border-radius:50px;
-  background:transparent;color:var(--muted);
-  border:1.5px solid var(--border);font-size:13px;cursor:pointer;font-family:inherit;
-}
+.edit-save{flex:1;padding:10px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.edit-cancel{padding:10px 16px;border-radius:50px;background:transparent;color:var(--muted);border:1.5px solid var(--border);font-size:13px;cursor:pointer;font-family:inherit}
 
-/* ── Install bar ── */
-.install-bar{
-  position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
-  padding:14px 16px;display:none;align-items:center;gap:10px;
-  box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto;
-}
+/* ── Install / Toast ── */
+.install-bar{position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto}
 .install-bar.on{display:flex}
 .install-bar span{flex:1;font-size:13px;font-weight:600;color:var(--text)}
 .install-bar button{padding:8px 16px;border-radius:50px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation}
 .btn-install{background:var(--text);color:white}
 .btn-dismiss{background:transparent;color:var(--muted);font-size:18px;padding:4px 8px}
-
-/* ── Empty / Toast ── */
 .empty{text-align:center;padding:52px 20px;color:var(--muted)}
 .empty-icon{font-size:44px;display:block;margin-bottom:14px;opacity:.35}
 .empty p{font-size:14px;line-height:1.7}
@@ -388,42 +360,68 @@ body{
   transform:translateX(-50%) translateY(120px);
   background:var(--text);color:#fff;
   padding:12px 26px;border-radius:50px;font-size:14px;font-weight:600;
-  box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:99;
+  box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:200;
   transition:transform .32s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;
 }
 .toast.on{transform:translateX(-50%) translateY(0)}
+@keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
 
-<!-- ── Login Screen ── -->
+<!-- Login -->
 <div id="loginScreen">
-  <div class="login-blob">🎤</div>
+  <div class="login-orb"></div>
   <div class="login-title">VoiceTask</div>
   <div class="login-sub">הוצא את המחשבות מהראש<br>סנכרן לגוגל קאלנדר שלך</div>
   <button class="google-btn" onclick="signInWithGoogle()">
-    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-    </svg>
+    <svg class="google-icon" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
     התחבר עם Google
   </button>
   <div class="login-terms">גישה לגוגל קאלנדר שלך בלבד</div>
 </div>
 
-<!-- ── Main App ── -->
+<!-- Siri Overlay -->
+<div id="siriOverlay">
+  <div class="siri-bg" onclick="stopSiri()"></div>
+  <div class="siri-content">
+    <div class="siri-text muted" id="siriText">מה תרצה לעשות?</div>
+    <div class="siri-hints" id="siriHints">
+      <span class="siri-hint-chip">הוסף משימה...</span>
+      <span class="siri-hint-chip">מחר בבוקר...</span>
+      <span class="siri-hint-chip">תזכיר לי...</span>
+      <span class="siri-hint-chip">מחק [משימה]</span>
+      <span class="siri-hint-chip">סיים [משימה]</span>
+    </div>
+    <div class="siri-wave" id="siriWave">
+      <!-- bars injected by JS -->
+    </div>
+    <div class="siri-orb" id="siriOrb">
+      <div class="siri-orb-glow"></div>
+      <div class="siri-orb-spin"></div>
+      <div class="siri-orb-inner"></div>
+    </div>
+    <button class="siri-cancel" onclick="stopSiri()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <!-- Confirm sheet -->
+    <div class="siri-confirm" id="siriConfirm">
+      <textarea class="siri-confirm-edit" id="siriEdit" rows="2" placeholder="ערוך את הטקסט..."></textarea>
+      <div class="siri-confirm-actions">
+        <button class="siri-confirm-save" onclick="confirmSiri()">שמור משימה</button>
+        <button class="siri-confirm-cancel" onclick="cancelSiriConfirm()">בטל</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
 <div id="app" style="display:none">
 
 <div class="header">
   <div class="logo-wrap">
     <div class="logo-icon">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
     </div>
     <span class="logo">VoiceTask</span>
   </div>
@@ -434,56 +432,36 @@ body{
 </div>
 
 <div class="mic-wrap">
-  <div class="vis-wrap" id="visWrap" onclick="toggle()">
-    <canvas id="vis" width="260" height="260"></canvas>
-    <div class="mic-btn" id="micBtn">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <div class="tap-orb" id="tapOrb" onclick="startSiri()">
+    <div class="tap-orb-inner">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.2))">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
         <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
       </svg>
     </div>
-    <div id="lottieIdle"></div><div id="lottieRec"></div>
   </div>
-  <div class="mic-label" id="micLbl">
-    <div class="rec-dot"></div>
-    <span id="micLblTxt">לחץ לדיבור</span>
-  </div>
-  <div class="transcript" id="transcript">
-    <div class="transcript-preview" id="transcriptPreview"></div>
-    <textarea class="transcript-edit" id="transcriptEdit" rows="3" placeholder="ערוך את הטקסט..."></textarea>
-    <div class="transcript-actions">
-      <button class="t-save" onclick="confirmTask()">שמור משימה</button>
-      <button class="t-cancel" onclick="cancelTask()">בטל</button>
-    </div>
-  </div>
+  <div class="tap-lbl">לחץ לדיבור</div>
 </div>
 
-<!-- Quick Actions -->
-<div class="quick-wrap" id="quickWrap">
-  <button class="quick-btn" onclick="quickFill('פגישה עכשיו ל-30 דקות')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    פגישה עכשיו
+<div class="quick-wrap">
+  <button class="quick-btn" onclick="quickSiri('פגישה עכשיו ל-30 דקות')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>פגישה עכשיו
   </button>
-  <button class="quick-btn" onclick="quickFill('תזכורת עוד שעה: ')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-    עוד שעה
+  <button class="quick-btn" onclick="quickSiri('תזכורת עוד שעה: ')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>עוד שעה
   </button>
-  <button class="quick-btn" onclick="quickFill('מחר בבוקר: ')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>
-    מחר בוקר
+  <button class="quick-btn" onclick="quickSiri('מחר בבוקר: ')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>מחר בוקר
   </button>
-  <button class="quick-btn" onclick="quickFill('הערב: ')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    הערב
+  <button class="quick-btn" onclick="quickSiri('הערב: ')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>הערב
   </button>
-  <button class="quick-btn" onclick="quickFill('לקנות: ')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-    קניות
+  <button class="quick-btn" onclick="quickSiri('לקנות: ')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>קניות
   </button>
-  <button class="quick-btn" onclick="quickFill('להתקשר עם ')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-    להתקשר
+  <button class="quick-btn" onclick="quickSiri('להתקשר עם ')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>להתקשר
   </button>
 </div>
 
@@ -494,47 +472,39 @@ body{
   <button class="f-btn" onclick="setFilter('כללי',this)">📌 כללי</button>
   <button class="f-btn" onclick="setFilter('done',this)">✓ הושלמו</button>
 </div>
-
 <div class="divider"></div>
 <div class="sec">
   <span class="sec-title">משימות</span>
   <button class="sec-btn" onclick="clearDone()">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
-    נקה הושלמו
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>נקה הושלמו
   </button>
 </div>
 <div class="list" id="list"></div>
-
 <div class="install-bar" id="installBar">
   <span>📲 הוסף למסך הבית</span>
   <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
   <button class="btn-install" onclick="installApp()">התקן</button>
 </div>
-
 </div><!-- /#app -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════════════════
-// Google OAuth Client ID
-// ══════════════════════════════════════════════════════════════════════════════
-const GOOGLE_CLIENT_ID = '98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
-const N8N_WEBHOOK = 'https://guyfs.app.n8n.cloud/webhook/voicetask';
+const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
+const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
 
-// ── App State ─────────────────────────────────────────────────────────────────
-const CATS = {
-  אישי:   {kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'],c:'#34d399'},
-  מקצועי: {kw:['לקוח','פגישה','עבודה','מייל','פרויקט','דוח','משרד','שיחה','זום','ישיבה'],c:'#818cf8'},
-  כללי:   {kw:[],c:'#fbbf24'}
+const CATS={
+  אישי:{kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'],c:'#34d399'},
+  מקצועי:{kw:['לקוח','פגישה','עבודה','מייל','פרויקט','דוח','משרד','שיחה','זום','ישיבה'],c:'#818cf8'},
+  כללי:{kw:[],c:'#fbbf24'}
 };
-
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
-let rec=null,live=false,filter='all',deferredPrompt=null;
+let filter='all',deferredPrompt=null;
 let gAuth=null,tokenClient=null;
+let rec=null,siriLive=false;
+let audioCtx=null,analyser=null,animId=null,stream=null;
 
-// ── SVG Icons ─────────────────────────────────────────────────────────────────
-const ICO = {
+const ICO={
   check:`<svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   undo:`<svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13A9 9 0 1 0 6 6.4"/></svg>`,
   edit:`<svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>`,
@@ -546,13 +516,12 @@ const ICO = {
   calPending:`<svg class="ico" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
 };
 
-// ── Google Auth ───────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function initAuth(){
-  const stored=JSON.parse(localStorage.getItem('vt_auth')||'null');
-  if(stored&&stored.expiry>Date.now()+60000){gAuth=stored;showApp();return;}
+  const s=JSON.parse(localStorage.getItem('vt_auth')||'null');
+  if(s&&s.expiry>Date.now()+60000){gAuth=s;showApp();return;}
   showLogin();
 }
-
 function signInWithGoogle(){
   if(!window.google){toast('טוען...');setTimeout(signInWithGoogle,800);return;}
   tokenClient=google.accounts.oauth2.initTokenClient({
@@ -563,48 +532,33 @@ function signInWithGoogle(){
         const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}});
         const u=await r.json();
         gAuth={access_token:resp.access_token,email:u.email||'',name:u.name||u.email||'',picture:u.picture||'',expiry:Date.now()+(+(resp.expires_in||3600))*1000};
-        localStorage.setItem('vt_auth',JSON.stringify(gAuth));
-        showApp();
-      }catch(e){toast('שגיאה בטעינת פרטי משתמש');}
+        localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
+      }catch(e){toast('שגיאה');}
     }
   });
   tokenClient.requestAccessToken({prompt:'consent'});
 }
-
-function showApp(){
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('app').style.display='';
-  updateUserChip();render();updateBadge();
-}
-function showLogin(){
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('app').style.display='none';
-}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge()}
+function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
   const chip=document.getElementById('userChip');
-  const avatar=gAuth.picture?`<img class="user-avatar" src="${gAuth.picture}" referrerpolicy="no-referrer">`:`<div class="user-initials">${(gAuth.name||'?')[0].toUpperCase()}</div>`;
-  const firstName=(gAuth.name||'').split(' ')[0]||gAuth.email.split('@')[0];
-  chip.innerHTML=avatar+`<span class="user-name-chip">${esc(firstName)}</span>`;
+  const av=gAuth.picture?`<img class="user-avatar" src="${gAuth.picture}" referrerpolicy="no-referrer">`:`<div class="user-initials">${(gAuth.name||'?')[0].toUpperCase()}</div>`;
+  chip.innerHTML=av+`<span class="user-name-chip">${esc((gAuth.name||'').split(' ')[0]||gAuth.email.split('@')[0])}</span>`;
 }
 function confirmSignOut(){if(confirm('להתנתק?'))signOut()}
-function signOut(){
-  if(gAuth&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});
-  gAuth=null;localStorage.removeItem('vt_auth');showLogin();
-}
+function signOut(){if(gAuth&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});gAuth=null;localStorage.removeItem('vt_auth');showLogin()}
 async function getToken(){
   if(!gAuth)return null;
   if(gAuth.expiry>Date.now()+60000)return gAuth.access_token;
   return new Promise(resolve=>{
-    if(!tokenClient){tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}})}
+    if(!tokenClient)tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}});
     const prev=tokenClient.callback;
     tokenClient.callback=(resp)=>{
       tokenClient.callback=prev;
       if(resp.error){resolve(null);return;}
-      gAuth.access_token=resp.access_token;
-      gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
-      localStorage.setItem('vt_auth',JSON.stringify(gAuth));
-      resolve(resp.access_token);
+      gAuth.access_token=resp.access_token;gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+      localStorage.setItem('vt_auth',JSON.stringify(gAuth));resolve(resp.access_token);
     };
     tokenClient.requestAccessToken({prompt:''});
   });
@@ -616,12 +570,10 @@ async function createCalendarEvent(task){
   const end=new Date(new Date(task.datetime).getTime()+3600000).toISOString();
   try{
     const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({summary:task.text,description:`קטגוריה: ${task.category}\nנוצר מ-VoiceTask 🎤`,start:{dateTime:task.datetime},end:{dateTime:end}})
     });
-    if(!res.ok)return null;
-    const data=await res.json();return data.id||null;
+    if(!res.ok)return null;const d=await res.json();return d.id||null;
   }catch(e){return null;}
 }
 async function deleteCalendarEvent(eventId){
@@ -629,44 +581,199 @@ async function deleteCalendarEvent(eventId){
   try{await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});}catch(e){}
 }
 
-// ── Audio Visualizer ──────────────────────────────────────────────────────────
-const canvas=document.getElementById('vis'),vctx=canvas.getContext('2d');
-const CX=130,CY=130;
-let audioCtx=null,analyser=null,animId=null,stream=null;
+// ── Siri UI ───────────────────────────────────────────────────────────────────
+// Build waveform bars
+(function(){
+  const wave=document.getElementById('siriWave');
+  const N=24,heights=[10,18,30,44,52,44,30,18,10,18,30,44,52,44,30,18,10,18,30,44,52,44,30,18];
+  const delays=[0,.1,.2,.3,.4,.3,.2,.1,0,.15,.25,.35,.45,.35,.25,.15,0,.1,.2,.3,.4,.3,.2,.1];
+  for(let i=0;i<N;i++){
+    const b=document.createElement('div');
+    b.className='siri-bar';
+    b.style.cssText=`--h:${heights[i]}px;--d:${(0.4+delays[i]*.6).toFixed(2)}s;animation-delay:${(delays[i]*.4).toFixed(2)}s`;
+    wave.appendChild(b);
+  }
+})();
 
+function startSiri(){
+  vibrate(10);
+  document.getElementById('siriOverlay').classList.add('on');
+  document.getElementById('siriText').textContent='מה תרצה לעשות?';
+  document.getElementById('siriText').className='siri-text muted';
+  document.getElementById('siriHints').style.display='flex';
+  document.getElementById('siriConfirm').classList.remove('on');
+  document.getElementById('siriOrb').classList.remove('speaking');
+  document.getElementById('siriWave').classList.remove('speaking');
+  startRec();
+}
+
+function stopSiri(){
+  stopRec();
+  document.getElementById('siriOverlay').classList.remove('on');
+  document.getElementById('siriConfirm').classList.remove('on');
+  document.getElementById('siriEdit').value='';
+}
+
+function quickSiri(template){
+  document.getElementById('siriOverlay').classList.add('on');
+  document.getElementById('siriText').textContent=template;
+  document.getElementById('siriText').className='siri-text';
+  document.getElementById('siriHints').style.display='none';
+  document.getElementById('siriEdit').value=template;
+  document.getElementById('siriConfirm').classList.add('on');
+  document.getElementById('siriOrb').classList.remove('speaking');
+  setTimeout(()=>document.getElementById('siriEdit').focus(),400);
+}
+
+function showSiriInterim(text){
+  const el=document.getElementById('siriText');
+  el.textContent=text||'מאזין...';
+  el.className='siri-text'+(text?'':' muted');
+  document.getElementById('siriHints').style.display='none';
+  document.getElementById('siriOrb').classList.add('speaking');
+  document.getElementById('siriWave').classList.add('speaking');
+}
+
+function showSiriFinal(text){
+  document.getElementById('siriOrb').classList.remove('speaking');
+  document.getElementById('siriWave').classList.remove('speaking');
+  // Try command first
+  const cmd=parseVoiceCommand(text);
+  if(cmd){executeCommand(cmd);return;}
+  // Show confirm sheet
+  document.getElementById('siriText').textContent=text;
+  document.getElementById('siriEdit').value=text;
+  document.getElementById('siriConfirm').classList.add('on');
+  setTimeout(()=>document.getElementById('siriEdit').focus(),350);
+}
+
+function confirmSiri(){
+  const txt=document.getElementById('siriEdit').value.trim();
+  if(txt)addTask(txt);
+  stopSiri();
+}
+function cancelSiriConfirm(){
+  document.getElementById('siriConfirm').classList.remove('on');
+  document.getElementById('siriEdit').value='';
+  document.getElementById('siriText').textContent='מה תרצה לעשות?';
+  document.getElementById('siriText').className='siri-text muted';
+  document.getElementById('siriHints').style.display='flex';
+}
+
+// ── Voice Commands ────────────────────────────────────────────────────────────
+function parseVoiceCommand(text){
+  const t=text.trim();
+  // מחק [task]
+  const del=/^(?:מחק|תמחק|מחקי|תמחקי)\s+(.+)$/.exec(t);
+  if(del)return{action:'delete',query:del[1]};
+  // סיים / סמן [task]
+  const done=/^(?:סיים|תסיים|סמן|תסמן|סמני)\s+(.+?)(?:\s+כהושלם)?$/.exec(t);
+  if(done)return{action:'done',query:done[1]};
+  // הראה / פתח [filter]
+  if(/^(?:הראה|פתח|תראה)\s+(?:הכל|כולם|כל\s+המשימות)$/.test(t))return{action:'filter',value:'all'};
+  if(/מקצועי|עבודה/.test(t)&&/הראה|פתח/.test(t))return{action:'filter',value:'מקצועי'};
+  if(/אישי/.test(t)&&/הראה|פתח/.test(t))return{action:'filter',value:'אישי'};
+  // Not a command
+  return null;
+}
+
+function findTaskByQuery(query){
+  const q=query.toLowerCase();
+  return tasks.find(t=>t.text.toLowerCase().includes(q)&&!t.completed);
+}
+
+function executeCommand(cmd){
+  if(cmd.action==='delete'){
+    const t=findTaskByQuery(cmd.query);
+    if(t){del(t.id);toast('משימה נמחקה');stopSiri();}
+    else{showSiriFeedback('לא מצאתי משימה כזו');}
+    return;
+  }
+  if(cmd.action==='done'){
+    const t=findTaskByQuery(cmd.query);
+    if(t){toggleDone(t.id);toast('סומנה כהושלמה');stopSiri();}
+    else{showSiriFeedback('לא מצאתי משימה כזו');}
+    return;
+  }
+  if(cmd.action==='filter'){
+    stopSiri();
+    const btns=document.querySelectorAll('.f-btn');
+    btns.forEach(b=>{if(b.textContent.includes(cmd.value==='all'?'הכל':cmd.value))b.click()});
+    return;
+  }
+}
+
+function showSiriFeedback(msg){
+  document.getElementById('siriText').textContent=msg;
+  document.getElementById('siriText').className='siri-text';
+  setTimeout(stopSiri,1800);
+}
+
+// ── Speech Recognition ────────────────────────────────────────────────────────
+function initRec(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('הדפדפן לא תומך בזיהוי קול');return null}
+  const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=true;
+  r.onresult=e=>{
+    const txt=[...e.results].map(x=>x[0].transcript).join('');
+    if(e.results[e.results.length-1].isFinal)showSiriFinal(txt);
+    else showSiriInterim(txt);
+  };
+  r.onerror=e=>{
+    stopRec();
+    if(e.error==='not-allowed')toast('⛔ אנא אשר גישה למיקרופון');
+    else if(e.error!=='no-speech')toast('שגיאה: '+e.error);
+  };
+  r.onend=stopRec;return r;
+}
+
+function startRec(){
+  rec=rec||initRec();if(!rec)return;
+  try{rec.start()}catch(e){return}
+  siriLive=true;
+  startVis();
+}
+
+function stopRec(){
+  if(!siriLive)return;siriLive=false;
+  try{rec.stop()}catch(e){}
+  rec=null;stopVis();
+}
+
+// ── Audio Visualizer (drives siri wave bars) ──────────────────────────────────
 async function startVis(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
     audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    analyser=audioCtx.createAnalyser();analyser.fftSize=128;
-    audioCtx.createMediaStreamSource(stream).connect(analyser);drawVis();
+    analyser=audioCtx.createAnalyser();analyser.fftSize=64;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    driveWave();
   }catch(e){}
 }
-function drawVis(){
-  const buf=new Uint8Array(analyser.frequencyBinCount),BARS=52,R=58;
+
+function driveWave(){
+  const bars=document.querySelectorAll('.siri-bar');
+  const buf=new Uint8Array(analyser.frequencyBinCount);
   function frame(){
     animId=requestAnimationFrame(frame);
     analyser.getByteFrequencyData(buf);
-    vctx.clearRect(0,0,260,260);
-    for(let i=0;i<BARS;i++){
-      const ang=(i/BARS)*Math.PI*2-Math.PI/2;
-      const raw=buf[Math.floor(i*buf.length/BARS)]/255;
-      const v=raw*raw,h=v*52+4;
-      vctx.beginPath();
-      vctx.moveTo(CX+Math.cos(ang)*R,CY+Math.sin(ang)*R);
-      vctx.lineTo(CX+Math.cos(ang)*(R+h),CY+Math.sin(ang)*(R+h));
-      vctx.strokeStyle=`rgba(255,255,255,${v*.7+.15})`;
-      vctx.lineWidth=2.6;vctx.lineCap='round';vctx.stroke();
-    }
+    bars.forEach((b,i)=>{
+      const raw=buf[Math.floor(i*buf.length/bars.length)]/255;
+      const h=Math.max(6,raw*raw*60+4);
+      b.style.height=h+'px';
+    });
   }
   frame();
 }
+
 function stopVis(){
   if(animId){cancelAnimationFrame(animId);animId=null}
   if(audioCtx){audioCtx.close();audioCtx=null}
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
-  vctx.clearRect(0,0,260,260);
+  document.querySelectorAll('.siri-bar').forEach(b=>{b.style.height='8px'});
 }
+
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&siriLive)stopSiri()});
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
@@ -675,191 +782,67 @@ window.addEventListener('appinstalled',()=>{document.getElementById('installBar'
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('installBar').classList.remove('on')})}
 function dismissInstall(){document.getElementById('installBar').classList.remove('on')}
 
-// ── Voice ─────────────────────────────────────────────────────────────────────
-function initRec(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('הדפדפן לא תומך בזיהוי קול');return null}
-  const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=true;
-  r.onresult=e=>{
-    const txt=[...e.results].map(x=>x[0].transcript).join('');
-    if(e.results[e.results.length-1].isFinal)showEditTranscript(txt);
-    else showTranscript(txt);
-  };
-  r.onerror=e=>{
-    stop();
-    if(e.error==='not-allowed')toast('⛔ אנא אשר גישה למיקרופון');
-    else if(e.error==='audio-capture')toast('מיקרופון לא זמין');
-    else if(e.error!=='no-speech')toast('שגיאה: '+e.error);
-  };
-  r.onend=stop;return r;
-}
-function toggle(){vibrate(10);live?stop():start()}
-async function start(){
-  rec=rec||initRec();if(!rec)return;
-  try{rec.start()}catch(e){return}
-  live=true;setUI(true);
-  setTimeout(()=>{if(live)startVis()},300);
-}
-function stop(){
-  if(!live)return;live=false;
-  try{rec.stop()}catch(e){}
-  rec=null;stopVis();setUI(false);
-}
-function setUI(on){
-  const btn=document.getElementById('micBtn');
-  const wrap=document.getElementById('visWrap');
-  const lbl=document.getElementById('micLbl');
-  const txt=document.getElementById('micLblTxt');
-  const stopIco=`<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
-  const micIco=`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
-  btn.className='mic-btn'+(on?' rec':'');
-  btn.innerHTML=on?stopIco:micIco;
-  wrap.className='vis-wrap'+(on?' rec':'');
-  lbl.className='mic-label'+(on?' rec':'');
-  txt.textContent=on?'מאזין...':'לחץ לדיבור';
-}
-function showTranscript(t){
-  document.getElementById('transcriptPreview').textContent=t;
-  document.getElementById('transcript').classList.add('on');
-}
-function showEditTranscript(t){
-  document.getElementById('transcriptPreview').textContent='';
-  document.getElementById('transcriptEdit').value=t;
-  document.getElementById('transcript').classList.add('on');
-  setTimeout(()=>document.getElementById('transcriptEdit').focus(),50);
-}
-function hideTranscript(){
-  document.getElementById('transcript').classList.remove('on');
-  document.getElementById('transcriptPreview').textContent='';
-  document.getElementById('transcriptEdit').value='';
-}
-function confirmTask(){const txt=document.getElementById('transcriptEdit').value.trim();if(txt)addTask(txt);else hideTranscript();}
-function cancelTask(){hideTranscript();}
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&live)stop()});
-
-// ── Quick Actions ─────────────────────────────────────────────────────────────
-function quickFill(template){
-  const ta=document.getElementById('transcriptEdit');
-  ta.value=template;
-  document.getElementById('transcript').classList.add('on');
-  ta.focus();
-  ta.setSelectionRange(ta.value.length,ta.value.length);
-}
-
 // ── Parsing ───────────────────────────────────────────────────────────────────
 function detectCat(text){
-  for(const[name,{kw}]of Object.entries(CATS)){
-    if(name==='כללי')continue;
-    if(kw.some(k=>text.includes(k)))return name;
-  }
+  for(const[name,{kw}]of Object.entries(CATS)){if(name==='כללי')continue;if(kw.some(k=>text.includes(k)))return name;}
   if(/לקנות|קנה|קניות/.test(text))return 'אישי';
   return 'כללי';
 }
-
 function detectIntent(text){
   if(/התקשר|תתקשר|לצלצל|צלצל/.test(text))return 'call';
-  if(/שלח הודעה|שלח ל|דבר עם|ווטסאפ|וואטסאפ/.test(text))return 'whatsapp';
   return 'task';
 }
-
 function detectTime(text){
   const now=new Date();
   let days=0;
-  if(text.includes('מחרתיים'))days=2;
-  else if(text.includes('מחר'))days=1;
+  if(text.includes('מחרתיים'))days=2;else if(text.includes('מחר'))days=1;
   const base=new Date(now);base.setDate(base.getDate()+days);
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
   if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
-  const isMorning=text.includes('בוקר');
-  const isNight=text.includes('לילה');
-  const setH=(h,m=0)=>{
-    base.setHours(h,m,0,0);
-    if(days===0&&base<=now)base.setDate(base.getDate()+1);
-    return new Date(base);
-  };
-  const wordHours={
-    'שתים עשרה':12,'שתיים עשרה':12,'אחת עשרה':11,'אחד עשר':11,
-    'עשר':isNight?22:10,'תשע':isMorning?9:21,'שמונה':isMorning?8:20,
-    'שבע':isMorning?7:19,'שש':isMorning?6:18,'חמש':isMorning?5:17,
-    'ארבע':isMorning?4:16,'שלוש':isMorning?3:15,
-    'שתיים':isMorning?2:14,'שתים':isMorning?2:14,'אחת':isMorning?1:13,'אחד':isMorning?1:13
-  };
+  const isMorning=text.includes('בוקר'),isNight=text.includes('לילה');
+  const setH=(h,m=0)=>{base.setHours(h,m,0,0);if(days===0&&base<=now)base.setDate(base.getDate()+1);return new Date(base)};
+  const wordHours={'שתים עשרה':12,'שתיים עשרה':12,'אחת עשרה':11,'אחד עשר':11,'עשר':isNight?22:10,'תשע':isMorning?9:21,'שמונה':isMorning?8:20,'שבע':isMorning?7:19,'שש':isMorning?6:18,'חמש':isMorning?5:17,'ארבע':isMorning?4:16,'שלוש':isMorning?3:15,'שתיים':isMorning?2:14,'שתים':isMorning?2:14,'אחת':isMorning?1:13,'אחד':isMorning?1:13};
   let firstIdx=Infinity,firstH=null,firstM=0;
   for(const[word,h] of Object.entries(wordHours)){
     const idx=text.indexOf(word);
-    if(idx!==-1&&idx<firstIdx){
-      firstIdx=idx;firstH=h;
-      const after=text.slice(idx+word.length,idx+word.length+8);
-      firstM=after.includes('וחצי')?30:after.includes('ורבע')?15:0;
-    }
+    if(idx!==-1&&idx<firstIdx){firstIdx=idx;firstH=h;const after=text.slice(idx+word.length,idx+word.length+8);firstM=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}
   }
   if(firstH!==null)return setH(firstH,firstM);
   const numRe=text.match(/(?:[בל]שעה?\s*|ב-?)(\d{1,2})(?::(\d{2}))?/)||text.match(/\b(\d{1,2}):(\d{2})\b/);
-  if(numRe){
-    let h=+numRe[1],m=+(numRe[2]||0);
-    if(h>=1&&h<=9&&!isMorning)h+=12;
-    if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,+(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}
-    return setH(h,m);
-  }
-  if(isMorning)return setH(9);
-  if(text.includes('צהריים'))return setH(13);
-  if(text.includes('אחר הצהריים'))return setH(15);
-  if(text.includes('ערב')||text.includes('הערב'))return setH(20);
-  if(isNight)return setH(22);
-  if(days>0)return setH(9);
-  return new Date(now.getTime()+3600000);
+  if(numRe){let h=+numRe[1],m=+(numRe[2]||0);if(h>=1&&h<=9&&!isMorning)h+=12;if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,+(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}return setH(h,m);}
+  if(isMorning)return setH(9);if(text.includes('צהריים'))return setH(13);if(text.includes('אחר הצהריים'))return setH(15);
+  if(text.includes('ערב')||text.includes('הערב'))return setH(20);if(isNight)return setH(22);
+  if(days>0)return setH(9);return new Date(now.getTime()+3600000);
 }
-
-// ── Tasks ─────────────────────────────────────────────────────────────────────
 function to24hText(text){
-  const morning=text.includes('בוקר');
-  text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>{h=+h;if(h>=1&&h<=9&&!morning)h+=12;return h.toString().padStart(2,'0')+':'+m;});
-  text=text.replace(/(ב-?|בשעה?\s*)(\d{1,2})(?![:0-9])/g,(full,pre,h)=>{h=+h;if(h>=1&&h<=9&&!morning)h+=12;return pre+h;});
+  const m=text.includes('בוקר');
+  text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m2)=>{h=+h;if(h>=1&&h<=9&&!m)h+=12;return h.toString().padStart(2,'0')+':'+m2});
+  text=text.replace(/(ב-?|בשעה?\s*)(\d{1,2})(?![:0-9])/g,(f,p,h)=>{h=+h;if(h>=1&&h<=9&&!m)h+=12;return p+h});
   return text;
 }
 
+// ── Tasks ─────────────────────────────────────────────────────────────────────
 function addTask(text){
   if(!text.trim())return;
-  const normalized=to24hText(text.trim());
-  const task={id:Date.now(),text:normalized,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false};
-  tasks.unshift(task);
-  save();render();toast('משימה נוספה');vibrate([10,30,10]);
-  hideTranscript();syncTask(task);
+  const n=to24hText(text.trim());
+  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false};
+  tasks.unshift(task);save();render();toast('משימה נוספה');vibrate([10,30,10]);syncTask(task);
 }
-
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
   fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})}).catch(()=>{});
 }
-
 async function syncTask(task){
   const eventId=await createCalendarEvent(task);
-  if(eventId){
-    const t=tasks.find(x=>x.id===task.id);
-    if(t){t.calendarEventId=eventId;save();render();}
-    toast('נוסף לגוגל קאלנדר');
-  }
+  if(eventId){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=eventId;save();render();}toast('נוסף לגוגל קאלנדר');}
   sendEmailNotification(task);
 }
-
-async function deleteFromCalendar(task){
-  if(!task.calendarEventId)return;
-  await deleteCalendarEvent(task.calendarEventId);
-}
-
+async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId)}
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
-
-async function del(id){
-  const t=tasks.find(x=>x.id===id);
-  if(t)await deleteFromCalendar(t);
-  tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();
-  toast('משימה נמחקה');
-}
-
+async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה')}
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
 function editTask(id){const el=document.getElementById('edit-'+id);if(el)el.classList.toggle('on')}
-
 async function saveEdit(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   const txt=document.getElementById('etxt-'+id).value.trim();
@@ -868,10 +851,8 @@ async function saveEdit(id){
   if(t.calendarEventId)await deleteFromCalendar(t);
   t.text=txt;t.category=detectCat(txt);
   if(dt)t.datetime=new Date(dt).toISOString();
-  t.calendarEventId=null;
-  save();render();await syncTask(t);toast('משימה עודכנה');
+  t.calendarEventId=null;save();render();await syncTask(t);toast('משימה עודכנה');
 }
-
 function cancelEdit(id){const el=document.getElementById('edit-'+id);if(el)el.classList.remove('on')}
 function clearDone(){tasks=tasks.filter(x=>!x.completed);save();render();toast('הושלמו נוקו')}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render()}
@@ -881,10 +862,7 @@ function updateBadge(){document.getElementById('badge').textContent=tasks.filter
 function render(){
   const el=document.getElementById('list');if(!el)return;
   const list=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
-  if(!list.length){
-    el.innerHTML=`<div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הבועה ודבר!</p></div>`;
-    return;
-  }
+  if(!list.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div>`;return}
   el.innerHTML=list.map(task=>{
     const cat=CATS[task.category]||CATS['כללי'];
     const dt=new Date(task.datetime);
@@ -893,33 +871,22 @@ function render(){
     const pad=n=>n.toString().padStart(2,'0');
     const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-    const calBadge=task.calendarEventId
-      ?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`
-      :`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
-    const intent=detectIntent(task.text);
-    const extraBtn=intent==='call'
-      ?`<button class="act call-btn" onclick="phoneAction(${task.id})" title="התקשר">${ICO.phone}</button>`
-      :'';
-    const doneIco=task.completed?ICO.undo:ICO.check;
+    const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
+    const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}</button>`:'';
     return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
   <div class="task-txt">${esc(task.text)}</div>
   <div class="date-block">
-    <div>
-      <div class="date-time-wrap"><div class="date-main">${timeStr}</div></div>
-      <div class="date-sub">${dateStr}</div>
-    </div>
+    <div><div class="date-main">${timeStr}</div><div class="date-sub">${dateStr}</div></div>
     ${calBadge}
   </div>
-  <div class="meta">
-    <select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select>
-  </div>
+  <div class="meta"><select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select></div>
   <div class="actions">
-    <button class="act done-btn" onclick="toggleDone(${task.id})" title="${task.completed?'שחזר':'סיים'}">${doneIco}</button>
-    <button class="act edit-btn" onclick="editTask(${task.id})" title="ערוך">${ICO.edit}</button>
+    <button class="act done-btn" onclick="toggleDone(${task.id})">${task.completed?ICO.undo:ICO.check}</button>
+    <button class="act edit-btn" onclick="editTask(${task.id})">${ICO.edit}</button>
     ${extraBtn}
-    <button class="act wa-btn" onclick="wa(${task.id})" title="WhatsApp">${ICO.msg}</button>
-    <button class="act cal-btn" onclick="cal(${task.id})" title="פתח בקאלנדר">${ICO.cal}</button>
-    <button class="act del-btn" onclick="del(${task.id})" title="מחק">${ICO.trash}</button>
+    <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
+    <button class="act cal-btn" onclick="cal(${task.id})">${ICO.cal}</button>
+    <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
@@ -934,34 +901,14 @@ function render(){
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
-function wa(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
-  const dt=new Date(t.datetime);
-  const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
-  window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${dt.toLocaleDateString('he-IL')} ${timeStr}`),'_blank');
-}
-function cal(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
-  const s=new Date(t.datetime),e=new Date(s.getTime()+3600000);
-  const f=d=>d.toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
-  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${f(s)}/${f(e)}`,'_blank');
-}
-function phoneAction(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
-  const phone=t.text.match(/\d[\d\-\s]{7,}/);
-  if(phone)window.open('tel:'+phone[0].replace(/\D/g,''));
-  else toast('לחץ לחיוג — הכנס מספר בעריכה');
-}
+function wa(id){const t=tasks.find(x=>x.id===id);if(!t)return;const dt=new Date(t.datetime);const ts=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${dt.toLocaleDateString('he-IL')} ${ts}`),'_blank')}
+function cal(id){const t=tasks.find(x=>x.id===id);if(!t)return;const s=new Date(t.datetime),e=new Date(s.getTime()+3600000);const f=d=>d.toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${f(s)}/${f(e)}`,'_blank')}
+function phoneAction(id){const t=tasks.find(x=>x.id===id);if(!t)return;const p=t.text.match(/\d[\d\-\s]{7,}/);if(p)window.open('tel:'+p[0].replace(/\D/g,''));else toast('הוסף מספר טלפון בעריכה')}
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
-function toast(msg){
-  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');
-  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2400);
-}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2400)}
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load',initAuth);
 </script>
 </body>
