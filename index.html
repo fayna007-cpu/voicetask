@@ -871,7 +871,8 @@ function render(){
     const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
     const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-    const dtLocal=dt.toISOString().slice(0,16);
+    const pad=n=>n.toString().padStart(2,'0');
+    const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     const calBadge=task.calendarEventId
       ?`<span class="cal-badge synced">📅 מסונכרן</span>`
       :`<span class="cal-badge pending">📅 ממתין</span>`;
