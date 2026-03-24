@@ -78,7 +78,7 @@
       "parameters": {
         "resource": "event",
         "operation": "delete",
-        "calendar": {"mode": "list", "value": "primary"},
+        "calendar": {"mode": "id", "value": "REPLACE_VOICETASK_CALENDAR_ID"},
         "eventId": "={{ ($json.body ?? $json).calendarEventId }}"
       }
     },
@@ -97,12 +97,17 @@
       "parameters": {
         "resource": "event",
         "operation": "create",
-        "calendar": {"mode": "list", "value": "primary"},
+        "calendar": {"mode": "id", "value": "REPLACE_VOICETASK_CALENDAR_ID"},
         "start": "={{ $('עיבוד נתונים').item.json.datetime }}",
         "end": "={{ $('עיבוד נתונים').item.json.endDatetime }}",
         "additionalFields": {
           "summary": "={{ $('עיבוד נתונים').item.json.text }}",
-          "description": "=קטגוריה: {{ $('עיבוד נתונים').item.json.category }}\nנוצר ב: {{ new Date($('עיבוד נתונים').item.json.createdAt).toLocaleString('he-IL') }}\n\nנוצר מ-VoiceTask 🎤"
+          "description": "=קטגוריה: {{ $('עיבוד נתונים').item.json.category }}\nנוצר ב: {{ new Date($('עיבוד נתונים').item.json.createdAt).toLocaleString('he-IL') }}\n\nנוצר מ-VoiceTask 🎤",
+          "attendees": [
+            {
+              "email": "={{ $('עיבוד נתונים').item.json.email }}"
+            }
+          ]
         }
       }
     },
