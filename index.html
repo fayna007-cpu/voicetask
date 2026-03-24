@@ -761,6 +761,17 @@ function detectTime(text){
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
+const N8N_WEBHOOK = 'https://guyfs.app.n8n.cloud/webhook/voicetask';
+
+function sendEmailNotification(task){
+  if(!gAuth?.email)return;
+  fetch(N8N_WEBHOOK,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})
+  }).catch(()=>{});
+}
+
 function to24hText(text){
   const morning=text.includes('בוקר');
   text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>{
@@ -799,6 +810,7 @@ async function syncTask(task){
     if(t){t.calendarEventId=eventId;save();render();}
     toast('📅 נוסף לגוגל קאלנדר');
   }
+  sendEmailNotification(task);
 }
 
 async function deleteFromCalendar(task){
