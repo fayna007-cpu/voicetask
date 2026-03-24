@@ -78,7 +78,7 @@
       "parameters": {
         "resource": "event",
         "operation": "delete",
-        "calendar": {"mode": "id", "value": "REPLACE_VOICETASK_CALENDAR_ID"},
+        "calendar": {"mode": "id", "value": "c5caabcb206401f369c59c985274f14ad284c3ff899fcc1d93bbd4e58213aeae@group.calendar.google.com"},
         "eventId": "={{ ($json.body ?? $json).calendarEventId }}"
       }
     },
@@ -97,7 +97,7 @@
       "parameters": {
         "resource": "event",
         "operation": "create",
-        "calendar": {"mode": "id", "value": "REPLACE_VOICETASK_CALENDAR_ID"},
+        "calendar": {"mode": "id", "value": "c5caabcb206401f369c59c985274f14ad284c3ff899fcc1d93bbd4e58213aeae@group.calendar.google.com"},
         "start": "={{ $('עיבוד נתונים').item.json.datetime }}",
         "end": "={{ $('עיבוד נתונים').item.json.endDatetime }}",
         "additionalFields": {
