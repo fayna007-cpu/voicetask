@@ -637,6 +637,7 @@ function showSiriInterim(text){
 }
 
 function showSiriFinal(text){
+  stopRec();
   document.getElementById('siriOrb').classList.remove('speaking');
   document.getElementById('siriWave').classList.remove('speaking');
   // Try command first
@@ -838,8 +839,9 @@ async function syncTask(task){
     if(res.ok){
       const d=await res.json();
       if(d.eventId){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=d.eventId;save();render();}toast('נוסף לגוגל קאלנדר');}
-    }
-  }catch(e){}
+      else toast('⚠️ סנכרון קאלנדר נכשל');
+    }else{toast('⚠️ שגיאת שרת n8n');}
+  }catch(e){toast('⚠️ לא ניתן להתחבר ל-n8n');}
 }
 async function deleteFromCalendar(task){
   if(!task.calendarEventId||!gAuth?.email)return;
