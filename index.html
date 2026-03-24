@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="VoiceTask">
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async></script>
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -32,6 +34,42 @@ body{
   overscroll-behavior-y:none;-webkit-user-select:none;user-select:none;
 }
 
+/* ── Login Screen ─────────────────────────────────────────────────────────── */
+#loginScreen{
+  position:fixed;inset:0;z-index:200;
+  background:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 32px;
+}
+#loginScreen.hidden{display:none}
+.login-blob{
+  width:160px;height:160px;flex-shrink:0;
+  border-radius:60% 40% 30% 70% / 60% 30% 70% 40%;
+  background:linear-gradient(135deg,#93c5fd 0%,#818cf8 35%,#c4b5fd 65%,#67e8f9 100%);
+  background-size:300% 300%;
+  animation:morph 9s ease-in-out infinite,grad-idle 7s ease infinite;
+  display:flex;align-items:center;justify-content:center;
+  font-size:64px;
+  margin-bottom:32px;
+  box-shadow:0 20px 60px rgba(96,165,250,.35);
+}
+.login-title{font-size:32px;font-weight:800;color:#1a1a1a;margin-bottom:10px;letter-spacing:-.8px;text-align:center}
+.login-sub{font-size:15px;color:#8a8a8e;margin-bottom:48px;text-align:center;line-height:1.7;max-width:280px}
+.google-btn{
+  display:flex;align-items:center;gap:12px;
+  padding:15px 32px;border-radius:50px;
+  background:#fff;color:#1a1a1a;
+  border:2px solid #e5e5ea;
+  font-size:16px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 4px 24px rgba(0,0,0,.1);
+  transition:transform .12s,box-shadow .2s;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+.google-btn:active{transform:scale(.96);box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.google-icon{width:22px;height:22px;flex-shrink:0}
+.login-terms{margin-top:20px;font-size:12px;color:#c7c7cc;text-align:center;line-height:1.6;max-width:260px}
+
 /* ── Header ── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
@@ -41,11 +79,30 @@ body{
   position:sticky;top:0;z-index:20;
 }
 .logo{font-size:21px;font-weight:800;letter-spacing:-0.6px;color:var(--text)}
+.header-right{display:flex;align-items:center;gap:10px}
 .badge{
   font-size:12px;font-weight:600;color:var(--muted);
   background:var(--surface);border:1.5px solid var(--border);
   padding:5px 13px;border-radius:20px;
 }
+/* User chip */
+.user-chip{
+  display:flex;align-items:center;gap:7px;
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:50px;padding:4px 12px 4px 4px;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .15s;
+}
+.user-chip:active{background:var(--bg)}
+.user-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.user-initials{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,#818cf8,#67e8f9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.user-name-chip{font-size:12px;font-weight:600;color:var(--text);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── Mic section ── */
 .mic-wrap{
@@ -95,17 +152,14 @@ body{
   100%{background-position:0% 50%}
 }
 
-/* Lottie — hidden, not used */
 #lottieIdle,#lottieRec{display:none}
 
-/* Canvas overlay on blob */
 #vis{
   position:absolute;inset:0;
   opacity:0;transition:opacity .5s;pointer-events:none;
 }
 .vis-wrap.rec #vis{opacity:1}
 
-/* Center icon inside blob */
 .mic-btn{
   position:relative;z-index:5;pointer-events:none;
   width:80px;height:80px;border-radius:50%;border:none;
@@ -119,7 +173,6 @@ body{
 .mic-btn.rec{background:rgba(255,255,255,.14);transform:scale(1.08)}
 .vis-wrap:active .mic-btn{transform:scale(.9)}
 
-/* Status label */
 .mic-label{
   font-size:16px;color:var(--muted);font-weight:500;letter-spacing:-.2px;
   transition:color .3s;
@@ -298,9 +351,32 @@ body{
 </head>
 <body>
 
+<!-- ── Login Screen ─────────────────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-blob">🎤</div>
+  <div class="login-title">VoiceTask</div>
+  <div class="login-sub">ניהול משימות קולי חכם<br>מסונכרן עם Google Calendar שלך</div>
+  <button class="google-btn" onclick="signInWithGoogle()">
+    <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    התחבר עם Google
+  </button>
+  <div class="login-terms">ההתחברות מאפשרת גישה לגוגל קאלנדר שלך בלבד</div>
+</div>
+
+<!-- ── Main App ──────────────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
 <div class="header">
   <div class="logo">VoiceTask</div>
-  <div class="badge" id="badge">0 פעילות</div>
+  <div class="header-right">
+    <div class="badge" id="badge">0 פעילות</div>
+    <div class="user-chip" id="userChip" onclick="confirmSignOut()"></div>
+  </div>
 </div>
 
 <div class="mic-wrap">
@@ -341,9 +417,22 @@ body{
   <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
   <button class="btn-install" onclick="installApp()">התקן</button>
 </div>
+
+</div><!-- /#app -->
+
 <div class="toast" id="toast"></div>
 
 <script>
+// ══════════════════════════════════════════════════════════════════════════════
+// SETUP: Replace with your Google OAuth Client ID
+// 1. Go to https://console.cloud.google.com/
+// 2. Create OAuth 2.0 Client ID (Web application)
+// 3. Add Authorized JS origin: https://fayna007-cpu.github.io
+// 4. Enable Google Calendar API v3
+// ══════════════════════════════════════════════════════════════════════════════
+const GOOGLE_CLIENT_ID = 'REPLACE_WITH_GOOGLE_CLIENT_ID';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+
 // ── App State ─────────────────────────────────────────────────────────────────
 const CATS = {
   אישי:   {kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'],c:'#34d399'},
@@ -353,6 +442,134 @@ const CATS = {
 
 let tasks = JSON.parse(localStorage.getItem('vt2')||'[]');
 let rec=null,live=false,filter='all',deferredPrompt=null;
+let gAuth=null,tokenClient=null;
+
+// ── Google Auth ───────────────────────────────────────────────────────────────
+function initAuth(){
+  const stored=JSON.parse(localStorage.getItem('vt_auth')||'null');
+  if(stored&&stored.expiry>Date.now()+60000){
+    gAuth=stored;
+    showApp();
+    return;
+  }
+  showLogin();
+}
+
+function signInWithGoogle(){
+  if(!window.google){toast('טוען...');setTimeout(signInWithGoogle,800);return;}
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:GOOGLE_CLIENT_ID,
+    scope:SCOPES,
+    callback:async(resp)=>{
+      if(resp.error){toast('שגיאת התחברות: '+resp.error);return;}
+      try{
+        const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
+          headers:{Authorization:'Bearer '+resp.access_token}
+        });
+        const u=await r.json();
+        gAuth={
+          access_token:resp.access_token,
+          email:u.email||'',
+          name:u.name||u.email||'',
+          picture:u.picture||'',
+          expiry:Date.now()+(+(resp.expires_in||3600))*1000
+        };
+        localStorage.setItem('vt_auth',JSON.stringify(gAuth));
+        showApp();
+      }catch(e){toast('שגיאה בטעינת פרטי משתמש');}
+    }
+  });
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+
+function showApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').style.display='';
+  updateUserChip();
+  render();updateBadge();
+}
+
+function showLogin(){
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('app').style.display='none';
+}
+
+function updateUserChip(){
+  if(!gAuth)return;
+  const chip=document.getElementById('userChip');
+  const avatar=gAuth.picture
+    ?`<img class="user-avatar" src="${gAuth.picture}" referrerpolicy="no-referrer">`
+    :`<div class="user-initials">${(gAuth.name||'?')[0].toUpperCase()}</div>`;
+  const firstName=(gAuth.name||'').split(' ')[0]||gAuth.email.split('@')[0];
+  chip.innerHTML=avatar+`<span class="user-name-chip">${esc(firstName)}</span>`;
+}
+
+function confirmSignOut(){
+  if(confirm('להתנתק?'))signOut();
+}
+
+function signOut(){
+  if(gAuth&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});
+  gAuth=null;
+  localStorage.removeItem('vt_auth');
+  showLogin();
+}
+
+async function getToken(){
+  if(!gAuth)return null;
+  if(gAuth.expiry>Date.now()+60000)return gAuth.access_token;
+  // Token about to expire — refresh silently
+  return new Promise(resolve=>{
+    if(!tokenClient){
+      tokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}
+      });
+    }
+    const prev=tokenClient.callback;
+    tokenClient.callback=(resp)=>{
+      tokenClient.callback=prev;
+      if(resp.error){resolve(null);return;}
+      gAuth.access_token=resp.access_token;
+      gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+      localStorage.setItem('vt_auth',JSON.stringify(gAuth));
+      resolve(resp.access_token);
+    };
+    tokenClient.requestAccessToken({prompt:''});
+  });
+}
+
+// ── Google Calendar API ───────────────────────────────────────────────────────
+async function createCalendarEvent(task){
+  const token=await getToken();
+  if(!token)return null;
+  const end=new Date(new Date(task.datetime).getTime()+3600000).toISOString();
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        summary:task.text,
+        description:`קטגוריה: ${task.category}\nנוצר מ-VoiceTask 🎤`,
+        start:{dateTime:task.datetime},
+        end:{dateTime:end}
+      })
+    });
+    if(!res.ok)return null;
+    const data=await res.json();
+    return data.id||null;
+  }catch(e){return null;}
+}
+
+async function deleteCalendarEvent(eventId){
+  const token=await getToken();
+  if(!token||!eventId)return;
+  try{
+    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+token}
+    });
+  }catch(e){}
+}
 
 // ── Audio Visualizer ──────────────────────────────────────────────────────────
 const canvas=document.getElementById('vis'),vctx=canvas.getContext('2d');
@@ -363,8 +580,7 @@ async function startVis(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
     audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    analyser=audioCtx.createAnalyser();
-    analyser.fftSize=128;
+    analyser=audioCtx.createAnalyser();analyser.fftSize=128;
     audioCtx.createMediaStreamSource(stream).connect(analyser);
     drawVis();
   }catch(e){}
@@ -379,11 +595,10 @@ function drawVis(){
     for(let i=0;i<BARS;i++){
       const ang=(i/BARS)*Math.PI*2-Math.PI/2;
       const raw=buf[Math.floor(i*buf.length/BARS)]/255;
-      const v=raw*raw, h=v*55+4;
+      const v=raw*raw,h=v*55+4;
       const c=Math.cos(ang),s=Math.sin(ang);
       vctx.beginPath();
-      vctx.moveTo(CX+c*R,CY+s*R);
-      vctx.lineTo(CX+c*(R+h),CY+s*(R+h));
+      vctx.moveTo(CX+c*R,CY+s*R);vctx.lineTo(CX+c*(R+h),CY+s*(R+h));
       vctx.strokeStyle=`rgba(255,255,255,${v*.65+.18})`;
       vctx.lineWidth=2.8;vctx.lineCap='round';vctx.stroke();
     }
@@ -418,8 +633,8 @@ function initRec(){
   const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=true;
   r.onresult=e=>{
     const txt=[...e.results].map(x=>x[0].transcript).join('');
-    if(e.results[e.results.length-1].isFinal){showEditTranscript(txt);}
-    else{showTranscript(txt);}
+    if(e.results[e.results.length-1].isFinal)showEditTranscript(txt);
+    else showTranscript(txt);
   };
   r.onerror=e=>{
     stop();
@@ -443,9 +658,7 @@ async function start(){
 function stop(){
   if(!live)return;live=false;
   try{rec.stop()}catch(e){}
-  rec=null;
-  stopVis();
-  setUI(false);
+  rec=null;stopVis();setUI(false);
 }
 
 function setUI(on){
@@ -473,8 +686,7 @@ function hideTranscript(){
 }
 function confirmTask(){
   const txt=document.getElementById('transcriptEdit').value.trim();
-  if(txt)addTask(txt);
-  else hideTranscript();
+  if(txt)addTask(txt);else hideTranscript();
 }
 function cancelTask(){hideTranscript();}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&live)stop()});
@@ -490,8 +702,6 @@ function detectCat(text){
 
 function detectTime(text){
   const now=new Date();
-
-  // ─── תאריך בסיס ───────────────────────────────────────
   let days=0;
   if(text.includes('מחרתיים'))days=2;
   else if(text.includes('מחר'))days=1;
@@ -510,17 +720,13 @@ function detectTime(text){
     return new Date(base);
   };
 
-  // ─── מילות שעה בעברית: מחפש את ה-OCCURRENCE הראשון בטקסט ───
   const wordHours={
     'שתים עשרה':12,'שתיים עשרה':12,
     'אחת עשרה':11,'אחד עשר':11,
     'עשר':isNight?22:10,
-    'תשע':isMorning?9:21,
-    'שמונה':isMorning?8:20,
-    'שבע':isMorning?7:19,
-    'שש':isMorning?6:18,
-    'חמש':isMorning?5:17,
-    'ארבע':isMorning?4:16,
+    'תשע':isMorning?9:21,'שמונה':isMorning?8:20,
+    'שבע':isMorning?7:19,'שש':isMorning?6:18,
+    'חמש':isMorning?5:17,'ארבע':isMorning?4:16,
     'שלוש':isMorning?3:15,
     'שתיים':isMorning?2:14,'שתים':isMorning?2:14,
     'אחת':isMorning?1:13,'אחד':isMorning?1:13
@@ -529,51 +735,39 @@ function detectTime(text){
   for(const[word,h] of Object.entries(wordHours)){
     const idx=text.indexOf(word);
     if(idx!==-1&&idx<firstIdx){
-      firstIdx=idx;
-      firstH=h;
-      // בדוק "וחצי" / "ורבע" מיד אחרי המילה
+      firstIdx=idx;firstH=h;
       const after=text.slice(idx+word.length,idx+word.length+8);
       firstM=after.includes('וחצי')?30:after.includes('ורבע')?15:0;
     }
   }
   if(firstH!==null)return setH(firstH,firstM);
 
-  // ─── שעה מספרית: "בשעה 4", "ב4", "16:30" ───────────────
   const numRe=text.match(/(?:[בל]שעה?\s*|ב-?)(\d{1,2})(?::(\d{2}))?/)||
               text.match(/\b(\d{1,2}):(\d{2})\b/);
   if(numRe){
-    let h=+numRe[1], m=+(numRe[2]||0);
-    // ספרה 1-9 בלי בוקר = שעת אחה"צ (ברירת מחדל בישראל)
+    let h=+numRe[1],m=+(numRe[2]||0);
     if(h>=1&&h<=9&&!isMorning)h+=12;
-    // "וחצי" בסביבת המספר
     if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,+(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}
     return setH(h,m);
   }
 
-  // ─── מילות זמן כלליות ────────────────────────────────────
-  if(isMorning)                             return setH(9);
-  if(text.includes('צהריים'))               return setH(13);
-  if(text.includes('אחר הצהריים'))          return setH(15);
-  if(text.includes('ערב')||text.includes('הערב')) return setH(20);
-  if(isNight)                               return setH(22);
-
+  if(isMorning)                              return setH(9);
+  if(text.includes('צהריים'))                return setH(13);
+  if(text.includes('אחר הצהריים'))           return setH(15);
+  if(text.includes('ערב')||text.includes('הערב'))return setH(20);
+  if(isNight)                                return setH(22);
   if(days>0)return setH(9);
   return new Date(now.getTime()+3600000);
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
-const N8N_WEBHOOK = 'https://guyfs.app.n8n.cloud/webhook/voicetask';
-const USER_EMAIL  = localStorage.getItem('vt_email') || 'fayna007@gmail.com';
-
 function to24hText(text){
   const morning=text.includes('בוקר');
-  // HH:MM patterns: 4:30 → 16:30
   text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>{
     h=+h;
     if(h>=1&&h<=9&&!morning)h+=12;
     return h.toString().padStart(2,'0')+':'+m;
   });
-  // bare digit after ב/ל/שעה: ב-4 / בשעה 4 → ב-16
   text=text.replace(/(ב-?|בשעה?\s*)(\d{1,2})(?![:0-9])/g,(full,pre,h)=>{
     h=+h;
     if(h>=1&&h<=9&&!morning)h+=12;
@@ -595,69 +789,60 @@ function addTask(text){
   tasks.unshift(task);
   save();render();toast('✅ משימה נוספה');vibrate([10,30,10]);
   hideTranscript();
-  sendToN8n(task);
+  syncTask(task);
 }
 
-function sendToN8n(task){
-  fetch(N8N_WEBHOOK,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({...task,email:USER_EMAIL,action:'create'})
-  })
-  .then(r=>r.json().catch(()=>null).then(data=>{
-    if(data&&data.eventId){
-      const t=tasks.find(x=>x.id===task.id);
-      if(t){t.calendarEventId=data.eventId;save();}
-    }
-    toast('🤖 n8n קיבל את המשימה');
-  }))
-  .catch(()=>{});
+async function syncTask(task){
+  const eventId=await createCalendarEvent(task);
+  if(eventId){
+    const t=tasks.find(x=>x.id===task.id);
+    if(t){t.calendarEventId=eventId;save();render();}
+    toast('📅 נוסף לגוגל קאלנדר');
+  }
 }
 
-function deleteFromCalendar(task){
+async function deleteFromCalendar(task){
   if(!task.calendarEventId)return;
-  fetch(N8N_WEBHOOK,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'delete',calendarEventId:task.calendarEventId,email:USER_EMAIL})
-  }).catch(()=>{});
+  await deleteCalendarEvent(task.calendarEventId);
 }
 
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
-function del(id){
+
+async function del(id){
   const t=tasks.find(x=>x.id===id);
-  if(t)deleteFromCalendar(t);
+  if(t)await deleteFromCalendar(t);
   tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();
   toast('🗑 משימה נמחקה');
 }
+
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
 
 function editTask(id){
   const el=document.getElementById('edit-'+id);
   if(el)el.classList.toggle('on');
 }
-function saveEdit(id){
+
+async function saveEdit(id){
   const t=tasks.find(x=>x.id===id);
   if(!t)return;
   const txt=document.getElementById('etxt-'+id).value.trim();
   const dt=document.getElementById('edt-'+id).value;
   if(!txt)return;
-  // מחק אירוע קיים בקאלנדר
-  if(t.calendarEventId)deleteFromCalendar(t);
-  t.text=txt;
-  t.category=detectCat(txt);
+  if(t.calendarEventId)await deleteFromCalendar(t);
+  t.text=txt;t.category=detectCat(txt);
   if(dt)t.datetime=new Date(dt).toISOString();
   t.calendarEventId=null;
   save();render();
-  // צור אירוע חדש
-  sendToN8n(t);
+  await syncTask(t);
   toast('✏️ משימה עודכנה');
 }
+
 function cancelEdit(id){
   const el=document.getElementById('edit-'+id);
   if(el)el.classList.remove('on');
 }
+
 function clearDone(){tasks=tasks.filter(x=>!x.completed);save();render();toast('🗑 הושלמו נוקו')}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render()}
 function updateBadge(){document.getElementById('badge').textContent=tasks.filter(t=>!t.completed).length+' פעילות'}
@@ -665,6 +850,7 @@ function updateBadge(){document.getElementById('badge').textContent=tasks.filter
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(){
   const el=document.getElementById('list');
+  if(!el)return;
   const list=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
   if(!list.length){el.innerHTML=`<div class="empty"><i>🎯</i><p>אין משימות כאן.<br>לחץ על הבועה ודבר!</p></div>`;return}
   el.innerHTML=list.map(task=>{
@@ -709,7 +895,12 @@ function render(){
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
-function wa(id){const t=tasks.find(x=>x.id===id);if(!t)return;window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${new Date(t.datetime).toLocaleDateString('he-IL')+' '+new Date(t.datetime).getHours().toString().padStart(2,'0')+':'+new Date(t.datetime).getMinutes().toString().padStart(2,'0')}`),'_blank')}
+function wa(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  const dt=new Date(t.datetime);
+  const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  window.open('https://wa.me/?text='+encodeURIComponent(`📌 ${t.text}\n⏰ ${dt.toLocaleDateString('he-IL')} ${timeStr}`),'_blank');
+}
 function cal(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   const s=new Date(t.datetime),e=new Date(s.getTime()+3600000);
@@ -726,7 +917,7 @@ function toast(msg){
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-render();updateBadge();
+window.addEventListener('load',initAuth);
 </script>
 </body>
 </html>
