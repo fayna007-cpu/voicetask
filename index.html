@@ -330,9 +330,10 @@ body{
 @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .card.done{opacity:.4}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
-.card.overdue{opacity:.6;filter:grayscale(.5)}
-.card.overdue .date-block{color:#ef4444}
-.overdue-label{font-size:11px;font-weight:700;color:#ef4444;margin-right:6px}
+.card.overdue{opacity:.75;border-color:#fca5a5;border-right:4px solid #ef4444;background:#fff5f5}
+.card.overdue .date-block{background:#fee2e2}
+.card.overdue .date-main,.card.overdue .date-sub{color:#ef4444}
+.overdue-label{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#ef4444;border-radius:20px;padding:2px 8px;margin-bottom:7px;letter-spacing:.3px}
 .task-txt{font-size:15px;line-height:1.55;font-weight:600;color:var(--text);margin-bottom:10px;-webkit-user-select:text;user-select:text}
 .date-block{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .date-main{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
