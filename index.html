@@ -330,6 +330,9 @@ body{
 @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .card.done{opacity:.4}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
+.card.overdue{opacity:.6;filter:grayscale(.5)}
+.card.overdue .date-block{color:#ef4444}
+.overdue-label{font-size:11px;font-weight:700;color:#ef4444;margin-right:6px}
 .task-txt{font-size:15px;line-height:1.55;font-weight:600;color:var(--text);margin-bottom:10px;-webkit-user-select:text;user-select:text}
 .date-block{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .date-main{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
@@ -940,6 +943,7 @@ function render(){
   el.innerHTML=list.map(task=>{
     const cat=CATS[task.category]||CATS['כללי'];
     const dt=new Date(task.datetime);
+    const isOverdue=!task.completed&&dt<new Date();
     const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
     const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
     const pad=n=>n.toString().padStart(2,'0');
@@ -947,7 +951,8 @@ function render(){
     const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
     const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
     const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}</button>`:'';
-    return `<div class="card${task.completed?' done':''}" style="--cc:${cat.c}">
+    return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
+  ${isOverdue?'<span class="overdue-label">⏰ עבר הזמן</span>':''}
   <div class="task-txt">${esc(task.text)}</div>
   <div class="date-block">
     <div><div class="date-main">${timeStr}</div><div class="date-sub">${dateStr}</div></div>
