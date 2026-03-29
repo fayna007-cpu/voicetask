@@ -831,12 +831,44 @@ function detectIntent(text){
 function detectTime(text){
   const now=new Date();
   let days=0;
-  if(text.includes('מחרתיים'))days=2;else if(text.includes('מחר'))days=1;
+
+  // ימים יחסיים
+  if(text.includes('מחרתיים')||text.includes('עוד יומיים'))days=2;
+  else if(text.includes('מחר'))days=1;
+
+  // שבוע הבא
+  if(!days&&(text.includes('שבוע הבא')||text.includes('שבוע הבאה')))days=7;
+
+  // סוף שבוע → שישי
+  if(!days&&(text.includes('סוף השבוע')||text.includes('סוף שבוע')||text.includes('סופשבוע'))){
+    const d=now.getDay();let diff=5-d;if(diff<=0)diff+=7;days=diff;
+  }
+
+  // ימות השבוע — תומך בכל תחיליות: ב, ל, ה, ביום, ליום, ביום ה, ב-
+  if(!days){
+    const dowMap={ראשון:0,שני:1,שלישי:2,רביעי:3,חמישי:4,שישי:5,שבת:6};
+    const dowM=text.match(/(?:(?:ב|ל|ה)-?(?:יום\s+(?:ה)?)?|יום\s+(?:ה)?)(ראשון|שני(?!ה)|שלישי|רביעי|חמישי|שישי|שבת)/)||
+               text.match(/(?:^|\s)(ראשון|שני(?!ה)|שלישי|רביעי|חמישי|שישי|שבת)(?:\s|$)/);
+    if(dowM){const dn=dowM[1];const today=now.getDay();let diff=dowMap[dn]-today;if(diff<=0)diff+=7;days=diff;}
+  }
+
+  // עוד X ימים
+  if(!days){const xd=text.match(/עוד\s+(\d+)\s*ימים?/);if(xd)days=+xd[1];}
+
   const base=new Date(now);base.setDate(base.getDate()+days);
+
+  // עוד X שעות
+  const xh=text.match(/עוד\s+(\d+(?:\.\d+)?)\s*שעות?/);
+  if(xh)return new Date(now.getTime()+parseFloat(xh[1])*3600000);
   if(text.includes('עוד שעתיים'))return new Date(now.getTime()+7200000);
+  if(text.includes('עוד שעה וחצי'))return new Date(now.getTime()+5400000);
   if(text.includes('עוד שעה'))return new Date(now.getTime()+3600000);
+  if(text.includes('עוד חצי שעה')||text.includes('עוד רבע שעה'.replace('רבע','חצי')))return new Date(now.getTime()+1800000);
+  if(text.includes('עוד רבע שעה'))return new Date(now.getTime()+900000);
+
   const isMorning=text.includes('בוקר'),isNight=text.includes('לילה');
   const setH=(h,m=0)=>{base.setHours(h,m,0,0);if(days===0&&base<=now)base.setDate(base.getDate()+1);return new Date(base)};
+
   const wordHours={'שתים עשרה':12,'שתיים עשרה':12,'אחת עשרה':11,'אחד עשר':11,'עשר':isNight?22:10,'תשע':isMorning?9:21,'שמונה':isMorning?8:20,'שבע':isMorning?7:19,'שש':isMorning?6:18,'חמש':isMorning?5:17,'ארבע':isMorning?4:16,'שלוש':isMorning?3:15,'שתיים':isMorning?2:14,'שתים':isMorning?2:14,'אחת':isMorning?1:13,'אחד':isMorning?1:13};
   let firstIdx=Infinity,firstH=null,firstM=0;
   for(const[word,h] of Object.entries(wordHours)){
@@ -844,11 +876,17 @@ function detectTime(text){
     if(idx!==-1&&idx<firstIdx){firstIdx=idx;firstH=h;const after=text.slice(idx+word.length,idx+word.length+8);firstM=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}
   }
   if(firstH!==null)return setH(firstH,firstM);
-  const numRe=text.match(/(?:[בל]שעה?\s*|ב-?)(\d{1,2})(?::(\d{2}))?/)||text.match(/\b(\d{1,2}):(\d{2})\b/);
-  if(numRe){let h=+numRe[1],m=+(numRe[2]||0);if(h>=1&&h<=9&&!isMorning)h+=12;if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,+(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}return setH(h,m);}
-  if(isMorning)return setH(9);if(text.includes('צהריים'))return setH(13);if(text.includes('אחר הצהריים'))return setH(15);
-  if(text.includes('ערב')||text.includes('הערב'))return setH(20);if(isNight)return setH(22);
-  if(days>0)return setH(9);return new Date(now.getTime()+3600000);
+
+  const numRe=text.match(/(?:[בל]שעה?\s*|ב-?)(\d{1,2})(?::(\d{2}))?/)||text.match(/(\d{1,2}):(\d{2})/);
+  if(numRe){let h=+numRe[1],m=+(numRe[2]||0);if(h>=1&&h<=9&&!isMorning)h+=12;if(!m){const after=text.slice((numRe.index||0)+numRe[0].length,(numRe.index||0)+numRe[0].length+8);m=after.includes('וחצי')?30:after.includes('ורבע')?15:0;}return setH(h,m);}
+
+  if(isMorning)return setH(9);
+  if(text.includes('צהריים')||text.includes('צהרים'))return setH(13);
+  if(text.includes('אחר הצהריים')||text.includes('אחה"צ')||text.includes("אחה'צ")||text.includes('אחצ')||text.includes('אחה״צ'))return setH(15);
+  if(text.includes('ערב')||text.includes('הערב'))return setH(20);
+  if(isNight)return setH(22);
+  if(days>0)return setH(9);
+  return new Date(now.getTime()+3600000);
 }
 function to24hText(text){
   const m=text.includes('בוקר');
