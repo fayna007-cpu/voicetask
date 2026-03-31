@@ -390,6 +390,49 @@ body{
 }
 .toast.on{transform:translateX(-50%) translateY(0)}
 @keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ── Routines ── */
+.routine-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}.routine-overlay.on{opacity:1;pointer-events:all}
+.rsheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:480px;background:var(--surface);border-radius:28px 28px 0 0;z-index:101;transition:transform .32s cubic-bezier(.34,1.15,.64,1);max-height:92svh;display:flex;flex-direction:column;overflow:hidden}
+.rsheet.on{transform:translateX(-50%) translateY(0)}
+.rsheet-scroll{overflow-y:auto;flex:1;padding-bottom:calc(24px + var(--sab))}
+.rsheet-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.rsheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px;flex-shrink:0}
+.rsheet-head h3{font-size:18px;font-weight:800;color:var(--text)}
+.rsheet-add-btn{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.routine-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;line-height:1.8}
+.routine-item{display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border)}
+.routine-item-body{flex:1;min-width:0;cursor:pointer}
+.routine-item-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px}
+.routine-item-meta{font-size:12px;color:var(--muted);line-height:1.7}
+.rtoggle{position:relative;width:44px;height:26px;flex-shrink:0}
+.rtoggle input{opacity:0;width:0;height:0;position:absolute}
+.rtoggle-sl{position:absolute;inset:0;background:var(--border2);border-radius:26px;cursor:pointer;transition:background .2s}
+.rtoggle input:checked~.rtoggle-sl{background:var(--accent)}
+.rtoggle-sl::before{content:'';position:absolute;height:20px;width:20px;right:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.rtoggle input:checked~.rtoggle-sl::before{transform:translateX(-18px)}
+.routine-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;line-height:1;font-size:18px;border-radius:8px;flex-shrink:0}
+.rform-section-title{font-size:18px;font-weight:800;color:var(--text);padding:16px 20px 4px;flex-shrink:0}
+.rform{padding:0 20px 8px;display:flex;flex-direction:column;gap:13px}
+.rform-lbl{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.rform-row{display:flex;gap:8px}
+.rfi{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--bg);font-size:14px;font-family:inherit;color:var(--text);outline:none;direction:rtl;-webkit-user-select:text;user-select:text}
+.rfi:focus{border-color:var(--accent)}
+select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer}
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.day-btn{padding:9px 0;border-radius:10px;border:1.5px solid var(--border2);background:var(--surface);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.day-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rform-voice-row{display:flex;gap:8px;align-items:stretch}
+.rform-voice-row .rfi{flex:1}
+.rmic-btn{padding:0 14px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface);color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;touch-action:manipulation}
+.rform-save{width:100%;padding:14px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:4px;touch-action:manipulation}
+.rform-back{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:8px 0 0;font-family:inherit;text-align:center;width:100%;touch-action:manipulation}
+.card.routine-card{border-right:4px solid var(--accent)}
+.routine-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--accent);background:rgba(99,102,241,.1);border-radius:20px;padding:2px 8px;margin-bottom:6px;letter-spacing:.2px}
+.dur-tag{font-size:11px;color:var(--muted);font-weight:600}
+.routine-notes{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.siri-routine-btn{width:100%;padding:10px;border-radius:var(--r-sm);background:rgba(99,102,241,.1);color:var(--accent);border:1.5px solid rgba(99,102,241,.25);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation}
+.routine-hdr-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:50px;background:var(--surface);border:1.5px solid var(--border);font-size:12px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -442,6 +485,7 @@ body{
         <button class="siri-confirm-save" onclick="confirmSiri()">שמור משימה</button>
         <button class="siri-confirm-cancel" onclick="cancelSiriConfirm()">בטל</button>
       </div>
+      <button class="siri-routine-btn" id="siriRoutineBtn" onclick="confirmSiriAsRoutine()" style="display:none">🔄 שמור כשגרה קבועה</button>
     </div>
   </div>
 </div>
@@ -458,6 +502,7 @@ body{
   </div>
   <div class="header-right">
     <div class="badge" id="badge">0 פעילות</div>
+    <button class="routine-hdr-btn" onclick="openRoutineSheet()">🔄 שגרה</button>
     <div class="user-chip" id="userChip" onclick="confirmSignOut()"></div>
   </div>
 </div>
@@ -517,6 +562,103 @@ body{
   <button class="btn-install" onclick="installApp()">התקן</button>
 </div>
 </div><!-- /#app -->
+<!-- Routine Overlay -->
+<div class="routine-overlay" id="routineOverlay" onclick="closeRoutineSheet()"></div>
+
+<!-- Sheet: Routine List -->
+<div class="rsheet" id="routineListSheet">
+  <div class="rsheet-handle"></div>
+  <div class="rsheet-head">
+    <h3>🔄 השגרות שלי</h3>
+    <button class="rsheet-add-btn" onclick="openRoutineForm(null,null)">+ הוסף</button>
+  </div>
+  <div class="rsheet-scroll" id="routineList"></div>
+</div>
+
+<!-- Sheet: Routine Form -->
+<div class="rsheet" id="routineFormSheet">
+  <div class="rsheet-handle"></div>
+  <p class="rform-section-title" id="rFormTitle">שגרה חדשה</p>
+  <div class="rsheet-scroll">
+    <div class="rform">
+      <div>
+        <div class="rform-lbl">שם האירוע</div>
+        <div class="rform-voice-row">
+          <input class="rfi" id="rText" type="text" placeholder="אימון, הסעה, ישיבה שבועית..."/>
+          <button class="rmic-btn" onclick="voiceRoutine()">🎤</button>
+        </div>
+      </div>
+      <div>
+        <div class="rform-lbl">ימים בשבוע</div>
+        <div class="day-grid">
+          <button class="day-btn" data-day="0" onclick="toggleDay(this)">א׳</button>
+          <button class="day-btn" data-day="1" onclick="toggleDay(this)">ב׳</button>
+          <button class="day-btn" data-day="2" onclick="toggleDay(this)">ג׳</button>
+          <button class="day-btn" data-day="3" onclick="toggleDay(this)">ד׳</button>
+          <button class="day-btn" data-day="4" onclick="toggleDay(this)">ה׳</button>
+          <button class="day-btn" data-day="5" onclick="toggleDay(this)">ו׳</button>
+          <button class="day-btn" data-day="6" onclick="toggleDay(this)">שב׳</button>
+        </div>
+      </div>
+      <div class="rform-row">
+        <div style="flex:1"><div class="rform-lbl">שעת התחלה</div><input class="rfi" id="rTime" type="time" value="09:00"/></div>
+        <div style="flex:1"><div class="rform-lbl">משך</div>
+          <select class="rfi" id="rDuration">
+            <option value="15">15 דק׳</option><option value="30">30 דק׳</option>
+            <option value="45">45 דק׳</option><option value="60" selected>שעה</option>
+            <option value="90">שעה וחצי</option><option value="120">שעתיים</option>
+            <option value="180">3 שעות</option>
+          </select>
+        </div>
+      </div>
+      <div class="rform-row">
+        <div style="flex:1"><div class="rform-lbl">תדירות</div>
+          <select class="rfi" id="rFreq">
+            <option value="1">כל שבוע</option>
+            <option value="2">כל שבועיים</option>
+            <option value="4">כל חודש</option>
+          </select>
+        </div>
+        <div style="flex:1"><div class="rform-lbl">קטגוריה</div>
+          <select class="rfi" id="rCat">
+            <option value="אישי">👤 אישי</option>
+            <option value="מקצועי">💼 מקצועי</option>
+            <option value="כללי">📌 כללי</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="rform-lbl">תאריך התחלה</div>
+        <input class="rfi" id="rStart" type="date"/>
+      </div>
+      <div>
+        <div class="rform-lbl">תזכורת</div>
+        <div class="rform-row">
+          <select class="rfi" id="rReminder" style="flex:1.2">
+            <option value="0">ללא תזכורת</option>
+            <option value="15">15 דקות לפני</option>
+            <option value="30">30 דקות לפני</option>
+            <option value="60" selected>שעה לפני</option>
+            <option value="120">שעתיים לפני</option>
+            <option value="1440">יום לפני (מייל)</option>
+          </select>
+          <select class="rfi" id="rReminderType" style="flex:1">
+            <option value="both">פוש + מייל</option>
+            <option value="push">פוש בלבד</option>
+            <option value="email">מייל בלבד</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="rform-lbl">הערות (אופציונלי)</div>
+        <input class="rfi" id="rNotes" type="text" placeholder="מה להביא, איפה להגיע..."/>
+      </div>
+      <button class="rform-save" onclick="saveRoutine()">שמור שגרה ✓</button>
+      <button class="rform-back" onclick="backToRoutineList()">← חזרה לרשימה</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -530,6 +672,9 @@ const CATS={
   כללי:{kw:[],c:'#fbbf24'}
 };
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
+let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]');
+let editingRoutineId=null;
+const scheduledNotifIds=new Set();
 let filter='all',deferredPrompt=null;
 let gAuth=null,tokenClient=null;
 let rec=null,siriLive=false;
@@ -577,7 +722,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge()}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -677,13 +822,13 @@ function showSiriFinal(text){
   stopRec();
   document.getElementById('siriOrb').classList.remove('speaking');
   document.getElementById('siriWave').classList.remove('speaking');
-  // Try command first
   const cmd=parseVoiceCommand(text);
   if(cmd){executeCommand(cmd);return;}
-  // Show confirm sheet
   document.getElementById('siriText').textContent=text;
   document.getElementById('siriEdit').value=text;
   document.getElementById('siriConfirm').classList.add('on');
+  const isRoutinePat=/כל\s*(ראשון|שני(?!ה)|שלישי|רביעי|חמישי|שישי|שבת)/.test(text);
+  document.getElementById('siriRoutineBtn').style.display=isRoutinePat?'block':'none';
   setTimeout(()=>document.getElementById('siriEdit').focus(),350);
 }
 
@@ -937,22 +1082,40 @@ function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b
 function updateBadge(){document.getElementById('badge').textContent=tasks.filter(t=>!t.completed).length+' פעילות'}
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function render(){
-  const el=document.getElementById('list');if(!el)return;
-  const list=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
-  if(!list.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div>`;return}
-  el.innerHTML=list.map(task=>{
-    const cat=CATS[task.category]||CATS['כללי'];
-    const dt=new Date(task.datetime);
-    const isOverdue=!task.completed&&dt<new Date();
-    const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
-    const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
-    const pad=n=>n.toString().padStart(2,'0');
-    const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-    const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-    const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
-    const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}</button>`:'';
-    return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
+function getRoutineInstances(){
+  const now=new Date();const instances=[];const seen=new Set();
+  for(let offset=-1;offset<14;offset++){
+    const checkDate=new Date(now);checkDate.setDate(now.getDate()+offset);checkDate.setHours(0,0,0,0);
+    const dow=checkDate.getDay();
+    routines.filter(r=>r.enabled&&r.days.includes(dow)).forEach(routine=>{
+      const rStart=new Date(routine.startDate);rStart.setHours(0,0,0,0);
+      if(checkDate<rStart)return;
+      const weeksSince=Math.round((checkDate-rStart)/(7*24*3600000));
+      if(weeksSince%(+routine.frequency)!==0)return;
+      const dateStr=checkDate.toISOString().slice(0,10);
+      const key=`${routine.id}_${dateStr}`;
+      if(seen.has(key))return;seen.add(key);
+      if((routine.skippedDates||[]).includes(dateStr))return;
+      const[h,m]=routine.time.split(':');
+      const instDate=new Date(checkDate);instDate.setHours(+h,+m,0,0);
+      instances.push({id:`routine_${routine.id}_${dateStr}`,routineId:routine.id,isRoutine:true,text:routine.text,category:routine.category,datetime:instDate.toISOString(),duration:+routine.duration,reminder:+routine.reminder,reminderType:routine.reminderType,notes:routine.notes||'',completed:(routine.completedDates||[]).includes(dateStr),dateStr});
+    });
+  }
+  return instances;
+}
+
+function renderTaskCard(task){
+  const cat=CATS[task.category]||CATS['כללי'];
+  const dt=new Date(task.datetime);
+  const isOverdue=!task.completed&&dt<new Date();
+  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
+  const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  const pad=n=>n.toString().padStart(2,'0');
+  const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
+  const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
+  const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}</button>`:'';
+  return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
   ${isOverdue?'<span class="overdue-label">⏰ עבר הזמן</span>':''}
   <div class="task-txt">${esc(task.text)}</div>
   <div class="date-block">
@@ -976,8 +1139,40 @@ function render(){
       <button class="edit-cancel" onclick="cancelEdit(${task.id})">בטל</button>
     </div>
   </div>
-</div>`;
-  }).join('');
+</div>`;}
+
+function renderRoutineInstance(inst){
+  const cat=CATS[inst.category]||CATS['כללי'];
+  const dt=new Date(inst.datetime);
+  const isOverdue=!inst.completed&&dt<new Date();
+  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
+  const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  const endDt=new Date(dt.getTime()+inst.duration*60000);
+  const endStr=endDt.getHours().toString().padStart(2,'0')+':'+endDt.getMinutes().toString().padStart(2,'0');
+  const durTxt=inst.duration<60?inst.duration+'דק׳':inst.duration===60?'שעה':inst.duration===90?'שעה וחצי':(inst.duration/60)+'שעות';
+  return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
+  <div class="routine-badge">🔄 שגרה קבועה</div>
+  <div class="task-txt">${esc(inst.text)}</div>
+  ${inst.notes?`<div class="routine-notes">📝 ${esc(inst.notes)}</div>`:''}
+  <div class="date-block">
+    <div><div class="date-main">${timeStr}–${endStr}</div><div class="date-sub">${dateStr}</div></div>
+    <span class="dur-tag">${durTxt}</span>
+  </div>
+  <div class="actions">
+    <button class="act done-btn" onclick="toggleRoutineComplete('${inst.routineId}','${inst.dateStr}')">${inst.completed?ICO.undo:ICO.check}</button>
+    <button class="act edit-btn" onclick="editRoutine(${inst.routineId})" title="ערוך שגרה">${ICO.edit}</button>
+    <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
+  </div>
+</div>`;}
+
+function render(){
+  const el=document.getElementById('list');if(!el)return;
+  const routineInstances=getRoutineInstances();
+  let taskList=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
+  let routineList=filter==='done'?routineInstances.filter(r=>r.completed):filter==='all'?routineInstances.filter(r=>!r.completed):routineInstances.filter(r=>r.category===filter&&!r.completed);
+  const allItems=[...taskList,...routineList].sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  if(!allItems.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div>`;return}
+  el.innerHTML=allItems.map(item=>item.isRoutine?renderRoutineInstance(item):renderTaskCard(item)).join('');
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
@@ -988,6 +1183,212 @@ function phoneAction(id){const t=tasks.find(x=>x.id===id);if(!t)return;const p=t
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2400)}
+
+// ── Routines ──────────────────────────────────────────────────────────────────
+function saveRoutines(){localStorage.setItem('vt_routines',JSON.stringify(routines));}
+
+function openRoutineSheet(){
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('routineListSheet').classList.add('on');
+  document.getElementById('routineFormSheet').classList.remove('on');
+  renderRoutineList();
+}
+function closeRoutineSheet(){
+  document.getElementById('routineOverlay').classList.remove('on');
+  document.getElementById('routineListSheet').classList.remove('on');
+  document.getElementById('routineFormSheet').classList.remove('on');
+}
+function backToRoutineList(){
+  document.getElementById('routineFormSheet').classList.remove('on');
+  document.getElementById('routineListSheet').classList.add('on');
+  renderRoutineList();
+}
+
+function renderRoutineList(){
+  const el=document.getElementById('routineList');if(!el)return;
+  const DAY_NAMES=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
+  if(!routines.length){el.innerHTML=`<div class="routine-empty">עוד אין שגרות.<br>לחץ "+ הוסף" כדי ליצור 🔄</div>`;return;}
+  el.innerHTML=routines.map(r=>{
+    const daysText=r.days.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES[d]).join(' + ');
+    const freqText=+r.frequency===1?'כל שבוע':+r.frequency===2?'כל שבועיים':'כל חודש';
+    const durTxt=+r.duration<60?r.duration+'דק׳':+r.duration===60?'שעה':+r.duration===90?'שעה וחצי':(+r.duration/60)+'שעות';
+    const remTxt=+r.reminder>0?` • תזכורת ${+r.reminder===15?'15דק׳':+r.reminder===30?'30דק׳':+r.reminder===60?'שעה':+r.reminder===120?'שעתיים':'יום'} לפני`:'';
+    return `<div class="routine-item">
+  <label class="rtoggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRoutineEnabled(${r.id},this.checked)"><span class="rtoggle-sl"></span></label>
+  <div class="routine-item-body" onclick="editRoutine(${r.id})">
+    <div class="routine-item-name">${esc(r.text)}</div>
+    <div class="routine-item-meta">${daysText} • ${r.time} • ${durTxt} • ${freqText}${remTxt}</div>
+    ${r.notes?`<div class="routine-item-meta">📝 ${esc(r.notes)}</div>`:''}
+  </div>
+  <button class="routine-del-btn" onclick="deleteRoutine(${r.id})">×</button>
+</div>`;
+  }).join('');
+}
+
+function openRoutineForm(prefill,editId){
+  editingRoutineId=editId||null;
+  document.getElementById('rFormTitle').textContent=editId?'ערוך שגרה':'שגרה חדשה';
+  document.getElementById('rText').value=prefill?.text||prefill?.name||'';
+  document.getElementById('rTime').value=prefill?.time||'09:00';
+  document.getElementById('rDuration').value=String(prefill?.duration||60);
+  document.getElementById('rFreq').value=String(prefill?.frequency||1);
+  document.getElementById('rCat').value=prefill?.category||'אישי';
+  document.getElementById('rStart').value=prefill?.startDate||new Date().toISOString().slice(0,10);
+  document.getElementById('rReminder').value=String(prefill?.reminder||60);
+  document.getElementById('rReminderType').value=prefill?.reminderType||'both';
+  document.getElementById('rNotes').value=prefill?.notes||'';
+  document.querySelectorAll('.day-btn').forEach(btn=>btn.classList.toggle('on',(prefill?.days||[]).includes(+btn.dataset.day)));
+  document.getElementById('routineListSheet').classList.remove('on');
+  document.getElementById('routineFormSheet').classList.add('on');
+}
+
+function toggleDay(btn){btn.classList.toggle('on');}
+
+function saveRoutine(){
+  const text=document.getElementById('rText').value.trim();
+  const days=[...document.querySelectorAll('.day-btn.on')].map(b=>+b.dataset.day);
+  const time=document.getElementById('rTime').value;
+  if(!text){toast('נא להזין שם לאירוע');return;}
+  if(!days.length){toast('נא לבחור לפחות יום אחד');return;}
+  const reminder=+document.getElementById('rReminder').value;
+  const reminderType=document.getElementById('rReminderType').value;
+  if(reminder>0&&(reminderType==='push'||reminderType==='both'))requestNotificationPermission();
+  const existing=editingRoutineId?routines.find(r=>r.id===editingRoutineId):null;
+  const routine={
+    id:editingRoutineId||Date.now(),
+    text,days,time,
+    duration:+document.getElementById('rDuration').value,
+    frequency:+document.getElementById('rFreq').value,
+    category:document.getElementById('rCat').value,
+    startDate:document.getElementById('rStart').value||new Date().toISOString().slice(0,10),
+    reminder,reminderType,
+    notes:document.getElementById('rNotes').value.trim(),
+    enabled:true,
+    completedDates:existing?.completedDates||[],
+    skippedDates:existing?.skippedDates||[],
+    scheduledEmailDates:existing?.scheduledEmailDates||[],
+    createdAt:existing?.createdAt||new Date().toISOString()
+  };
+  if(editingRoutineId){routines=routines.map(r=>r.id===editingRoutineId?routine:r);}
+  else{routines.unshift(routine);}
+  editingRoutineId=null;
+  saveRoutines();scheduleEmailReminders();scheduleNotifications();render();
+  closeRoutineSheet();toast(routine.id===routine.createdAt?'שגרה נוספה 🔄':'שגרה עודכנה 🔄');
+}
+
+function editRoutine(id){
+  const r=routines.find(x=>x.id==id);if(!r)return;
+  openRoutineSheet();setTimeout(()=>openRoutineForm(r,r.id),150);
+}
+function deleteRoutine(id){
+  if(!confirm('למחוק את השגרה?'))return;
+  routines=routines.filter(r=>r.id!==id);saveRoutines();renderRoutineList();render();toast('שגרה נמחקה');
+}
+function toggleRoutineEnabled(id,enabled){
+  const r=routines.find(x=>x.id===id);if(r){r.enabled=enabled;saveRoutines();render();}
+}
+function toggleRoutineComplete(routineId,dateStr){
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  const idx=(r.completedDates||[]).indexOf(dateStr);
+  if(!r.completedDates)r.completedDates=[];
+  if(idx===-1){r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');}
+  else{r.completedDates.splice(idx,1);}
+  saveRoutines();render();
+}
+function skipRoutineInstance(routineId,dateStr){
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  if(!r.skippedDates)r.skippedDates=[];
+  r.skippedDates.push(dateStr);saveRoutines();render();toast('דולג');
+}
+
+// Voice for routine form
+function voiceRoutine(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('הדפדפן לא תומך בזיהוי קולי');return;}
+  const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=false;
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript;
+    const parsed=parseRoutineFromText(text);
+    if(parsed.name)document.getElementById('rText').value=parsed.name;
+    document.querySelectorAll('.day-btn').forEach(btn=>btn.classList.toggle('on',parsed.days.includes(+btn.dataset.day)));
+    if(parsed.time)document.getElementById('rTime').value=parsed.time;
+    toast('זוהה ✓');
+  };
+  r.onerror=()=>toast('לא הצלחתי לשמוע, נסה שוב');
+  try{r.start();toast('מאזין...');}catch(e){}
+}
+
+function parseRoutineFromText(text){
+  const days=[];
+  const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const dayNums=[0,1,2,3,4,5,6];
+  dayNames.forEach((name,i)=>{if(text.includes(name)&&!(name==='שני'&&text.includes('שנייה')))days.push(dayNums[i]);});
+  const nameMatch=text.match(/^(.+?)\s+(?:כל|ב)/);
+  const name=nameMatch?nameMatch[1].trim():text.replace(/כל.*/,'').replace(/ב.*/,'').trim();
+  const dt=detectTime(text);
+  const time=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  return{name,days,time};
+}
+
+// Voice from siri → routine
+function confirmSiriAsRoutine(){
+  const txt=document.getElementById('siriEdit').value.trim();
+  stopSiri();if(!txt)return;
+  setTimeout(()=>{
+    openRoutineSheet();
+    setTimeout(()=>{openRoutineForm(parseRoutineFromText(txt),null);},350);
+  },200);
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────────
+async function requestNotificationPermission(){
+  if(!('Notification' in window))return false;
+  if(Notification.permission==='granted')return true;
+  const p=await Notification.requestPermission();return p==='granted';
+}
+function scheduleNotifications(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const now=new Date();
+  getRoutineInstances().filter(inst=>!inst.completed&&inst.reminder>0&&(inst.reminderType==='push'||inst.reminderType==='both')).forEach(inst=>{
+    const notifyTime=new Date(new Date(inst.datetime).getTime()-inst.reminder*60000);
+    const delay=notifyTime-now;
+    const key=`notif_${inst.id}`;
+    if(delay>0&&delay<48*3600000&&!scheduledNotifIds.has(key)){
+      scheduledNotifIds.add(key);
+      setTimeout(()=>showPushNotification(inst),delay);
+    }
+  });
+}
+function showPushNotification(inst){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const dt=new Date(inst.datetime);
+  const endDt=new Date(dt.getTime()+inst.duration*60000);
+  const fmt=d=>d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+  const title=`🔔 ${inst.text}`;
+  const body=`מתחיל ב-${fmt(dt)} עד ${fmt(endDt)}${inst.notes?'\n📝 '+inst.notes:''}`;
+  if(navigator.serviceWorker?.controller){
+    navigator.serviceWorker.controller.postMessage({type:'SHOW_NOTIFICATION',title,body,tag:inst.id});
+  }else{
+    try{new Notification(title,{body,icon:'./icon.svg',tag:inst.id,dir:'rtl'});}catch(e){}
+  }
+}
+function scheduleEmailReminders(){
+  if(!gAuth?.email)return;
+  const now=new Date();
+  getRoutineInstances().forEach(inst=>{
+    if(inst.completed||inst.reminder<=0||inst.reminderType==='push')return;
+    const routine=routines.find(r=>r.id==inst.routineId);if(!routine)return;
+    if((routine.scheduledEmailDates||[]).includes(inst.dateStr))return;
+    const remindTime=new Date(new Date(inst.datetime).getTime()-inst.reminder*60000);
+    if(remindTime<=now||remindTime>new Date(now.getTime()+48*3600000))return;
+    fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'reminder',email:gAuth.email,text:inst.text,notes:inst.notes,reminderDatetime:remindTime.toISOString(),eventDatetime:inst.datetime,duration:inst.duration})
+    }).then(()=>{
+      if(!routine.scheduledEmailDates)routine.scheduledEmailDates=[];
+      routine.scheduledEmailDates.push(inst.dateStr);saveRoutines();
+    }).catch(()=>{});
+  });
+}
 
 window.addEventListener('load',initAuth);
 </script>

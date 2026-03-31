@@ -17,6 +17,20 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Push notification via message from main thread
+self.addEventListener('message', event => {
+  if(event.data&&event.data.type==='SHOW_NOTIFICATION'){
+    self.registration.showNotification(event.data.title,{
+      body:event.data.body,
+      icon:'./icon.svg',
+      badge:'./icon.svg',
+      tag:event.data.tag,
+      dir:'rtl',
+      vibrate:[200,100,200]
+    });
+  }
+});
+
 // Strategy:
 //   HTML  → network first (always get latest), fallback to cache
 //   Assets → cache first (icon, manifest don't change often)

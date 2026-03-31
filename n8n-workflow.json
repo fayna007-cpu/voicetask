@@ -185,11 +185,72 @@
         "respondWith": "json",
         "responseBody": "{\"status\": \"deleted\"}"
       }
+    },
+    {
+      "id": "node-reminder-email",
+      "name": "מייל תזכורת",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [680, 560],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ ($json.body ?? $json).email }}",
+        "subject": "=🔔 תזכורת: {{ ($json.body ?? $json).text }}",
+        "emailType": "html",
+        "message": "=<div dir=\"rtl\" style=\"font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#f9f9fb;border-radius:12px;overflow:hidden\"><div style=\"background:#6366f1;padding:24px 28px\"><h2 style=\"color:white;margin:0;font-size:20px\">🔔 תזכורת לאירוע שלך</h2></div><div style=\"padding:24px 28px\"><table style=\"width:100%;border-collapse:collapse\"><tr><td style=\"padding:8px 0;color:#555;width:100px\"><b>אירוע</b></td><td style=\"padding:8px 0;font-size:16px\">{{ ($json.body ?? $json).text }}</td></tr><tr><td style=\"padding:8px 0;color:#555\"><b>מתחיל</b></td><td style=\"padding:8px 0\">{{ new Date(($json.body ?? $json).eventDatetime).toLocaleString('he-IL') }}</td></tr><tr><td style=\"padding:8px 0;color:#555\"><b>משך</b></td><td style=\"padding:8px 0\">{{ ($json.body ?? $json).duration }} דקות</td></tr>{{ ($json.body ?? $json).notes ? '<tr><td style=\"padding:8px 0;color:#555\"><b>הערות</b></td><td style=\"padding:8px 0\">' + ($json.body ?? $json).notes + '</td></tr>' : '' }}</table></div><div style=\"padding:12px 28px;background:#f0f0f0;font-size:12px;color:#888\">נשלח מ-VoiceTask 🔄</div></div>"
+      }
+    },
+    {
+      "id": "node-respond-reminder",
+      "name": "תשובה - תזכורת",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 560],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"reminder_sent\"}"
+      }
+    },
+    {
+      "id": "node-if-reminder",
+      "name": "בדיקת תזכורת",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 480],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.action ?? $json.action }}",
+              "rightValue": "reminder",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      }
     }
   ],
   "connections": {
     "קבלת משימה": {
-      "main": [[{ "node": "בדיקת פעולה", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "בדיקת תזכורת", "type": "main", "index": 0 }]]
+    },
+    "בדיקת תזכורת": {
+      "main": [
+        [{ "node": "מייל תזכורת", "type": "main", "index": 0 }],
+        [{ "node": "בדיקת פעולה", "type": "main", "index": 0 }]
+      ]
+    },
+    "מייל תזכורת": {
+      "main": [[{ "node": "תשובה - תזכורת", "type": "main", "index": 0 }]]
     },
     "בדיקת פעולה": {
       "main": [
