@@ -112,8 +112,29 @@ body{
   box-shadow:0 4px 12px rgba(99,102,241,.3);
 }
 .logo{font-size:19px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
-.header-right{display:flex;align-items:center;gap:9px}
-.badge{font-size:12px;font-weight:700;color:var(--muted);background:var(--surface);border:1.5px solid var(--border);padding:5px 12px;border-radius:20px}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.badge{font-size:12px;font-weight:700;color:var(--muted);background:var(--surface);border:1.5px solid var(--border);padding:5px 12px;border-radius:20px;flex-shrink:0}
+.menu-btn{width:38px;height:38px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s}
+.menu-btn:active{background:var(--border)}
+/* ── Side Menu ── */
+.side-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s ease;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.side-overlay.on{opacity:1;pointer-events:all}
+.side-menu{position:fixed;top:0;left:0;bottom:0;width:min(300px,82vw);background:var(--surface);z-index:301;transform:translateX(-102%);transition:transform .35s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column;overflow:hidden;box-shadow:4px 0 40px rgba(0,0,0,.18)}
+.side-menu.on{transform:translateX(0)}
+.side-menu-head{padding:calc(28px + var(--sat)) 24px 20px;background:linear-gradient(150deg,var(--accent) 0%,var(--accent2) 100%);flex-shrink:0}
+.side-menu-avatar{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;overflow:hidden;margin-bottom:12px}
+.side-menu-avatar img{width:100%;height:100%;object-fit:cover}
+.side-menu-name{font-size:17px;font-weight:800;color:#fff;margin-bottom:2px}
+.side-menu-email{font-size:12px;color:rgba(255,255,255,.75)}
+.side-menu-body{flex:1;padding:10px 0;overflow-y:auto}
+.side-item{display:flex;align-items:center;gap:14px;padding:15px 24px;border:none;background:none;width:100%;text-align:right;font-family:inherit;font-size:15px;font-weight:600;color:var(--text);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .12s;direction:rtl}
+.side-item:active{background:var(--bg)}
+.side-item-ico{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.side-item-ico.purple{background:rgba(99,102,241,.12)}
+.side-item-ico.yellow{background:rgba(251,191,36,.15)}
+.side-item-ico.red{background:rgba(239,68,68,.1)}
+.side-item.danger{color:#ef4444}
+.side-divider{height:1px;background:var(--border);margin:8px 16px}
 .user-chip{
   display:flex;align-items:center;gap:7px;
   background:var(--surface);border:1.5px solid var(--border);
@@ -563,9 +584,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   </div>
   <div class="header-right">
     <div class="badge" id="badge">0 פעילות</div>
-    <button class="routine-hdr-btn" onclick="openNotifManager()">🔔 התראות</button>
-    <button class="routine-hdr-btn" onclick="openRoutineSheet()">🔄 שגרה</button>
-    <div class="user-chip" id="userChip" onclick="confirmSignOut()"></div>
+    <button class="menu-btn" onclick="openSideMenu()" aria-label="תפריט">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
   </div>
 </div>
 
@@ -624,6 +645,31 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   <button class="btn-install" onclick="installApp()">התקן</button>
 </div>
 </div><!-- /#app -->
+<!-- Side Menu -->
+<div class="side-overlay" id="sideOverlay" onclick="closeSideMenu()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="side-menu-head">
+    <div class="side-menu-avatar" id="sideAvatar"></div>
+    <div class="side-menu-name" id="sideName">VoiceTask</div>
+    <div class="side-menu-email" id="sideEmail"></div>
+  </div>
+  <div class="side-menu-body">
+    <button class="side-item" onclick="closeSideMenu();openRoutineSheet()">
+      <div class="side-item-ico purple">🔄</div>
+      שגרות
+    </button>
+    <button class="side-item" onclick="closeSideMenu();openNotifManager()">
+      <div class="side-item-ico yellow">🔔</div>
+      ניהול התראות
+    </button>
+    <div class="side-divider"></div>
+    <button class="side-item danger" onclick="closeSideMenu();confirmSignOut()">
+      <div class="side-item-ico red">🚪</div>
+      יציאה
+    </button>
+  </div>
+</div>
+
 <!-- Routine Overlay -->
 <div class="routine-overlay" id="routineOverlay" onclick="closeRoutineSheet()"></div>
 
@@ -921,9 +967,24 @@ function showApp(){document.getElementById('loginScreen').classList.add('hidden'
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
-  const chip=document.getElementById('userChip');
-  const av=gAuth.picture?`<img class="user-avatar" src="${gAuth.picture}" referrerpolicy="no-referrer">`:`<div class="user-initials">${(gAuth.name||'?')[0].toUpperCase()}</div>`;
-  chip.innerHTML=av+`<span class="user-name-chip">${esc((gAuth.name||'').split(' ')[0]||gAuth.email.split('@')[0])}</span>`;
+  // Fill side menu header
+  const nameEl=document.getElementById('sideName');
+  const emailEl=document.getElementById('sideEmail');
+  const avatarEl=document.getElementById('sideAvatar');
+  if(nameEl)nameEl.textContent=gAuth.name||gAuth.email||'VoiceTask';
+  if(emailEl)emailEl.textContent=gAuth.email||'';
+  if(avatarEl){
+    if(gAuth.picture)avatarEl.innerHTML=`<img src="${gAuth.picture}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    else avatarEl.textContent=(gAuth.name||'?')[0].toUpperCase();
+  }
+}
+function openSideMenu(){
+  document.getElementById('sideOverlay').classList.add('on');
+  document.getElementById('sideMenu').classList.add('on');
+}
+function closeSideMenu(){
+  document.getElementById('sideOverlay').classList.remove('on');
+  document.getElementById('sideMenu').classList.remove('on');
 }
 function confirmSignOut(){if(confirm('להתנתק?'))signOut()}
 function signOut(){if(gAuth?.access_token&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});gAuth=null;localStorage.removeItem('vt_auth');showLogin()}
