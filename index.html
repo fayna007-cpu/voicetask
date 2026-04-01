@@ -909,6 +909,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
 const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
+const PUSH_SERVER='https://voicetask-push.REPLACE.workers.dev';// ← שנה לאחר deploy
+const VAPID_PUBLIC_KEY='BCkBcRLfmYljHezmWoubFdRMxuL1ExrkzilYUAaz47dR390m1PR_LvXwMDdZDAHQpCNU58V8mvoJ-BD2jrxvgIM';
 
 const CATS={
   אישי:{kw:['לקנות','קניות','בית','סידורים','משפחה','ילדים','אוכל','רופא','כביסה','ניקיון'],c:'#34d399'},
@@ -1858,8 +1860,28 @@ function scheduleWeeklyReminderNotifs(){
 // ── Notifications ──────────────────────────────────────────────────────────────
 async function requestNotificationPermission(){
   if(!('Notification' in window))return false;
-  if(Notification.permission==='granted')return true;
-  const p=await Notification.requestPermission();return p==='granted';
+  if(Notification.permission==='granted'){subscribeToPush();return true;}
+  const p=await Notification.requestPermission();
+  if(p==='granted')subscribeToPush();
+  return p==='granted';
+}
+async function subscribeToPush(){
+  if(!('serviceWorker'in navigator)||!('PushManager'in window))return;
+  if(PUSH_SERVER.includes('REPLACE'))return;// not configured yet
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:VAPID_PUBLIC_KEY});
+    }
+    const userId=gAuth?.email||'anon';
+    fetch(PUSH_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),userId})}).catch(()=>{});
+  }catch(e){console.warn('Push subscribe:',e);}
+}
+async function scheduleToPushServer(notifications){
+  if(PUSH_SERVER.includes('REPLACE'))return;
+  const userId=gAuth?.email||'anon';
+  fetch(PUSH_SERVER+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,notifications})}).catch(()=>{});
 }
 function scheduleNotifications(){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
@@ -1967,11 +1989,12 @@ function renderNotifManager(){
       const dayLabel=n.dayOfWeek===-1?'כל יום':DAY_NAMES_FULL[n.dayOfWeek]||'';
       html+=`<div class="notif-item">
   <div class="notif-item-icon custom">🔔</div>
-  <div class="notif-item-body" onclick="openNotifForm(${JSON.stringify(n)},${n.id})" style="cursor:pointer">
+  <div class="notif-item-body" onclick="editCustomNotif(${n.id})" style="cursor:pointer">
     <div class="notif-item-name">${esc(n.text)}</div>
     <div class="notif-meta">${dayLabel} · ${n.time||'08:00'}</div>
   </div>
   <label class="rtoggle" style="flex-shrink:0"><input type="checkbox" ${n.enabled?'checked':''} onchange="toggleCustomNotif(${n.id},this.checked)"><span class="rtoggle-sl"></span></label>
+  <button class="routine-edit-btn" onclick="editCustomNotif(${n.id})" style="margin-left:4px">✏️</button>
   <button class="routine-del-btn" onclick="deleteCustomNotif(${n.id})">×</button>
 </div>`;
     });
@@ -1984,6 +2007,9 @@ function editRoutineFromNotif(id){
   setTimeout(()=>{openRoutineSheet();setTimeout(()=>editRoutine(id),200);},100);
 }
 
+function editCustomNotif(id){
+  const n=customNotifs.find(x=>x.id===id);if(n)openNotifForm(n,id);
+}
 function deleteCustomNotif(id){
   customNotifs=customNotifs.filter(n=>n.id!==id);
   saveCustomNotifsData();scheduleCustomNotifs();renderNotifManager();toast('התראה נמחקה');
@@ -2065,9 +2091,11 @@ function scheduleCustomNotifs(){
     const delay=next-now;
     if(delay>0&&delay<8*86400000){
       scheduledNotifIds.add(key);
+      // schedule via push server (works when app closed)
+      scheduleToPushServer([{id:'custom_'+n.id,title:'🔔 '+n.text,body:`${n.time||''}`,fireAt:next.toISOString()}]);
       setTimeout(()=>{
         showPushNotification({text:n.text,datetime:next.toISOString(),duration:0,notes:'',id:'custom_'+n.id});
-        scheduledNotifIds.delete(key);scheduleCustomNotifs(); // reschedule next occurrence
+        scheduledNotifIds.delete(key);scheduleCustomNotifs();
       },delay);
     }
   });

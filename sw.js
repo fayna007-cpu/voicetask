@@ -17,16 +17,31 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Push notification via message from main thread
+// Push from server (works when app is closed)
+self.addEventListener('push', e => {
+  let data={title:'VoiceTask 🔔',body:''};
+  try{data={...data,...e.data.json()};}catch(_){}
+  e.waitUntil(self.registration.showNotification(data.title,{
+    body:data.body,icon:'./icon.svg',badge:'./icon.svg',
+    dir:'rtl',vibrate:[200,100,200],tag:data.tag||'vt-push'
+  }));
+});
+
+// Notification click — open/focus the app
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({type:'window'}).then(cs=>{
+    const c=cs.find(x=>x.url.includes(self.location.origin)&&'focus'in x);
+    return c?c.focus():clients.openWindow('/');
+  }));
+});
+
+// Push notification via message from main thread (fallback when app is open)
 self.addEventListener('message', event => {
   if(event.data&&event.data.type==='SHOW_NOTIFICATION'){
     self.registration.showNotification(event.data.title,{
-      body:event.data.body,
-      icon:'./icon.svg',
-      badge:'./icon.svg',
-      tag:event.data.tag,
-      dir:'rtl',
-      vibrate:[200,100,200]
+      body:event.data.body,icon:'./icon.svg',badge:'./icon.svg',
+      tag:event.data.tag,dir:'rtl',vibrate:[200,100,200]
     });
   }
 });
