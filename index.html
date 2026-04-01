@@ -319,7 +319,7 @@ body{
 .quick-btn svg{opacity:.55}
 
 /* ── Filters ── */
-.filters{display:flex;gap:7px;overflow-x:auto;padding:14px 20px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters{display:flex;gap:7px;overflow-x:auto;padding:12px 16px 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .filters::-webkit-scrollbar{display:none}
 .f-btn{
   flex-shrink:0;padding:8px 16px;border-radius:50px;
@@ -331,12 +331,24 @@ body{
 .f-btn.on{background:var(--text);border-color:var(--text);color:#fff;font-weight:700}
 
 /* ── Section ── */
-.sec{display:flex;justify-content:space-between;align-items:center;padding:0 20px 10px}
-.sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px}
+.sec{display:none}
 .sec-btn{display:flex;align-items:center;gap:5px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;min-height:36px;touch-action:manipulation;font-weight:600}
 
 /* ── Task List ── */
-.list{display:flex;flex-direction:column;gap:10px;padding:0 20px}
+.list{display:flex;flex-direction:column;gap:0;padding:0}
+
+/* ── Sections ── */
+.task-section{margin:0 0 16px;padding:0 16px}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 10px}
+.section-hdr-left{display:flex;align-items:center;gap:8px}
+.section-hdr-icon{font-size:18px;line-height:1}
+.section-hdr-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.4px}
+.section-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;border-radius:10px;background:rgba(99,102,241,.15);color:var(--accent);font-size:11px;font-weight:800;padding:0 7px}
+.section-count.green{background:rgba(16,185,129,.12);color:#10b981}
+.section-cards{background:var(--surface);border-radius:20px;overflow:hidden;box-shadow:0 2px 24px rgba(0,0,0,.07);border:1px solid rgba(228,228,233,.8)}
+.section-cards .card{border-radius:0;box-shadow:none;border:none;border-bottom:1px solid var(--border);animation:slide .28s cubic-bezier(.25,.46,.45,.94)}
+.section-cards .card:last-child{border-bottom:none}
+.section-empty{text-align:center;color:var(--muted);font-size:13px;padding:20px;background:var(--surface);border-radius:20px;border:1px solid var(--border)}
 
 /* ── Card ── */
 .card{
@@ -634,13 +646,6 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   <button class="f-btn" onclick="setFilter('מקצועי',this)">💼 מקצועי</button>
   <button class="f-btn" onclick="setFilter('כללי',this)">📌 כללי</button>
   <button class="f-btn" onclick="setFilter('done',this)">✓ הושלמו</button>
-</div>
-<div class="divider"></div>
-<div class="sec">
-  <span class="sec-title">משימות</span>
-  <button class="sec-btn" onclick="clearDone()">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>נקה הושלמו
-  </button>
 </div>
 <div class="list" id="list"></div>
 <div class="install-bar" id="installBar">
@@ -1434,11 +1439,55 @@ function renderRoutineInstance(inst){
 function render(){
   const el=document.getElementById('list');if(!el)return;
   const routineInstances=getRoutineInstances();
-  let taskList=filter==='all'?tasks.filter(t=>!t.completed):filter==='done'?tasks.filter(t=>t.completed):tasks.filter(t=>t.category===filter&&!t.completed);
-  let routineList=filter==='done'?routineInstances.filter(r=>r.completed):filter==='all'?routineInstances.filter(r=>!r.completed):routineInstances.filter(r=>r.category===filter&&!r.completed);
-  const allItems=[...taskList,...routineList].sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
-  if(!allItems.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div>`;return}
-  el.innerHTML=allItems.map(item=>item.isRoutine?renderRoutineInstance(item):renderTaskCard(item)).join('');
+  let taskList=filter==='done'
+    ?tasks.filter(t=>t.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime))
+    :filter==='all'
+      ?tasks.filter(t=>!t.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime))
+      :tasks.filter(t=>t.category===filter&&!t.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  let routineList=filter==='done'
+    ?routineInstances.filter(r=>r.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime))
+    :filter==='all'
+      ?routineInstances.filter(r=>!r.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime))
+      :routineInstances.filter(r=>r.category===filter&&!r.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+
+  if(!taskList.length&&!routineList.length){
+    el.innerHTML=`<div style="padding:0 16px"><div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div></div>`;
+    return;
+  }
+  let html='';
+  // Section 1: Regular tasks
+  if(taskList.length||filter==='all'||filter==='done'){
+    const countBadge=taskList.length?`<span class="section-count">${taskList.length}</span>`:'';
+    html+=`<div class="task-section">
+<div class="section-hdr">
+  <div class="section-hdr-left">
+    <span class="section-hdr-icon">📋</span>
+    <span class="section-hdr-title">משימות שוטפות</span>
+    ${countBadge}
+  </div>
+  ${filter!=='done'?`<button class="sec-btn" onclick="clearDone()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>נקה הושלמו</button>`:''}
+</div>`;
+    if(taskList.length){
+      html+=`<div class="section-cards">${taskList.map(renderTaskCard).join('')}</div>`;
+    }else{
+      html+=`<div class="section-empty">אין משימות שוטפות.</div>`;
+    }
+    html+=`</div>`;
+  }
+  // Section 2: Routine instances
+  if(routineList.length){
+    html+=`<div class="task-section">
+<div class="section-hdr">
+  <div class="section-hdr-left">
+    <span class="section-hdr-icon">🔄</span>
+    <span class="section-hdr-title">שגרות</span>
+    <span class="section-count green">${routineList.length}</span>
+  </div>
+</div>
+<div class="section-cards">${routineList.map(renderRoutineInstance).join('')}</div>
+</div>`;
+  }
+  el.innerHTML=html;
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
