@@ -837,6 +837,10 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
+    <div style="padding:12px 16px 0;display:flex;align-items:center;gap:10px">
+      <div class="rform-lbl" style="margin:0;white-space:nowrap">התחל מ</div>
+      <input class="rfi" id="schedStartDate" type="date" style="flex:1" oninput="refreshScheduleSlots()"/>
+    </div>
     <div id="scheduleSlotsList" style="padding:16px;display:flex;flex-direction:column;gap:10px"></div>
     <div style="padding:0 16px 16px">
       <button class="sched-confirm-btn" id="scheduleConfirmBtn" onclick="confirmScheduling()">הוסף לגוגל קאלנדר ✓</button>
@@ -1467,13 +1471,15 @@ function windowStartHour(r){
   return{morning:7,afternoon:14,evening:18}[r.timeWindow]||7;
 }
 
-function generateWeekSlots(routine,weekOffset=0){
+function generateWeekSlots(routine,weekOffset=0,startDate=null){
   const now=new Date();
-  const weekStart=new Date(now);
-  weekStart.setDate(now.getDate()-now.getDay()+weekOffset*7);
+  const ref=startDate||now;
+  const effectiveNow=ref>now?ref:now;
+  const weekStart=new Date(ref);
+  weekStart.setDate(ref.getDate()-ref.getDay()+weekOffset*7);
   weekStart.setHours(0,0,0,0);
   if(routine.scheduleMode==='verbal'&&routine.verbParsed){
-    return generateVerbalSlots(routine,weekStart,now);
+    return generateVerbalSlots(routine,weekStart,effectiveNow);
   }
   const count=routine.timesPerWeek||3;
   const prefDays=routine.preferredDays?.length?routine.preferredDays:[0,1,2,3,4,5,6];
@@ -1482,12 +1488,12 @@ function generateWeekSlots(routine,weekOffset=0){
   const slots=[];
   for(let d=0;d<7&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
-    if(date<now)continue;
+    if(date<effectiveNow)continue;
     if(prefDays.includes(date.getDay())){date.setHours(startH,startM,0,0);slots.push(date.toISOString());}
   }
   for(let d=0;d<7&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
-    if(date<now)continue;
+    if(date<effectiveNow)continue;
     date.setHours(startH,startM,0,0);
     if(!slots.includes(date.toISOString()))slots.push(date.toISOString());
   }
@@ -1497,17 +1503,18 @@ function generateVerbalSlots(routine,weekStart,now){
   const parsed=routine.verbParsed;
   const count=parsed.timesPerWeek||routine.timesPerWeek||3;
   const WIN_H={morning:7,afternoon:13,evening:18};
-  const slots=[];let lastDayIdx=-2;
+  const slots=[];
+  const sched=[];// track scheduled day indices for rest-day checks
   const daySlots=parsed.daySlots||[];
   if(daySlots.length){
     const sorted=[...daySlots].sort((a,b)=>a.day-b.day);
-    for(const{day,timeWindow}of sorted){
+    for(const{day,timeWindow,hour,minute}of sorted){
       if(slots.length>=count)break;
       const date=new Date(weekStart);date.setDate(weekStart.getDate()+day);
       if(date<now)continue;
-      if(parsed.restDayBetween&&lastDayIdx>=0&&day-lastDayIdx<2)continue;
-      date.setHours(WIN_H[timeWindow]||7,0,0,0);
-      slots.push(date.toISOString());lastDayIdx=day;
+      if(parsed.restDayBetween&&sched.some(sd=>Math.abs(day-sd)<2))continue;
+      date.setHours(hour!=null?hour:WIN_H[timeWindow]||7, minute!=null?minute:0, 0,0);
+      slots.push(date.toISOString());sched.push(day);
     }
   }
   if(slots.length<count){
@@ -1515,10 +1522,10 @@ function generateVerbalSlots(routine,weekStart,now){
     for(let d=0;d<7&&slots.length<count;d++){
       const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
       if(date<now)continue;
-      if(parsed.restDayBetween&&lastDayIdx>=0&&d-lastDayIdx<2)continue;
+      if(parsed.restDayBetween&&sched.some(sd=>Math.abs(d-sd)<2))continue;
       date.setHours(h,0,0,0);
       const iso=date.toISOString();
-      if(!slots.includes(iso)){slots.push(iso);lastDayIdx=d;}
+      if(!slots.includes(iso)){slots.push(iso);sched.push(d);}
     }
   }
   return slots.slice(0,count);
@@ -1581,14 +1588,14 @@ function renderRoutineList(){
   }).join('');
 }
 
-function openScheduleSheet(routineId){
-  const r=routines.find(x=>x.id===routineId);if(!r)return;
-  schedulingRoutineId=routineId;
-  const slots=generateWeekSlots(r);
+function refreshScheduleSlots(){
+  const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
+  const pickerVal=document.getElementById('schedStartDate').value;
+  const startDate=pickerVal?new Date(pickerVal):null;
+  const slots=generateWeekSlots(r,0,startDate);
   schedulingSlots=slots.map(dt=>({dt,selected:true}));
   const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
   const MONTH_NAMES=['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
-  document.getElementById('scheduleSheetTitle').textContent=`תזמן: ${esc(r.name||r.text||'')}`;
   const list=document.getElementById('scheduleSlotsList');
   list.innerHTML=slots.map((dt,i)=>{
     const d=new Date(dt);
@@ -1607,10 +1614,18 @@ function openScheduleSheet(routineId){
   </div>
 </div>`;
   }).join('');
-  if(!slots.length){list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים השבוע.<br>נסה לשנות ימים מועדפים.</div>`;}
-  document.getElementById('routineListSheet').classList.remove('on');
-  document.getElementById('scheduleSheet').classList.add('on');
+  if(!slots.length)list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים.<br>בחר תאריך עתידי.</div>`;
   initSlotLongPress();
+}
+function openScheduleSheet(routineId){
+  const r=routines.find(x=>x.id===routineId);if(!r)return;
+  schedulingRoutineId=routineId;
+  document.getElementById('scheduleSheetTitle').textContent=`תזמן: ${esc(r.name||r.text||'')}`;
+  document.getElementById('schedStartDate').value=new Date().toISOString().split('T')[0];
+  refreshScheduleSlots();
+  ['routineListSheet','routineFormSheet'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('scheduleSheet').classList.add('on');
 }
 function toggleSlot(i){
   schedulingSlots[i].selected=!schedulingSlots[i].selected;
@@ -1738,7 +1753,12 @@ function saveRoutine(){
   else routines.unshift(routine);
   editingRoutineId=null;
   saveRoutines();scheduleWeeklyReminderNotifs();render();
-  closeRoutineSheet();toast(existing?'שגרה עודכנה 🔄':'שגרה נוספה 🔄');
+  if(rScheduleMode==='verbal'){
+    setTimeout(()=>openScheduleSheet(routine.id),80);
+    toast(existing?'שגרה עודכנה — בחר מועדים 📅':'שגרה נוספה — בחר מועדים 📅');
+  } else {
+    closeRoutineSheet();toast(existing?'שגרה עודכנה 🔄':'שגרה נוספה 🔄');
+  }
 }
 
 function editRoutine(id){
@@ -2135,41 +2155,71 @@ function selectSchedMode(mode){
 // ── Verbal schedule parser ─────────────────────────────────────────────────────
 function parseVerbSchedule(text){
   const res={timesPerWeek:3,daySlots:[],restDayBetween:false,duration:null,timeWindow:'morning'};
+  const NUM={'אחת':1,'אחד':1,'פעמיים':2,'שתיים':2,'שלוש':3,'שלושה':3,'ארבע':4,'ארבעה':4,'חמש':5,'חמישה':5,'שש':6,'שישה':6,'שבע':7};
   // Duration
   if(/שעה וחצי/.test(text))res.duration=90;
   else if(/שעתיים/.test(text))res.duration=120;
   else if(/שלוש שעות/.test(text))res.duration=180;
-  else if(/שעה/.test(text))res.duration=60;
+  else if(/(?<!ב)שעה(?!\s*\d)/.test(text))res.duration=60;
   else{const m=text.match(/(\d+)\s*דקות?/);if(m)res.duration=+m[1];}
-  // Times per week
-  const NUM={'אחת':1,'אחד':1,'פעמיים':2,'שתיים':2,'שלוש':3,'שלושה':3,'ארבע':4,'ארבעה':4,'חמש':5,'חמישה':5,'שש':6,'שישה':6,'שבע':7};
-  const twm=text.match(/(פעמיים)|(\d+|אחת|אחד|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\s*פעמים/);
+  // Times per week — "פעמיים בשבוע" / "3 אימונים בשבוע" / "3 פעמים בשבוע"
+  const twm=text.match(/(פעמיים)\s*בשבוע|(\d+|אחת|אחד|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\s*(?:פעמים|אימונים|פגישות|פעילויות|אירועים|ריצות|אימון)?\s*בשבוע/);
   if(twm)res.timesPerWeek=twm[1]?2:(NUM[twm[2]]||+twm[2]||3);
   else if(/פעם אחת|פעם בשבוע/.test(text))res.timesPerWeek=1;
   // Rest day
-  res.restDayBetween=/יום מנוח|הפרש יום|לפחות יום/.test(text);
-  // Windows
-  const WIN={'ערב':'evening','בוקר':'morning','אחה"צ':'afternoon','אחר הצהריים':'afternoon','צהריים':'afternoon','לילה':'evening'};
-  // Day groups
+  res.restDayBetween=/יום מנוח|הפרש יום|לפחות יום|מנוחה ביניה|מנוחה בניה/.test(text);
+  const WIN={'ערב':'evening','הערב':'evening','בוקר':'morning','הבוקר':'morning','אחה"צ':'afternoon','אחר הצהריים':'afternoon','צהריים':'afternoon','לילה':'evening'};
   const GROUP={'אמצע שבוע':[1,2,3],'אמצע-שבוע':[1,2,3],'ימי אמצע':[1,2,3],'סוף שבוע':[5,6],'סופ"ש':[5,6],'סופש':[5,6],'ימי שבוע':[0,1,2,3,4],'ימי עבודה':[0,1,2,3,4]};
-  // Individual days
   const DAYS=[{re:/ראשון|א׳/,d:0},{re:/שני(?!ה)|ב׳/,d:1},{re:/שלישי|ג׳/,d:2},{re:/רביעי|ד׳/,d:3},{re:/חמישי|ה׳/,d:4},{re:/שישי|ו׳/,d:5},{re:/שבת|שב׳/,d:6}];
-  // Split on clause boundaries
-  const parts=text.split(/,|;|\s+ו(?=ב[אבגדהושי׳"]|\s+ב(?:יום|מצע|וקר|רב|חר|ערב|לילה))/);
+  function extractTime(seg){
+    let m;
+    m=seg.match(/[מב]-?(\d{1,2}):(\d{2})/);if(m)return{hour:+m[1],minute:+m[2]};
+    m=seg.match(/\b(\d{1,2}):(\d{2})\b/);if(m)return{hour:+m[1],minute:+m[2]};
+    m=seg.match(/[מב](\d{1,2})(?!\d|:)/);if(m)return{hour:+m[1],minute:0};
+    return null;
+  }
+  // Count slots requested within a segment ("2 אימונים", "אחד", "עוד אחד")
+  function segCount(seg){
+    const m=seg.match(/(?:עוד\s+)?(\d+|אחת|אחד|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*(?:אימונים|פגישות|פעילויות|ריצות|פעמים|אירועים)?/);
+    if(m){const n=NUM[m[1]]||+m[1];if(n>=1&&n<=7)return n;}
+    return null;
+  }
+  // Pick N days from a group, respecting rest-day gap when needed
+  function pickDays(days,count,restDay){
+    const s=[...days].sort((a,b)=>a-b);
+    if(!restDay)return s.slice(0,count);
+    const out=[];let last=-2;
+    for(const d of s){if(out.length>=count)break;if(last>=0&&d-last<2)continue;out.push(d);last=d;}
+    s.forEach(d=>{if(out.length<count&&!out.includes(d))out.push(d);});
+    return out;
+  }
+  // Normalize conjunctions → segment boundaries
+  const normalized=text
+    .replace(/\s*ועוד\s*/g,',')
+    .replace(/\s*וגם\s*/g,',')
+    .replace(/\s*ו(?=ב(?:אמצע|סוף|יום|ימי|סופ|ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|בוקר|ערב|צהריים))/g,',');
+  const parts=normalized.split(/,|;/);
   parts.forEach(part=>{
+    part=part.trim();if(!part)return;
     const ldays=[];
-    for(const[kw,days]of Object.entries(GROUP)){if(part.includes(kw))days.forEach(d=>{if(!ldays.includes(d))ldays.push(d);});}
+    for(const[kw,gdays]of Object.entries(GROUP)){
+      if(part.includes(kw)){
+        const cnt=segCount(part);
+        pickDays(gdays,cnt||gdays.length,res.restDayBetween).forEach(d=>{if(!ldays.includes(d))ldays.push(d);});
+      }
+    }
     DAYS.forEach(({re,d})=>{if(re.test(part)&&!ldays.includes(d))ldays.push(d);});
     let win=null;
     for(const[kw,w]of Object.entries(WIN)){if(part.includes(kw)){win=w;break;}}
-    if(ldays.length&&win){ldays.sort((a,b)=>a-b);ldays.forEach(d=>{if(!res.daySlots.find(s=>s.day===d))res.daySlots.push({day:d,timeWindow:win});});}
-    else if(ldays.length){ldays.sort((a,b)=>a-b);ldays.forEach(d=>{if(!res.daySlots.find(s=>s.day===d))res.daySlots.push({day:d,timeWindow:null});});}
-    else if(win&&!ldays.length)res.timeWindow=win;
+    const ts=extractTime(part);
+    if(ldays.length){
+      ldays.sort((a,b)=>a-b);
+      ldays.forEach(d=>{if(!res.daySlots.find(s=>s.day===d))res.daySlots.push({day:d,timeWindow:win,hour:ts?.hour??null,minute:ts?.minute??null});});
+    } else if(win)res.timeWindow=win;
   });
-  // Fill nulls
   if(res.daySlots.length){
-    const fallback=res.timeWindow||'morning';
-    res.daySlots.forEach(s=>{if(!s.timeWindow)s.timeWindow=fallback;});
+    const fb=res.timeWindow||'morning';
+    res.daySlots.forEach(s=>{if(!s.timeWindow)s.timeWindow=fb;});
   }
   return res;
 }
