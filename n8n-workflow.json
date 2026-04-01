@@ -274,10 +274,10 @@
       "main": [[{ "node": "תשובה - מייל", "type": "main", "index": 0 }]]
     },
     "גוגל קלנדר": {
-      "main": [[
-        { "node": "שליחת מייל", "type": "main", "index": 0 },
-        { "node": "תשובה - יצירה", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [{ "node": "שליחת מייל", "type": "main", "index": 0 }],
+        [{ "node": "תשובה - יצירה", "type": "main", "index": 0 }]
+      ]
     }
   },
   "active": false,

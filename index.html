@@ -464,6 +464,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .routine-sched-btn{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:8px 16px;border-radius:50px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .routine-sched-btn:active{opacity:.8}
 .routine-sched-done{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:6px 12px;border-radius:50px;background:#dcfce7;color:#16a34a;border:1.5px solid #bbf7d0;font-size:12px;font-weight:700}
+.routine-test-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:7px 13px;border-radius:50px;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.routine-test-btn:active{background:var(--border);color:var(--text)}
+.routine-actions-row{padding:0 20px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1376,7 +1379,7 @@ function renderRoutineList(){
   </div>
   <button class="routine-del-btn" onclick="deleteRoutine(${r.id})">×</button>
 </div>
-<div style="padding:0 20px 12px 20px">${schedBtn}</div>`;
+<div class="routine-actions-row">${schedBtn}<button class="routine-test-btn" onclick="testRoutine(${r.id})">🧪 טסט</button></div>`;
   }).join('');
 }
 
@@ -1569,6 +1572,29 @@ function confirmSiriAsRoutine(){
   const txt=document.getElementById('siriEdit').value.trim();
   stopSiri();if(!txt)return;
   setTimeout(()=>{openRoutineSheet();setTimeout(()=>openRoutineForm(parseRoutineFromText(txt),null),350);},200);
+}
+
+// Test routine — calendar event + push notification
+async function testRoutine(id){
+  const r=routines.find(x=>x.id===id);if(!r)return;
+  const name=r.name||r.text||'שגרה';
+  // 1. Push notification immediately
+  const start=new Date(Date.now()+5*60000);
+  const end=new Date(start.getTime()+(r.duration||60)*60000);
+  const fmt=d=>`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  await requestNotificationPermission();
+  showPushNotification({text:`🧪 טסט: ${name}`,notes:`${fmt(start)}–${fmt(end)} · ${durLabel(r.duration||60)}`,id:'test_'+id});
+  // 2. Calendar event 5 min from now
+  toast('יוצר אירוע טסט בקאלנדר...');
+  const testRoutineObj={...r,duration:r.duration||60};
+  const ev=await createCalendarEvent(testRoutineObj,start.toISOString());
+  if(ev&&!ev.id?.startsWith('local_')){
+    toast('✓ אירוע טסט בקאלנדר + נוטיפיקציה ✓');
+  }else if(ev){
+    toast('✓ נוטיפיקציה נשלחה · הוסף חשבון Google לסנכרון קאלנדר');
+  }else{
+    toast('✓ נוטיפיקציה נשלחה');
+  }
 }
 
 // Weekly scheduling reminder notification
