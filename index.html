@@ -467,6 +467,19 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .routine-test-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:7px 13px;border-radius:50px;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .routine-test-btn:active{background:var(--border);color:var(--text)}
 .routine-actions-row{padding:0 20px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.routine-edit-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:5px;font-size:15px;border-radius:8px;flex-shrink:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;line-height:1}
+.routine-edit-btn:active{background:var(--bg);color:var(--accent)}
+.slot-time-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.slot-time-input{padding:5px 10px;border-radius:10px;border:1.5px solid var(--accent);background:#fff;font-size:14px;font-family:inherit;color:var(--text);outline:none;direction:ltr;display:none;-webkit-user-select:text;user-select:text}
+.slot-long-hint{font-size:10px;color:var(--muted);margin-top:3px;opacity:.65}
+/* Verbal schedule mode */
+.sched-mode-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;box-sizing:border-box}
+.sched-mode-btn{padding:11px 8px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;text-align:center;box-sizing:border-box;width:100%}
+.sched-mode-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rfi-verbal{display:block;width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--bg);font-size:14px;font-family:inherit;color:var(--text);outline:none;direction:rtl;transition:border-color .15s,background .15s;box-sizing:border-box;resize:none;min-height:80px;line-height:1.6;-webkit-user-select:text;user-select:text}
+.rfi-verbal:focus{border-color:var(--accent);background:#fff}
+.routine-clear-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:7px 13px;border-radius:50px;background:#fff0f0;color:#dc2626;border:1.5px solid #fecaca;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.routine-clear-btn:active{background:#fecaca}
 </style>
 </head>
 <body>
@@ -657,6 +670,22 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
       </div>
 
       <div class="rfield">
+        <div class="rform-lbl">אופן תזמון</div>
+        <div class="sched-mode-toggle">
+          <button class="sched-mode-btn on" data-mode="manual" onclick="selectSchedMode('manual')">📅 בחירה ידנית</button>
+          <button class="sched-mode-btn" data-mode="verbal" onclick="selectSchedMode('verbal')">📝 תיאור מילולי</button>
+        </div>
+      </div>
+
+      <div class="rfield" id="rVerbalField" style="display:none">
+        <div class="rform-lbl">תאר את השגרה</div>
+        <textarea class="rfi-verbal" id="rVerbal" placeholder="למשל: 3 פעמים בשבוע, ב׳ ג׳ ד׳ בערב ושישי בבוקר, יום מנוחה בינהם..."></textarea>
+        <div class="rform-hint">תיאור חופשי — המערכת תייצר את הסלוטים אוטומטית</div>
+      </div>
+
+      <div id="rManualFields" style="display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box">
+
+      <div class="rfield">
         <div class="rform-lbl">ימים מועדפים <span class="rform-hint" style="display:inline">(ריק = כל יום)</span></div>
         <div class="day-grid">
           <button class="day-btn" data-day="0" onclick="toggleDay(this)">א׳</button>
@@ -683,6 +712,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="rform-lbl">שעת התחלה קבועה</div>
         <input class="rfi" id="rSpecificTime" type="time" value="07:00"/>
       </div>
+
+      </div><!-- /#rManualFields -->
 
       <div class="rfield-2col">
         <div class="rfield">
@@ -1149,8 +1180,8 @@ function sendEmailNotification(task){
   fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})}).catch(()=>{});
 }
 async function syncTask(task){
-  const eventId=await createCalendarEvent(task);
-  if(eventId){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=eventId;save();render();}toast('נוסף לגוגל קאלנדר');}
+  const ev=await createCalendarEvent(task,task.datetime);
+  if(ev){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=ev.id||ev;save();render();}toast('נוסף לגוגל קאלנדר');}
   sendEmailNotification(task);
 }
 async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId)}
@@ -1182,7 +1213,9 @@ function getRoutineInstances(){
   const instances=[];
   routines.filter(r=>r.enabled).forEach(r=>{
     const name=r.name||r.text||'';
-    Object.values(r.scheduledWeeks||{}).flat().forEach(dt=>{
+    Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item?.dt;
+      if(!dt)return;
       const d=new Date(dt);
       if(d<cutoff||d>future)return;
       if((r.skippedDates||[]).includes(dt))return;
@@ -1277,6 +1310,7 @@ function toast(msg){const el=document.getElementById('toast');el.textContent=msg
 
 // ── Routines ──────────────────────────────────────────────────────────────────
 let rFreqCount=3;
+let rScheduleMode='manual';
 let schedulingRoutineId=null;
 let schedulingSlots=[];
 
@@ -1302,30 +1336,58 @@ function windowStartHour(r){
 }
 
 function generateWeekSlots(routine,weekOffset=0){
+  const now=new Date();
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-now.getDay()+weekOffset*7);
+  weekStart.setHours(0,0,0,0);
+  if(routine.scheduleMode==='verbal'&&routine.verbParsed){
+    return generateVerbalSlots(routine,weekStart,now);
+  }
   const count=routine.timesPerWeek||3;
   const prefDays=routine.preferredDays?.length?routine.preferredDays:[0,1,2,3,4,5,6];
   const startH=windowStartHour(routine);
   const startM=routine.timeWindow==='specific'?+(routine.specificTime||'07:00').split(':')[1]:0;
-  const now=new Date();
-  // week start = Sunday of target week
-  const weekStart=new Date(now);
-  weekStart.setDate(now.getDate()-now.getDay()+weekOffset*7);
-  weekStart.setHours(0,0,0,0);
   const slots=[];
-  // First pass: preferred days
   for(let d=0;d<7&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
     if(date<now)continue;
-    if(prefDays.includes(date.getDay())){
-      date.setHours(startH,startM,0,0);slots.push(date.toISOString());
-    }
+    if(prefDays.includes(date.getDay())){date.setHours(startH,startM,0,0);slots.push(date.toISOString());}
   }
-  // Second pass: any remaining days if not enough
   for(let d=0;d<7&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
     if(date<now)continue;
     date.setHours(startH,startM,0,0);
     if(!slots.includes(date.toISOString()))slots.push(date.toISOString());
+  }
+  return slots.slice(0,count);
+}
+function generateVerbalSlots(routine,weekStart,now){
+  const parsed=routine.verbParsed;
+  const count=parsed.timesPerWeek||routine.timesPerWeek||3;
+  const WIN_H={morning:7,afternoon:13,evening:18};
+  const slots=[];let lastDayIdx=-2;
+  const daySlots=parsed.daySlots||[];
+  if(daySlots.length){
+    const sorted=[...daySlots].sort((a,b)=>a.day-b.day);
+    for(const{day,timeWindow}of sorted){
+      if(slots.length>=count)break;
+      const date=new Date(weekStart);date.setDate(weekStart.getDate()+day);
+      if(date<now)continue;
+      if(parsed.restDayBetween&&lastDayIdx>=0&&day-lastDayIdx<2)continue;
+      date.setHours(WIN_H[timeWindow]||7,0,0,0);
+      slots.push(date.toISOString());lastDayIdx=day;
+    }
+  }
+  if(slots.length<count){
+    const h=WIN_H[parsed.timeWindow]||WIN_H.morning;
+    for(let d=0;d<7&&slots.length<count;d++){
+      const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
+      if(date<now)continue;
+      if(parsed.restDayBetween&&lastDayIdx>=0&&d-lastDayIdx<2)continue;
+      date.setHours(h,0,0,0);
+      const iso=date.toISOString();
+      if(!slots.includes(iso)){slots.push(iso);lastDayIdx=d;}
+    }
   }
   return slots.slice(0,count);
 }
@@ -1367,8 +1429,9 @@ function renderRoutineList(){
     const prefText=r.preferredDays?.length?r.preferredDays.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES[d]).join('+'):'כל יום';
     const win=WIN_LABEL[r.timeWindow]||'בוקר';
     const scheduled=r.scheduledWeeks?.[wk]||[];
-    const schedBtn=scheduled.length
-      ?`<span class="routine-sched-done">✓ מתוזמן ${scheduled.length} פגישות</span>`
+    const schedCount=scheduled.length;
+    const schedBtn=schedCount
+      ?`<span class="routine-sched-done">✓ מתוזמן ${schedCount} פגישות</span><button class="routine-clear-btn" onclick="clearRoutineEvents(${r.id})">🗑 נקה אירועים</button>`
       :(r.enabled?`<button class="routine-sched-btn" onclick="openScheduleSheet(${r.id})">⚡ תזמן השבוע</button>`:'');
     return`<div class="routine-item">
   <label class="rtoggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRoutineEnabled(${r.id},this.checked)"><span class="rtoggle-sl"></span></label>
@@ -1377,7 +1440,10 @@ function renderRoutineList(){
     <div class="routine-item-meta">${r.timesPerWeek||3}×/שבוע · ${durLabel(r.duration||60)} · ${win} · ${prefText}</div>
     ${r.notes?`<div class="routine-item-meta">📝 ${esc(r.notes)}</div>`:''}
   </div>
-  <button class="routine-del-btn" onclick="deleteRoutine(${r.id})">×</button>
+  <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;align-items:center">
+    <button class="routine-edit-btn" onclick="editRoutine(${r.id})">✏️</button>
+    <button class="routine-del-btn" onclick="deleteRoutine(${r.id})">×</button>
+  </div>
 </div>
 <div class="routine-actions-row">${schedBtn}<button class="routine-test-btn" onclick="testRoutine(${r.id})">🧪 טסט</button></div>`;
   }).join('');
@@ -1397,17 +1463,22 @@ function openScheduleSheet(routineId){
     const endD=new Date(d.getTime()+(r.duration||60)*60000);
     const fmt=x=>`${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`;
     const dateLabel=`${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
-    return`<div class="slot-card on" id="slot_${i}" onclick="toggleSlot(${i})">
+    return`<div class="slot-card on" id="slot_${i}" data-idx="${i}" onclick="toggleSlot(${i})">
   <div class="slot-check">✓</div>
   <div class="slot-info">
     <div class="slot-day">${dateLabel}</div>
-    <div class="slot-time">${fmt(d)} – ${fmt(endD)} (${durLabel(r.duration||60)})</div>
+    <div class="slot-time-row">
+      <span class="slot-time" id="slot_time_lbl_${i}">${fmt(d)} – ${fmt(endD)} (${durLabel(r.duration||60)})</span>
+      <input type="time" class="slot-time-input" id="slot_time_input_${i}" value="${fmt(d)}" onclick="event.stopPropagation()" oninput="changeSlotTime(${i},this.value)"/>
+    </div>
+    <div class="slot-long-hint">לחיצה ארוכה לשינוי שעה</div>
   </div>
 </div>`;
   }).join('');
   if(!slots.length){list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים השבוע.<br>נסה לשנות ימים מועדפים.</div>`;}
   document.getElementById('routineListSheet').classList.remove('on');
   document.getElementById('scheduleSheet').classList.add('on');
+  initSlotLongPress();
 }
 function toggleSlot(i){
   schedulingSlots[i].selected=!schedulingSlots[i].selected;
@@ -1415,20 +1486,29 @@ function toggleSlot(i){
 }
 async function confirmScheduling(){
   const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
-  const chosen=schedulingSlots.filter(s=>s.selected).map(s=>s.dt);
+  const chosen=schedulingSlots.filter(s=>s.selected);
   if(!chosen.length){toast('לא נבחרו פגישות');return;}
   document.getElementById('scheduleConfirmBtn').textContent='מוסיף...';
   document.getElementById('scheduleConfirmBtn').disabled=true;
   const created=[];
-  for(const dt of chosen){
-    const ev=await createCalendarEvent(r,dt);
-    if(ev)created.push(dt);
-    else created.push(dt); // save locally even if calendar fails
+  for(const s of chosen){
+    const ev=await createCalendarEvent(r,s.dt);
+    created.push({dt:s.dt,eventId:ev?.id||null});
   }
   const wk=getWeekKey();
   if(!r.scheduledWeeks)r.scheduledWeeks={};
   r.scheduledWeeks[wk]=created;
   saveRoutines();render();
+  // Send email notification via n8n
+  if(gAuth?.email&&created.length){
+    const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    const slotsText=created.map(s=>{const d=new Date(s.dt);return `יום ${DAY_NAMES[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}).join(', ');
+    fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'email_only',email:gAuth.email,text:`📅 תוזמן: ${r.name||r.text}`,
+        datetime:created[0].dt,category:r.category||'שגרה',
+        notes:`${created.length} פגישות: ${slotsText}`})
+    }).catch(()=>{});
+  }
   document.getElementById('scheduleConfirmBtn').textContent='הוסף לגוגל קאלנדר ✓';
   document.getElementById('scheduleConfirmBtn').disabled=false;
   toast(`✓ ${created.length} אירועים תוזמנו`);
@@ -1476,6 +1556,10 @@ function openRoutineForm(prefill,editId){
   const tw=prefill?.timeWindow||'morning';
   document.querySelectorAll('.rwindow-btn').forEach(b=>b.classList.toggle('on',b.dataset.window===tw));
   document.getElementById('rSpecificTimeField').style.display=tw==='specific'?'':'none';
+  // schedule mode
+  rScheduleMode=prefill?.scheduleMode||'manual';
+  selectSchedMode(rScheduleMode);
+  document.getElementById('rVerbal').value=prefill?.verbCondition||'';
   document.getElementById('routineListSheet').classList.remove('on');
   document.getElementById('routineFormSheet').classList.add('on');
 }
@@ -1494,11 +1578,13 @@ function saveRoutine(){
   const reminder=+document.getElementById('rReminder').value;
   if(reminder>0)requestNotificationPermission();
   const existing=editingRoutineId?routines.find(r=>r.id===editingRoutineId):null;
+  const verbCondition=rScheduleMode==='verbal'?document.getElementById('rVerbal').value.trim():'';
+  const verbParsed=rScheduleMode==='verbal'&&verbCondition?parseVerbSchedule(verbCondition):null;
   const routine={
     id:editingRoutineId||Date.now(),
     name,
-    timesPerWeek:rFreqCount,
-    duration:+document.getElementById('rDuration').value,
+    timesPerWeek:verbParsed?.timesPerWeek||rFreqCount,
+    duration:verbParsed?.duration||+document.getElementById('rDuration').value,
     preferredDays:[...document.querySelectorAll('.day-btn.on')].map(b=>+b.dataset.day),
     timeWindow:document.querySelector('.rwindow-btn.on')?.dataset.window||'morning',
     specificTime:document.getElementById('rSpecificTime').value,
@@ -1507,6 +1593,9 @@ function saveRoutine(){
     category:document.getElementById('rCat').value,
     reminder,
     notes:document.getElementById('rNotes').value.trim(),
+    scheduleMode:rScheduleMode,
+    verbCondition,
+    verbParsed,
     enabled:true,
     completedDates:existing?.completedDates||[],
     skippedDates:existing?.skippedDates||[],
@@ -1671,6 +1760,119 @@ function scheduleEmailReminders(){
       routine.scheduledEmailDates.push(inst.dateStr);saveRoutines();
     }).catch(()=>{});
   });
+}
+
+// ── Slot long-press for time edit ──────────────────────────────────────────────
+function initSlotLongPress(){
+  const list=document.getElementById('scheduleSlotsList');
+  let pressTimer=null;
+  list.addEventListener('touchstart',e=>{
+    const card=e.target.closest('.slot-card');if(!card)return;
+    if(e.target.closest('.slot-time-input'))return;
+    const idx=+card.dataset.idx;
+    pressTimer=setTimeout(()=>{showSlotTimeEdit(idx);vibrate&&vibrate([30,10,30]);},500);
+  },{passive:true});
+  list.addEventListener('touchend',()=>{clearTimeout(pressTimer);},{passive:true});
+  list.addEventListener('touchmove',()=>{clearTimeout(pressTimer);},{passive:true});
+  // Desktop long-click fallback
+  list.addEventListener('mousedown',e=>{
+    const card=e.target.closest('.slot-card');if(!card)return;
+    if(e.target.closest('.slot-time-input'))return;
+    pressTimer=setTimeout(()=>showSlotTimeEdit(+card.dataset.idx),600);
+  });
+  list.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+}
+function showSlotTimeEdit(i){
+  document.querySelectorAll('.slot-time-input').forEach((inp,j)=>{inp.style.display=j===i?'inline-block':'none';});
+  const inp=document.getElementById('slot_time_input_'+i);if(inp)inp.focus();
+}
+function changeSlotTime(i,val){
+  if(!val)return;
+  const[h,m]=val.split(':').map(Number);
+  const old=new Date(schedulingSlots[i].dt);
+  old.setHours(h,m,0,0);
+  schedulingSlots[i].dt=old.toISOString();
+  const r=routines.find(x=>x.id===schedulingRoutineId);
+  const endD=new Date(old.getTime()+(r?.duration||60)*60000);
+  const fmt=x=>`${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`;
+  const lbl=document.getElementById('slot_time_lbl_'+i);
+  if(lbl)lbl.textContent=`${fmt(old)} – ${fmt(endD)} (${durLabel(r?.duration||60)})`;
+}
+
+// ── Clear routine calendar events ──────────────────────────────────────────────
+async function clearRoutineEvents(id){
+  if(!confirm('למחוק את האירועים מגוגל קאלנדר?'))return;
+  const r=routines.find(x=>x.id===id);if(!r)return;
+  const wk=getWeekKey();
+  const scheduled=r.scheduledWeeks?.[wk]||[];
+  const token=await getToken().catch(()=>null);
+  let deleted=0;
+  for(const item of scheduled){
+    const eventId=typeof item==='string'?null:item.eventId;
+    if(eventId&&token&&!eventId.startsWith('local_')){
+      try{
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+          {method:'DELETE',headers:{Authorization:'Bearer '+token}});
+        deleted++;
+      }catch(e){}
+    }
+  }
+  if(!r.scheduledWeeks)r.scheduledWeeks={};
+  r.scheduledWeeks[wk]=[];
+  saveRoutines();renderRoutineList();render();
+  toast(deleted?`✓ ${deleted} אירועים נמחקו`:'✓ תזמון נוקה');
+}
+
+// ── Schedule mode toggle ───────────────────────────────────────────────────────
+function selectSchedMode(mode){
+  rScheduleMode=mode;
+  document.querySelectorAll('.sched-mode-btn').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
+  const vf=document.getElementById('rVerbalField');
+  const mf=document.getElementById('rManualFields');
+  if(vf)vf.style.display=mode==='verbal'?'':'none';
+  if(mf)mf.style.display=mode==='manual'?'':'none';
+}
+
+// ── Verbal schedule parser ─────────────────────────────────────────────────────
+function parseVerbSchedule(text){
+  const res={timesPerWeek:3,daySlots:[],restDayBetween:false,duration:null,timeWindow:'morning'};
+  // Duration
+  if(/שעה וחצי/.test(text))res.duration=90;
+  else if(/שעתיים/.test(text))res.duration=120;
+  else if(/שלוש שעות/.test(text))res.duration=180;
+  else if(/שעה/.test(text))res.duration=60;
+  else{const m=text.match(/(\d+)\s*דקות?/);if(m)res.duration=+m[1];}
+  // Times per week
+  const NUM={'אחת':1,'אחד':1,'פעמיים':2,'שתיים':2,'שלוש':3,'שלושה':3,'ארבע':4,'ארבעה':4,'חמש':5,'חמישה':5,'שש':6,'שישה':6,'שבע':7};
+  const twm=text.match(/(פעמיים)|(\d+|אחת|אחד|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\s*פעמים/);
+  if(twm)res.timesPerWeek=twm[1]?2:(NUM[twm[2]]||+twm[2]||3);
+  else if(/פעם אחת|פעם בשבוע/.test(text))res.timesPerWeek=1;
+  // Rest day
+  res.restDayBetween=/יום מנוח|הפרש יום|לפחות יום/.test(text);
+  // Windows
+  const WIN={'ערב':'evening','בוקר':'morning','אחה"צ':'afternoon','אחר הצהריים':'afternoon','צהריים':'afternoon','לילה':'evening'};
+  // Day groups
+  const GROUP={'אמצע שבוע':[1,2,3],'אמצע-שבוע':[1,2,3],'ימי אמצע':[1,2,3],'סוף שבוע':[5,6],'סופ"ש':[5,6],'סופש':[5,6],'ימי שבוע':[0,1,2,3,4],'ימי עבודה':[0,1,2,3,4]};
+  // Individual days
+  const DAYS=[{re:/ראשון|א׳/,d:0},{re:/שני(?!ה)|ב׳/,d:1},{re:/שלישי|ג׳/,d:2},{re:/רביעי|ד׳/,d:3},{re:/חמישי|ה׳/,d:4},{re:/שישי|ו׳/,d:5},{re:/שבת|שב׳/,d:6}];
+  // Split on clause boundaries
+  const parts=text.split(/,|;|\s+ו(?=ב[אבגדהושי׳"]|\s+ב(?:יום|מצע|וקר|רב|חר|ערב|לילה))/);
+  parts.forEach(part=>{
+    const ldays=[];
+    for(const[kw,days]of Object.entries(GROUP)){if(part.includes(kw))days.forEach(d=>{if(!ldays.includes(d))ldays.push(d);});}
+    DAYS.forEach(({re,d})=>{if(re.test(part)&&!ldays.includes(d))ldays.push(d);});
+    let win=null;
+    for(const[kw,w]of Object.entries(WIN)){if(part.includes(kw)){win=w;break;}}
+    if(ldays.length&&win){ldays.sort((a,b)=>a-b);ldays.forEach(d=>{if(!res.daySlots.find(s=>s.day===d))res.daySlots.push({day:d,timeWindow:win});});}
+    else if(ldays.length){ldays.sort((a,b)=>a-b);ldays.forEach(d=>{if(!res.daySlots.find(s=>s.day===d))res.daySlots.push({day:d,timeWindow:null});});}
+    else if(win&&!ldays.length)res.timeWindow=win;
+  });
+  // Fill nulls
+  if(res.daySlots.length){
+    const fallback=res.timeWindow||'morning';
+    res.daySlots.forEach(s=>{if(!s.timeWindow)s.timeWindow=fallback;});
+  }
+  return res;
 }
 
 function initSheetSwipe(sheetEl,overlayEl){
