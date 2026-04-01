@@ -440,6 +440,30 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .routine-notes{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
 .siri-routine-btn{width:100%;padding:10px;border-radius:var(--r-sm);background:rgba(99,102,241,.1);color:var(--accent);border:1.5px solid rgba(99,102,241,.25);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation}
 .routine-hdr-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:50px;background:var(--surface);border:1.5px solid var(--border);font-size:12px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* Stepper */
+.rfreq-stepper{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:14px;background:var(--bg);height:48px;overflow:hidden}
+.rfreq-btn{width:48px;height:48px;border:none;background:none;font-size:26px;color:var(--accent);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1}
+.rfreq-btn:active{background:rgba(99,102,241,.1)}
+.rfreq-count{flex:1;text-align:center;font-size:20px;font-weight:800;color:var(--text)}
+/* Time window */
+.rwindow-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;box-sizing:border-box}
+.rwindow-btn{padding:13px 0;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;text-align:center;width:100%;box-sizing:border-box}
+.rwindow-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rform-hint{font-size:11px;color:var(--muted);margin-top:4px}
+/* Schedule sheet */
+.slot-card{background:var(--bg);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;border:1.5px solid transparent;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.slot-card.on{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.3)}
+.slot-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:13px;color:transparent}
+.slot-card.on .slot-check{background:var(--accent);border-color:var(--accent);color:#fff}
+.slot-info{flex:1;min-width:0}
+.slot-day{font-size:15px;font-weight:700;color:var(--text)}
+.slot-time{font-size:13px;color:var(--muted);margin-top:2px}
+.sched-confirm-btn{width:100%;padding:16px;border-radius:50px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(99,102,241,.25);-webkit-tap-highlight-color:transparent;touch-action:manipulation;box-sizing:border-box;display:block}
+.sched-confirm-btn:active{opacity:.85}
+/* Routine card schedule button */
+.routine-sched-btn{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:8px 16px;border-radius:50px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.routine-sched-btn:active{opacity:.8}
+.routine-sched-done{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:6px 12px;border-radius:50px;background:#dcfce7;color:#16a34a;border:1.5px solid #bbf7d0;font-size:12px;font-weight:700}
 </style>
 </head>
 <body>
@@ -599,15 +623,38 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
     <div class="rform">
 
       <div class="rfield">
-        <div class="rform-lbl">שם האירוע</div>
+        <div class="rform-lbl">שם הפעילות</div>
         <div class="rfi-mic-wrap">
-          <input class="rfi" id="rText" type="text" placeholder="אימון, הסעה, ישיבה שבועית..."/>
+          <input class="rfi" id="rText" type="text" placeholder="אימון, ריצה, יוגה, ישיבה..."/>
           <button class="rfi-mic-btn" onclick="voiceRoutine()">🎤</button>
         </div>
       </div>
 
+      <div class="rfield-2col">
+        <div class="rfield">
+          <div class="rform-lbl">כמה פעמים בשבוע</div>
+          <div class="rfreq-stepper">
+            <button class="rfreq-btn" onclick="adjFreq(-1)">−</button>
+            <span class="rfreq-count" id="rFreqDisplay">3</span>
+            <button class="rfreq-btn" onclick="adjFreq(1)">+</button>
+          </div>
+        </div>
+        <div class="rfield">
+          <div class="rform-lbl">משך כל פגישה</div>
+          <select class="rfi" id="rDuration">
+            <option value="15">15 דק׳</option>
+            <option value="30">30 דק׳</option>
+            <option value="45">45 דק׳</option>
+            <option value="60">שעה</option>
+            <option value="90" selected>שעה וחצי</option>
+            <option value="120">שעתיים</option>
+            <option value="180">3 שעות</option>
+          </select>
+        </div>
+      </div>
+
       <div class="rfield">
-        <div class="rform-lbl">ימים בשבוע</div>
+        <div class="rform-lbl">ימים מועדפים <span class="rform-hint" style="display:inline">(ריק = כל יום)</span></div>
         <div class="day-grid">
           <button class="day-btn" data-day="0" onclick="toggleDay(this)">א׳</button>
           <button class="day-btn" data-day="1" onclick="toggleDay(this)">ב׳</button>
@@ -619,34 +666,22 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         </div>
       </div>
 
-      <div class="rfield-2col">
-        <div class="rfield">
-          <div class="rform-lbl">שעת התחלה</div>
-          <input class="rfi" id="rTime" type="time" value="09:00"/>
-        </div>
-        <div class="rfield">
-          <div class="rform-lbl">משך</div>
-          <select class="rfi" id="rDuration">
-            <option value="15">15 דק׳</option>
-            <option value="30">30 דק׳</option>
-            <option value="45">45 דק׳</option>
-            <option value="60" selected>שעה</option>
-            <option value="90">שעה וחצי</option>
-            <option value="120">שעתיים</option>
-            <option value="180">3 שעות</option>
-          </select>
+      <div class="rfield">
+        <div class="rform-lbl">חלון שעות מועדף</div>
+        <div class="rwindow-grid">
+          <button class="rwindow-btn on" data-window="morning" onclick="selectWindow(this)">🌅 בוקר (06–10)</button>
+          <button class="rwindow-btn" data-window="afternoon" onclick="selectWindow(this)">☀️ אחה"צ (12–16)</button>
+          <button class="rwindow-btn" data-window="evening" onclick="selectWindow(this)">🌆 ערב (17–21)</button>
+          <button class="rwindow-btn" data-window="specific" onclick="selectWindow(this)">⏰ שעה קבועה</button>
         </div>
       </div>
 
+      <div class="rfield" id="rSpecificTimeField" style="display:none">
+        <div class="rform-lbl">שעת התחלה קבועה</div>
+        <input class="rfi" id="rSpecificTime" type="time" value="07:00"/>
+      </div>
+
       <div class="rfield-2col">
-        <div class="rfield">
-          <div class="rform-lbl">תדירות</div>
-          <select class="rfi" id="rFreq">
-            <option value="1">כל שבוע</option>
-            <option value="2">כל שבועיים</option>
-            <option value="4">כל חודש</option>
-          </select>
-        </div>
         <div class="rfield">
           <div class="rform-lbl">קטגוריה</div>
           <select class="rfi" id="rCat">
@@ -655,34 +690,36 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
             <option value="כללי">📌 כללי</option>
           </select>
         </div>
+        <div class="rfield">
+          <div class="rform-lbl">תזכורת לפני</div>
+          <select class="rfi" id="rReminder">
+            <option value="0">ללא</option>
+            <option value="15">15 דק׳</option>
+            <option value="30" selected>30 דק׳</option>
+            <option value="60">שעה</option>
+            <option value="120">שעתיים</option>
+          </select>
+        </div>
       </div>
 
       <div class="rfield">
-        <div class="rform-lbl">תאריך התחלה</div>
-        <input class="rfi" id="rStart" type="date"/>
-      </div>
-
-      <div class="rfield">
-        <div class="rform-lbl">תזכורת</div>
-        <div class="rfield-3col">
+        <div class="rform-lbl">תזכורת שבועית לתזמון</div>
+        <div class="rfield-2col">
           <div class="rfield">
-            <select class="rfi" id="rReminder">
-              <option value="0">ללא תזכורת</option>
-              <option value="15">15 דקות לפני</option>
-              <option value="30">30 דקות לפני</option>
-              <option value="60" selected>שעה לפני</option>
-              <option value="120">שעתיים לפני</option>
-              <option value="1440">יום לפני (מייל)</option>
+            <select class="rfi" id="rWeekReminderDay">
+              <option value="-1">ללא תזכורת</option>
+              <option value="0" selected>ראשון</option>
+              <option value="1">שני</option>
+              <option value="4">חמישי</option>
+              <option value="5">שישי</option>
+              <option value="6">שבת</option>
             </select>
           </div>
           <div class="rfield">
-            <select class="rfi" id="rReminderType">
-              <option value="both">פוש + מייל</option>
-              <option value="push">פוש בלבד</option>
-              <option value="email">מייל בלבד</option>
-            </select>
+            <input class="rfi" id="rWeekReminderTime" type="time" value="08:00"/>
           </div>
         </div>
+        <div class="rform-hint">התראה לתזמון שגרה לשבוע הקרוב</div>
       </div>
 
       <div class="rfield">
@@ -692,6 +729,22 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 
       <button class="rform-save" onclick="saveRoutine()">שמור שגרה ✓</button>
 
+    </div>
+  </div>
+</div>
+
+<!-- Sheet: Schedule Week -->
+<div class="rsheet" id="scheduleSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeScheduleSheet()">✕</button>
+    <h3 id="scheduleSheetTitle">תזמן השבוע</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll">
+    <div id="scheduleSlotsList" style="padding:16px;display:flex;flex-direction:column;gap:10px"></div>
+    <div style="padding:0 16px 16px">
+      <button class="sched-confirm-btn" id="scheduleConfirmBtn" onclick="confirmScheduling()">הוסף לגוגל קאלנדר ✓</button>
     </div>
   </div>
 </div>
@@ -709,7 +762,7 @@ const CATS={
   כללי:{kw:[],c:'#fbbf24'}
 };
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
-let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]');
+let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]').map(r=>r.timesPerWeek!=null?r:{...r,name:r.text||r.name||'',timesPerWeek:Math.max(1,r.days?.length||3),preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}});
 let editingRoutineId=null;
 const scheduledNotifIds=new Set();
 let filter='all',deferredPrompt=null;
@@ -759,7 +812,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1120,24 +1173,22 @@ function updateBadge(){document.getElementById('badge').textContent=tasks.filter
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function getRoutineInstances(){
-  const now=new Date();const instances=[];const seen=new Set();
-  for(let offset=-1;offset<14;offset++){
-    const checkDate=new Date(now);checkDate.setDate(now.getDate()+offset);checkDate.setHours(0,0,0,0);
-    const dow=checkDate.getDay();
-    routines.filter(r=>r.enabled&&r.days.includes(dow)).forEach(routine=>{
-      const rStart=new Date(routine.startDate);rStart.setHours(0,0,0,0);
-      if(checkDate<rStart)return;
-      const weeksSince=Math.round((checkDate-rStart)/(7*24*3600000));
-      if(weeksSince%(+routine.frequency)!==0)return;
-      const dateStr=checkDate.toISOString().slice(0,10);
-      const key=`${routine.id}_${dateStr}`;
-      if(seen.has(key))return;seen.add(key);
-      if((routine.skippedDates||[]).includes(dateStr))return;
-      const[h,m]=routine.time.split(':');
-      const instDate=new Date(checkDate);instDate.setHours(+h,+m,0,0);
-      instances.push({id:`routine_${routine.id}_${dateStr}`,routineId:routine.id,isRoutine:true,text:routine.text,category:routine.category,datetime:instDate.toISOString(),duration:+routine.duration,reminder:+routine.reminder,reminderType:routine.reminderType,notes:routine.notes||'',completed:(routine.completedDates||[]).includes(dateStr),dateStr});
+  const now=new Date();
+  const cutoff=new Date(now.getTime()-24*3600000);
+  const future=new Date(now.getTime()+21*24*3600000);
+  const instances=[];
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const name=r.name||r.text||'';
+    Object.values(r.scheduledWeeks||{}).flat().forEach(dt=>{
+      const d=new Date(dt);
+      if(d<cutoff||d>future)return;
+      if((r.skippedDates||[]).includes(dt))return;
+      instances.push({id:`routine_${r.id}_${dt}`,routineId:r.id,isRoutine:true,
+        text:name,category:r.category,datetime:dt,duration:+(r.duration||60),
+        reminder:+(r.reminder||0),notes:r.notes||'',
+        completed:(r.completedDates||[]).includes(dt),dateStr:dt});
     });
-  }
+  });
   return instances;
 }
 
@@ -1222,98 +1273,248 @@ function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2400)}
 
 // ── Routines ──────────────────────────────────────────────────────────────────
+let rFreqCount=3;
+let schedulingRoutineId=null;
+let schedulingSlots=[];
+
+function migrateRoutine(r){
+  if(r.timesPerWeek!=null)return r;
+  return{...r,name:r.text||r.name||'',timesPerWeek:Math.max(1,r.days?.length||3),
+    preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',
+    weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}};
+}
 function saveRoutines(){localStorage.setItem('vt_routines',JSON.stringify(routines));}
+
+function getWeekKey(d=new Date()){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);
+  const yr=dt.getUTCFullYear();
+  const wk=Math.ceil((((dt-new Date(Date.UTC(yr,0,1)))/86400000)+1)/7);
+  return`${yr}-W${String(wk).padStart(2,'0')}`;
+}
+
+function windowStartHour(r){
+  if(r.timeWindow==='specific'){const[h]=( r.specificTime||'07:00').split(':');return+h;}
+  return{morning:7,afternoon:14,evening:18}[r.timeWindow]||7;
+}
+
+function generateWeekSlots(routine,weekOffset=0){
+  const count=routine.timesPerWeek||3;
+  const prefDays=routine.preferredDays?.length?routine.preferredDays:[0,1,2,3,4,5,6];
+  const startH=windowStartHour(routine);
+  const startM=routine.timeWindow==='specific'?+(routine.specificTime||'07:00').split(':')[1]:0;
+  const now=new Date();
+  // week start = Sunday of target week
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-now.getDay()+weekOffset*7);
+  weekStart.setHours(0,0,0,0);
+  const slots=[];
+  // First pass: preferred days
+  for(let d=0;d<7&&slots.length<count;d++){
+    const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
+    if(date<now)continue;
+    if(prefDays.includes(date.getDay())){
+      date.setHours(startH,startM,0,0);slots.push(date.toISOString());
+    }
+  }
+  // Second pass: any remaining days if not enough
+  for(let d=0;d<7&&slots.length<count;d++){
+    const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
+    if(date<now)continue;
+    date.setHours(startH,startM,0,0);
+    if(!slots.includes(date.toISOString()))slots.push(date.toISOString());
+  }
+  return slots.slice(0,count);
+}
 
 function openRoutineSheet(){
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('routineListSheet').classList.add('on');
   document.getElementById('routineFormSheet').classList.remove('on');
+  document.getElementById('scheduleSheet').classList.remove('on');
   renderRoutineList();
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet')];
+  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet'),document.getElementById('scheduleSheet')];
   ov.style.opacity='';ov.style.transition='';
   sheets.forEach(s=>{s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
 }
 function backToRoutineList(){
-  const form=document.getElementById('routineFormSheet');
-  const list=document.getElementById('routineListSheet');
-  form.classList.remove('on');
-  setTimeout(()=>{list.classList.add('on');renderRoutineList();},40);
+  document.getElementById('routineFormSheet').classList.remove('on');
+  document.getElementById('scheduleSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('routineListSheet').classList.add('on');renderRoutineList();},40);
 }
+function closeScheduleSheet(){
+  document.getElementById('scheduleSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('routineListSheet').classList.add('on');renderRoutineList();},40);
+}
+
+function durLabel(min){return min<60?min+'דק׳':min===60?'שעה':min===90?'שעה וחצי':(min/60)+'שעות';}
 
 function renderRoutineList(){
   const el=document.getElementById('routineList');if(!el)return;
   const DAY_NAMES=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
-  if(!routines.length){el.innerHTML=`<div class="routine-empty">עוד אין שגרות.<br>לחץ "+ הוסף" כדי ליצור 🔄</div>`;return;}
+  const WIN_LABEL={morning:'🌅 בוקר',afternoon:'☀️ אחה"צ',evening:'🌆 ערב',specific:'⏰ קבוע'};
+  if(!routines.length){el.innerHTML=`<div class="routine-empty">עוד אין שגרות.<br>לחץ "+ הוסף" 🔄</div>`;return;}
+  const wk=getWeekKey();
   el.innerHTML=routines.map(r=>{
-    const daysText=r.days.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES[d]).join(' + ');
-    const freqText=+r.frequency===1?'כל שבוע':+r.frequency===2?'כל שבועיים':'כל חודש';
-    const durTxt=+r.duration<60?r.duration+'דק׳':+r.duration===60?'שעה':+r.duration===90?'שעה וחצי':(+r.duration/60)+'שעות';
-    const remTxt=+r.reminder>0?` • תזכורת ${+r.reminder===15?'15דק׳':+r.reminder===30?'30דק׳':+r.reminder===60?'שעה':+r.reminder===120?'שעתיים':'יום'} לפני`:'';
-    return `<div class="routine-item">
+    const name=r.name||r.text||'';
+    const prefText=r.preferredDays?.length?r.preferredDays.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES[d]).join('+'):'כל יום';
+    const win=WIN_LABEL[r.timeWindow]||'בוקר';
+    const scheduled=r.scheduledWeeks?.[wk]||[];
+    const schedBtn=scheduled.length
+      ?`<span class="routine-sched-done">✓ מתוזמן ${scheduled.length} פגישות</span>`
+      :(r.enabled?`<button class="routine-sched-btn" onclick="openScheduleSheet(${r.id})">⚡ תזמן השבוע</button>`:'');
+    return`<div class="routine-item">
   <label class="rtoggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRoutineEnabled(${r.id},this.checked)"><span class="rtoggle-sl"></span></label>
   <div class="routine-item-body" onclick="editRoutine(${r.id})">
-    <div class="routine-item-name">${esc(r.text)}</div>
-    <div class="routine-item-meta">${daysText} • ${r.time} • ${durTxt} • ${freqText}${remTxt}</div>
+    <div class="routine-item-name">${esc(name)}</div>
+    <div class="routine-item-meta">${r.timesPerWeek||3}×/שבוע · ${durLabel(r.duration||60)} · ${win} · ${prefText}</div>
     ${r.notes?`<div class="routine-item-meta">📝 ${esc(r.notes)}</div>`:''}
   </div>
   <button class="routine-del-btn" onclick="deleteRoutine(${r.id})">×</button>
+</div>
+<div style="padding:0 20px 12px 20px">${schedBtn}</div>`;
+  }).join('');
+}
+
+function openScheduleSheet(routineId){
+  const r=routines.find(x=>x.id===routineId);if(!r)return;
+  schedulingRoutineId=routineId;
+  const slots=generateWeekSlots(r);
+  schedulingSlots=slots.map(dt=>({dt,selected:true}));
+  const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const MONTH_NAMES=['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
+  document.getElementById('scheduleSheetTitle').textContent=`תזמן: ${esc(r.name||r.text||'')}`;
+  const list=document.getElementById('scheduleSlotsList');
+  list.innerHTML=slots.map((dt,i)=>{
+    const d=new Date(dt);
+    const endD=new Date(d.getTime()+(r.duration||60)*60000);
+    const fmt=x=>`${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`;
+    const dateLabel=`${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+    return`<div class="slot-card on" id="slot_${i}" onclick="toggleSlot(${i})">
+  <div class="slot-check">✓</div>
+  <div class="slot-info">
+    <div class="slot-day">${dateLabel}</div>
+    <div class="slot-time">${fmt(d)} – ${fmt(endD)} (${durLabel(r.duration||60)})</div>
+  </div>
 </div>`;
   }).join('');
+  if(!slots.length){list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים השבוע.<br>נסה לשנות ימים מועדפים.</div>`;}
+  document.getElementById('routineListSheet').classList.remove('on');
+  document.getElementById('scheduleSheet').classList.add('on');
+}
+function toggleSlot(i){
+  schedulingSlots[i].selected=!schedulingSlots[i].selected;
+  document.getElementById('slot_'+i).classList.toggle('on',schedulingSlots[i].selected);
+}
+async function confirmScheduling(){
+  const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
+  const chosen=schedulingSlots.filter(s=>s.selected).map(s=>s.dt);
+  if(!chosen.length){toast('לא נבחרו פגישות');return;}
+  document.getElementById('scheduleConfirmBtn').textContent='מוסיף...';
+  document.getElementById('scheduleConfirmBtn').disabled=true;
+  const created=[];
+  for(const dt of chosen){
+    const ev=await createCalendarEvent(r,dt);
+    if(ev)created.push(dt);
+    else created.push(dt); // save locally even if calendar fails
+  }
+  const wk=getWeekKey();
+  if(!r.scheduledWeeks)r.scheduledWeeks={};
+  r.scheduledWeeks[wk]=created;
+  saveRoutines();render();
+  document.getElementById('scheduleConfirmBtn').textContent='הוסף לגוגל קאלנדר ✓';
+  document.getElementById('scheduleConfirmBtn').disabled=false;
+  toast(`✓ ${created.length} אירועים תוזמנו`);
+  setTimeout(()=>closeScheduleSheet(),800);
+}
+
+async function createCalendarEvent(routine,dateTimeStr){
+  const token=await getToken();
+  if(!token)return{id:'local_'+Date.now()};
+  const start=new Date(dateTimeStr);
+  const end=new Date(start.getTime()+(routine.duration||60)*60000);
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ev={
+    summary:routine.name||routine.text||'',
+    description:routine.notes||'',
+    start:{dateTime:start.toISOString(),timeZone:tz},
+    end:{dateTime:end.toISOString(),timeZone:tz},
+    reminders:{useDefault:false,overrides:routine.reminder>0?[{method:'popup',minutes:+routine.reminder}]:[]}
+  };
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(ev)});
+    if(!res.ok)return{id:'local_'+Date.now()};
+    return await res.json();
+  }catch(e){return{id:'local_'+Date.now()};}
 }
 
 function openRoutineForm(prefill,editId){
   editingRoutineId=editId||null;
   document.getElementById('rFormTitle').textContent=editId?'ערוך שגרה':'שגרה חדשה';
-  document.getElementById('rText').value=prefill?.text||prefill?.name||'';
-  document.getElementById('rTime').value=prefill?.time||'09:00';
-  document.getElementById('rDuration').value=String(prefill?.duration||60);
-  document.getElementById('rFreq').value=String(prefill?.frequency||1);
+  const name=prefill?.name||prefill?.text||'';
+  document.getElementById('rText').value=name;
+  rFreqCount=prefill?.timesPerWeek||3;
+  document.getElementById('rFreqDisplay').textContent=rFreqCount;
+  document.getElementById('rDuration').value=String(prefill?.duration||90);
   document.getElementById('rCat').value=prefill?.category||'אישי';
-  document.getElementById('rStart').value=prefill?.startDate||new Date().toISOString().slice(0,10);
-  document.getElementById('rReminder').value=String(prefill?.reminder||60);
-  document.getElementById('rReminderType').value=prefill?.reminderType||'both';
+  document.getElementById('rReminder').value=String(prefill?.reminder||30);
   document.getElementById('rNotes').value=prefill?.notes||'';
-  document.querySelectorAll('.day-btn').forEach(btn=>btn.classList.toggle('on',(prefill?.days||[]).includes(+btn.dataset.day)));
+  document.getElementById('rWeekReminderDay').value=String(prefill?.weeklyReminderDay??0);
+  document.getElementById('rWeekReminderTime').value=prefill?.weeklyReminderTime||'08:00';
+  document.getElementById('rSpecificTime').value=prefill?.specificTime||'07:00';
+  // days
+  document.querySelectorAll('.day-btn').forEach(btn=>btn.classList.toggle('on',(prefill?.preferredDays||[]).includes(+btn.dataset.day)));
+  // time window
+  const tw=prefill?.timeWindow||'morning';
+  document.querySelectorAll('.rwindow-btn').forEach(b=>b.classList.toggle('on',b.dataset.window===tw));
+  document.getElementById('rSpecificTimeField').style.display=tw==='specific'?'':'none';
   document.getElementById('routineListSheet').classList.remove('on');
   document.getElementById('routineFormSheet').classList.add('on');
 }
 
+function adjFreq(delta){rFreqCount=Math.max(1,Math.min(7,rFreqCount+delta));document.getElementById('rFreqDisplay').textContent=rFreqCount;}
 function toggleDay(btn){btn.classList.toggle('on');}
+function selectWindow(btn){
+  document.querySelectorAll('.rwindow-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('rSpecificTimeField').style.display=btn.dataset.window==='specific'?'':'none';
+}
 
 function saveRoutine(){
-  const text=document.getElementById('rText').value.trim();
-  const days=[...document.querySelectorAll('.day-btn.on')].map(b=>+b.dataset.day);
-  const time=document.getElementById('rTime').value;
-  if(!text){toast('נא להזין שם לאירוע');return;}
-  if(!days.length){toast('נא לבחור לפחות יום אחד');return;}
+  const name=document.getElementById('rText').value.trim();
+  if(!name){toast('נא להזין שם לפעילות');return;}
   const reminder=+document.getElementById('rReminder').value;
-  const reminderType=document.getElementById('rReminderType').value;
-  if(reminder>0&&(reminderType==='push'||reminderType==='both'))requestNotificationPermission();
+  if(reminder>0)requestNotificationPermission();
   const existing=editingRoutineId?routines.find(r=>r.id===editingRoutineId):null;
   const routine={
     id:editingRoutineId||Date.now(),
-    text,days,time,
+    name,
+    timesPerWeek:rFreqCount,
     duration:+document.getElementById('rDuration').value,
-    frequency:+document.getElementById('rFreq').value,
+    preferredDays:[...document.querySelectorAll('.day-btn.on')].map(b=>+b.dataset.day),
+    timeWindow:document.querySelector('.rwindow-btn.on')?.dataset.window||'morning',
+    specificTime:document.getElementById('rSpecificTime').value,
+    weeklyReminderDay:+document.getElementById('rWeekReminderDay').value,
+    weeklyReminderTime:document.getElementById('rWeekReminderTime').value,
     category:document.getElementById('rCat').value,
-    startDate:document.getElementById('rStart').value||new Date().toISOString().slice(0,10),
-    reminder,reminderType,
+    reminder,
     notes:document.getElementById('rNotes').value.trim(),
     enabled:true,
     completedDates:existing?.completedDates||[],
     skippedDates:existing?.skippedDates||[],
-    scheduledEmailDates:existing?.scheduledEmailDates||[],
+    scheduledWeeks:existing?.scheduledWeeks||{},
     createdAt:existing?.createdAt||new Date().toISOString()
   };
-  if(editingRoutineId){routines=routines.map(r=>r.id===editingRoutineId?routine:r);}
-  else{routines.unshift(routine);}
+  if(editingRoutineId)routines=routines.map(r=>r.id===editingRoutineId?routine:r);
+  else routines.unshift(routine);
   editingRoutineId=null;
-  saveRoutines();scheduleEmailReminders();scheduleNotifications();render();
-  closeRoutineSheet();toast(routine.id===routine.createdAt?'שגרה נוספה 🔄':'שגרה עודכנה 🔄');
+  saveRoutines();scheduleWeeklyReminderNotifs();render();
+  closeRoutineSheet();toast(existing?'שגרה עודכנה 🔄':'שגרה נוספה 🔄');
 }
 
 function editRoutine(id){
@@ -1329,10 +1530,10 @@ function toggleRoutineEnabled(id,enabled){
 }
 function toggleRoutineComplete(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
-  const idx=(r.completedDates||[]).indexOf(dateStr);
   if(!r.completedDates)r.completedDates=[];
+  const idx=r.completedDates.indexOf(dateStr);
   if(idx===-1){r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');}
-  else{r.completedDates.splice(idx,1);}
+  else r.completedDates.splice(idx,1);
   saveRoutines();render();
 }
 function skipRoutineInstance(routineId,dateStr){
@@ -1351,33 +1552,49 @@ function voiceRoutine(){
     const parsed=parseRoutineFromText(text);
     if(parsed.name)document.getElementById('rText').value=parsed.name;
     document.querySelectorAll('.day-btn').forEach(btn=>btn.classList.toggle('on',parsed.days.includes(+btn.dataset.day)));
-    if(parsed.time)document.getElementById('rTime').value=parsed.time;
     toast('זוהה ✓');
   };
   r.onerror=()=>toast('לא הצלחתי לשמוע, נסה שוב');
   try{r.start();toast('מאזין...');}catch(e){}
 }
-
 function parseRoutineFromText(text){
   const days=[];
   const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-  const dayNums=[0,1,2,3,4,5,6];
-  dayNames.forEach((name,i)=>{if(text.includes(name)&&!(name==='שני'&&text.includes('שנייה')))days.push(dayNums[i]);});
+  dayNames.forEach((name,i)=>{if(text.includes(name)&&!(name==='שני'&&text.includes('שנייה')))days.push(i);});
   const nameMatch=text.match(/^(.+?)\s+(?:כל|ב)/);
   const name=nameMatch?nameMatch[1].trim():text.replace(/כל.*/,'').replace(/ב.*/,'').trim();
-  const dt=detectTime(text);
-  const time=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
-  return{name,days,time};
+  return{name,days};
 }
-
-// Voice from siri → routine
 function confirmSiriAsRoutine(){
   const txt=document.getElementById('siriEdit').value.trim();
   stopSiri();if(!txt)return;
-  setTimeout(()=>{
-    openRoutineSheet();
-    setTimeout(()=>{openRoutineForm(parseRoutineFromText(txt),null);},350);
-  },200);
+  setTimeout(()=>{openRoutineSheet();setTimeout(()=>openRoutineForm(parseRoutineFromText(txt),null),350);},200);
+}
+
+// Weekly scheduling reminder notification
+function scheduleWeeklyReminderNotifs(){
+  if(!('Notification'in window)||Notification.permission!=='granted')return;
+  const now=new Date();
+  routines.forEach(r=>{
+    const day=+r.weeklyReminderDay;
+    if(day===-1||!r.enabled)return;
+    const[rh,rm]=(r.weeklyReminderTime||'08:00').split(':').map(Number);
+    const next=new Date(now);
+    let daysAhead=(day-now.getDay()+7)%7;
+    if(daysAhead===0){
+      const todayTime=new Date(now);todayTime.setHours(rh,rm,0,0);
+      if(todayTime<=now)daysAhead=7;
+    }
+    next.setDate(now.getDate()+daysAhead);next.setHours(rh,rm,0,0);
+    const delay=next-now;
+    const key=`wkremind_${r.id}`;
+    if(delay>0&&delay<7*86400000&&!scheduledNotifIds.has(key)){
+      scheduledNotifIds.add(key);
+      setTimeout(()=>{
+        showPushNotification({text:`⚡ תזמן: ${r.name||r.text}`,notes:`${r.timesPerWeek||3} פגישות השבוע`,id:'wk_'+r.id});
+      },delay);
+    }
+  });
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────────
@@ -1474,6 +1691,7 @@ function initSwipeGestures(){
   const ov=document.getElementById('routineOverlay');
   initSheetSwipe(document.getElementById('routineListSheet'),ov);
   initSheetSwipe(document.getElementById('routineFormSheet'),ov);
+  initSheetSwipe(document.getElementById('scheduleSheet'),ov);
 }
 
 window.addEventListener('load',()=>{initAuth();initSwipeGestures();});
