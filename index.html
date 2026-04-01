@@ -480,6 +480,20 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .rfi-verbal:focus{border-color:var(--accent);background:#fff}
 .routine-clear-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:7px 13px;border-radius:50px;background:#fff0f0;color:#dc2626;border:1.5px solid #fecaca;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .routine-clear-btn:active{background:#fecaca}
+/* ── Notification Manager ── */
+.notif-section-title{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;padding:14px 20px 8px;border-bottom:1px solid var(--border)}
+.notif-item{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.notif-item-icon{width:36px;height:36px;border-radius:12px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.notif-item-icon.routine{background:rgba(99,102,241,.1)}
+.notif-item-icon.custom{background:rgba(251,191,36,.12)}
+.notif-item-body{flex:1;min-width:0}
+.notif-item-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px}
+.notif-meta{font-size:12px;color:var(--muted);line-height:1.6}
+.notif-edit-link{font-size:11px;color:var(--accent);font-weight:700;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;touch-action:manipulation}
+.notif-empty{text-align:center;padding:28px 20px;color:var(--muted);font-size:13px}
+.notif-any-day-btn{grid-column:1/-1;height:44px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;box-sizing:border-box;padding:0}
+.notif-any-day-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.notif-day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -549,6 +563,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   </div>
   <div class="header-right">
     <div class="badge" id="badge">0 פעילות</div>
+    <button class="routine-hdr-btn" onclick="openNotifManager()">🔔 התראות</button>
     <button class="routine-hdr-btn" onclick="openRoutineSheet()">🔄 שגרה</button>
     <div class="user-chip" id="userChip" onclick="confirmSignOut()"></div>
   </div>
@@ -783,6 +798,61 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   </div>
 </div>
 
+<!-- Sheet: Notification Manager -->
+<div class="rsheet" id="notifManagerSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeNotifManager()">✕</button>
+    <h3>🔔 ניהול התראות</h3>
+    <button class="rsheet-add-btn" onclick="openNotifForm(null,null)">+ הוסף</button>
+  </div>
+  <div class="rsheet-scroll" id="notifManagerList"></div>
+</div>
+
+<!-- Sheet: Notification Form -->
+<div class="rsheet" id="notifFormSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="backToNotifList()">←</button>
+    <h3 id="notifFormTitle">התראה חדשה</h3>
+    <button class="rsheet-close-btn" onclick="closeNotifManager()">✕</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="rform">
+
+      <div class="rfield">
+        <div class="rform-lbl">תוכן ההתראה</div>
+        <div class="rfi-mic-wrap">
+          <input class="rfi" id="nfText" type="text" placeholder="להזמין הסעה, לשלם חשבון..."/>
+          <button class="rfi-mic-btn" onclick="voiceNotif()">🎤</button>
+        </div>
+      </div>
+
+      <div class="rfield">
+        <div class="rform-lbl">יום בשבוע</div>
+        <button class="notif-any-day-btn" id="nfAnyDay" onclick="toggleNotifAnyDay()">כל יום</button>
+        <div class="notif-day-grid" id="nfDayGrid" style="margin-top:8px">
+          <button class="day-btn" data-day="0" onclick="toggleNotifDay(this)">א׳</button>
+          <button class="day-btn" data-day="1" onclick="toggleNotifDay(this)">ב׳</button>
+          <button class="day-btn" data-day="2" onclick="toggleNotifDay(this)">ג׳</button>
+          <button class="day-btn" data-day="3" onclick="toggleNotifDay(this)">ד׳</button>
+          <button class="day-btn" data-day="4" onclick="toggleNotifDay(this)">ה׳</button>
+          <button class="day-btn" data-day="5" onclick="toggleNotifDay(this)">ו׳</button>
+          <button class="day-btn" data-day="6" onclick="toggleNotifDay(this)">שב׳</button>
+        </div>
+      </div>
+
+      <div class="rfield">
+        <div class="rform-lbl">שעה</div>
+        <input class="rfi" id="nfTime" type="time" value="08:00"/>
+      </div>
+
+      <button class="rform-save" onclick="saveNotifForm()">שמור התראה ✓</button>
+
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -796,6 +866,7 @@ const CATS={
   כללי:{kw:[],c:'#fbbf24'}
 };
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
+let customNotifs=JSON.parse(localStorage.getItem('vt_custom_notifs')||'[]');
 let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]').map(r=>r.timesPerWeek!=null?r:{...r,name:r.text||r.name||'',timesPerWeek:Math.max(1,r.days?.length||3),preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}});
 let editingRoutineId=null;
 const scheduledNotifIds=new Set();
@@ -1734,10 +1805,12 @@ function scheduleNotifications(){
 function showPushNotification(inst){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   const dt=new Date(inst.datetime);
-  const endDt=new Date(dt.getTime()+inst.duration*60000);
+  const dur=+(inst.duration||0);
   const fmt=d=>d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
   const title=`🔔 ${inst.text}`;
-  const body=`מתחיל ב-${fmt(dt)} עד ${fmt(endDt)}${inst.notes?'\n📝 '+inst.notes:''}`;
+  let body;
+  if(dur>0){const endDt=new Date(dt.getTime()+dur*60000);body=`מתחיל ב-${fmt(dt)} עד ${fmt(endDt)}${inst.notes?'\n📝 '+inst.notes:''}`;}
+  else body=inst.notes||fmt(dt);
   if(navigator.serviceWorker?.controller){
     navigator.serviceWorker.controller.postMessage({type:'SHOW_NOTIFICATION',title,body,tag:inst.id});
   }else{
@@ -1759,6 +1832,171 @@ function scheduleEmailReminders(){
       if(!routine.scheduledEmailDates)routine.scheduledEmailDates=[];
       routine.scheduledEmailDates.push(inst.dateStr);saveRoutines();
     }).catch(()=>{});
+  });
+}
+
+// ── Custom Notification Manager ───────────────────────────────────────────────
+const DAY_NAMES_FULL=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+let editingNotifId=null;
+let nfAnyDayActive=true;
+
+function saveCustomNotifsData(){localStorage.setItem('vt_custom_notifs',JSON.stringify(customNotifs));}
+
+function openNotifManager(){
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('notifManagerSheet').classList.add('on');
+  document.getElementById('notifFormSheet').classList.remove('on');
+  renderNotifManager();
+}
+function closeNotifManager(){
+  document.getElementById('routineOverlay').classList.remove('on');
+  document.getElementById('notifManagerSheet').classList.remove('on');
+  document.getElementById('notifFormSheet').classList.remove('on');
+}
+function backToNotifList(){
+  document.getElementById('notifFormSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('notifManagerSheet').classList.add('on');renderNotifManager();},40);
+}
+
+function renderNotifManager(){
+  const el=document.getElementById('notifManagerList');if(!el)return;
+  const DAY_SH=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
+  let html='';
+
+  // Section 1: routine-based notifications
+  const routineNotifs=routines.filter(r=>r.enabled&&(r.reminder>0||r.weeklyReminderDay>=0));
+  html+=`<div class="notif-section-title">🔄 מהשגרות שלי</div>`;
+  if(!routineNotifs.length){
+    html+=`<div class="notif-empty">אין התראות שגרה פעילות.<br>הגדר תזכורת בעת יצירת שגרה.</div>`;
+  }else{
+    routineNotifs.forEach(r=>{
+      const name=esc(r.name||r.text||'');
+      let meta='';
+      if(r.weeklyReminderDay>=0)meta+=`⚡ תזמון שבועי: ${DAY_NAMES_FULL[r.weeklyReminderDay]} ${r.weeklyReminderTime||'08:00'}<br>`;
+      if(r.reminder>0)meta+=`🔔 תזכורת: ${r.reminder} דק׳ לפני אירוע`;
+      html+=`<div class="notif-item">
+  <div class="notif-item-icon routine">🔄</div>
+  <div class="notif-item-body">
+    <div class="notif-item-name">${name}</div>
+    <div class="notif-meta">${meta}</div>
+  </div>
+  <button class="notif-edit-link" onclick="editRoutineFromNotif(${r.id})">ערוך ←</button>
+</div>`;
+    });
+  }
+
+  // Section 2: custom notifications
+  html+=`<div class="notif-section-title">🔔 התראות מותאמות אישית</div>`;
+  if(!customNotifs.length){
+    html+=`<div class="notif-empty">אין התראות מותאמות.<br>לחץ "+ הוסף" ליצירה.</div>`;
+  }else{
+    customNotifs.forEach(n=>{
+      const dayLabel=n.dayOfWeek===-1?'כל יום':DAY_NAMES_FULL[n.dayOfWeek]||'';
+      html+=`<div class="notif-item">
+  <div class="notif-item-icon custom">🔔</div>
+  <div class="notif-item-body" onclick="openNotifForm(${JSON.stringify(n)},${n.id})" style="cursor:pointer">
+    <div class="notif-item-name">${esc(n.text)}</div>
+    <div class="notif-meta">${dayLabel} · ${n.time||'08:00'}</div>
+  </div>
+  <label class="rtoggle" style="flex-shrink:0"><input type="checkbox" ${n.enabled?'checked':''} onchange="toggleCustomNotif(${n.id},this.checked)"><span class="rtoggle-sl"></span></label>
+  <button class="routine-del-btn" onclick="deleteCustomNotif(${n.id})">×</button>
+</div>`;
+    });
+  }
+  el.innerHTML=html;
+}
+
+function editRoutineFromNotif(id){
+  closeNotifManager();
+  setTimeout(()=>{openRoutineSheet();setTimeout(()=>editRoutine(id),200);},100);
+}
+
+function deleteCustomNotif(id){
+  customNotifs=customNotifs.filter(n=>n.id!==id);
+  saveCustomNotifsData();scheduleCustomNotifs();renderNotifManager();toast('התראה נמחקה');
+}
+function toggleCustomNotif(id,enabled){
+  const n=customNotifs.find(x=>x.id===id);if(n){n.enabled=enabled;saveCustomNotifsData();scheduleCustomNotifs();}
+}
+
+function openNotifForm(prefill,editId){
+  editingNotifId=editId||null;
+  document.getElementById('notifFormTitle').textContent=editId?'ערוך התראה':'התראה חדשה';
+  document.getElementById('nfText').value=prefill?.text||'';
+  document.getElementById('nfTime').value=prefill?.time||'08:00';
+  // day
+  nfAnyDayActive=prefill?prefill.dayOfWeek===-1:true;
+  document.getElementById('nfAnyDay').classList.toggle('on',nfAnyDayActive);
+  document.querySelectorAll('#nfDayGrid .day-btn').forEach(b=>{
+    b.classList.toggle('on',!nfAnyDayActive&&prefill?.dayOfWeek===+b.dataset.day);
+  });
+  document.getElementById('notifManagerSheet').classList.remove('on');
+  document.getElementById('notifFormSheet').classList.add('on');
+}
+function toggleNotifAnyDay(){
+  nfAnyDayActive=!nfAnyDayActive;
+  document.getElementById('nfAnyDay').classList.toggle('on',nfAnyDayActive);
+  if(nfAnyDayActive)document.querySelectorAll('#nfDayGrid .day-btn').forEach(b=>b.classList.remove('on'));
+}
+function toggleNotifDay(btn){
+  if(nfAnyDayActive){nfAnyDayActive=false;document.getElementById('nfAnyDay').classList.remove('on');}
+  // single-select for day
+  document.querySelectorAll('#nfDayGrid .day-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function saveNotifForm(){
+  const text=document.getElementById('nfText').value.trim();
+  if(!text){toast('נא להזין תוכן להתראה');return;}
+  const time=document.getElementById('nfTime').value||'08:00';
+  const selDay=document.querySelector('#nfDayGrid .day-btn.on');
+  const dayOfWeek=nfAnyDayActive?-1:(selDay?+selDay.dataset.day:0);
+  const notif={
+    id:editingNotifId||Date.now(),
+    text,time,dayOfWeek,enabled:true,
+    createdAt:editingNotifId?(customNotifs.find(n=>n.id===editingNotifId)?.createdAt||new Date().toISOString()):new Date().toISOString()
+  };
+  if(editingNotifId)customNotifs=customNotifs.map(n=>n.id===editingNotifId?notif:n);
+  else customNotifs.unshift(notif);
+  editingNotifId=null;
+  saveCustomNotifsData();scheduleCustomNotifs();
+  requestNotificationPermission();
+  backToNotifList();toast(editingNotifId?'התראה עודכנה':'התראה נוספה 🔔');
+}
+function voiceNotif(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('הדפדפן לא תומך בזיהוי קולי');return;}
+  const r=new SR();r.lang='he-IL';r.continuous=false;r.interimResults=false;
+  r.onresult=e=>{document.getElementById('nfText').value=e.results[0][0].transcript;toast('זוהה ✓');};
+  r.onerror=()=>toast('לא הצלחתי לשמוע, נסה שוב');
+  try{r.start();toast('מאזין...');}catch(e){}
+}
+
+// ── Schedule custom notifications ─────────────────────────────────────────────
+function scheduleCustomNotifs(){
+  if(!('Notification'in window)||Notification.permission!=='granted')return;
+  const now=new Date();
+  customNotifs.filter(n=>n.enabled).forEach(n=>{
+    const key=`customnotif_${n.id}`;
+    if(scheduledNotifIds.has(key))return;
+    const[h,m]=(n.time||'08:00').split(':').map(Number);
+    let next=new Date(now);
+    if(n.dayOfWeek===-1){
+      // daily
+      next.setHours(h,m,0,0);
+      if(next<=now)next.setDate(next.getDate()+1);
+    }else{
+      let daysAhead=(n.dayOfWeek-now.getDay()+7)%7;
+      if(daysAhead===0){const t=new Date(now);t.setHours(h,m,0,0);if(t<=now)daysAhead=7;}
+      next.setDate(now.getDate()+daysAhead);next.setHours(h,m,0,0);
+    }
+    const delay=next-now;
+    if(delay>0&&delay<8*86400000){
+      scheduledNotifIds.add(key);
+      setTimeout(()=>{
+        showPushNotification({text:n.text,datetime:next.toISOString(),duration:0,notes:'',id:'custom_'+n.id});
+        scheduledNotifIds.delete(key);scheduleCustomNotifs(); // reschedule next occurrence
+      },delay);
+    }
   });
 }
 
@@ -1901,8 +2139,9 @@ function initSheetSwipe(sheetEl,overlayEl){
       setTimeout(()=>{
         sheetEl.style.transform='';sheetEl.style.transition='';
         overlayEl.style.opacity='';overlayEl.style.transition='';
-        document.getElementById('routineListSheet').classList.remove('on');
-        document.getElementById('routineFormSheet').classList.remove('on');
+        ['routineListSheet','routineFormSheet','scheduleSheet','notifManagerSheet','notifFormSheet'].forEach(id=>{
+          const el=document.getElementById(id);if(el)el.classList.remove('on');
+        });
         overlayEl.classList.remove('on');
       },260);
     }else{
@@ -1920,9 +2159,11 @@ function initSwipeGestures(){
   initSheetSwipe(document.getElementById('routineListSheet'),ov);
   initSheetSwipe(document.getElementById('routineFormSheet'),ov);
   initSheetSwipe(document.getElementById('scheduleSheet'),ov);
+  initSheetSwipe(document.getElementById('notifManagerSheet'),ov);
+  initSheetSwipe(document.getElementById('notifFormSheet'),ov);
 }
 
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();});
 </script>
 </body>
 </html>
