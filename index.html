@@ -1503,30 +1503,21 @@ function generateVerbalSlots(routine,weekStart,now){
   const parsed=routine.verbParsed;
   const count=parsed.timesPerWeek||routine.timesPerWeek||3;
   const WIN_H={morning:7,afternoon:13,evening:18};
-  const slots=[];
-  const sched=[];// track scheduled day indices for rest-day checks
+  const slots=[];const schedDates=[];
   const daySlots=parsed.daySlots||[];
-  if(daySlots.length){
-    const sorted=[...daySlots].sort((a,b)=>a.day-b.day);
-    for(const{day,timeWindow,hour,minute}of sorted){
-      if(slots.length>=count)break;
-      const date=new Date(weekStart);date.setDate(weekStart.getDate()+day);
-      if(date<now)continue;
-      if(parsed.restDayBetween&&sched.some(sd=>Math.abs(day-sd)<2))continue;
-      date.setHours(hour!=null?hour:WIN_H[timeWindow]||7, minute!=null?minute:0, 0,0);
-      slots.push(date.toISOString());sched.push(day);
-    }
-  }
-  if(slots.length<count){
-    const h=WIN_H[parsed.timeWindow]||WIN_H.morning;
-    for(let d=0;d<7&&slots.length<count;d++){
-      const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
-      if(date<now)continue;
-      if(parsed.restDayBetween&&sched.some(sd=>Math.abs(d-sd)<2))continue;
-      date.setHours(h,0,0,0);
-      const iso=date.toISOString();
-      if(!slots.includes(iso)){slots.push(iso);sched.push(d);}
-    }
+  const fallbackH=WIN_H[parsed.timeWindow]||WIN_H.morning;
+  // Scan up to 3 weeks to find enough future slots by day-of-week
+  for(let dOff=0;dOff<21&&slots.length<count;dOff++){
+    const date=new Date(weekStart);date.setDate(weekStart.getDate()+dOff);
+    if(date<now)continue;
+    const dow=date.getDay();
+    const ms=daySlots.find(s=>s.day===dow);
+    if(daySlots.length&&!ms)continue;// skip days not in daySlots
+    if(parsed.restDayBetween&&schedDates.some(sd=>Math.abs(date-sd)<2*86400000))continue;
+    const h=ms?(ms.hour!=null?ms.hour:WIN_H[ms.timeWindow]||fallbackH):fallbackH;
+    const m=ms?(ms.minute!=null?ms.minute:0):0;
+    const d2=new Date(date);d2.setHours(h,m,0,0);
+    slots.push(d2.toISOString());schedDates.push(d2);
   }
   return slots.slice(0,count);
 }
@@ -1892,10 +1883,11 @@ function showPushNotification(inst){
   let body;
   if(dur>0){const endDt=new Date(dt.getTime()+dur*60000);body=`מתחיל ב-${fmt(dt)} עד ${fmt(endDt)}${inst.notes?'\n📝 '+inst.notes:''}`;}
   else body=inst.notes||fmt(dt);
-  if(navigator.serviceWorker?.controller){
-    navigator.serviceWorker.controller.postMessage({type:'SHOW_NOTIFICATION',title,body,tag:inst.id});
+  const opts={body,icon:'./icon.svg',badge:'./icon.svg',tag:String(inst.id),dir:'rtl',vibrate:[200,100,200],requireInteraction:false};
+  if('serviceWorker'in navigator){
+    navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,opts)).catch(()=>{try{new Notification(title,opts);}catch(e){}});
   }else{
-    try{new Notification(title,{body,icon:'./icon.svg',tag:inst.id,dir:'rtl'});}catch(e){}
+    try{new Notification(title,opts);}catch(e){}
   }
 }
 function scheduleEmailReminders(){
