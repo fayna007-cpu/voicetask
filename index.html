@@ -515,6 +515,10 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .notif-any-day-btn{grid-column:1/-1;height:44px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;box-sizing:border-box;padding:0}
 .notif-any-day-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .notif-day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;width:100%;box-sizing:border-box}
+.notif-test-wrap{padding:12px 20px 18px;background:var(--bg)}
+.notif-test-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.notif-test-btn{flex:1;min-width:72px;padding:10px 8px;border-radius:12px;border:1.5px solid var(--accent);background:#fff;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.notif-test-btn:active{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -2008,6 +2012,17 @@ function renderNotifManager(){
 </div>`;
     });
   }
+  // Section 3: test push
+  html+=`<div class="notif-section-title">🧪 בדיקת פוש מהשרת</div>
+<div class="notif-test-wrap">
+  <div class="notif-meta">לחץ, סגור את האפליקציה — הפוש יגיע מהשרת גם כשהאפליקציה סגורה</div>
+  <div class="notif-test-btns">
+    <button class="notif-test-btn" onclick="sendTestPush(1)">עוד דקה</button>
+    <button class="notif-test-btn" onclick="sendTestPush(2)">2 דקות</button>
+    <button class="notif-test-btn" onclick="sendTestPush(5)">5 דקות</button>
+  </div>
+</div>`;
+
   el.innerHTML=html;
 }
 
@@ -2025,6 +2040,20 @@ function deleteCustomNotif(id){
 }
 function toggleCustomNotif(id,enabled){
   const n=customNotifs.find(x=>x.id===id);if(n){n.enabled=enabled;saveCustomNotifsData();scheduleCustomNotifs();}
+}
+async function sendTestPush(minutes){
+  const ok=await requestNotificationPermission();
+  if(!ok){toast('נדרשת הרשאת התראות');return;}
+  await subscribeToPush();
+  const fireAt=new Date(Date.now()+minutes*60000);
+  const sentAt=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  scheduleToPushServer([{
+    id:'test_manual_'+Date.now(),
+    title:'🧪 בדיקת פוש — VoiceTask',
+    body:`נשלח מהשרת ב-${sentAt} · סגרת את האפליקציה?`,
+    fireAt:fireAt.toISOString()
+  }]);
+  toast(`✓ פוש יישלח בעוד ${minutes} דק׳ — כעת סגור את האפליקציה`);
 }
 
 function openNotifForm(prefill,editId){
