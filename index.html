@@ -969,7 +969,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1812,12 +1812,15 @@ function confirmSiriAsRoutine(){
 async function testRoutine(id){
   const r=routines.find(x=>x.id===id);if(!r)return;
   const name=r.name||r.text||'שגרה';
-  // 1. Push notification immediately
+  // 1. Push notification immediately (in-app)
   const start=new Date(Date.now()+5*60000);
   const end=new Date(start.getTime()+(r.duration||60)*60000);
   const fmt=d=>`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   await requestNotificationPermission();
   showPushNotification({text:`🧪 טסט: ${name}`,notes:`${fmt(start)}–${fmt(end)} · ${durLabel(r.duration||60)}`,id:'test_'+id});
+  // 2. Server-side push in 65s (so cron catches it — works when app is closed)
+  const fireAt=new Date(Date.now()+65000);
+  scheduleToPushServer([{id:'test_push_'+id+'_'+Date.now(),title:`🧪 טסט סגור: ${name}`,body:'פוש שרת — האפליקציה הייתה סגורה',fireAt:fireAt.toISOString()}]);
   // 2. Calendar event 5 min from now
   toast('יוצר אירוע טסט בקאלנדר...');
   const testRoutineObj={...r,duration:r.duration||60};
@@ -1835,6 +1838,7 @@ async function testRoutine(id){
 function scheduleWeeklyReminderNotifs(){
   if(!('Notification'in window)||Notification.permission!=='granted')return;
   const now=new Date();
+  const pushNotifs=[];
   routines.forEach(r=>{
     const day=+r.weeklyReminderDay;
     if(day===-1||!r.enabled)return;
@@ -1853,8 +1857,10 @@ function scheduleWeeklyReminderNotifs(){
       setTimeout(()=>{
         showPushNotification({text:`⚡ תזמן: ${r.name||r.text}`,notes:`${r.timesPerWeek||3} פגישות השבוע`,id:'wk_'+r.id});
       },delay);
+      pushNotifs.push({id:'wk_'+r.id,title:`⚡ תזמן: ${r.name||r.text}`,body:`${r.timesPerWeek||3} פגישות השבוע`,fireAt:next.toISOString()});
     }
   });
+  if(pushNotifs.length)scheduleToPushServer(pushNotifs);
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────────
@@ -1886,6 +1892,7 @@ async function scheduleToPushServer(notifications){
 function scheduleNotifications(){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   const now=new Date();
+  const pushNotifs=[];
   getRoutineInstances().filter(inst=>!inst.completed&&inst.reminder>0&&(inst.reminderType==='push'||inst.reminderType==='both')).forEach(inst=>{
     const notifyTime=new Date(new Date(inst.datetime).getTime()-inst.reminder*60000);
     const delay=notifyTime-now;
@@ -1893,8 +1900,10 @@ function scheduleNotifications(){
     if(delay>0&&delay<48*3600000&&!scheduledNotifIds.has(key)){
       scheduledNotifIds.add(key);
       setTimeout(()=>showPushNotification(inst),delay);
+      pushNotifs.push({id:'inst_'+inst.id,title:'🔔 '+inst.text,body:inst.notes||new Date(inst.datetime).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),fireAt:notifyTime.toISOString()});
     }
   });
+  if(pushNotifs.length)scheduleToPushServer(pushNotifs);
 }
 function showPushNotification(inst){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
