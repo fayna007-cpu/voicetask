@@ -392,14 +392,17 @@ body{
 @keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ── Routines ── */
-.routine-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}.routine-overlay.on{opacity:1;pointer-events:all}
-.rsheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:480px;background:var(--surface);border-radius:28px 28px 0 0;z-index:101;transition:transform .32s cubic-bezier(.34,1.15,.64,1);max-height:92svh;display:flex;flex-direction:column;overflow:hidden}
+.routine-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .3s ease}.routine-overlay.on{opacity:1;pointer-events:all}
+.rsheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(106%);width:100%;max-width:480px;background:var(--surface);border-radius:28px 28px 0 0;z-index:101;transition:transform .4s cubic-bezier(.25,.46,.45,.94);max-height:92svh;display:flex;flex-direction:column;overflow:hidden;will-change:transform}
 .rsheet.on{transform:translateX(-50%) translateY(0)}
-.rsheet-scroll{overflow-y:auto;flex:1;padding-bottom:calc(24px + var(--sab))}
-.rsheet-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
-.rsheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px;flex-shrink:0}
-.rsheet-head h3{font-size:18px;font-weight:800;color:var(--text)}
-.rsheet-add-btn{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.rsheet-scroll{overflow-y:auto;flex:1;padding-bottom:calc(32px + var(--sab));overscroll-behavior:contain}
+.rsheet-handle-area{padding:14px 0 6px;cursor:grab;touch-action:none;flex-shrink:0;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center}
+.rsheet-handle{width:44px;height:5px;background:var(--border2);border-radius:3px}
+.rsheet-head{display:flex;align-items:center;gap:10px;padding:4px 16px 14px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.rsheet-head h3{flex:1;font-size:17px;font-weight:800;color:var(--text);text-align:center}
+.rsheet-close-btn{width:32px;height:32px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px;flex-shrink:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;line-height:1;font-family:inherit}
+.rsheet-close-btn:active{background:var(--border2);color:var(--text)}
+.rsheet-add-btn{display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0}
 .routine-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;line-height:1.8}
 .routine-item{display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border)}
 .routine-item-body{flex:1;min-width:0;cursor:pointer}
@@ -412,7 +415,7 @@ body{
 .rtoggle-sl::before{content:'';position:absolute;height:20px;width:20px;right:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .rtoggle input:checked~.rtoggle-sl::before{transform:translateX(-18px)}
 .routine-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;line-height:1;font-size:18px;border-radius:8px;flex-shrink:0}
-.rform-section-title{font-size:18px;font-weight:800;color:var(--text);padding:16px 20px 4px;flex-shrink:0}
+.rform-section-title{display:none}
 .rform{padding:0 20px 8px;display:flex;flex-direction:column;gap:13px}
 .rform-lbl{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .rform-row{display:flex;gap:8px}
@@ -567,8 +570,11 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer}
 
 <!-- Sheet: Routine List -->
 <div class="rsheet" id="routineListSheet">
-  <div class="rsheet-handle"></div>
+  <div class="rsheet-handle-area">
+    <div class="rsheet-handle"></div>
+  </div>
   <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeRoutineSheet()">✕</button>
     <h3>🔄 השגרות שלי</h3>
     <button class="rsheet-add-btn" onclick="openRoutineForm(null,null)">+ הוסף</button>
   </div>
@@ -577,8 +583,14 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer}
 
 <!-- Sheet: Routine Form -->
 <div class="rsheet" id="routineFormSheet">
-  <div class="rsheet-handle"></div>
-  <p class="rform-section-title" id="rFormTitle">שגרה חדשה</p>
+  <div class="rsheet-handle-area">
+    <div class="rsheet-handle"></div>
+  </div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="backToRoutineList()">←</button>
+    <h3 id="rFormTitle">שגרה חדשה</h3>
+    <button class="rsheet-close-btn" onclick="closeRoutineSheet()">✕</button>
+  </div>
   <div class="rsheet-scroll">
     <div class="rform">
       <div>
@@ -654,7 +666,6 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer}
         <input class="rfi" id="rNotes" type="text" placeholder="מה להביא, איפה להגיע..."/>
       </div>
       <button class="rform-save" onclick="saveRoutine()">שמור שגרה ✓</button>
-      <button class="rform-back" onclick="backToRoutineList()">← חזרה לרשימה</button>
     </div>
   </div>
 </div>
@@ -1194,14 +1205,17 @@ function openRoutineSheet(){
   renderRoutineList();
 }
 function closeRoutineSheet(){
-  document.getElementById('routineOverlay').classList.remove('on');
-  document.getElementById('routineListSheet').classList.remove('on');
-  document.getElementById('routineFormSheet').classList.remove('on');
+  const ov=document.getElementById('routineOverlay');
+  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet')];
+  ov.style.opacity='';ov.style.transition='';
+  sheets.forEach(s=>{s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
+  ov.classList.remove('on');
 }
 function backToRoutineList(){
-  document.getElementById('routineFormSheet').classList.remove('on');
-  document.getElementById('routineListSheet').classList.add('on');
-  renderRoutineList();
+  const form=document.getElementById('routineFormSheet');
+  const list=document.getElementById('routineListSheet');
+  form.classList.remove('on');
+  setTimeout(()=>{list.classList.add('on');renderRoutineList();},40);
 }
 
 function renderRoutineList(){
@@ -1390,7 +1404,53 @@ function scheduleEmailReminders(){
   });
 }
 
-window.addEventListener('load',initAuth);
+function initSheetSwipe(sheetEl,overlayEl){
+  let startY=0,dy=0,active=false;
+  sheetEl.addEventListener('touchstart',e=>{
+    const handle=sheetEl.querySelector('.rsheet-handle-area');
+    const scroll=sheetEl.querySelector('.rsheet-scroll');
+    const fromHandle=handle&&handle.contains(e.target);
+    if(!fromHandle&&scroll&&scroll.scrollTop>0)return;
+    startY=e.touches[0].clientY;dy=0;active=true;
+    sheetEl.style.transition='none';overlayEl.style.transition='none';
+  },{passive:true});
+  sheetEl.addEventListener('touchmove',e=>{
+    if(!active)return;
+    dy=Math.max(0,e.touches[0].clientY-startY);
+    sheetEl.style.transform=`translateX(-50%) translateY(${dy}px)`;
+    overlayEl.style.opacity=Math.max(0,1-dy/240);
+  },{passive:true});
+  sheetEl.addEventListener('touchend',()=>{
+    if(!active)return;active=false;
+    if(dy>110){
+      sheetEl.style.transition='transform .26s ease-in';
+      overlayEl.style.transition='opacity .26s ease-in';
+      sheetEl.style.transform='translateX(-50%) translateY(110%)';
+      overlayEl.style.opacity='0';
+      setTimeout(()=>{
+        sheetEl.style.transform='';sheetEl.style.transition='';
+        overlayEl.style.opacity='';overlayEl.style.transition='';
+        document.getElementById('routineListSheet').classList.remove('on');
+        document.getElementById('routineFormSheet').classList.remove('on');
+        overlayEl.classList.remove('on');
+      },260);
+    }else{
+      sheetEl.style.transition='transform .32s cubic-bezier(.25,.46,.45,.94)';
+      overlayEl.style.transition='opacity .32s ease';
+      sheetEl.style.transform='translateX(-50%) translateY(0)';
+      overlayEl.style.opacity='1';
+      setTimeout(()=>{sheetEl.style.transform='';sheetEl.style.transition='';overlayEl.style.opacity='';overlayEl.style.transition='';},320);
+    }
+    dy=0;
+  });
+}
+function initSwipeGestures(){
+  const ov=document.getElementById('routineOverlay');
+  initSheetSwipe(document.getElementById('routineListSheet'),ov);
+  initSheetSwipe(document.getElementById('routineFormSheet'),ov);
+}
+
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();});
 </script>
 </body>
 </html>
