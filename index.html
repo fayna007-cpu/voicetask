@@ -1513,7 +1513,7 @@ function generateVerbalSlots(routine,weekStart,now){
     const dow=date.getDay();
     const ms=daySlots.find(s=>s.day===dow);
     if(daySlots.length&&!ms)continue;// skip days not in daySlots
-    if(parsed.restDayBetween&&schedDates.some(sd=>Math.abs(date-sd)<2*86400000))continue;
+    if(parsed.restDayBetween&&schedDates.some(sd=>{const sdDay=new Date(sd.getFullYear(),sd.getMonth(),sd.getDate());return Math.abs(date-sdDay)<2*86400000;}))continue;
     const h=ms?(ms.hour!=null?ms.hour:WIN_H[ms.timeWindow]||fallbackH):fallbackH;
     const m=ms?(ms.minute!=null?ms.minute:0):0;
     const d2=new Date(date);d2.setHours(h,m,0,0);
