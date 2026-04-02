@@ -406,16 +406,37 @@ body{
 .settings-row-ico.yellow{background:#fef9c3}
 .settings-select{appearance:none;-webkit-appearance:none;border:1.5px solid var(--border2);background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a7a82' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat 6px center;border-radius:10px;padding:6px 10px 6px 22px;font-size:13px;font-family:inherit;color:var(--text);cursor:pointer;outline:none;direction:ltr;text-align:right;flex-shrink:0}
 .settings-notif-sub{font-size:11px;color:var(--muted);padding:0 20px 10px;margin-top:-4px;font-weight:700;letter-spacing:.4px}
-.pj-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
-.pj-row:last-child{border-bottom:none}
-.pj-time-col{text-align:center;flex-shrink:0;width:42px}
-.pj-day{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.3px}
-.pj-clock{font-size:15px;font-weight:900;color:var(--text);letter-spacing:-.5px}
-.pj-content{flex:1;min-width:0}
-.pj-title{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pj-body{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pj-send-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.pj-send-btn:active{opacity:.7}
+/* ── Push Journey Calendar ── */
+.pj-cal-wrap{padding:0 16px 8px}
+.pj-cal-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0 10px}
+.pj-cal-nav-lbl{font-size:13px;font-weight:800;color:var(--text)}
+.pj-cal-nav-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.pj-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.pj-day-col{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s}
+.pj-day-col.today .pj-day-num{background:var(--accent);color:#fff}
+.pj-day-col.selected{background:rgba(26,86,219,.1)}
+.pj-day-name{font-size:10px;font-weight:700;color:var(--muted)}
+.pj-day-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text)}
+.pj-badge{min-width:15px;height:15px;border-radius:8px;background:var(--accent);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 3px}
+.pj-badge.empty{background:transparent;height:15px}
+.pj-detail-wrap{margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+.pj-detail-empty{padding:14px;text-align:center;color:var(--muted);font-size:12px;background:var(--surface)}
+.pj-detail-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
+.pj-detail-row:last-child{border-bottom:none}
+.pj-detail-time{font-size:14px;font-weight:900;color:var(--text);width:34px;flex-shrink:0;letter-spacing:-.5px}
+.pj-detail-content{flex:1;min-width:0}
+.pj-detail-title{font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pj-detail-body{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pj-detail-send{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+/* Per-card notification chip */
+.notif-chip-row{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.notif-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:rgba(26,86,219,.08);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.notif-journey-panel{margin-top:8px;background:var(--bg);border-radius:10px;padding:8px 10px;display:none;flex-direction:column;gap:4px}
+.notif-journey-panel.on{display:flex}
+.nj-item{display:flex;gap:8px;align-items:flex-start;padding:4px 0;border-bottom:1px solid var(--border)}
+.nj-item:last-child{border-bottom:none}
+.nj-time{font-size:10px;font-weight:800;color:var(--accent);white-space:nowrap;padding-top:1px;width:34px;flex-shrink:0}
+.nj-text{font-size:11px;color:var(--text);line-height:1.4}
 .settings-cards{background:var(--surface);border-radius:18px;overflow:hidden;border:1px solid var(--border);margin:0 16px}
 .settings-stat-row{display:flex;gap:10px;padding:16px}
 .settings-stat{flex:1;background:var(--bg);border-radius:14px;padding:14px 12px;text-align:center}
@@ -799,8 +820,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="settings-row-arrow">›</div>
       </div>
     </div>
-    <div class="settings-section">מסע ההתראות שלך — 7 ימים קדימה</div>
-    <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px"></div>
+    <div class="settings-section">לוח התראות</div>
+    <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px;border-radius:18px;overflow:visible;border:none;margin:0 16px 4px;background:transparent"></div>
     <div class="settings-section">הגדרות התראות חכמות</div>
     <div class="settings-cards">
       <div class="settings-notif-sub">📋 משימות שוטפות</div>
@@ -1271,6 +1292,15 @@ function saveNotifSettings(){
   scheduleSmartPushNotifs();
   toast('✅ הגדרות נשמרו');
 }
+function notifCtx(name){
+  const n=(name||'').toLowerCase();
+  if(/אימון|ריצה|ספורט|כושר|שחיי|אופני|יוגה|פילאטיס|חדר כושר/.test(n))return{morning:'תתכונן לאימון 💪',pre:m=>`בעוד ${m} דק׳ — לבש, שתה מים, קדימה! 💪`};
+  if(/ישיבה|פגישה|מצגת|לקוח|שיחה|zoom|teams/.test(n))return{morning:'הכן עצמך לפגישה 🤝',pre:m=>`בעוד ${m} דק׳ — בדוק חומרים וחיבור 🤝`};
+  if(/לימוד|קורס|קריאה|שיעור|למידה|ספר|AI|בינה/.test(n))return{morning:'זמן ללמוד 📚',pre:m=>`בעוד ${m} דק׳ — פתח את הספרים 📚`};
+  if(/אוכל|ארוחה|בישול|מסעדה/.test(n))return{morning:'ארוחה מתוכננת 🍽️',pre:m=>`בעוד ${m} דק׳ — הכן ארוחה 🍽️`};
+  if(/רופא|בדיקה|תרופ|רפואי|קליניק/.test(n))return{morning:'תזכור תור רפואי 💊',pre:m=>`בעוד ${m} דק׳ — הכן מסמכים 💊`};
+  return{morning:'תתכונן מראש ⚡',pre:m=>`בעוד ${m} דק׳ — אל תשכח! ⚡`};
+}
 function buildSmartPushBatch(windowMs){
   if(!notifSettings)loadNotifSettings();
   const s=notifSettings,now=new Date(),WIN=windowMs||48*3600000;
@@ -1328,12 +1358,12 @@ function buildSmartPushBatch(windowMs){
       const isToday=ds===ymd(now);const isTomorrow=ds===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
       const[mh,mm]=(s.routines.morningTime||'07:00').split(':').map(Number);
       const morningFire=new Date(slot);morningFire.setHours(mh,mm,0,0);
+      const ctx=notifCtx(name);
       if(r.morningReminder!==false)
-        queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${isToday?'היום':isTomorrow?'מחר':ds} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
+        queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${isToday?'היום':isTomorrow?'מחר':ds} בשעה ${slotFmt} — ${ctx.morning}`,morningFire);
       const routineReminderMins=r.reminder!=null?r.reminder:s.routines.reminderMins;
       if(routineReminderMins>0){
-        const mins=routineReminderMins;
-        queue('rslot_'+r.id+'_'+ds,'⚡ '+name,mins>=60?`בעוד שעה יש לך ${name} ב-${slotFmt} — תתכונן!`:`בעוד ${mins} דק׳ יש לך ${name} — אל תשכח! ⚡`,new Date(slot-mins*60000));
+        queue('rslot_'+r.id+'_'+ds,'⚡ '+name,ctx.pre(routineReminderMins),new Date(slot-routineReminderMins*60000));
       }
     });});
   });
@@ -1359,24 +1389,55 @@ function scheduleSmartPushNotifs(){
   const batch=buildSmartPushBatch();
   if(batch.length)scheduleToPushServer(batch);
 }
+let pjWeekOffset=0,pjSelectedDay=null;
 function renderPushJourney(){
   const el=document.getElementById('pushJourneyList');if(!el)return;
-  const batch=buildSmartPushBatch(7*24*3600000).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
-  if(!batch.length){el.innerHTML='<div style="padding:16px 20px;color:var(--muted);font-size:13px;text-align:center">אין התראות מתוכננות — הוסף משימות ושגרות</div>';return;}
-  const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
   const now=new Date();
-  el.innerHTML=batch.map(n=>{
+  const batch=buildSmartPushBatch(14*24*3600000);
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay()+pjWeekOffset*7);weekStart.setHours(0,0,0,0);
+  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
+  const dayN=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+  const mN=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const todayStr=ymd(now);
+  const cols=Array.from({length:7},(_,i)=>{const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);const ds=ymd(d);return{d,ds,count:batch.filter(n=>n.fireAt.startsWith(ds)).length,isToday:ds===todayStr,isSel:ds===pjSelectedDay};});
+  let detailHtml='';
+  if(pjSelectedDay){
+    const dayN2=batch.filter(n=>n.fireAt.startsWith(pjSelectedDay)).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
+    detailHtml=dayN2.length?`<div class="pj-detail-wrap">${dayN2.map(n=>{
+      const fire=new Date(n.fireAt);const t=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+      const st=n.title.replace(/'/g,'&#39;'),sb=n.body.replace(/'/g,'&#39;');
+      return`<div class="pj-detail-row"><div class="pj-detail-time">${t}</div><div class="pj-detail-content"><div class="pj-detail-title">${n.title}</div><div class="pj-detail-body">${n.body}</div></div><button class="pj-detail-send" onclick="sendPushJourneyItem('${n.id}','${st}','${sb}')">▶</button></div>`;
+    }).join('')}</div>`:`<div class="pj-detail-wrap"><div class="pj-detail-empty">אין התראות ביום זה</div></div>`;
+  }
+  el.innerHTML=`<div class="pj-cal-wrap"><div class="pj-cal-nav">
+    <button class="pj-cal-nav-btn" onclick="pjNav(1)">‹</button>
+    <span class="pj-cal-nav-lbl">${weekStart.getDate()} ${mN[weekStart.getMonth()]} — ${weekEnd.getDate()} ${mN[weekEnd.getMonth()]}</span>
+    <button class="pj-cal-nav-btn" onclick="pjNav(-1)">›</button>
+  </div><div class="pj-strip">${cols.map(c=>`<div class="pj-day-col${c.isToday?' today':''}${c.isSel?' selected':''}" onclick="pjSelectDay('${c.ds}')"><div class="pj-day-name">${dayN[c.d.getDay()]}</div><div class="pj-day-num">${c.d.getDate()}</div><div class="pj-badge${c.count?'':' empty'}">${c.count||'·'}</div></div>`).join('')}</div>${detailHtml}</div>`;
+}
+function pjNav(dir){pjWeekOffset+=dir;renderPushJourney();}
+function pjSelectDay(ds){pjSelectedDay=pjSelectedDay===ds?null:ds;renderPushJourney();}
+function toggleNotifJourney(key){
+  const panel=document.getElementById('nj-'+key);if(!panel)return;
+  const isOn=panel.classList.toggle('on');
+  if(!isOn){return;}
+  const batch=buildSmartPushBatch(7*24*3600000);
+  // match by task id prefix or routine id+date
+  const items=batch.filter(n=>{
+    if(key.startsWith('t')){const tid=key.slice(1);return n.id.includes('task_'+tid)||n.id.includes('tmorning_'+tid);}
+    const rkey=key.slice(1);// routineId_dateStr
+    const[rid,ds]=rkey.split('_',2);
+    return n.id.includes('rmorning_'+rid)||n.id.includes('rslot_'+rid);
+  }).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
+  if(!items.length){panel.innerHTML='<div class="nj-item"><div class="nj-text" style="color:var(--muted)">אין התראות מתוכננות</div></div>';return;}
+  panel.innerHTML=items.map(n=>{
     const fire=new Date(n.fireAt);
-    const isToday=fire.toDateString()===now.toDateString();
-    const isTmr=fire.toDateString()===new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).toDateString();
-    const dayLbl=isToday?'היום':isTmr?'מחר':dayNames[fire.getDay()];
-    const timeLbl=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-    const safeTitle=n.title.replace(/'/g,'&#39;');const safeBody=n.body.replace(/'/g,'&#39;');
-    return `<div class="pj-row">
-      <div class="pj-time-col"><div class="pj-day">${dayLbl}</div><div class="pj-clock">${timeLbl}</div></div>
-      <div class="pj-content"><div class="pj-title">${n.title}</div><div class="pj-body">${n.body}</div></div>
-      <button class="pj-send-btn" onclick="sendPushJourneyItem('${n.id}','${safeTitle}','${safeBody}')" title="שלח עכשיו">▶</button>
-    </div>`;
+    const dayNames=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+    const t=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    const now=new Date();const isToday=fire.toDateString()===now.toDateString();
+    const dayLbl=(isToday?'היום ':dayNames[fire.getDay()]+' ')+t;
+    return`<div class="nj-item"><div class="nj-time">${dayLbl}</div><div class="nj-text"><strong>${n.title}</strong><br>${n.body}</div></div>`;
   }).join('');
 }
 async function sendPushJourneyItem(id,title,body){
@@ -1818,6 +1879,7 @@ function renderTaskCard(task){
     <button class="act cal-btn" onclick="cal(${task.id})">${ICO.cal}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
     <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
@@ -1855,6 +1917,7 @@ function renderRoutineInstance(inst){
     <button class="act edit-btn" onclick="editRoutine(${inst.routineId})" title="ערוך שגרה">${ICO.edit}</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
 </div>`;}
 
 function render(){
