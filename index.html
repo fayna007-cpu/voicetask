@@ -14,11 +14,11 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f0f0f5;--surface:#fff;
-  --border:#e4e4e9;--border2:#d0d0d8;
-  --text:#0a0a0a;--muted:#7a7a82;
-  --accent:#6366f1;--accent2:#818cf8;
-  --r:20px;--r-sm:14px;
+  --bg:#f4f6fb;--surface:#fff;
+  --border:#e8eaf0;--border2:#d0d4e4;
+  --text:#111827;--muted:#6b7280;
+  --accent:#1a56db;--accent2:#3b82f6;
+  --r:16px;--r-sm:12px;
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
 }
@@ -27,7 +27,7 @@ body{
   font-family:-apple-system,'SF Pro Display','Segoe UI',Arial,sans-serif;
   background:var(--bg);color:var(--text);
   min-height:100svh;max-width:480px;margin:0 auto;
-  padding:0 0 calc(120px + var(--sab));
+  padding:0 0 calc(88px + var(--sab));
   padding-left:var(--sal);padding-right:var(--sar);
   direction:rtl;overflow-x:hidden;
   overscroll-behavior-y:none;-webkit-user-select:none;user-select:none;
@@ -98,11 +98,10 @@ body{
 /* ── Header ── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:calc(16px + var(--sat)) 20px 14px;
-  background:rgba(240,240,245,.92);
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  padding:calc(14px + var(--sat)) 20px 14px;
+  background:#fff;
   position:sticky;top:0;z-index:20;
-  border-bottom:1px solid rgba(228,228,233,.6);
+  box-shadow:0 1px 0 rgba(0,0,0,.07);
 }
 .logo-wrap{display:flex;align-items:center;gap:9px}
 .logo-icon{
@@ -111,9 +110,9 @@ body{
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 12px rgba(99,102,241,.3);
 }
-.logo{font-size:19px;font-weight:800;letter-spacing:-.5px;color:var(--text)}
+.logo{font-size:20px;font-weight:900;letter-spacing:-.8px;color:var(--accent)}
 .header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.badge{font-size:12px;font-weight:700;color:var(--muted);background:var(--surface);border:1.5px solid var(--border);padding:5px 12px;border-radius:20px;flex-shrink:0}
+.badge{font-size:12px;font-weight:700;color:var(--accent);background:rgba(26,86,219,.08);border:1.5px solid rgba(26,86,219,.15);padding:5px 12px;border-radius:20px;flex-shrink:0}
 .menu-btn{width:38px;height:38px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s}
 .menu-btn:active{background:var(--border)}
 /* ── Side Menu ── */
@@ -146,27 +145,12 @@ body{
 .user-initials{width:27px;height:27px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#67e8f9);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
 .user-name-chip{font-size:12px;font-weight:600;color:var(--text);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ── Mic button (tap to open Siri) ── */
-.mic-wrap{display:flex;flex-direction:column;align-items:center;padding:28px 20px 16px;gap:14px}
-.tap-orb{
-  width:110px;height:110px;border-radius:50%;
-  background:conic-gradient(from 0deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
-  animation:orb-spin 6s linear infinite;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;position:relative;
-  box-shadow:0 16px 48px rgba(99,102,241,.28);
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-  transition:transform .15s,box-shadow .3s;
-}
-.tap-orb:active{transform:scale(.93)}
-.tap-orb-inner{
-  width:90px;height:90px;border-radius:50%;
-  background:radial-gradient(circle at 38% 35%,rgba(255,255,255,.45) 0%,transparent 55%),
-             conic-gradient(from 180deg,#c084fc,#818cf8,#38bdf8,#34d399,#fbbf24,#f87171,#c084fc);
-  animation:orb-spin 6s linear infinite reverse;
-  display:flex;align-items:center;justify-content:center;
-}
-.tap-lbl{font-size:14px;color:var(--muted);font-weight:600;letter-spacing:-.1px}
+/* ── Greeting bar ── */
+.mic-wrap{display:none}
+.tap-orb,.tap-orb-inner,.tap-lbl{display:none}
+.greeting-bar{padding:16px 20px 8px;display:flex;flex-direction:column;gap:2px}
+.greeting-date{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px}
+.greeting-sub{font-size:13px;color:var(--muted);font-weight:500}
 
 /* ── Siri Overlay ── */
 #siriOverlay{
@@ -305,13 +289,13 @@ body{
 }
 
 /* ── Quick Actions ── */
-.quick-wrap{display:flex;gap:8px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.quick-wrap{display:flex;gap:6px;overflow-x:auto;padding:0 16px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .quick-wrap::-webkit-scrollbar{display:none}
 .quick-btn{
-  flex-shrink:0;display:flex;align-items:center;gap:6px;
-  padding:9px 16px;border-radius:50px;
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  padding:8px 14px;border-radius:50px;
   border:1.5px solid var(--border);background:var(--surface);
-  color:var(--text);font-size:13px;font-weight:600;cursor:pointer;
+  color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;
   transition:all .16s;font-family:inherit;
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;white-space:nowrap;
 }
@@ -319,7 +303,7 @@ body{
 .quick-btn svg{opacity:.55}
 
 /* ── Filters ── */
-.filters{display:flex;gap:7px;overflow-x:auto;padding:12px 16px 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:10px 16px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .filters::-webkit-scrollbar{display:none}
 .f-btn{
   flex-shrink:0;padding:8px 16px;border-radius:50px;
@@ -343,7 +327,7 @@ body{
 .section-hdr-left{display:flex;align-items:center;gap:8px}
 .section-hdr-icon{font-size:18px;line-height:1}
 .section-hdr-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.4px}
-.section-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;border-radius:10px;background:rgba(99,102,241,.15);color:var(--accent);font-size:11px;font-weight:800;padding:0 7px}
+.section-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:10px;background:rgba(26,86,219,.1);color:var(--accent);font-size:11px;font-weight:800;padding:0 7px}
 .section-count.green{background:rgba(16,185,129,.12);color:#10b981}
 .section-cards{background:var(--surface);border-radius:20px;overflow:hidden;box-shadow:0 2px 24px rgba(0,0,0,.07);border:1px solid rgba(228,228,233,.8)}
 .section-cards .card{border-radius:0;box-shadow:none;border:none;border-bottom:1px solid var(--border);animation:slide .28s cubic-bezier(.25,.46,.45,.94)}
@@ -352,33 +336,35 @@ body{
 
 /* ── Card ── */
 .card{
-  background:var(--surface);border:1px solid rgba(228,228,233,.8);
-  border-radius:var(--r);border-right:3px solid var(--cc,var(--accent));
-  padding:16px;position:relative;
-  animation:slide .28s cubic-bezier(.25,.46,.45,.94);
-  box-shadow:0 2px 16px rgba(0,0,0,.05);
-  transition:opacity .25s,box-shadow .2s;
+  background:var(--surface);
+  padding:14px 16px;position:relative;
+  transition:opacity .25s;
 }
-.card:hover{box-shadow:0 4px 24px rgba(0,0,0,.08)}
-@keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.card.done{opacity:.4}
+@keyframes slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.card.done{opacity:.38}
 .card.done .task-txt{text-decoration:line-through;color:var(--muted)}
-.card.overdue{opacity:.75;border-color:#fca5a5;border-right:4px solid #ef4444;background:#fff5f5}
-.card.overdue .date-block{background:#fee2e2}
-.card.overdue .date-main,.card.overdue .date-sub{color:#ef4444}
-.overdue-label{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#ef4444;border-radius:20px;padding:2px 8px;margin-bottom:7px;letter-spacing:.3px}
-.task-txt{font-size:15px;line-height:1.55;font-weight:600;color:var(--text);margin-bottom:10px;-webkit-user-select:text;user-select:text}
-.date-block{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.card.overdue{background:#fff8f8}
+.card.overdue .card-time{color:#ef4444}
+.card.overdue .card-date{color:#ef4444}
+.overdue-label{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:#ef4444;background:#fee2e2;border-radius:20px;padding:2px 9px;margin-bottom:8px;letter-spacing:.3px}
+.card-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}
+.card-cat-dot{width:8px;height:8px;border-radius:50%;background:var(--cc,var(--accent));flex-shrink:0;margin-top:6px}
+.card-main{flex:1;min-width:0}
+.card-time{font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-.5px;flex-shrink:0;line-height:1.2}
+.task-txt{font-size:15px;line-height:1.5;font-weight:700;color:var(--text);-webkit-user-select:text;user-select:text;margin-bottom:3px}
+.card-meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.card-date{font-size:12px;color:var(--muted);font-weight:500}
+.date-block{display:none}
 .date-main{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
 .date-sub{font-size:11px;color:var(--muted);margin-top:1px}
-.cal-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
+.cal-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
 .cal-badge.synced{background:#dcfce7;color:#16a34a}
 .cal-badge.pending{background:#fef9c3;color:#b45309}
-.meta{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.cat-sel{background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;border-radius:20px;padding:5px 12px;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;min-height:30px}
-.actions{display:flex;gap:6px;justify-content:flex-end}
+.meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cat-sel{background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:600;border-radius:20px;padding:4px 10px;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;min-height:28px}
+.actions{display:flex;gap:5px;justify-content:flex-end}
 .act{
-  width:36px;height:36px;border-radius:50%;
+  width:32px;height:32px;border-radius:50%;
   border:1.5px solid var(--border);background:var(--bg);color:var(--muted);
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:transform .1s,background .15s,color .15s,border-color .15s;
@@ -403,7 +389,7 @@ body{
 .edit-cancel{padding:10px 16px;border-radius:50px;background:transparent;color:var(--muted);border:1.5px solid var(--border);font-size:13px;cursor:pointer;font-family:inherit}
 
 /* ── Install / Toast ── */
-.install-bar{position:fixed;bottom:calc(16px + var(--sab));left:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto}
+.install-bar{position:fixed;bottom:calc(76px + var(--sab));left:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto}
 .install-bar.on{display:flex}
 .install-bar span{flex:1;font-size:13px;font-weight:600;color:var(--text)}
 .install-bar button{padding:8px 16px;border-radius:50px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation}
@@ -414,7 +400,7 @@ body{
 .empty p{font-size:14px;line-height:1.7}
 .divider{height:1px;background:var(--border);margin:4px 20px 12px;opacity:.6}
 .toast{
-  position:fixed;bottom:calc(28px + var(--sab));left:50%;
+  position:fixed;bottom:calc(84px + var(--sab));left:50%;
   transform:translateX(-50%) translateY(120px);
   background:var(--text);color:#fff;
   padding:12px 26px;border-radius:50px;font-size:14px;font-weight:600;
@@ -467,8 +453,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .day-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .rform-save{width:100%;padding:16px;border-radius:50px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation;box-shadow:0 4px 20px rgba(99,102,241,.25);-webkit-tap-highlight-color:transparent;box-sizing:border-box;display:block}
 .rform-save:active{opacity:.85}
-.card.routine-card{border-right:4px solid var(--accent)}
-.routine-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--accent);background:rgba(99,102,241,.1);border-radius:20px;padding:2px 8px;margin-bottom:6px;letter-spacing:.2px}
+.card.routine-card{}
+.routine-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#0d9488;background:rgba(13,148,136,.08);border-radius:20px;padding:2px 9px;margin-bottom:6px;letter-spacing:.2px}
 .dur-tag{font-size:11px;color:var(--muted);font-weight:600}
 .routine-notes{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
 .siri-routine-btn{width:100%;padding:10px;border-radius:var(--r-sm);background:rgba(99,102,241,.1);color:var(--accent);border:1.5px solid rgba(99,102,241,.25);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation}
@@ -513,6 +499,14 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .rfi-verbal:focus{border-color:var(--accent);background:#fff}
 .routine-clear-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:7px 13px;border-radius:50px;background:#fff0f0;color:#dc2626;border:1.5px solid #fecaca;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .routine-clear-btn:active{background:#fecaca}
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:8px 0 calc(10px + var(--sab));z-index:50;box-shadow:0 -2px 16px rgba(0,0,0,.06)}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0;border:none;background:none;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.bnav-item.active{color:var(--accent)}
+.bnav-icon{font-size:22px;line-height:1}
+.bnav-fab-wrap{flex:1;display:flex;justify-content:center;align-items:center}
+.bnav-fab{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(26,86,219,.4);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s,box-shadow .2s;margin-top:-16px}
+.bnav-fab:active{transform:scale(.91);box-shadow:0 2px 10px rgba(26,86,219,.3)}
 /* ── Notification Manager ── */
 .notif-section-title{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;padding:14px 20px 8px;border-bottom:1px solid var(--border)}
 .notif-item{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)}
@@ -606,17 +600,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   </div>
 </div>
 
-<div class="mic-wrap">
-  <div class="tap-orb" id="tapOrb" onclick="startSiri()">
-    <div class="tap-orb-inner">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.2))">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </div>
-  </div>
-  <div class="tap-lbl">לחץ לדיבור</div>
+<div class="greeting-bar">
+  <div class="greeting-date" id="greetingDate">שלום!</div>
+  <div class="greeting-sub" id="greetingSub">טוען...</div>
 </div>
 
 <div class="quick-wrap">
@@ -652,6 +638,33 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   <span>📲 הוסף למסך הבית</span>
   <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
   <button class="btn-install" onclick="installApp()">התקן</button>
+</div>
+<div class="bottom-nav">
+  <button class="bnav-item" onclick="openNotifManager()">
+    <span class="bnav-icon">🔔</span>
+    <span>התראות</span>
+  </button>
+  <button class="bnav-item" onclick="openRoutineSheet()">
+    <span class="bnav-icon">🔄</span>
+    <span>שגרות</span>
+  </button>
+  <div class="bnav-fab-wrap">
+    <button class="bnav-fab" onclick="startSiri()" aria-label="הוסף משימה">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+  </div>
+  <button class="bnav-item active" id="bnavTasks">
+    <span class="bnav-icon">📋</span>
+    <span>משימות</span>
+  </button>
+  <button class="bnav-item" onclick="openSideMenu()">
+    <span class="bnav-icon">☰</span>
+    <span>תפריט</span>
+  </button>
 </div>
 </div><!-- /#app -->
 <!-- Side Menu -->
@@ -978,7 +991,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1379,21 +1392,26 @@ function renderTaskCard(task){
   const cat=CATS[task.category]||CATS['כללי'];
   const dt=new Date(task.datetime);
   const isOverdue=!task.completed&&dt<new Date();
-  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
+  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'long'});
   const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
   const pad=n=>n.toString().padStart(2,'0');
   const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-  const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן</span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
-  const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}</button>`:'';
+  const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן<\/span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
+  const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}<\/button>`:'';
   return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
-  ${isOverdue?'<span class="overdue-label">⏰ עבר הזמן</span>':''}
-  <div class="task-txt">${esc(task.text)}</div>
-  <div class="date-block">
-    <div><div class="date-main">${timeStr}</div><div class="date-sub">${dateStr}</div></div>
-    ${calBadge}
+  ${isOverdue?'<div class="overdue-label">⏰ עבר הזמן<\/div>':''}
+  <div class="card-row">
+    <div class="card-main">
+      <div class="task-txt">${esc(task.text)}</div>
+      <div class="card-meta-row">
+        <span class="card-date">${dateStr}</span>
+        ${calBadge}
+        <select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select>
+      </div>
+    </div>
+    <div class="card-time">${timeStr}</div>
   </div>
-  <div class="meta"><select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select></div>
   <div class="actions">
     <button class="act done-btn" onclick="toggleDone(${task.id})">${task.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="editTask(${task.id})">${ICO.edit}</button>
@@ -1416,18 +1434,23 @@ function renderRoutineInstance(inst){
   const cat=CATS[inst.category]||CATS['כללי'];
   const dt=new Date(inst.datetime);
   const isOverdue=!inst.completed&&dt<new Date();
-  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
+  const dateStr=dt.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'long'});
   const timeStr=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
   const endDt=new Date(dt.getTime()+inst.duration*60000);
   const endStr=endDt.getHours().toString().padStart(2,'0')+':'+endDt.getMinutes().toString().padStart(2,'0');
   const durTxt=inst.duration<60?inst.duration+'דק׳':inst.duration===60?'שעה':inst.duration===90?'שעה וחצי':(inst.duration/60)+'שעות';
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
-  <div class="routine-badge">🔄 שגרה קבועה</div>
-  <div class="task-txt">${esc(inst.text)}</div>
-  ${inst.notes?`<div class="routine-notes">📝 ${esc(inst.notes)}</div>`:''}
-  <div class="date-block">
-    <div><div class="date-main">${timeStr}–${endStr}</div><div class="date-sub">${dateStr}</div></div>
-    <span class="dur-tag">${durTxt}</span>
+  <div class="routine-badge">🔄 שגרה</div>
+  <div class="card-row">
+    <div class="card-main">
+      <div class="task-txt">${esc(inst.text)}</div>
+      <div class="card-meta-row">
+        <span class="card-date">${dateStr}</span>
+        <span class="dur-tag">${durTxt}</span>
+        ${inst.notes?`<span class="card-date">📝 ${esc(inst.notes)}<\/span>`:''}
+      </div>
+    </div>
+    <div class="card-time">${timeStr}<br><span style="font-size:12px;font-weight:500;color:var(--muted)">–${endStr}</span></div>
   </div>
   <div class="actions">
     <button class="act done-btn" onclick="toggleRoutineComplete('${inst.routineId}','${inst.dateStr}')">${inst.completed?ICO.undo:ICO.check}</button>
@@ -1488,6 +1511,21 @@ function render(){
 </div>`;
   }
   el.innerHTML=html;
+  updateGreeting();
+}
+
+function updateGreeting(){
+  const dateEl=document.getElementById('greetingDate');
+  const subEl=document.getElementById('greetingSub');
+  if(!dateEl||!subEl)return;
+  const now=new Date();
+  const h=now.getHours();
+  const greet=h<5?'לילה טוב':h<12?'בוקר טוב':h<17?'צהריים טובים':h<21?'ערב טוב':'לילה טוב';
+  const name=gAuth?.name?.split(' ')[0]||'';
+  dateEl.textContent=`${greet}${name?' '+name:''}!`;
+  const active=tasks.filter(t=>!t.completed).length;
+  const routineCount=routines.filter(r=>r.enabled).length;
+  subEl.textContent=active?`${active} משימות פעילות · ${routineCount} שגרות`:routineCount?`${routineCount} שגרות פעילות`:'אין משימות — לחץ 🎤 להוספה';
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
@@ -1924,6 +1962,7 @@ async function requestNotificationPermission(){
   if(p==='granted')subscribeToPush();
   return p==='granted';
 }
+function urlBase64ToUint8Array(b64){const padding='='.repeat((4-b64.length%4)%4);const base64=(b64+padding).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(base64);return Uint8Array.from(raw,c=>c.charCodeAt(0));}
 async function subscribeToPush(){
   if(!('serviceWorker'in navigator)||!('PushManager'in window))return;
   if(PUSH_SERVER.includes('REPLACE'))return;// not configured yet
@@ -1931,7 +1970,7 @@ async function subscribeToPush(){
     const reg=await navigator.serviceWorker.ready;
     let sub=await reg.pushManager.getSubscription();
     if(!sub){
-      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:VAPID_PUBLIC_KEY});
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
     }
     const userId=gAuth?.email||'anon';
     fetch(PUSH_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),userId})}).catch(()=>{});
