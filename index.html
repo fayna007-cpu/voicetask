@@ -403,6 +403,9 @@ body{
 .settings-row-title{font-size:15px;font-weight:700;color:var(--text)}
 .settings-row-sub{font-size:12px;color:var(--muted);margin-top:2px}
 .settings-row-arrow{color:var(--muted);font-size:18px;flex-shrink:0}
+.settings-row-ico.yellow{background:#fef9c3}
+.settings-select{appearance:none;-webkit-appearance:none;border:1.5px solid var(--border2);background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a7a82' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat 6px center;border-radius:10px;padding:6px 10px 6px 22px;font-size:13px;font-family:inherit;color:var(--text);cursor:pointer;outline:none;direction:ltr;text-align:right;flex-shrink:0}
+.settings-notif-sub{font-size:11px;color:var(--muted);padding:0 20px 10px;margin-top:-4px;font-weight:700;letter-spacing:.4px}
 .settings-cards{background:var(--surface);border-radius:18px;overflow:hidden;border:1px solid var(--border);margin:0 16px}
 .settings-stat-row{display:flex;gap:10px;padding:16px}
 .settings-stat{flex:1;background:var(--bg);border-radius:14px;padding:14px 12px;text-align:center}
@@ -767,6 +770,46 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="settings-row-arrow">›</div>
       </div>
     </div>
+    <div class="settings-section">הגדרות התראות חכמות</div>
+    <div class="settings-cards">
+      <div class="settings-notif-sub">📋 משימות שוטפות</div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תזכורת לפני משימה</div><div class="settings-row-sub">כמה זמן לפני</div></div>
+        <select class="settings-select" id="ns-tasks-reminderMins" onchange="saveNotifSettings()">
+          <option value="0">כבוי</option><option value="10">10 דק׳</option><option value="15">15 דק׳</option>
+          <option value="30">30 דק׳</option><option value="60">שעה</option><option value="120">שעתיים</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">סיכום בוקר</div><div class="settings-row-sub">שעת תקציר יומי</div></div>
+        <input type="time" class="settings-select" id="ns-tasks-morningTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">התראת פיגור</div><div class="settings-row-sub">משימה שחלפה ולא הושלמה</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-tasks-overdueAlert" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">🔄 שגרות</div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תזכורת לפני שגרה</div><div class="settings-row-sub">כמה זמן לפני</div></div>
+        <select class="settings-select" id="ns-routines-reminderMins" onchange="saveNotifSettings()">
+          <option value="0">כבוי</option><option value="10">10 דק׳</option><option value="15">15 דק׳</option>
+          <option value="30">30 דק׳</option><option value="60">שעה</option><option value="120">שעתיים</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">סיכום שגרות בבוקר</div><div class="settings-row-sub">שעת שליחה</div></div>
+        <input type="time" class="settings-select" id="ns-routines-morningTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">📈 פרודוקטיביות</div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תכנון ערב</div><div class="settings-row-sub">תזכורת יומית לתכנן את מחר</div></div>
+        <input type="time" class="settings-select" id="ns-productivity-eveningTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">סקירה שבועית</div><div class="settings-row-sub">ראשון 20:00 — סיכום + תכנון שבוע</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-productivity-weeklyReview" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+    </div>
     <div class="settings-section">אזור מסוכן</div>
     <div class="settings-cards">
       <div class="settings-row" onclick="confirmClearData()">
@@ -1081,7 +1124,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1117,6 +1160,7 @@ function openSettings(){
     <div class="settings-stat"><div class="settings-stat-num">${customNotifs.length}</div><div class="settings-stat-lbl">התראות</div></div>`;
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('settingsSheet').classList.add('on');
+  loadNotifSettings();
 }
 function closeSettings(){
   document.getElementById('settingsSheet').classList.remove('on');
@@ -1166,6 +1210,98 @@ function confirmClearData(){
   save();saveRoutines();saveCustomNotifsData();
   render();closeSettings();toast('נתונים נמחקו');
 }
+// ── Smart Push Notification Settings ─────────────────────────────────────────
+let notifSettings=null;
+const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},productivity:{eveningTime:'21:00',weeklyReview:true}};
+function loadNotifSettings(){
+  try{const s=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');
+    notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},productivity:{...NS_DEFAULTS.productivity}};
+  }catch(e){notifSettings=JSON.parse(JSON.stringify(NS_DEFAULTS));}
+  // Sync values to DOM elements (if settings sheet already rendered)
+  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
+  pairs.forEach(([id,section,key,prop])=>{const el=document.getElementById(id);if(!el)return;if(prop==='checked')el.checked=!!notifSettings[section][key];else el.value=notifSettings[section][key];});
+}
+function saveNotifSettings(){
+  const g=id=>document.getElementById(id);
+  notifSettings={
+    tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked},
+    routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00'},
+    productivity:{eveningTime:g('ns-productivity-eveningTime')?.value||'21:00',weeklyReview:!!g('ns-productivity-weeklyReview')?.checked}
+  };
+  localStorage.setItem('vt_notif_settings',JSON.stringify(notifSettings));
+  scheduleSmartPushNotifs();
+  toast('✅ הגדרות נשמרו');
+}
+function scheduleSmartPushNotifs(){
+  if(!('Notification'in window)||Notification.permission!=='granted')return;
+  if(!notifSettings)loadNotifSettings();
+  const s=notifSettings,now=new Date(),WIN=48*3600000;
+  const batch=[],seen=new Set();
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fmt=d=>d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return t.getUTCFullYear()+'-W'+String(Math.ceil((((t-y)/86400000)+1)/7)).padStart(2,'0');};
+  function queue(id,title,body,fireAt){
+    if(seen.has(id))return;const delay=fireAt-now;
+    if(delay<=0||delay>WIN)return;seen.add(id);
+    batch.push({id,title,body,fireAt:fireAt.toISOString()});
+  }
+  // Morning briefing (combined tasks + routines)
+  [0,1].forEach(off=>{
+    const base=new Date(now);base.setDate(now.getDate()+off);
+    const[th,tm]=(s.tasks.morningTime||'08:00').split(':').map(Number);
+    const[rh,rm]=(s.routines.morningTime||'07:00').split(':').map(Number);
+    const early=(th*60+tm)<=(rh*60+rm);
+    const fire=new Date(base);fire.setHours(early?th:rh,early?tm:rm,0,0);
+    const ds=ymd(fire);
+    const dayS=new Date(base);dayS.setHours(0,0,0,0);
+    const dayE=new Date(base);dayE.setHours(23,59,59,999);
+    const tc=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=dayS&&new Date(t.datetime)<=dayE).length;
+    let rc=0;
+    routines.filter(r=>r.enabled).forEach(r=>{[0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{const sd=new Date(iso);if(sd>=dayS&&sd<=dayE)rc++;});});});
+    const total=tc+rc;
+    queue('morning_'+ds,'☀️ סיכום בוקר'+(off===0?' — היום':' — מחר'),total>0?`${tc} משימות · ${rc} שגרות`:'אין פריטים מתוכננים',fire);
+  });
+  // Task reminders
+  if(s.tasks.reminderMins>0){
+    tasks.filter(t=>!t.completed&&t.datetime).forEach(t=>{
+      const taskTime=new Date(t.datetime);
+      queue('task_'+t.id,'📌 '+t.text,'⏰ '+fmt(taskTime),new Date(taskTime-s.tasks.reminderMins*60000));
+    });
+  }
+  // Overdue alerts
+  if(s.tasks.overdueAlert){
+    tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<now&&(now-new Date(t.datetime))<24*3600000).forEach(t=>{
+      queue('overdue_'+t.id,'⚠️ לא הושלמה: '+t.text,'הייתה מתוכננת ל-'+fmt(new Date(t.datetime)),new Date(now+60000));
+    });
+  }
+  // Routine slot reminders
+  if(s.routines.reminderMins>0){
+    routines.filter(r=>r.enabled).forEach(r=>{
+      [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
+        const slot=new Date(iso);
+        queue('rslot_'+r.id+'_'+ymd(slot),(r.name||r.text||'שגרה'),'⏰ '+fmt(slot),new Date(slot-s.routines.reminderMins*60000));
+      });});
+    });
+  }
+  // Evening planning
+  if(s.productivity.eveningTime){
+    [0,1].forEach(off=>{
+      const fire=new Date(now);fire.setDate(now.getDate()+off);
+      const[eh,em]=(s.productivity.eveningTime||'21:00').split(':').map(Number);
+      fire.setHours(eh,em,0,0);
+      const tmrTC=tasks.filter(t=>!t.completed&&t.datetime).filter(t=>{const d=new Date(t.datetime);const tmr=new Date(fire);tmr.setDate(fire.getDate()+1);tmr.setHours(0,0,0,0);const tmrE=new Date(tmr);tmrE.setHours(23,59,59,999);return d>=tmr&&d<=tmrE;}).length;
+      queue('evening_'+ymd(fire),'🌙 תכנון ערב',tmrTC>0?`${tmrTC} משימות מחכות מחר — תכנן עכשיו`:'כדאי לתכנן מה עושים מחר',fire);
+    });
+  }
+  // Weekly review — next Sunday 20:00
+  if(s.productivity.weeklyReview){
+    const rev=new Date(now);const days=(7-rev.getDay())%7||7;rev.setDate(rev.getDate()+days);rev.setHours(20,0,0,0);
+    const done=tasks.filter(t=>t.completed).length,total=tasks.length;
+    queue('weekly_'+isoWeek(rev),'📊 סקירה שבועית',`סיימת ${done} מתוך ${total} משימות — מה השבוע הבא?`,rev);
+  }
+  if(batch.length)scheduleToPushServer(batch);
+}
+
 async function testPushFromSettings(){
   // First re-subscribe to make sure subscription is fresh after encryption fix
   toast('⏳ מתחבר...');
@@ -2598,7 +2734,7 @@ function initSwipeGestures(){
   initSheetSwipe(document.getElementById('notifFormSheet'),ov);
 }
 
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();});
 </script>
 </body>
 </html>
