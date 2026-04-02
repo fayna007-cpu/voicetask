@@ -18,8 +18,8 @@ async function encrypt(sub, payload) {
   const shared=new Uint8Array(await crypto.subtle.deriveBits({name:'ECDH',public:recvPub},eph.privateKey,256));
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const ikm=await hkdf(shared,auth,concat(new TextEncoder().encode('WebPush: info\0'),p256dh,ephPub),32);
-  const cek=await hkdf(ikm,salt,concat(new TextEncoder().encode('Content-Encoding: aes128gcm\0'),new Uint8Array([1])),16);
-  const nonce=await hkdf(ikm,salt,concat(new TextEncoder().encode('Content-Encoding: nonce\0'),new Uint8Array([1])),12);
+  const cek=await hkdf(ikm,salt,new TextEncoder().encode('Content-Encoding: aes128gcm\0'),16);
+  const nonce=await hkdf(ikm,salt,new TextEncoder().encode('Content-Encoding: nonce\0'),12);
   const aes=await crypto.subtle.importKey('raw',cek,{name:'AES-GCM'},false,['encrypt']);
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce},aes,concat(new TextEncoder().encode(payload),new Uint8Array([2]))));
   return concat(salt,new Uint8Array([0,0,16,0]),new Uint8Array([65]),ephPub,ct);
@@ -78,7 +78,13 @@ export default {
       const notif=JSON.parse(await env.KV.get(name)||'null');
       if(!notif||new Date(notif.fireAt).getTime()>now)return;
       const sub=JSON.parse(await env.KV.get(`sub:${notif.userId}`)||'null');
-      if(sub)await sendPush(sub,notif.title,notif.body,env);
+      if(sub){
+        try{
+          const r=await sendPush(sub,notif.title,notif.body,env);
+          // 410 = subscription expired, 404 = gone — delete subscription too
+          if(r.status===410||r.status===404)await env.KV.delete(`sub:${notif.userId}`);
+        }catch(e){console.error('sendPush failed:',e);}
+      }
       await env.KV.delete(name);
     }));
   }

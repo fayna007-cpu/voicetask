@@ -388,6 +388,27 @@ body{
 .edit-save{flex:1;padding:10px;border-radius:50px;background:var(--text);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .edit-cancel{padding:10px 16px;border-radius:50px;background:transparent;color:var(--muted);border:1.5px solid var(--border);font-size:13px;cursor:pointer;font-family:inherit}
 
+/* ── Settings Sheet ── */
+.settings-section{padding:20px 20px 8px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.8px;text-transform:uppercase}
+.settings-row{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.settings-row:last-child{border-bottom:none}
+.settings-row:active{background:var(--bg)}
+.settings-row-ico{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.settings-row-ico.blue{background:#dbeafe}
+.settings-row-ico.green{background:#dcfce7}
+.settings-row-ico.orange{background:#ffedd5}
+.settings-row-ico.red{background:#fee2e2}
+.settings-row-ico.purple{background:#ede9fe}
+.settings-row-body{flex:1;min-width:0}
+.settings-row-title{font-size:15px;font-weight:700;color:var(--text)}
+.settings-row-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.settings-row-arrow{color:var(--muted);font-size:18px;flex-shrink:0}
+.settings-cards{background:var(--surface);border-radius:18px;overflow:hidden;border:1px solid var(--border);margin:0 16px}
+.settings-stat-row{display:flex;gap:10px;padding:16px}
+.settings-stat{flex:1;background:var(--bg);border-radius:14px;padding:14px 12px;text-align:center}
+.settings-stat-num{font-size:24px;font-weight:900;color:var(--accent)}
+.settings-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600}
+
 /* ── Install / Toast ── */
 .install-bar{position:fixed;bottom:calc(76px + var(--sab));left:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:50;max-width:448px;margin:0 auto}
 .install-bar.on{display:flex}
@@ -684,11 +705,80 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
       <div class="side-item-ico yellow">🔔</div>
       ניהול התראות
     </button>
+    <button class="side-item" onclick="closeSideMenu();openSettings()">
+      <div class="side-item-ico blue">⚙️</div>
+      הגדרות וגיבוי
+    </button>
     <div class="side-divider"></div>
     <button class="side-item danger" onclick="closeSideMenu();confirmSignOut()">
       <div class="side-item-ico red">🚪</div>
       יציאה
     </button>
+  </div>
+</div>
+
+<!-- Settings Sheet -->
+<div class="rsheet" id="settingsSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeSettings()">✕</button>
+    <h3>⚙️ הגדרות</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="settings-section">סטטיסטיקה</div>
+    <div class="settings-stat-row" id="settingsStats"></div>
+    <div class="settings-section">גיבוי ושחזור</div>
+    <div class="settings-cards">
+      <div class="settings-row" onclick="exportData()">
+        <div class="settings-row-ico green">📤</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">ייצוא נתונים</div>
+          <div class="settings-row-sub">שמור קובץ גיבוי JSON של כל המשימות, השגרות וההתראות</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-row" onclick="document.getElementById('importFile').click()">
+        <div class="settings-row-ico blue">📥</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">ייבוא נתונים</div>
+          <div class="settings-row-sub">שחזר מקובץ גיבוי — הנתונים יתווספו לקיימים</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+    <div class="settings-section">התראות</div>
+    <div class="settings-cards">
+      <div class="settings-row" onclick="closeSideMenu();openNotifManager()">
+        <div class="settings-row-ico yellow">🔔</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">ניהול התראות</div>
+          <div class="settings-row-sub">התראות מותאמות אישית לכל שעה ויום</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-row" onclick="testPushFromSettings()">
+        <div class="settings-row-ico purple">🧪</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">בדיקת פוש רקע</div>
+          <div class="settings-row-sub">שלח פוש בעוד דקה — סגור אחר כך את האפליקציה</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
+    <div class="settings-section">אזור מסוכן</div>
+    <div class="settings-cards">
+      <div class="settings-row" onclick="confirmClearData()">
+        <div class="settings-row-ico red">🗑️</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">מחק את כל הנתונים</div>
+          <div class="settings-row-sub">מחיקה בלתי הפיכה של כל המשימות והשגרות</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
+    <div style="height:32px"></div>
   </div>
 </div>
 
@@ -1015,6 +1105,70 @@ function closeSideMenu(){
   document.getElementById('sideMenu').classList.remove('on');
 }
 function confirmSignOut(){if(confirm('להתנתק?'))signOut()}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function openSettings(){
+  // stats
+  const done=tasks.filter(t=>t.completed).length;
+  document.getElementById('settingsStats').innerHTML=`
+    <div class="settings-stat"><div class="settings-stat-num">${tasks.length}</div><div class="settings-stat-lbl">משימות</div></div>
+    <div class="settings-stat"><div class="settings-stat-num">${done}</div><div class="settings-stat-lbl">הושלמו</div></div>
+    <div class="settings-stat"><div class="settings-stat-num">${routines.length}</div><div class="settings-stat-lbl">שגרות</div></div>
+    <div class="settings-stat"><div class="settings-stat-num">${customNotifs.length}</div><div class="settings-stat-lbl">התראות</div></div>`;
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('settingsSheet').classList.add('on');
+}
+function closeSettings(){
+  document.getElementById('settingsSheet').classList.remove('on');
+  document.getElementById('routineOverlay').classList.remove('on');
+}
+function exportData(){
+  const data={version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`voicetask-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();URL.revokeObjectURL(url);
+  toast('✅ קובץ גיבוי הורד');
+}
+function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      let added=0;
+      if(Array.isArray(data.tasks)){
+        const existIds=new Set(tasks.map(t=>t.id));
+        const newTasks=data.tasks.filter(t=>!existIds.has(t.id));
+        tasks=[...newTasks,...tasks];save();added+=newTasks.length;
+      }
+      if(Array.isArray(data.routines)){
+        const existIds=new Set(routines.map(r=>r.id));
+        const newR=data.routines.filter(r=>!existIds.has(r.id));
+        routines=[...newR,...routines];saveRoutines();added+=newR.length;
+      }
+      if(Array.isArray(data.customNotifs)){
+        const existIds=new Set(customNotifs.map(n=>n.id));
+        const newN=data.customNotifs.filter(n=>!existIds.has(n.id));
+        customNotifs=[...newN,...customNotifs];saveCustomNotifsData();added+=newN.length;
+      }
+      render();scheduleCustomNotifs();
+      toast(`✅ יובאו ${added} פריטים חדשים`);
+    }catch(_){toast('❌ קובץ לא תקין');}
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+function confirmClearData(){
+  if(!confirm('למחוק את כל המשימות, השגרות וההתראות? פעולה זו בלתי הפיכה.'))return;
+  tasks=[];routines=[];customNotifs=[];
+  save();saveRoutines();saveCustomNotifsData();
+  render();closeSettings();toast('נתונים נמחקו');
+}
+async function testPushFromSettings(){
+  await sendTestPush(1);
+}
 function signOut(){if(gAuth?.access_token&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});gAuth=null;localStorage.removeItem('vt_auth');showLogin()}
 async function getToken(){
   if(!gAuth?.access_token)return null;
@@ -1624,7 +1778,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet'),document.getElementById('scheduleSheet')];
+  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet'),document.getElementById('scheduleSheet'),document.getElementById('settingsSheet')];
   ov.style.opacity='';ov.style.transition='';
   sheets.forEach(s=>{s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
