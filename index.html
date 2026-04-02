@@ -1274,15 +1274,28 @@ function scheduleSmartPushNotifs(){
       queue('overdue_'+t.id,'⚠️ לא הושלמה: '+t.text,'הייתה מתוכננת ל-'+fmt(new Date(t.datetime)),new Date(now+60000));
     });
   }
-  // Routine slot reminders
-  if(s.routines.reminderMins>0){
-    routines.filter(r=>r.enabled).forEach(r=>{
-      [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
-        const slot=new Date(iso);
-        queue('rslot_'+r.id+'_'+ymd(slot),(r.name||r.text||'שגרה'),'⏰ '+fmt(slot),new Date(slot-s.routines.reminderMins*60000));
-      });});
-    });
-  }
+  // Routine slot reminders — morning heads-up + pre-slot alert
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const name=r.name||r.text||'שגרה';
+    [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
+      const slot=new Date(iso);
+      const ds=ymd(slot);
+      const slotFmt=fmt(slot);
+      const isToday=ds===ymd(now);
+      const isTomorrow=ds===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
+      // 1. Morning heads-up: fires at routines.morningTime on the day of the slot
+      const[mh,mm]=(s.routines.morningTime||'07:00').split(':').map(Number);
+      const morningFire=new Date(slot);morningFire.setHours(mh,mm,0,0);
+      const dayLabel=isToday?'היום':isTomorrow?'מחר':ds;
+      queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${dayLabel} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
+      // 2. Pre-slot alert: X mins before the slot
+      if(s.routines.reminderMins>0){
+        const mins=s.routines.reminderMins;
+        const preBody=mins>=60?`בעוד שעה יש לך ${name} ב-${slotFmt} — תתכונן!`:`בעוד ${mins} דק׳ יש לך ${name} — אל תשכח! ⚡`;
+        queue('rslot_'+r.id+'_'+ds,'⚡ '+name,preBody,new Date(slot-mins*60000));
+      }
+    });});
+  });
   // Evening planning
   if(s.productivity.eveningTime){
     [0,1].forEach(off=>{
