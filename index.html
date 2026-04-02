@@ -492,6 +492,11 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .dur-tag{font-size:11px;color:var(--muted);font-weight:600}
 .routine-notes{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
 .siri-routine-btn{width:100%;padding:10px;border-radius:var(--r-sm);background:rgba(99,102,241,.1);color:var(--accent);border:1.5px solid rgba(99,102,241,.25);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;touch-action:manipulation}
+.siri-notif-row{display:flex;align-items:center;gap:8px;padding:8px 0 4px;flex-wrap:wrap}
+.siri-notif-lbl{font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0}
+.siri-notif-sel{appearance:none;-webkit-appearance:none;border:1.5px solid var(--border2);background:var(--bg);border-radius:10px;padding:5px 10px;font-size:12px;font-family:inherit;color:var(--text);cursor:pointer;outline:none}
+.siri-notif-morning{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0}
+.siri-notif-morning input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
 .routine-hdr-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:50px;background:var(--surface);border:1.5px solid var(--border);font-size:12px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 /* Stepper */
 .rfreq-stepper{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:14px;background:var(--bg);height:48px;overflow:hidden}
@@ -607,6 +612,20 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
     <!-- Confirm sheet -->
     <div class="siri-confirm" id="siriConfirm">
       <textarea class="siri-confirm-edit" id="siriEdit" rows="2" placeholder="ערוך את הטקסט..."></textarea>
+      <div class="siri-notif-row">
+        <span class="siri-notif-lbl">🔔 התראה לפני:</span>
+        <select class="siri-notif-sel" id="siriReminderMins">
+          <option value="0">ללא</option>
+          <option value="10">10 דק׳</option>
+          <option value="30" selected>30 דק׳</option>
+          <option value="60">שעה</option>
+          <option value="120">שעתיים</option>
+        </select>
+        <label class="siri-notif-morning">
+          <input type="checkbox" id="siriMorningAlert" checked>
+          <span>תזכורת בוקר</span>
+        </label>
+      </div>
       <div class="siri-confirm-actions">
         <button class="siri-confirm-save" onclick="confirmSiri()">שמור משימה</button>
         <button class="siri-confirm-cancel" onclick="cancelSiriConfirm()">בטל</button>
@@ -953,7 +972,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
           </select>
         </div>
         <div class="rfield">
-          <div class="rform-lbl">תזכורת לפני</div>
+          <div class="rform-lbl">⚡ תזכורת לפני</div>
           <select class="rfi" id="rReminder">
             <option value="0">ללא</option>
             <option value="15">15 דק׳</option>
@@ -961,6 +980,13 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
             <option value="60">שעה</option>
             <option value="120">שעתיים</option>
           </select>
+        </div>
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">☀️ תזכורת בוקר ביום השגרה</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+          <label class="rtoggle"><input type="checkbox" id="rMorningReminder" checked><span class="rtoggle-sl"></span></label>
+          <span style="font-size:13px;color:var(--muted)">שלח פוש בבוקר עם שעת השגרה</span>
         </div>
       </div>
 
@@ -1270,13 +1296,24 @@ function buildSmartPushBatch(windowMs){
     let rc=0;routines.filter(r=>r.enabled).forEach(r=>{[0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{const sd=new Date(iso);if(sd>=dayS&&sd<=dayE)rc++;});});});
     queue('morning_'+ds,'☀️ סיכום בוקר'+(off===0?' — היום':' — מחר'),tc+rc>0?`${tc} משימות · ${rc} שגרות`:'אין פריטים מתוכננים',fire);
   });
-  // Task reminders
-  if(s.tasks.reminderMins>0){
-    tasks.filter(t=>!t.completed&&t.datetime).forEach(t=>{
+  // Task reminders — per-task override OR global setting
+  tasks.filter(t=>!t.completed&&t.datetime).forEach(t=>{
+    const mins=t.reminderMins!=null?t.reminderMins:s.tasks.reminderMins;
+    if(mins>0){
       const taskTime=new Date(t.datetime);
-      queue('task_'+t.id,'📌 '+t.text,'⏰ '+fmt(taskTime),new Date(taskTime-s.tasks.reminderMins*60000));
-    });
-  }
+      queue('task_'+t.id,'📌 '+t.text,'⏰ '+fmt(taskTime),new Date(taskTime-mins*60000));
+    }
+    // Morning alert for task (if enabled per-task)
+    if(t.morningAlert!==false){
+      const taskTime=new Date(t.datetime);
+      const[mh,mm]=(s.tasks.morningTime||'08:00').split(':').map(Number);
+      const morningFire=new Date(taskTime);morningFire.setHours(mh,mm,0,0);
+      const isToday=ymd(taskTime)===ymd(now);const isTomorrow=ymd(taskTime)===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
+      if(isToday||isTomorrow){
+        queue('tmorning_'+t.id,'📌 תזכורת: '+t.text,`${isToday?'היום':' מחר'} בשעה ${fmt(taskTime)} ⏰`,morningFire);
+      }
+    }
+  });
   // Overdue alerts
   if(s.tasks.overdueAlert){
     tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<now&&(now-new Date(t.datetime))<24*3600000).forEach(t=>{
@@ -1291,9 +1328,11 @@ function buildSmartPushBatch(windowMs){
       const isToday=ds===ymd(now);const isTomorrow=ds===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
       const[mh,mm]=(s.routines.morningTime||'07:00').split(':').map(Number);
       const morningFire=new Date(slot);morningFire.setHours(mh,mm,0,0);
-      queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${isToday?'היום':isTomorrow?'מחר':ds} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
-      if(s.routines.reminderMins>0){
-        const mins=s.routines.reminderMins;
+      if(r.morningReminder!==false)
+        queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${isToday?'היום':isTomorrow?'מחר':ds} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
+      const routineReminderMins=r.reminder!=null?r.reminder:s.routines.reminderMins;
+      if(routineReminderMins>0){
+        const mins=routineReminderMins;
         queue('rslot_'+r.id+'_'+ds,'⚡ '+name,mins>=60?`בעוד שעה יש לך ${name} ב-${slotFmt} — תתכונן!`:`בעוד ${mins} דק׳ יש לך ${name} — אל תשכח! ⚡`,new Date(slot-mins*60000));
       }
     });});
@@ -1688,8 +1727,11 @@ function to24hText(text){
 function addTask(text){
   if(!text.trim())return;
   const n=to24hText(text.trim());
-  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false};
+  const reminderMins=+(document.getElementById('siriReminderMins')?.value||0);
+  const morningAlert=document.getElementById('siriMorningAlert')?.checked!==false;
+  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert};
   tasks.unshift(task);save();render();toast('משימה נוספה');vibrate([10,30,10]);syncTask(task);
+  scheduleSmartPushNotifs();
 }
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
@@ -2133,6 +2175,7 @@ function openRoutineForm(prefill,editId){
   document.getElementById('rDuration').value=String(prefill?.duration||90);
   document.getElementById('rCat').value=prefill?.category||'אישי';
   document.getElementById('rReminder').value=String(prefill?.reminder||30);
+  document.getElementById('rMorningReminder').checked=prefill?.morningReminder!==false;
   document.getElementById('rNotes').value=prefill?.notes||'';
   document.getElementById('rWeekReminderDay').value=String(prefill?.weeklyReminderDay??0);
   document.getElementById('rWeekReminderTime').value=prefill?.weeklyReminderTime||'08:00';
@@ -2179,6 +2222,7 @@ function saveRoutine(){
     weeklyReminderTime:document.getElementById('rWeekReminderTime').value,
     category:document.getElementById('rCat').value,
     reminder,
+    morningReminder:document.getElementById('rMorningReminder')?.checked!==false,
     notes:document.getElementById('rNotes').value.trim(),
     scheduleMode:rScheduleMode,
     verbCondition,
