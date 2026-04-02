@@ -1167,7 +1167,22 @@ function confirmClearData(){
   render();closeSettings();toast('נתונים נמחקו');
 }
 async function testPushFromSettings(){
-  await sendTestPush(1);
+  // First re-subscribe to make sure subscription is fresh after encryption fix
+  toast('⏳ מתחבר...');
+  const subOk=await subscribeToPush();
+  if(!subOk){toast('❌ לא הצליח לרשום subscription — פתח מהאייקון במסך הבית');return;}
+  // Immediately send a test push (no delay) via /send-now
+  const userId=gAuth?.email||'anon';
+  try{
+    const r=await fetch(PUSH_SERVER+'/send-now',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId,title:'🔔 VoiceTask — בדיקה מיידית',body:'אם אתה רואה את זה האפליקציה סגורה — פוש עובד! ✅'})
+    });
+    const data=await r.json();
+    if(data.ok)toast('✅ נשלח! סגור עכשיו ובדוק התראות');
+    else if(data.error)toast('❌ '+data.error);
+    else toast('שרת ענה: '+data.status);
+  }catch(e){toast('❌ שגיאת רשת: '+e.message);}
 }
 function signOut(){if(gAuth?.access_token&&window.google)google.accounts.oauth2.revoke(gAuth.access_token,()=>{});gAuth=null;localStorage.removeItem('vt_auth');showLogin()}
 async function getToken(){

@@ -67,6 +67,32 @@ export default {
       return new Response('OK',{headers:CORS});
     }
 
+    // GET /debug?userId=... — check what's stored for this user
+    if(url.pathname==='/debug'&&req.method==='GET'){
+      const userId=url.searchParams.get('userId')||'anon';
+      const sub=await env.KV.get(`sub:${userId}`);
+      const notifList=await env.KV.list({prefix:'notif:'});
+      const notifs=[];
+      for(const{name}of notifList.keys){
+        const v=await env.KV.get(name);
+        if(v){const p=JSON.parse(v);if(p.userId===userId)notifs.push({key:name,...p});}
+      }
+      return new Response(JSON.stringify({
+        hasSubscription:!!sub,
+        subscriptionEndpoint:sub?JSON.parse(sub).endpoint?.slice(0,60)+'...':null,
+        pendingNotifs:notifs
+      },{},2),{headers:{...CORS,'Content-Type':'application/json'}});
+    }
+
+    // POST /send-now — immediately send a push (test)
+    if(url.pathname==='/send-now'&&req.method==='POST'){
+      const{userId,title,body}=await req.json();
+      const sub=JSON.parse(await env.KV.get(`sub:${userId}`)||'null');
+      if(!sub)return new Response(JSON.stringify({error:'no subscription for '+userId}),{status:404,headers:{...CORS,'Content-Type':'application/json'}});
+      const r=await sendPush(sub,title||'🧪 Test',body||'immediate test',env);
+      return new Response(JSON.stringify({status:r.status,ok:r.ok}),{headers:{...CORS,'Content-Type':'application/json'}});
+    }
+
     return new Response('VoiceTask Push Server',{headers:CORS});
   },
 
