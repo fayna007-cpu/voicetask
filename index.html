@@ -406,6 +406,16 @@ body{
 .settings-row-ico.yellow{background:#fef9c3}
 .settings-select{appearance:none;-webkit-appearance:none;border:1.5px solid var(--border2);background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a7a82' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat 6px center;border-radius:10px;padding:6px 10px 6px 22px;font-size:13px;font-family:inherit;color:var(--text);cursor:pointer;outline:none;direction:ltr;text-align:right;flex-shrink:0}
 .settings-notif-sub{font-size:11px;color:var(--muted);padding:0 20px 10px;margin-top:-4px;font-weight:700;letter-spacing:.4px}
+.pj-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.pj-row:last-child{border-bottom:none}
+.pj-time-col{text-align:center;flex-shrink:0;width:42px}
+.pj-day{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.3px}
+.pj-clock{font-size:15px;font-weight:900;color:var(--text);letter-spacing:-.5px}
+.pj-content{flex:1;min-width:0}
+.pj-title{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pj-body{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pj-send-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pj-send-btn:active{opacity:.7}
 .settings-cards{background:var(--surface);border-radius:18px;overflow:hidden;border:1px solid var(--border);margin:0 16px}
 .settings-stat-row{display:flex;gap:10px;padding:16px}
 .settings-stat{flex:1;background:var(--bg);border-radius:14px;padding:14px 12px;text-align:center}
@@ -770,6 +780,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="settings-row-arrow">›</div>
       </div>
     </div>
+    <div class="settings-section">מסע ההתראות שלך — 7 ימים קדימה</div>
+    <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px"></div>
     <div class="settings-section">הגדרות התראות חכמות</div>
     <div class="settings-cards">
       <div class="settings-notif-sub">📋 משימות שוטפות</div>
@@ -1161,6 +1173,7 @@ function openSettings(){
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('settingsSheet').classList.add('on');
   loadNotifSettings();
+  renderPushJourney();
 }
 function closeSettings(){
   document.getElementById('settingsSheet').classList.remove('on');
@@ -1232,10 +1245,9 @@ function saveNotifSettings(){
   scheduleSmartPushNotifs();
   toast('✅ הגדרות נשמרו');
 }
-function scheduleSmartPushNotifs(){
-  if(!('Notification'in window)||Notification.permission!=='granted')return;
+function buildSmartPushBatch(windowMs){
   if(!notifSettings)loadNotifSettings();
-  const s=notifSettings,now=new Date(),WIN=48*3600000;
+  const s=notifSettings,now=new Date(),WIN=windowMs||48*3600000;
   const batch=[],seen=new Set();
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fmt=d=>d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
@@ -1245,7 +1257,7 @@ function scheduleSmartPushNotifs(){
     if(delay<=0||delay>WIN)return;seen.add(id);
     batch.push({id,title,body,fireAt:fireAt.toISOString()});
   }
-  // Morning briefing (combined tasks + routines)
+  // Morning briefing
   [0,1].forEach(off=>{
     const base=new Date(now);base.setDate(now.getDate()+off);
     const[th,tm]=(s.tasks.morningTime||'08:00').split(':').map(Number);
@@ -1253,13 +1265,10 @@ function scheduleSmartPushNotifs(){
     const early=(th*60+tm)<=(rh*60+rm);
     const fire=new Date(base);fire.setHours(early?th:rh,early?tm:rm,0,0);
     const ds=ymd(fire);
-    const dayS=new Date(base);dayS.setHours(0,0,0,0);
-    const dayE=new Date(base);dayE.setHours(23,59,59,999);
+    const dayS=new Date(base);dayS.setHours(0,0,0,0);const dayE=new Date(base);dayE.setHours(23,59,59,999);
     const tc=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=dayS&&new Date(t.datetime)<=dayE).length;
-    let rc=0;
-    routines.filter(r=>r.enabled).forEach(r=>{[0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{const sd=new Date(iso);if(sd>=dayS&&sd<=dayE)rc++;});});});
-    const total=tc+rc;
-    queue('morning_'+ds,'☀️ סיכום בוקר'+(off===0?' — היום':' — מחר'),total>0?`${tc} משימות · ${rc} שגרות`:'אין פריטים מתוכננים',fire);
+    let rc=0;routines.filter(r=>r.enabled).forEach(r=>{[0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{const sd=new Date(iso);if(sd>=dayS&&sd<=dayE)rc++;});});});
+    queue('morning_'+ds,'☀️ סיכום בוקר'+(off===0?' — היום':' — מחר'),tc+rc>0?`${tc} משימות · ${rc} שגרות`:'אין פריטים מתוכננים',fire);
   });
   // Task reminders
   if(s.tasks.reminderMins>0){
@@ -1274,25 +1283,18 @@ function scheduleSmartPushNotifs(){
       queue('overdue_'+t.id,'⚠️ לא הושלמה: '+t.text,'הייתה מתוכננת ל-'+fmt(new Date(t.datetime)),new Date(now+60000));
     });
   }
-  // Routine slot reminders — morning heads-up + pre-slot alert
+  // Routine slot reminders
   routines.filter(r=>r.enabled).forEach(r=>{
     const name=r.name||r.text||'שגרה';
     [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
-      const slot=new Date(iso);
-      const ds=ymd(slot);
-      const slotFmt=fmt(slot);
-      const isToday=ds===ymd(now);
-      const isTomorrow=ds===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
-      // 1. Morning heads-up: fires at routines.morningTime on the day of the slot
+      const slot=new Date(iso);const ds=ymd(slot);const slotFmt=fmt(slot);
+      const isToday=ds===ymd(now);const isTomorrow=ds===ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
       const[mh,mm]=(s.routines.morningTime||'07:00').split(':').map(Number);
       const morningFire=new Date(slot);morningFire.setHours(mh,mm,0,0);
-      const dayLabel=isToday?'היום':isTomorrow?'מחר':ds;
-      queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${dayLabel} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
-      // 2. Pre-slot alert: X mins before the slot
+      queue('rmorning_'+r.id+'_'+ds,'🗓️ תזכורת: '+name,`${isToday?'היום':isTomorrow?'מחר':ds} בשעה ${slotFmt} — תתכונן מראש 💪`,morningFire);
       if(s.routines.reminderMins>0){
         const mins=s.routines.reminderMins;
-        const preBody=mins>=60?`בעוד שעה יש לך ${name} ב-${slotFmt} — תתכונן!`:`בעוד ${mins} דק׳ יש לך ${name} — אל תשכח! ⚡`;
-        queue('rslot_'+r.id+'_'+ds,'⚡ '+name,preBody,new Date(slot-mins*60000));
+        queue('rslot_'+r.id+'_'+ds,'⚡ '+name,mins>=60?`בעוד שעה יש לך ${name} ב-${slotFmt} — תתכונן!`:`בעוד ${mins} דק׳ יש לך ${name} — אל תשכח! ⚡`,new Date(slot-mins*60000));
       }
     });});
   });
@@ -1300,19 +1302,55 @@ function scheduleSmartPushNotifs(){
   if(s.productivity.eveningTime){
     [0,1].forEach(off=>{
       const fire=new Date(now);fire.setDate(now.getDate()+off);
-      const[eh,em]=(s.productivity.eveningTime||'21:00').split(':').map(Number);
-      fire.setHours(eh,em,0,0);
-      const tmrTC=tasks.filter(t=>!t.completed&&t.datetime).filter(t=>{const d=new Date(t.datetime);const tmr=new Date(fire);tmr.setDate(fire.getDate()+1);tmr.setHours(0,0,0,0);const tmrE=new Date(tmr);tmrE.setHours(23,59,59,999);return d>=tmr&&d<=tmrE;}).length;
+      const[eh,em]=(s.productivity.eveningTime||'21:00').split(':').map(Number);fire.setHours(eh,em,0,0);
+      const tmr=new Date(fire);tmr.setDate(fire.getDate()+1);tmr.setHours(0,0,0,0);const tmrE=new Date(tmr);tmrE.setHours(23,59,59,999);
+      const tmrTC=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=tmr&&new Date(t.datetime)<=tmrE).length;
       queue('evening_'+ymd(fire),'🌙 תכנון ערב',tmrTC>0?`${tmrTC} משימות מחכות מחר — תכנן עכשיו`:'כדאי לתכנן מה עושים מחר',fire);
     });
   }
-  // Weekly review — next Sunday 20:00
+  // Weekly review
   if(s.productivity.weeklyReview){
     const rev=new Date(now);const days=(7-rev.getDay())%7||7;rev.setDate(rev.getDate()+days);rev.setHours(20,0,0,0);
-    const done=tasks.filter(t=>t.completed).length,total=tasks.length;
-    queue('weekly_'+isoWeek(rev),'📊 סקירה שבועית',`סיימת ${done} מתוך ${total} משימות — מה השבוע הבא?`,rev);
+    queue('weekly_'+isoWeek(rev),'📊 סקירה שבועית',`סיימת ${tasks.filter(t=>t.completed).length} מתוך ${tasks.length} משימות — מה השבוע הבא?`,rev);
   }
+  return batch;
+}
+function scheduleSmartPushNotifs(){
+  if(!('Notification'in window)||Notification.permission!=='granted')return;
+  const batch=buildSmartPushBatch();
   if(batch.length)scheduleToPushServer(batch);
+}
+function renderPushJourney(){
+  const el=document.getElementById('pushJourneyList');if(!el)return;
+  const batch=buildSmartPushBatch(7*24*3600000).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
+  if(!batch.length){el.innerHTML='<div style="padding:16px 20px;color:var(--muted);font-size:13px;text-align:center">אין התראות מתוכננות — הוסף משימות ושגרות</div>';return;}
+  const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const now=new Date();
+  el.innerHTML=batch.map(n=>{
+    const fire=new Date(n.fireAt);
+    const isToday=fire.toDateString()===now.toDateString();
+    const isTmr=fire.toDateString()===new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).toDateString();
+    const dayLbl=isToday?'היום':isTmr?'מחר':dayNames[fire.getDay()];
+    const timeLbl=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    const safeTitle=n.title.replace(/'/g,'&#39;');const safeBody=n.body.replace(/'/g,'&#39;');
+    return `<div class="pj-row">
+      <div class="pj-time-col"><div class="pj-day">${dayLbl}</div><div class="pj-clock">${timeLbl}</div></div>
+      <div class="pj-content"><div class="pj-title">${n.title}</div><div class="pj-body">${n.body}</div></div>
+      <button class="pj-send-btn" onclick="sendPushJourneyItem('${n.id}','${safeTitle}','${safeBody}')" title="שלח עכשיו">▶</button>
+    </div>`;
+  }).join('');
+}
+async function sendPushJourneyItem(id,title,body){
+  toast('⏳ שולח...');
+  const userId=gAuth?.email||'anon';
+  const subOk=await subscribeToPush();
+  if(!subOk){toast('❌ לא רשום — פתח מהאייקון');return;}
+  try{
+    const r=await fetch(PUSH_SERVER+'/send-now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,title,body})});
+    const d=await r.json();
+    if(d.ok)toast('✅ נשלח! סגור את האפליקציה');
+    else toast('❌ שגיאה: '+d.status);
+  }catch(e){toast('❌ '+e.message);}
 }
 
 async function testPushFromSettings(){
