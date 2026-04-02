@@ -428,6 +428,14 @@ body{
 .pj-detail-title{font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pj-detail-body{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pj-detail-send{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.pj-src{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-top:2px;letter-spacing:.2px}
+.pj-src.cal{background:#dbeafe;color:#1d4ed8}
+.pj-src.routine{background:#ede9fe;color:#7c3aed}
+.pj-src.task{background:#dcfce7;color:#15803d}
+.pj-src.auto{background:#f1f5f9;color:#64748b}
+.pj-type-hdr{padding:6px 14px 4px;font-size:10px;font-weight:700;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border);letter-spacing:.3px}
+.pj-mute-btn{width:22px;height:22px;border-radius:50%;background:transparent;color:#94a3b8;border:1px solid var(--border);font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.pj-edit-btn{width:22px;height:22px;border-radius:50%;background:#eef2ff;color:var(--accent);border:none;font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
 /* Per-card notification chip */
 .notif-chip-row{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .notif-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:rgba(26,86,219,.08);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:inherit;-webkit-tap-highlight-color:transparent}
@@ -800,6 +808,14 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="settings-row-arrow">›</div>
       </div>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <div class="settings-row" onclick="hardRefreshApp()">
+        <div class="settings-row-ico" style="background:#fef3c7">🔄</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">נקה קאש ורענן</div>
+          <div class="settings-row-sub">לאחר עדכון גרסה — מוחק קאש ומטעין מחדש</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
     </div>
     <div class="settings-section">התראות</div>
     <div class="settings-cards">
@@ -820,7 +836,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
         <div class="settings-row-arrow">›</div>
       </div>
     </div>
-    <div class="settings-section">לוח התראות</div>
+    <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between">לוח התראות<button onclick="refreshJourneyOnly()" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:8px">↺ רענן</button></div>
     <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px;border-radius:18px;overflow:visible;border:none;margin:0 16px 4px;background:transparent"></div>
     <div class="settings-section">הגדרות התראות חכמות</div>
     <div class="settings-cards">
@@ -1226,6 +1242,32 @@ function closeSettings(){
   document.getElementById('settingsSheet').classList.remove('on');
   document.getElementById('routineOverlay').classList.remove('on');
 }
+async function hardRefreshApp(){
+  if(!confirm('לנקות את הקאש ולטעון מחדש? הדף יתרענן.'))return;
+  toast('⏳ מנקה קאש...');
+  if('caches'in window){const ns=await caches.keys();await Promise.all(ns.map(n=>caches.delete(n)));}
+  if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));}
+  setTimeout(()=>window.location.reload(true),500);
+}
+async function refreshJourneyOnly(){
+  toast('⏳ מרענן...');
+  _calCache=[];
+  await scheduleSmartPushNotifs().catch(()=>{});
+  await renderPushJourney();
+  toast('✅ לוח עודכן');
+}
+function editFromJourney(notifId){
+  closeSettings();
+  setTimeout(()=>{
+    if(notifId.startsWith('rmorning_')||notifId.startsWith('rslot_')){
+      const rid=notifId.split('_')[1];
+      editRoutine(rid);
+    }else if(notifId.startsWith('task_')||notifId.startsWith('tmorning_')||notifId.startsWith('overdue_')){
+      const parts=notifId.split('_');const tid=parseInt(parts[parts.length-1]);
+      editTask(tid);
+    }
+  },400);
+}
 function exportData(){
   const data={version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -1385,6 +1427,9 @@ function buildSmartPushBatch(windowMs){
   return batch;
 }
 let _calCache=[];
+let mutedNotifIds=new Set(JSON.parse(localStorage.getItem('vt_muted_notifs')||'[]'));
+function saveMutedNotifs(){localStorage.setItem('vt_muted_notifs',JSON.stringify([...mutedNotifIds]));}
+function muteNotifId(id){mutedNotifIds.add(id);saveMutedNotifs();renderPushJourney();}
 async function fetchCalendarNotifs(){
   const token=await getToken().catch(()=>null);
   if(!token)return[];
@@ -1431,7 +1476,7 @@ async function renderPushJourney(){
   const el=document.getElementById('pushJourneyList');if(!el)return;
   if(!_calCache.length)_calCache=await fetchCalendarNotifs().catch(()=>[]);
   const now=new Date();
-  const batch=[...buildSmartPushBatch(14*24*3600000),..._calCache];
+  const batch=[...buildSmartPushBatch(14*24*3600000),..._calCache].filter(n=>!mutedNotifIds.has(n.id));
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay()+pjWeekOffset*7);weekStart.setHours(0,0,0,0);
   const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
@@ -1441,12 +1486,26 @@ async function renderPushJourney(){
   const cols=Array.from({length:7},(_,i)=>{const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);const ds=ymd(d);return{d,ds,count:batch.filter(n=>n.fireAt.startsWith(ds)).length,isToday:ds===todayStr,isSel:ds===pjSelectedDay};});
   let detailHtml='';
   if(pjSelectedDay){
-    const dayN2=batch.filter(n=>n.fireAt.startsWith(pjSelectedDay)).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
-    detailHtml=dayN2.length?`<div class="pj-detail-wrap">${dayN2.map(n=>{
-      const fire=new Date(n.fireAt);const t=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-      const st=n.title.replace(/'/g,'&#39;'),sb=n.body.replace(/'/g,'&#39;');
-      return`<div class="pj-detail-row"><div class="pj-detail-time">${t}</div><div class="pj-detail-content"><div class="pj-detail-title">${n.title}</div><div class="pj-detail-body">${n.body}</div></div><button class="pj-detail-send" onclick="sendPushJourneyItem('${n.id}','${st}','${sb}')">▶</button></div>`;
-    }).join('')}</div>`:`<div class="pj-detail-wrap"><div class="pj-detail-empty">אין התראות ביום זה</div></div>`;
+    const dayN2=batch.filter(n=>n.fireAt.startsWith(pjSelectedDay));
+    if(dayN2.length){
+      const groups=[{label:'📅 לוח שנה',items:[]},{label:'🔄 שגרות',items:[]},{label:'📌 משימות שוטפות',items:[]},{label:'⚡ אוטומטי',items:[]}];
+      dayN2.forEach(n=>{
+        if(n.id.startsWith('gcal_'))groups[0].items.push(n);
+        else if(n.id.startsWith('rmorning_')||n.id.startsWith('rslot_'))groups[1].items.push(n);
+        else if(n.id.startsWith('task_')||n.id.startsWith('tmorning_')||n.id.startsWith('overdue_'))groups[2].items.push(n);
+        else groups[3].items.push(n);
+      });
+      const renderRow=n=>{
+        const fire=new Date(n.fireAt);const t=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+        const st=n.title.replace(/'/g,'&#39;'),sb=n.body.replace(/'/g,'&#39;');
+        const canEdit=n.id.startsWith('rmorning_')||n.id.startsWith('rslot_')||n.id.startsWith('task_')||n.id.startsWith('tmorning_')||n.id.startsWith('overdue_');
+        const editBtn=canEdit?`<button class="pj-edit-btn" onclick="editFromJourney('${n.id}')">✏️</button>`:'';
+        return`<div class="pj-detail-row"><div class="pj-detail-time">${t}</div><div class="pj-detail-content"><div class="pj-detail-title">${n.title}</div><div class="pj-detail-body">${n.body}</div></div>${editBtn}<button class="pj-detail-send" onclick="sendPushJourneyItem('${n.id}','${st}','${sb}')">▶</button><button class="pj-mute-btn" onclick="muteNotifId('${n.id}')">✕</button></div>`;
+      };
+      detailHtml=`<div class="pj-detail-wrap">${groups.filter(g=>g.items.length).map(g=>`<div class="pj-type-hdr">${g.label}</div>${g.items.sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt)).map(renderRow).join('')}`).join('')}</div>`;
+    }else{
+      detailHtml=`<div class="pj-detail-wrap"><div class="pj-detail-empty">אין התראות ביום זה</div></div>`;
+    }
   }
   el.innerHTML=`<div class="pj-cal-wrap"><div class="pj-cal-nav">
     <button class="pj-cal-nav-btn" onclick="pjNav(1)">‹</button>
