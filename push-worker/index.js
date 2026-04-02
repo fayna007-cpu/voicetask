@@ -67,6 +67,18 @@ export default {
       return new Response('OK',{headers:CORS});
     }
 
+    // POST /cleanup — delete any stored notifs for userId NOT in validIds
+    if(url.pathname==='/cleanup'&&req.method==='POST'){
+      const{userId,validIds=[]}=await req.json();
+      const list=await env.KV.list({prefix:'notif:'});
+      await Promise.all(list.keys.map(async({name})=>{
+        const raw=await env.KV.get(name);if(!raw)return;
+        const n=JSON.parse(raw);
+        if(n.userId===userId&&!validIds.includes(name.slice(6)))await env.KV.delete(name);
+      }));
+      return new Response('OK',{headers:CORS});
+    }
+
     // GET /debug?userId=... — check what's stored for this user
     if(url.pathname==='/debug'&&req.method==='GET'){
       const userId=url.searchParams.get('userId')||'anon';

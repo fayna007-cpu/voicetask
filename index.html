@@ -1384,16 +1384,54 @@ function buildSmartPushBatch(windowMs){
   }
   return batch;
 }
-function scheduleSmartPushNotifs(){
+let _calCache=[];
+async function fetchCalendarNotifs(){
+  const token=await getToken().catch(()=>null);
+  if(!token)return[];
+  try{
+    if(!notifSettings)loadNotifSettings();
+    const s=notifSettings;
+    const now=new Date(),max=new Date(now.getTime()+7*24*3600e3);
+    const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now.toISOString()}&timeMax=${max.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=100`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)return[];
+    const{items=[]}=await r.json();
+    const[mh,mm]=(s.tasks.morningTime||'08:00').split(':').map(Number);
+    const reminderMins=s.tasks.reminderMins||30;
+    const notifs=[];
+    items.forEach(ev=>{
+      if(!ev.start?.dateTime)return;// skip all-day
+      const start=new Date(ev.start.dateTime);if(start<now)return;
+      const name=ev.summary||'אירוע';
+      const ctx=notifCtx(name);
+      const timeLbl=start.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+      const morningFire=new Date(start);morningFire.setHours(mh,mm,0,0);
+      if(morningFire>now)notifs.push({id:'gcal_m_'+ev.id,title:'🗓️ '+name,body:`היום בשעה ${timeLbl} — ${ctx.morning}`,fireAt:morningFire.toISOString(),_cal:true});
+      if(reminderMins>0){const pre=new Date(start-reminderMins*60e3);if(pre>now)notifs.push({id:'gcal_p_'+ev.id,title:'⚡ '+name,body:ctx.pre(reminderMins),fireAt:pre.toISOString(),_cal:true});}
+    });
+    return notifs;
+  }catch(e){console.warn('fetchCalendarNotifs:',e);return[];}
+}
+async function cleanupPushServer(validIds){
+  if(PUSH_SERVER.includes('REPLACE'))return;
+  const userId=gAuth?.email||'anon';
+  try{await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});}
+  catch(e){console.warn('cleanupPushServer:',e);}
+}
+async function scheduleSmartPushNotifs(){
   if(!('Notification'in window)||Notification.permission!=='granted')return;
-  const batch=buildSmartPushBatch();
-  if(batch.length)scheduleToPushServer(batch);
+  const appBatch=buildSmartPushBatch();
+  _calCache=await fetchCalendarNotifs();
+  const all=[...appBatch,..._calCache];
+  const validIds=all.map(n=>n.id);
+  if(all.length)await scheduleToPushServer(all);
+  cleanupPushServer(validIds);// async cleanup — don't await
 }
 let pjWeekOffset=0,pjSelectedDay=null;
-function renderPushJourney(){
+async function renderPushJourney(){
   const el=document.getElementById('pushJourneyList');if(!el)return;
+  if(!_calCache.length)_calCache=await fetchCalendarNotifs().catch(()=>[]);
   const now=new Date();
-  const batch=buildSmartPushBatch(14*24*3600000);
+  const batch=[...buildSmartPushBatch(14*24*3600000),..._calCache];
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay()+pjWeekOffset*7);weekStart.setHours(0,0,0,0);
   const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
@@ -1806,7 +1844,7 @@ async function syncTask(task){
 async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId)}
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
-async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה')}
+async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה');scheduleSmartPushNotifs();}
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
 function editTask(id){const el=document.getElementById('edit-'+id);if(el)el.classList.toggle('on')}
 async function saveEdit(id){
@@ -2315,9 +2353,10 @@ function editRoutine(id){
 function deleteRoutine(id){
   if(!confirm('למחוק את השגרה?'))return;
   routines=routines.filter(r=>r.id!==id);saveRoutines();renderRoutineList();render();toast('שגרה נמחקה');
+  scheduleSmartPushNotifs();
 }
 function toggleRoutineEnabled(id,enabled){
-  const r=routines.find(x=>x.id===id);if(r){r.enabled=enabled;saveRoutines();render();}
+  const r=routines.find(x=>x.id===id);if(r){r.enabled=enabled;saveRoutines();render();scheduleSmartPushNotifs();}
 }
 function toggleRoutineComplete(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
