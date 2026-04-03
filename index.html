@@ -1602,10 +1602,32 @@ async function createTaskCalendarEvent(task){
   try{
     const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
       method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({summary:task.text,description:`קטגוריה: ${task.category}\nנוצר מ-VoiceTask 🎤`,start:{dateTime:task.datetime},end:{dateTime:end}})
+      body:JSON.stringify({summary:task.text,description:`קטגוריה: ${task.category}\nנוצר מ-VoiceTask 🎤\nvt_task_id:${task.id}`,start:{dateTime:task.datetime},end:{dateTime:end}})
     });
     if(!res.ok)return null;const d=await res.json();return d.id||null;
   }catch(e){return null;}
+}
+// Fetch all future calendar events created by VoiceTask and delete any whose task no longer exists in the app
+async function cleanupOrphanedCalendarEvents(){
+  const token=await getToken();if(!token)return 0;
+  try{
+    const now=new Date().toISOString();
+    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?q=VoiceTask&timeMin=${now}&singleEvents=true&maxResults=250`;
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)return 0;
+    const{items=[]}=await r.json();
+    const taskIds=new Set(tasks.map(t=>String(t.id)));
+    let deleted=0;
+    await Promise.all(items.map(async ev=>{
+      const m=(ev.description||'').match(/vt_task_id:(\d+)/);
+      if(!m)return;// not a VoiceTask task event
+      if(!taskIds.has(m[1])){
+        await deleteCalendarEvent(ev.id);
+        deleted++;
+      }
+    }));
+    return deleted;
+  }catch(e){return 0;}
 }
 async function deleteCalendarEvent(eventId){
   if(!eventId||eventId.startsWith('local_'))return;// fake local ID — nothing to delete
@@ -1917,9 +1939,12 @@ async function deleteFromCalendar(task){if(!task.calendarEventId)return;await de
 async function syncOneTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   toast('⏳ מסנכרן...');
+  // If there's already a real calendar event, delete it first to avoid duplicates
+  if(t.calendarEventId&&!t.calendarEventId.startsWith('local_'))await deleteCalendarEvent(t.calendarEventId);
   const evId=await createTaskCalendarEvent(t);
   t.calendarEventId=evId||null;save();render();
-  if(evId)toast('✅ נוסף לגוגל קאלנדר');else toast('❌ לא הצליח — בדוק חיבור');
+  if(evId){toast('✅ נוסף לגוגל קאלנדר');sendEmailNotification(t);}
+  else toast('❌ לא הצליח — בדוק חיבור');
 }
 async function unsyncTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
@@ -1929,16 +1954,25 @@ async function unsyncTask(id){
   t.calendarEventId=null;save();render();toast('🗑️ הוסר מגוגל קאלנדר');
 }
 async function syncAllPending(){
+  if(!gAuth?.access_token){toast('⚠️ יש להתחבר ל-Google תחילה');return;}
+  toast('⏳ בודק קאלנדר...');
+  // 1. Clean up orphaned calendar events from deleted tasks
+  const orphans=await cleanupOrphanedCalendarEvents();
+  // 2. Sync all pending/local tasks
   const pending=tasks.filter(t=>!t.completed&&t.datetime&&(!t.calendarEventId||t.calendarEventId.startsWith('local_')));
-  if(!pending.length){toast('✅ אין משימות ממתינות');return;}
-  toast(`⏳ מסנכרן ${pending.length} משימות...`);
+  if(!pending.length&&orphans===0){toast('✅ הכל מסונכרן — אין פריטים ממתינים');return;}
+  if(pending.length)toast(`⏳ מסנכרן ${pending.length} משימות...`);
   let ok=0,fail=0;
   for(const t of pending){
     const evId=await createTaskCalendarEvent(t);
-    if(evId){t.calendarEventId=evId;ok++;}else fail++;
+    if(evId){t.calendarEventId=evId;ok++;sendEmailNotification(t);}else fail++;
   }
   save();render();
-  toast(fail===0?`✅ סונכרנו ${ok} משימות`:`✅ ${ok} הצליחו · ❌ ${fail} נכשלו`);
+  const parts=[];
+  if(ok>0)parts.push(`✅ ${ok} סונכרנו`);
+  if(fail>0)parts.push(`❌ ${fail} נכשלו`);
+  if(orphans>0)parts.push(`🗑️ ${orphans} ישנים נמחקו`);
+  toast(parts.join(' · ')||'✅ הכל תקין');
   scheduleSmartPushNotifs();
 }
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
