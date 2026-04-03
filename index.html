@@ -438,6 +438,56 @@ body{
 .pj-type-hdr{padding:6px 14px 4px;font-size:10px;font-weight:700;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border);letter-spacing:.3px}
 .pj-mute-btn{width:22px;height:22px;border-radius:50%;background:transparent;color:#94a3b8;border:1px solid var(--border);font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
 .pj-edit-btn{width:22px;height:22px;border-radius:50%;background:#eef2ff;color:var(--accent);border:none;font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+/* ── Calendar Panel ──────────────────────────────────────────── */
+.cal-panel{margin:8px 16px 0;background:var(--surface);border-radius:20px;box-shadow:0 2px 24px rgba(0,0,0,.07);border:1px solid rgba(228,228,233,.8);overflow:hidden}
+.cal-panel-head{display:flex;align-items:center;padding:12px 14px 10px;gap:6px}
+.cal-nav-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:background .14s}
+.cal-nav-btn:active{background:var(--bg)}
+.cal-week-label{flex:1;text-align:center;font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.cal-head-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.cal-gcal-toggle{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:50px;border:1.5px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:all .18s;white-space:nowrap}
+.cal-gcal-toggle.on{border-color:rgba(26,86,219,.4);background:rgba(26,86,219,.06);color:var(--accent)}
+.cal-gcal-dot{width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .18s}
+.cal-gcal-toggle.on .cal-gcal-dot{background:var(--accent)}
+.cal-collapse-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .14s}
+.cal-chevron{transition:transform .32s cubic-bezier(.25,.46,.45,.94);display:block}
+.cal-panel.expanded .cal-chevron{transform:rotate(180deg)}
+.cal-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 10px 10px}
+.cal-day-col{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px 6px;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .16s}
+.cal-day-col.selected{background:rgba(26,86,219,.08)}
+.cal-day-name{font-size:10px;font-weight:700;color:var(--muted);line-height:1}
+.cal-day-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--text);transition:all .22s cubic-bezier(.34,1.56,.64,1)}
+.cal-day-col.today .cal-day-num{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(26,86,219,.35)}
+.cal-day-col.selected .cal-day-num{transform:scale(1.12)}
+.cal-day-dots{display:flex;gap:2px;align-items:center;min-height:6px}
+.cal-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.cal-dot-more{font-size:8px;font-weight:800;color:var(--muted);margin-right:1px}
+.cal-body{max-height:0;overflow:hidden;transition:max-height .38s cubic-bezier(.25,.46,.45,.94)}
+.cal-panel.expanded .cal-body{max-height:520px;overflow-y:auto;overscroll-behavior:contain}
+.cal-timeline{position:relative;background:linear-gradient(180deg,#f8f9fc 0%,#fff 100%);border-top:1px solid var(--border)}
+.cal-hour-row{display:flex;align-items:flex-start;min-height:52px;position:relative;border-bottom:1px solid var(--border)}
+.cal-hour-row:last-child{border-bottom:none}
+.cal-hour-lbl{width:42px;flex-shrink:0;padding:6px 8px 0 0;font-size:10px;font-weight:700;color:var(--muted);direction:ltr;text-align:left}
+.cal-hour-events{flex:1;min-height:52px;padding:4px 4px 4px 0;display:flex;flex-direction:column;gap:3px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cal-task-pill{display:flex;align-items:center;gap:7px;padding:6px 10px 6px 8px;background:var(--surface);border-radius:10px;border-right:4px solid var(--pill-color,var(--accent));box-shadow:0 1px 6px rgba(0,0,0,.08);animation:slide .28s cubic-bezier(.25,.46,.45,.94);cursor:pointer;-webkit-tap-highlight-color:transparent;min-width:0;overflow:hidden;transition:opacity .15s,transform .1s;position:relative;z-index:2}
+.cal-task-pill:active{opacity:.75;transform:scale(.97)}
+.cal-task-pill.done{opacity:.35}
+.cal-pill-time{font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0;white-space:nowrap}
+.cal-pill-text{font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.cal-gcal-pill{display:flex;align-items:center;gap:7px;padding:6px 10px 6px 8px;background:rgba(26,86,219,.05);border-radius:10px;border:1.5px dashed rgba(26,86,219,.3);animation:slide .28s cubic-bezier(.25,.46,.45,.94);cursor:pointer;-webkit-tap-highlight-color:transparent;min-width:0;overflow:hidden;transition:opacity .15s,transform .1s;position:relative;z-index:2}
+.cal-gcal-pill:active{opacity:.75;transform:scale(.97)}
+.cal-gcal-pill-ico{font-size:12px;flex-shrink:0}
+.cal-gcal-pill-text{font-size:13px;font-weight:600;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.cal-gcal-pill-time{font-size:11px;font-weight:700;color:var(--accent);opacity:.7;flex-shrink:0;white-space:nowrap}
+.cal-now-line{position:absolute;left:0;right:42px;height:2px;background:#ef4444;pointer-events:none;z-index:10;animation:now-pulse 2s ease-in-out infinite}
+.cal-now-knob{position:absolute;right:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:#ef4444}
+@keyframes now-pulse{0%,100%{opacity:.65}50%{opacity:1}}
+.cal-gcal-loading{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12px;color:var(--muted);font-weight:600}
+.cal-spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--border);border-top-color:var(--accent);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cal-offline-notice{padding:10px 16px;font-size:12px;color:#b45309;background:#fef9c3;border-top:1px solid #fde68a;font-weight:600}
+.cal-empty-day{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px}
+.cal-empty-day-add{color:var(--accent);font-weight:700;cursor:pointer;display:block;margin-top:6px}
 /* Per-card notification chip */
 .notif-chip-row{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .notif-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:rgba(26,86,219,.08);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:inherit;-webkit-tap-highlight-color:transparent}
@@ -708,6 +758,28 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   <button class="quick-btn" onclick="quickSiri('להתקשר עם ')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.35 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.56a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>להתקשר
   </button>
+</div>
+
+<div class="cal-panel" id="calPanel">
+  <div class="cal-panel-head">
+    <button class="cal-nav-btn" onclick="calNavWeek(-1)">›</button>
+    <div class="cal-week-label" id="calWeekLabel"></div>
+    <button class="cal-nav-btn" onclick="calNavWeek(1)">‹</button>
+    <div class="cal-head-right">
+      <button class="cal-gcal-toggle" id="calGcalToggle" onclick="toggleCalGcal()">
+        <span class="cal-gcal-dot"></span>יומן גוגל
+      </button>
+      <button class="cal-collapse-btn" onclick="toggleCalExpand()">
+        <svg class="cal-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="cal-strip" id="calStrip"></div>
+  <div class="cal-body" id="calBody">
+    <div class="cal-timeline" id="calTimeline"></div>
+    <div class="cal-gcal-loading" id="calGcalLoading" style="display:none"><div class="cal-spinner"></div><span>טוען אירועי גוגל...</span></div>
+    <div class="cal-offline-notice" id="calOfflineNotice" style="display:none">⚠️ לא ניתן לטעון — בדוק חיבור</div>
+  </div>
 </div>
 
 <div class="filters">
@@ -1143,6 +1215,28 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   </div>
 </div>
 
+<!-- Sheet: Edit Google Calendar Event -->
+<div class="rsheet" id="calGcalEditSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeCalGcalEdit()">✕</button>
+    <h3 id="calGcalEditTitle">ערוך אירוע</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="rform">
+      <div class="rfield"><div class="rform-lbl">כותרת</div><input class="rfi" id="calGcalEditSummary" type="text" placeholder="שם האירוע"/></div>
+      <div style="display:flex;gap:10px">
+        <div class="rfield" style="flex:1"><div class="rform-lbl">תאריך</div><input class="rfi" id="calGcalEditDate" type="date"/></div>
+        <div class="rfield" style="flex:1"><div class="rform-lbl">שעה</div><input class="rfi" id="calGcalEditTime" type="time"/></div>
+      </div>
+      <div class="rfield"><div class="rform-lbl">תיאור</div><textarea class="rfi" id="calGcalEditDesc" rows="3" placeholder="תיאור..."></textarea></div>
+      <button class="rform-save" onclick="saveCalGcalEdit()">שמור שינויים ✓</button>
+      <button class="rform-save" style="background:#ef4444;margin-top:8px" onclick="deleteCalGcalEvent()">מחק אירוע</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1163,6 +1257,11 @@ let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]').map(r=>r.time
 let editingRoutineId=null;
 const scheduledNotifIds=new Set();
 let filter='all',deferredPrompt=null;
+let calExpanded=false,calWeekOffset=0,calSelectedDay=null;
+let calGcalOn=false,calGcalEvents=[],calGcalFetching=false,calGcalFetchWeek=null;
+let _calNowTimer=null,_editingGcalEventId=null;
+const CAL_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const CAL_DAYS=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
 let gAuth=null,tokenClient=null;
 let rec=null,siriLive=false;
 let audioCtx=null,analyser=null,animId=null,stream=null;
@@ -1209,7 +1308,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -2145,6 +2244,7 @@ function render(){
   }
   el.innerHTML=html;
   updateGreeting();
+  renderCalView();
 }
 
 function updateGreeting(){
@@ -3063,8 +3163,205 @@ function initSwipeGestures(){
   initSheetSwipe(document.getElementById('scheduleSheet'),ov);
   initSheetSwipe(document.getElementById('notifManagerSheet'),ov);
   initSheetSwipe(document.getElementById('notifFormSheet'),ov);
+  initSheetSwipe(document.getElementById('calGcalEditSheet'),ov);
 }
 
+// ── Calendar Panel ────────────────────────────────────────────────────────────
+function calYMD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function calWeekStartDate(off){const d=new Date();d.setDate(d.getDate()-d.getDay()+off*7);d.setHours(0,0,0,0);return d;}
+function calFmtTime(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+
+function initCalPanel(){
+  calExpanded=localStorage.getItem('vt_cal_expanded')==='1';
+  calGcalOn=localStorage.getItem('vt_cal_gcal')==='1';
+  calSelectedDay=calYMD(new Date());
+  const panel=document.getElementById('calPanel');
+  if(panel&&calExpanded)panel.classList.add('expanded');
+  document.getElementById('calGcalToggle')?.classList.toggle('on',calGcalOn);
+  renderCalStrip();
+  if(calExpanded){renderCalTimeline();startCalNowLine();if(calGcalOn&&gAuth?.access_token)fetchCalViewEvents();}
+}
+function toggleCalExpand(){
+  calExpanded=!calExpanded;
+  document.getElementById('calPanel').classList.toggle('expanded',calExpanded);
+  if(calExpanded){if(!calSelectedDay)calSelectedDay=calYMD(new Date());renderCalTimeline();startCalNowLine();if(calGcalOn)fetchCalViewEvents();}
+  else stopCalNowLine();
+  localStorage.setItem('vt_cal_expanded',calExpanded?'1':'0');
+}
+function calNavWeek(dir){
+  calWeekOffset+=dir;
+  calSelectedDay=calYMD(calWeekStartDate(calWeekOffset));
+  if(calGcalOn&&calGcalFetchWeek!==calWeekOffset){calGcalEvents=[];calGcalFetchWeek=null;if(calExpanded)fetchCalViewEvents();}
+  renderCalStrip();
+  if(calExpanded)renderCalTimeline();
+}
+function calSelectDay(ymd){
+  calSelectedDay=ymd;
+  document.querySelectorAll('.cal-day-col').forEach(el=>el.classList.toggle('selected',el.dataset.ymd===ymd));
+  if(calExpanded)renderCalTimeline();
+}
+function renderCalStrip(){
+  const strip=document.getElementById('calStrip'),label=document.getElementById('calWeekLabel');
+  if(!strip||!label)return;
+  const ws=calWeekStartDate(calWeekOffset);
+  const we=new Date(ws);we.setDate(ws.getDate()+6);
+  label.textContent=ws.getDate()+' \u2013 '+we.getDate()+' \u05D1'+CAL_MONTHS[we.getMonth()];
+  const todayStr=calYMD(new Date());
+  const allItems=[...tasks,...getRoutineInstances()];
+  strip.innerHTML=Array.from({length:7},(_,i)=>{
+    const d=new Date(ws);d.setDate(ws.getDate()+i);
+    const ymd=calYMD(d);
+    const dayItems=allItems.filter(t=>t.datetime&&calYMD(new Date(t.datetime))===ymd&&!t.completed);
+    const dots=dayItems.slice(0,3).map(t=>`<div class="cal-dot" style="background:${(CATS[t.category]||CATS['\u05DB\u05DC\u05DC\u05D9']).c}"></div>`).join('');
+    const more=dayItems.length>3?`<span class="cal-dot-more">+${dayItems.length-3}</span>`:'';
+    return`<div class="cal-day-col${ymd===todayStr?' today':''}${ymd===calSelectedDay?' selected':''}" data-ymd="${ymd}" onclick="calSelectDay('${ymd}')"><div class="cal-day-name">${CAL_DAYS[d.getDay()]}</div><div class="cal-day-num">${d.getDate()}</div><div class="cal-day-dots">${dots}${more}</div></div>`;
+  }).join('');
+}
+function renderCalTimeline(){
+  const container=document.getElementById('calTimeline');
+  if(!container||!calSelectedDay)return;
+  const allAppItems=[...tasks,...getRoutineInstances()].filter(t=>t.datetime&&calYMD(new Date(t.datetime))===calSelectedDay);
+  const gcalItems=calGcalOn?calGcalEvents.filter(ev=>{const s=ev.start?.dateTime||ev.start?.date;return s&&calYMD(new Date(s))===calSelectedDay;}).sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date)):[];
+  const HOURS=Array.from({length:17},(_,i)=>i+7);
+  const now=new Date(),todayStr=calYMD(now),SLOT_H=52;
+  let html='';
+  HOURS.forEach(h=>{
+    const hStr=String(h).padStart(2,'0')+':00';
+    const hourApp=allAppItems.filter(t=>new Date(t.datetime).getHours()===h);
+    const hourGcal=gcalItems.filter(ev=>new Date(ev.start?.dateTime||ev.start?.date).getHours()===h);
+    const appPills=hourApp.map(t=>{
+      const cat=CATS[t.category]||CATS['\u05DB\u05DC\u05DC\u05D9'];
+      const fn=t.isRoutine?`calEditRoutineInst('${t.routineId}')`:`calEditTask(${t.id})`;
+      return`<div class="cal-task-pill${t.completed?' done':''}" style="--pill-color:${cat.c}" onclick="${fn}"><span class="cal-pill-time">${calFmtTime(t.datetime)}</span><span class="cal-pill-text">${esc(t.text)}</span></div>`;
+    }).join('');
+    const gcalPills=hourGcal.map(ev=>`<div class="cal-gcal-pill" onclick="calEditGcalEvent('${ev.id}')"><span class="cal-gcal-pill-ico">\uD83D\uDDD3</span><span class="cal-gcal-pill-text">${esc(ev.summary||'\u05D0\u05D9\u05E8\u05D5\u05E2')}</span><span class="cal-gcal-pill-time">${ev.start?.dateTime?calFmtTime(ev.start.dateTime):''}</span></div>`).join('');
+    html+=`<div class="cal-hour-row" id="cal-h-${h}"><div class="cal-hour-lbl">${hStr}</div><div class="cal-hour-events" onclick="calHourTap(event,${h},'${calSelectedDay}')">${appPills}${gcalPills}</div></div>`;
+  });
+  const total=allAppItems.length+gcalItems.length;
+  if(!total)html=`<div class="cal-empty-day">\uD83D\uDCED \u05D0\u05D9\u05DF \u05D0\u05D9\u05E8\u05D5\u05E2\u05D9\u05DD \u05D1\u05D9\u05D5\u05DD \u05D6\u05D4<span class="cal-empty-day-add" onclick="calCreateTaskAtHour(9,'${calSelectedDay}')">+ \u05D4\u05D5\u05E1\u05E3 \u05DE\u05E9\u05D9\u05DE\u05D4 \u05D1-09:00</span></div>`+html;
+  container.innerHTML=html;
+  container.style.position='relative';
+  if(calSelectedDay===todayStr){
+    const mins=now.getHours()*60+now.getMinutes(),TOP=7*60;
+    const top=((mins-TOP)/60)*SLOT_H;
+    if(top>=0){
+      const line=document.createElement('div');line.className='cal-now-line';line.id='calNowLine';line.style.top=top+'px';
+      line.innerHTML='<div class="cal-now-knob"></div>';container.appendChild(line);
+      setTimeout(()=>{const b=document.getElementById('calBody');if(b)b.scrollTop=Math.max(0,top-80);},420);
+    }
+  }
+}
+function calHourTap(e,hour,ymd){
+  if(e.target.closest('.cal-task-pill,.cal-gcal-pill'))return;
+  calCreateTaskAtHour(hour,ymd);
+}
+function calCreateTaskAtHour(hour,_ymd){
+  quickSiri(String(hour).padStart(2,'0')+':00: ');
+}
+function calEditTask(id){
+  const card=document.getElementById('edit-'+id);
+  if(card){card.closest('.card')?.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>editTask(id),350);}
+}
+function calEditRoutineInst(routineId){editRoutine(routineId);}
+function toggleCalGcal(){
+  calGcalOn=!calGcalOn;
+  document.getElementById('calGcalToggle')?.classList.toggle('on',calGcalOn);
+  localStorage.setItem('vt_cal_gcal',calGcalOn?'1':'0');
+  if(calGcalOn){
+    if(!gAuth?.access_token){toast('\u05D7\u05D1\u05E8 Google \u05DC\u05E6\u05E4\u05D9\u05D9\u05D4 \u05D1\u05D0\u05D9\u05E8\u05D5\u05E2\u05D9 \u05D9\u05D5\u05DE\u05DF');calGcalOn=false;document.getElementById('calGcalToggle')?.classList.remove('on');return;}
+    fetchCalViewEvents();
+  }else if(calExpanded)renderCalTimeline();
+}
+async function fetchCalViewEvents(){
+  if(!calGcalOn||calGcalFetching)return;
+  if(calGcalFetchWeek===calWeekOffset&&calGcalEvents.length){if(calExpanded)renderCalTimeline();return;}
+  calGcalFetching=true;
+  document.getElementById('calGcalLoading').style.display='flex';
+  document.getElementById('calOfflineNotice').style.display='none';
+  try{
+    const token=await getToken().catch(()=>null);
+    if(!token)throw new Error('no_token');
+    const ws=calWeekStartDate(calWeekOffset),we=new Date(ws);we.setDate(ws.getDate()+7);
+    const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${ws.toISOString()}&timeMax=${we.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=100`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)throw new Error('api');
+    const{items=[]}=await r.json();
+    calGcalEvents=items.filter(ev=>ev.status!=='cancelled'&&!(ev.description||'').includes('vt_task_id:'));
+    calGcalFetchWeek=calWeekOffset;
+  }catch(e){
+    calGcalEvents=[];
+    if(e.message==='no_token')toast('\u05D9\u05E9 \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DC-Google');
+    else document.getElementById('calOfflineNotice').style.display='block';
+  }finally{
+    calGcalFetching=false;
+    document.getElementById('calGcalLoading').style.display='none';
+    if(calExpanded)renderCalTimeline();
+  }
+}
+function calEditGcalEvent(eventId){
+  const ev=calGcalEvents.find(e=>e.id===eventId);if(!ev)return;
+  _editingGcalEventId=eventId;
+  const start=ev.start?.dateTime?new Date(ev.start.dateTime):null;
+  const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('calGcalEditSummary').value=ev.summary||'';
+  document.getElementById('calGcalEditDesc').value=ev.description?.replace(/\nvt_task_id:\d+/,'')||'';
+  if(start){
+    document.getElementById('calGcalEditDate').value=`${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+    document.getElementById('calGcalEditTime').value=`${pad(start.getHours())}:${pad(start.getMinutes())}`;
+  }
+  document.getElementById('calGcalEditTitle').textContent=esc(ev.summary||'\u05E2\u05E8\u05D5\u05DA \u05D0\u05D9\u05E8\u05D5\u05E2');
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('calGcalEditSheet').classList.add('on');
+}
+function closeCalGcalEdit(){
+  document.getElementById('calGcalEditSheet').classList.remove('on');
+  document.getElementById('routineOverlay').classList.remove('on');
+}
+async function saveCalGcalEdit(){
+  const ev=calGcalEvents.find(e=>e.id===_editingGcalEventId);if(!ev)return;
+  const summary=document.getElementById('calGcalEditSummary').value.trim();
+  const date=document.getElementById('calGcalEditDate').value;
+  const time=document.getElementById('calGcalEditTime').value;
+  const desc=document.getElementById('calGcalEditDesc').value.trim();
+  if(!summary||!date||!time){toast('\u05E0\u05D0 \u05DC\u05DE\u05DC\u05D0 \u05E9\u05DD, \u05EA\u05D0\u05E8\u05D9\u05DA \u05D5\u05E9\u05E2\u05D4');return;}
+  const start=new Date(date+'T'+time+':00');
+  const dur=(ev.end?.dateTime&&ev.start?.dateTime)?new Date(ev.end.dateTime)-new Date(ev.start.dateTime):3600000;
+  const end=new Date(start.getTime()+dur);
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const token=await getToken().catch(()=>null);
+  if(!token){toast('\u05E0\u05D3\u05E8\u05E9\u05EA \u05D4\u05EA\u05D7\u05D1\u05E8\u05D5\u05EA \u05DC-Google');return;}
+  toast('\u23F3 \u05E9\u05D5\u05DE\u05E8...');
+  try{
+    const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${_editingGcalEventId}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({summary,description:desc,start:{dateTime:start.toISOString(),timeZone:tz},end:{dateTime:end.toISOString(),timeZone:tz}})});
+    if(!r.ok)throw new Error('api');
+    const idx=calGcalEvents.findIndex(e=>e.id===_editingGcalEventId);
+    if(idx!==-1)calGcalEvents[idx]={...calGcalEvents[idx],summary,description:desc,start:{dateTime:start.toISOString()},end:{dateTime:end.toISOString()}};
+    closeCalGcalEdit();renderCalStrip();if(calExpanded)renderCalTimeline();toast('\u2705 \u05D0\u05D9\u05E8\u05D5\u05E2 \u05E2\u05D5\u05D3\u05DB\u05DF');
+  }catch(e){toast('\u274C \u05DC\u05D0 \u05D4\u05E6\u05DC\u05D9\u05D7 \u2014 \u05D1\u05D3\u05D5\u05E7 \u05D7\u05D9\u05D1\u05D5\u05E8');}
+}
+async function deleteCalGcalEvent(){
+  if(!confirm('\u05DC\u05DE\u05D7\u05D5\u05E7 \u05D0\u05EA \u05D4\u05D0\u05D9\u05E8\u05D5\u05E2 \u05DE\u05D2\u05D5\u05D2\u05DC \u05E7\u05D0\u05DC\u05E0\u05D3\u05E8?'))return;
+  const token=await getToken().catch(()=>null);if(!token)return;
+  toast('\u23F3 \u05DE\u05D5\u05D7\u05E7...');
+  try{
+    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${_editingGcalEventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+    calGcalEvents=calGcalEvents.filter(e=>e.id!==_editingGcalEventId);
+    closeCalGcalEdit();renderCalStrip();if(calExpanded)renderCalTimeline();toast('\uD83D\uDDD1\uFE0F \u05D0\u05D9\u05E8\u05D5\u05E2 \u05E0\u05DE\u05D7\u05E7');
+  }catch(e){toast('\u274C \u05DC\u05D0 \u05D4\u05E6\u05DC\u05D9\u05D7');}
+}
+function startCalNowLine(){
+  stopCalNowLine();
+  _calNowTimer=setInterval(()=>{
+    if(!calExpanded){stopCalNowLine();return;}
+    const line=document.getElementById('calNowLine');
+    if(!line||calSelectedDay!==calYMD(new Date()))return;
+    const now=new Date(),mins=now.getHours()*60+now.getMinutes();
+    line.style.top=((mins-7*60)/60*52)+'px';
+  },60000);
+}
+function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTimer=null;}}
+function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
+
+window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
 window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();});
 </script>
 </body>
