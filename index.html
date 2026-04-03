@@ -357,9 +357,11 @@ body{
 .date-block{display:none}
 .date-main{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
 .date-sub{font-size:11px;color:var(--muted);margin-top:1px}
-.cal-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px}
+.cal-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px;border:none;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
 .cal-badge.synced{background:#dcfce7;color:#16a34a}
+.cal-badge.synced:active{background:#bbf7d0}
 .cal-badge.pending{background:#fef9c3;color:#b45309}
+.cal-badge.pending:active{background:#fde68a}
 .meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .cat-sel{background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:600;border-radius:20px;padding:4px 10px;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;min-height:28px}
 .actions{display:flex;gap:5px;justify-content:flex-end}
@@ -819,6 +821,14 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
     </div>
     <div class="settings-section">התראות</div>
     <div class="settings-cards">
+      <div class="settings-row" onclick="closeSettings();syncAllPending()">
+        <div class="settings-row-ico" style="background:#dbeafe">🔄</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">סנכרן משימות ממתינות</div>
+          <div class="settings-row-sub">שולח לגוגל קאלנדר את כל המשימות שעדיין לא סונכרנו</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
       <div class="settings-row" onclick="closeSideMenu();openNotifManager()">
         <div class="settings-row-ico yellow">🔔</div>
         <div class="settings-row-body">
@@ -1586,7 +1596,7 @@ async function getToken(){
 }
 
 // ── Google Calendar API ───────────────────────────────────────────────────────
-async function createCalendarEvent(task){
+async function createTaskCalendarEvent(task){
   const token=await getToken();if(!token)return null;
   const end=new Date(new Date(task.datetime).getTime()+3600000).toISOString();
   try{
@@ -1598,7 +1608,8 @@ async function createCalendarEvent(task){
   }catch(e){return null;}
 }
 async function deleteCalendarEvent(eventId){
-  const token=await getToken();if(!token||!eventId)return;
+  if(!eventId||eventId.startsWith('local_'))return;// fake local ID — nothing to delete
+  const token=await getToken();if(!token)return;
   try{await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});}catch(e){}
 }
 
@@ -1896,11 +1907,40 @@ function sendEmailNotification(task){
   fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})}).catch(()=>{});
 }
 async function syncTask(task){
-  const ev=await createCalendarEvent(task,task.datetime);
-  if(ev){const t=tasks.find(x=>x.id===task.id);if(t){t.calendarEventId=ev.id||ev;save();render();}toast('נוסף לגוגל קאלנדר');}
+  const evId=await createTaskCalendarEvent(task);
+  const t=tasks.find(x=>x.id===task.id);
+  if(t){t.calendarEventId=evId||null;save();render();}
+  if(evId)toast('✅ נוסף לגוגל קאלנדר');else toast('⚠️ שמור — ממתין לסנכרון עם קאלנדר');
   sendEmailNotification(task);
 }
-async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId)}
+async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId);}
+async function syncOneTask(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  toast('⏳ מסנכרן...');
+  const evId=await createTaskCalendarEvent(t);
+  t.calendarEventId=evId||null;save();render();
+  if(evId)toast('✅ נוסף לגוגל קאלנדר');else toast('❌ לא הצליח — בדוק חיבור');
+}
+async function unsyncTask(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  if(!confirm('להסיר את האירוע מגוגל קאלנדר?'))return;
+  toast('⏳ מסיר...');
+  await deleteFromCalendar(t);
+  t.calendarEventId=null;save();render();toast('🗑️ הוסר מגוגל קאלנדר');
+}
+async function syncAllPending(){
+  const pending=tasks.filter(t=>!t.completed&&t.datetime&&(!t.calendarEventId||t.calendarEventId.startsWith('local_')));
+  if(!pending.length){toast('✅ אין משימות ממתינות');return;}
+  toast(`⏳ מסנכרן ${pending.length} משימות...`);
+  let ok=0,fail=0;
+  for(const t of pending){
+    const evId=await createTaskCalendarEvent(t);
+    if(evId){t.calendarEventId=evId;ok++;}else fail++;
+  }
+  save();render();
+  toast(fail===0?`✅ סונכרנו ${ok} משימות`:`✅ ${ok} הצליחו · ❌ ${fail} נכשלו`);
+  scheduleSmartPushNotifs();
+}
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
 async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה');scheduleSmartPushNotifs();}
@@ -1953,7 +1993,8 @@ function renderTaskCard(task){
   const pad=n=>n.toString().padStart(2,'0');
   const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   const opts=Object.keys(CATS).map(c=>`<option value="${c}"${c===task.category?' selected':''}>${c}</option>`).join('');
-  const calBadge=task.calendarEventId?`<span class="cal-badge synced">${ICO.calSynced}מסונכרן<\/span>`:`<span class="cal-badge pending">${ICO.calPending}ממתין</span>`;
+  const isSynced=task.calendarEventId&&!task.calendarEventId.startsWith('local_');
+  const calBadge=isSynced?`<button class="cal-badge synced" onclick="unsyncTask(${task.id})" title="לחץ לביטול סנכרון">${ICO.calSynced}מסונכרן ✕<\/button>`:`<button class="cal-badge pending" onclick="syncOneTask(${task.id})" title="לחץ לסנכרון עם קאלנדר">${ICO.calPending}ממתין — סנכרן</button>`;
   const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}<\/button>`:'';
   return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
   ${isOverdue?'<div class="overdue-label">⏰ עבר הזמן<\/div>':''}
