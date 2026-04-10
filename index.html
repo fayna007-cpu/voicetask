@@ -1903,9 +1903,13 @@ function stopRec(){
 }
 
 // ── Audio Visualizer (drives siri wave bars) ──────────────────────────────────
+let _visGen=0; // incremented on every stopVis — lets pending startVis know it was cancelled
 async function startVis(){
+  const gen=++_visGen;
   try{
-    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    if(gen!==_visGen){s.getTracks().forEach(t=>t.stop());return;} // cancelled while waiting — release immediately
+    stream=s;
     audioCtx=new(window.AudioContext||window.webkitAudioContext)();
     analyser=audioCtx.createAnalyser();analyser.fftSize=64;
     audioCtx.createMediaStreamSource(stream).connect(analyser);
@@ -1929,6 +1933,7 @@ function driveWave(){
 }
 
 function stopVis(){
+  _visGen++; // invalidate any pending getUserMedia call in startVis
   if(animId){cancelAnimationFrame(animId);animId=null}
   if(audioCtx){audioCtx.close();audioCtx=null}
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
