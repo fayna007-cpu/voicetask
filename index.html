@@ -1764,6 +1764,7 @@ function startSiri(){
 
 function stopSiri(){
   stopRec();
+  stopVis(); // always release mic — stopRec may have returned early if siriLive was already false
   document.getElementById('siriOverlay').classList.remove('on');
   document.getElementById('siriConfirm').classList.remove('on');
   document.getElementById('siriEdit').value='';
@@ -1886,8 +1887,9 @@ function initRec(){
 }
 
 function startRec(){
-  // always create a fresh instance to avoid "aborted" from a stale SR
-  if(rec){try{rec.stop();}catch(e){} rec=null;}
+  // abort any existing instance and create a fresh one
+  if(rec){try{rec.abort();}catch(e){} rec=null;}
+  stopVis(); // ensure previous mic stream is released before starting new one
   rec=initRec();if(!rec)return;
   try{rec.start();}catch(e){rec=null;return;}
   siriLive=true;
@@ -1898,7 +1900,7 @@ function stopRec(){
   if(!siriLive)return;
   siriLive=false;
   const r=rec;rec=null; // clear first so onend guard (rec===r) fails on re-entry
-  if(r){try{r.stop();}catch(e){}}
+  if(r){try{r.abort();}catch(e){}} // abort() releases mic immediately, faster than stop()
   stopVis();
 }
 
@@ -2039,8 +2041,11 @@ function addTask(text){
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
   fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
-    .then(r=>{if(!r.ok)console.warn('Email webhook returned',r.status);})
-    .catch(e=>console.warn('Email webhook error:',e));
+    .then(r=>{
+      if(r.ok)console.log('Email sent OK for task:',task.id);
+      else{console.warn('Email webhook returned',r.status);toast('⚠️ מייל לא נשלח ('+r.status+')');}
+    })
+    .catch(e=>{console.warn('Email webhook error:',e);toast('⚠️ מייל לא נשלח — בדוק חיבור');});
 }
 async function syncTask(task){
   let evId=null;
