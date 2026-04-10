@@ -2054,9 +2054,8 @@ function addTask(text){
 }
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
-  // text/plain avoids CORS preflight (simple request) — N8N parses JSON body regardless
-  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
-    .then(r=>{if(!r.ok)console.warn('Email webhook returned',r.status);})
+  // no-cors: request reaches N8N regardless of CORS headers, response is opaque (we don't need it)
+  fetch(N8N_WEBHOOK,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
     .catch(e=>console.warn('Email webhook error:',e));
 }
 async function syncTask(task){
