@@ -1681,17 +1681,19 @@ function signOut(){if(gAuth?.access_token&&window.google)google.accounts.oauth2.
 async function getToken(){
   if(!gAuth?.access_token)return null;
   if(gAuth.expiry>Date.now()+60000)return gAuth.access_token;
-  return new Promise(resolve=>{
-    if(!tokenClient)tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}});
-    const prev=tokenClient.callback;
-    tokenClient.callback=(resp)=>{
-      tokenClient.callback=prev;
-      if(resp.error){resolve(null);return;}
-      gAuth.access_token=resp.access_token;gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
-      localStorage.setItem('vt_auth',JSON.stringify(gAuth));resolve(resp.access_token);
-    };
-    tokenClient.requestAccessToken({prompt:''});
-  });
+  try{
+    return new Promise(resolve=>{
+      if(!tokenClient)tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}});
+      const prev=tokenClient.callback;
+      tokenClient.callback=(resp)=>{
+        tokenClient.callback=prev;
+        if(resp.error){resolve(null);return;}
+        gAuth.access_token=resp.access_token;gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+        localStorage.setItem('vt_auth',JSON.stringify(gAuth));resolve(resp.access_token);
+      };
+      tokenClient.requestAccessToken({prompt:''});
+    });
+  }catch(e){console.warn('getToken error:',e);return null;}
 }
 
 // ── Google Calendar API ───────────────────────────────────────────────────────
@@ -1874,24 +1876,30 @@ function initRec(){
     else showSiriInterim(txt);
   };
   r.onerror=e=>{
+    if(rec!==r)return; // stale instance — ignore
     stopRec();
     if(e.error==='not-allowed')toast('⛔ אנא אשר גישה למיקרופון');
-    else if(e.error!=='no-speech')toast('שגיאה: '+e.error);
+    else if(e.error!=='no-speech'&&e.error!=='aborted')toast('שגיאה: '+e.error);
   };
-  r.onend=stopRec;return r;
+  r.onend=()=>{if(rec===r)stopRec();};  // only stop if still the active instance
+  return r;
 }
 
 function startRec(){
-  rec=rec||initRec();if(!rec)return;
-  try{rec.start()}catch(e){return}
+  // always create a fresh instance to avoid "aborted" from a stale SR
+  if(rec){try{rec.stop();}catch(e){} rec=null;}
+  rec=initRec();if(!rec)return;
+  try{rec.start();}catch(e){rec=null;return;}
   siriLive=true;
   startVis();
 }
 
 function stopRec(){
-  if(!siriLive)return;siriLive=false;
-  try{rec.stop()}catch(e){}
-  rec=null;stopVis();
+  if(!siriLive)return;
+  siriLive=false;
+  const r=rec;rec=null; // clear first so onend guard (rec===r) fails on re-entry
+  if(r){try{r.stop();}catch(e){}}
+  stopVis();
 }
 
 // ── Audio Visualizer (drives siri wave bars) ──────────────────────────────────
@@ -2025,14 +2033,17 @@ function addTask(text){
 }
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
-  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})}).catch(()=>{});
+  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
+    .then(r=>{if(!r.ok)console.warn('Email webhook returned',r.status);})
+    .catch(e=>console.warn('Email webhook error:',e));
 }
 async function syncTask(task){
-  const evId=await createTaskCalendarEvent(task);
+  let evId=null;
+  try{evId=await createTaskCalendarEvent(task);}catch(e){console.warn('syncTask calendar error:',e);}
   const t=tasks.find(x=>x.id===task.id);
   if(t){t.calendarEventId=evId||null;save();render();}
   if(evId)toast('✅ נוסף לגוגל קאלנדר');else toast('⚠️ שמור — ממתין לסנכרון עם קאלנדר');
-  sendEmailNotification(task);
+  sendEmailNotification(task); // always send email regardless of calendar result
 }
 async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId);}
 async function syncOneTask(id){
