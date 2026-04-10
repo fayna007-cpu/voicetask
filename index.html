@@ -1275,7 +1275,7 @@ const CAL_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','י
 const CAL_DAYS=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
 let gAuth=null,tokenClient=null;
 let rec=null,siriLive=false;
-let audioCtx=null,analyser=null,animId=null,stream=null;
+let animId=null;
 
 const ICO={
   check:`<svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
@@ -1925,50 +1925,34 @@ function resetRec(){
   document.getElementById('siriOrb').classList.remove('speaking');
   document.getElementById('siriWave').classList.remove('speaking');
   const btn=document.getElementById('siriRetryBtn');
-  if(btn){btn.style.transform='rotate(180deg)';setTimeout(()=>btn.style.transform='',400);}
-  setTimeout(()=>{
-    rec=initRec();if(!rec)return;
-    try{rec.start();}catch(e){rec=null;toast('לא ניתן לגשת למיקרופון — נסה שוב');return;}
-    siriLive=true;
-    startVis();
-  },600); // 600ms gives the OS enough time to fully release the mic
+  if(btn){btn.style.transform='rotate(180deg)';setTimeout(()=>btn.style.transform='',300);}
+  // No getUserMedia anymore — SR is the only mic user, abort() releases it immediately
+  rec=initRec();if(!rec)return;
+  try{rec.start();}catch(e){rec=null;toast('לא ניתן לגשת למיקרופון — נסה שוב');return;}
+  siriLive=true;
+  startVis();
 }
 
-// ── Audio Visualizer (drives siri wave bars) ──────────────────────────────────
-let _visGen=0; // incremented on every stopVis — lets pending startVis know it was cancelled
-async function startVis(){
-  const gen=++_visGen;
-  try{
-    const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    if(gen!==_visGen){s.getTracks().forEach(t=>t.stop());return;} // cancelled while waiting — release immediately
-    stream=s;
-    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    analyser=audioCtx.createAnalyser();analyser.fftSize=64;
-    audioCtx.createMediaStreamSource(stream).connect(analyser);
-    driveWave();
-  }catch(e){}
-}
-
-function driveWave(){
+// ── Audio Visualizer (synthetic — no getUserMedia, avoids mic conflicts with SR) ──
+function startVis(){
+  if(animId)return;
   const bars=document.querySelectorAll('.siri-bar');
-  const buf=new Uint8Array(analyser.frequencyBinCount);
+  const peaks=Array.from({length:bars.length},()=>Math.random());
+  let t=0;
   function frame(){
     animId=requestAnimationFrame(frame);
-    analyser.getByteFrequencyData(buf);
+    t+=0.07;
     bars.forEach((b,i)=>{
-      const raw=buf[Math.floor(i*buf.length/bars.length)]/255;
-      const h=Math.max(6,raw*raw*60+4);
-      b.style.height=h+'px';
+      // smooth random wave — each bar has its own phase
+      const v=0.4+0.6*Math.abs(Math.sin(t+i*0.7+peaks[i]*3));
+      b.style.height=Math.max(6,v*52)+'px';
     });
   }
   frame();
 }
 
 function stopVis(){
-  _visGen++; // invalidate any pending getUserMedia call in startVis
-  if(animId){cancelAnimationFrame(animId);animId=null}
-  if(audioCtx){audioCtx.close();audioCtx=null}
-  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  if(animId){cancelAnimationFrame(animId);animId=null;}
   document.querySelectorAll('.siri-bar').forEach(b=>{b.style.height='8px'});
 }
 
