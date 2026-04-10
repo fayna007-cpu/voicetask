@@ -252,6 +252,16 @@ body{
   margin-bottom:8px;
 }
 .siri-cancel:active{background:rgba(255,255,255,.22);transform:scale(.93)}
+/* Retry / reset recording button */
+.siri-retry-btn{
+  position:absolute;top:18px;left:18px;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.18);
+  color:#fff;font-size:22px;line-height:1;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:background .15s,transform .2s;display:flex;align-items:center;justify-content:center;
+}
+.siri-retry-btn:active{background:rgba(255,255,255,.22);transform:rotate(180deg) scale(.93)}
 
 /* Transcript confirm sheet (slides up after final result) */
 .siri-confirm{
@@ -687,6 +697,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
       <div class="siri-orb-spin"></div>
       <div class="siri-orb-inner"></div>
     </div>
+    <button class="siri-retry-btn" id="siriRetryBtn" onclick="resetRec()" title="רענן מקליט">↺</button>
     <button class="siri-cancel" onclick="stopSiri()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
@@ -1903,6 +1914,25 @@ function stopRec(){
   if(r){try{r.abort();}catch(e){}} // abort() releases mic immediately, faster than stop()
   stopVis();
 }
+function resetRec(){
+  // Nuclear option — kill everything, wait for OS to release mic, restart clean
+  siriLive=false;
+  if(rec){try{rec.abort();}catch(e){} rec=null;}
+  stopVis();
+  document.getElementById('siriText').textContent='מאזין...';
+  document.getElementById('siriText').className='siri-text muted';
+  document.getElementById('siriConfirm').classList.remove('on');
+  document.getElementById('siriOrb').classList.remove('speaking');
+  document.getElementById('siriWave').classList.remove('speaking');
+  const btn=document.getElementById('siriRetryBtn');
+  if(btn){btn.style.transform='rotate(180deg)';setTimeout(()=>btn.style.transform='',400);}
+  setTimeout(()=>{
+    rec=initRec();if(!rec)return;
+    try{rec.start();}catch(e){rec=null;toast('לא ניתן לגשת למיקרופון — נסה שוב');return;}
+    siriLive=true;
+    startVis();
+  },600); // 600ms gives the OS enough time to fully release the mic
+}
 
 // ── Audio Visualizer (drives siri wave bars) ──────────────────────────────────
 let _visGen=0; // incremented on every stopVis — lets pending startVis know it was cancelled
@@ -2040,12 +2070,10 @@ function addTask(text){
 }
 function sendEmailNotification(task){
   if(!gAuth?.email)return;
-  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
-    .then(r=>{
-      if(r.ok)console.log('Email sent OK for task:',task.id);
-      else{console.warn('Email webhook returned',r.status);toast('⚠️ מייל לא נשלח ('+r.status+')');}
-    })
-    .catch(e=>{console.warn('Email webhook error:',e);toast('⚠️ מייל לא נשלח — בדוק חיבור');});
+  // text/plain avoids CORS preflight (simple request) — N8N parses JSON body regardless
+  fetch(N8N_WEBHOOK,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({...task,email:gAuth.email,action:'email_only'})})
+    .then(r=>{if(!r.ok)console.warn('Email webhook returned',r.status);})
+    .catch(e=>console.warn('Email webhook error:',e));
 }
 async function syncTask(task){
   let evId=null;
