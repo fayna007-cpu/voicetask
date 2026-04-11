@@ -1318,7 +1318,13 @@ function stopVis(){
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&siriLive)stopSiri()});
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  // Play sound when a push arrives while the app is open
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='SHOW_NOTIFICATION')playNotifSound();
+  });
+}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBar').classList.add('on')});
 window.addEventListener('appinstalled',()=>{document.getElementById('installBar').classList.remove('on');toast('🎉 האפליקציה הותקנה!')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('installBar').classList.remove('on')})}
@@ -1483,7 +1489,39 @@ async function saveEdit(id){
 function cancelEdit(id){const el=document.getElementById('edit-'+id);if(el)el.classList.remove('on')}
 function clearDone(){tasks=tasks.filter(x=>!x.completed);save();render();toast('הושלמו נוקו')}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render()}
-function updateBadge(){document.getElementById('badge').textContent=tasks.filter(t=>!t.completed).length+' פעילות'}
+function updateBadge(){
+  const count=tasks.filter(t=>!t.completed).length;
+  document.getElementById('badge').textContent=count+' פעילות';
+  // App icon badge (PWA — Chrome/Edge/Android)
+  if('setAppBadge'in navigator){
+    if(count>0)navigator.setAppBadge(count).catch(()=>{});
+    else navigator.clearAppBadge().catch(()=>{});
+  }
+}
+
+// ── Notification sound (Web Audio, no external file) ──────────────────────────
+let _audioCtx=null;
+function getAudioCtx(){
+  if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return _audioCtx;
+}
+function playNotifSound(){
+  try{
+    const ctx=getAudioCtx();
+    // Two-tone chime: soft high note → lower note
+    [[880,0,0.12],[660,0.13,0.22]].forEach(([freq,start,end])=>{
+      const osc=ctx.createOscillator();
+      const gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.type='sine';osc.frequency.value=freq;
+      const t=ctx.currentTime+start;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(0.22,t+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+end+0.18);
+      osc.start(t);osc.stop(ctx.currentTime+end+0.22);
+    });
+  }catch(e){}
+}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function getRoutineInstances(){
@@ -2136,6 +2174,7 @@ function showPushNotification(inst){
   if(dur>0){const endDt=new Date(dt.getTime()+dur*60000);body=`מתחיל ב-${fmt(dt)} עד ${fmt(endDt)}${inst.notes?'\n📝 '+inst.notes:''}`;}
   else body=inst.notes||fmt(dt);
   const opts={body,icon:'./icon.svg',badge:'./icon.svg',tag:String(inst.id),dir:'rtl',vibrate:[200,100,200],requireInteraction:false};
+  playNotifSound();
   if('serviceWorker'in navigator){
     navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,opts)).catch(()=>{try{new Notification(title,opts);}catch(e){}});
   }else{
