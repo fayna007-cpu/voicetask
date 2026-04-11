@@ -1,5 +1,5 @@
-const V = 'vt-v2';
-const ASSETS = ['./manifest.json', './icon.svg'];
+const V = 'vt-v3';
+const ASSETS = ['./manifest.json', './icon.svg', './style.css'];
 
 // On install: cache only static assets (not HTML — so updates reach the user)
 self.addEventListener('install', e => {
