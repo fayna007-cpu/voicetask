@@ -202,6 +202,10 @@
     <div class="side-menu-email" id="sideEmail"></div>
   </div>
   <div class="side-menu-body">
+    <button class="side-item" onclick="closeSideMenu();openBacklogSheet()">
+      <div class="side-item-ico green">📋</div>
+      הרשימות שלי
+    </button>
     <button class="side-item" onclick="closeSideMenu();openRoutineSheet()">
       <div class="side-item-ico purple">🔄</div>
       שגרות
@@ -604,6 +608,142 @@
       <button class="rform-save" onclick="saveCalGcalEdit()">שמור שינויים ✓</button>
       <button class="rform-save" style="background:#ef4444;margin-top:8px" onclick="deleteCalGcalEvent()">מחק אירוע</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Backlog Sheets ─────────────────────────────────────── -->
+<!-- Sheet 1: List of topics -->
+<div class="rsheet" id="backlogListSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeBacklogSheet()">✕</button>
+    <h3>הרשימות שלי</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll">
+    <div id="backlogListContainer" class="bl-list-container"></div>
+    <div style="padding:0 20px 24px">
+      <button class="bl-add-btn" onclick="openNewListForm()">＋ רשימה חדשה</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sheet 2: Items inside a topic -->
+<div class="rsheet" id="backlogTopicSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="backToBacklogList()">←</button>
+    <h3 id="backlogTopicTitle">נושא</h3>
+    <button class="bl-export-btn" onclick="exportBacklogCSV()" title="ייצוא CSV">⬇ CSV</button>
+  </div>
+  <div style="padding:12px 20px 0">
+    <input class="bl-search" id="backlogSearch" type="text" placeholder="🔍 חיפוש..." oninput="renderBacklogItems()">
+    <div class="bl-chips" id="backlogChips">
+      <button class="bl-chip on" data-f="all" onclick="setBacklogFilter('all',this)">הכל</button>
+      <button class="bl-chip" data-f="idea" onclick="setBacklogFilter('idea',this)">💡 רעיון</button>
+      <button class="bl-chip" data-f="active" onclick="setBacklogFilter('active',this)">🔄 פעיל</button>
+      <button class="bl-chip" data-f="blocked" onclick="setBacklogFilter('blocked',this)">⏸ מושהה</button>
+      <button class="bl-chip" data-f="done" onclick="setBacklogFilter('done',this)">✅ בוצע</button>
+    </div>
+    <div class="bl-sort-row">
+      <span class="bl-sort-lbl">מיון:</span>
+      <button class="bl-sort-btn on" data-s="createdAt" onclick="setBacklogSort('createdAt',this)">תאריך</button>
+      <button class="bl-sort-btn" data-s="priority" onclick="setBacklogSort('priority',this)">עדיפות</button>
+      <button class="bl-sort-btn" data-s="status" onclick="setBacklogSort('status',this)">סטטוס</button>
+    </div>
+  </div>
+  <div class="rsheet-scroll" style="padding-top:4px">
+    <div id="backlogItemsContainer" class="bl-items-container"></div>
+    <div style="padding:0 20px 24px">
+      <button class="bl-add-btn" onclick="openBacklogItemForm(null)">＋ הוסף פריט</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sheet 3: Add / Edit item -->
+<div class="rsheet" id="backlogItemSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeBacklogItemSheet()">←</button>
+    <h3 id="backlogItemSheetTitle">פריט חדש</h3>
+    <button class="bl-delete-item-btn" id="backlogItemDeleteBtn" onclick="deleteBacklogItemFromForm()" style="display:none">🗑</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="rform">
+      <div class="rfield">
+        <div class="rform-lbl">תיאור <span style="color:var(--accent)">*</span></div>
+        <textarea class="rfi" id="blItemText" rows="2" placeholder="מה אתה רוצה לעשות?"></textarea>
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">הערות</div>
+        <textarea class="rfi" id="blItemNotes" rows="2" placeholder="פרטים נוספים..."></textarea>
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">לינק</div>
+        <input class="rfi" id="blItemUrl" type="url" placeholder="https://...">
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">סטטוס</div>
+        <div class="bl-status-row" id="blStatusRow">
+          <button class="bl-status-btn on" data-s="idea" onclick="selectBlStatus('idea',this)">💡 רעיון</button>
+          <button class="bl-status-btn" data-s="active" onclick="selectBlStatus('active',this)">🔄 פעיל</button>
+          <button class="bl-status-btn" data-s="blocked" onclick="selectBlStatus('blocked',this)">⏸ מושהה</button>
+          <button class="bl-status-btn" data-s="done" onclick="selectBlStatus('done',this)">✅ בוצע</button>
+        </div>
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">עדיפות</div>
+        <div class="bl-pri-row" id="blPriRow">
+          <button class="bl-pri-btn" data-p="high" onclick="selectBlPri('high',this)">🔴 גבוה</button>
+          <button class="bl-pri-btn on" data-p="medium" onclick="selectBlPri('medium',this)">🟡 בינוני</button>
+          <button class="bl-pri-btn" data-p="low" onclick="selectBlPri('low',this)">🟢 נמוך</button>
+        </div>
+      </div>
+      <div class="rfield">
+        <div class="rform-lbl">תאריך יעד (אופציונלי)</div>
+        <input class="rfi" id="blItemDue" type="date">
+      </div>
+      <button class="rform-save" onclick="saveBacklogItem()">שמור ✓</button>
+      <!-- Convert to main task -->
+      <div class="bl-convert-section" id="blConvertSection">
+        <div class="bl-convert-title">הפוך למשימה ראשית</div>
+        <div class="bl-convert-desc">הפריט יועתק לרשימת המשימות שלך ויסונכרן לגוגל קאלנדר</div>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <div class="rfield" style="flex:1;margin:0">
+            <div class="rform-lbl">תאריך</div>
+            <input class="rfi" id="blConvertDate" type="date">
+          </div>
+          <div class="rfield" style="flex:1;margin:0">
+            <div class="rform-lbl">שעה</div>
+            <input class="rfi" id="blConvertTime" type="time" value="09:00">
+          </div>
+        </div>
+        <button class="bl-convert-btn" onclick="convertBacklogToTask()">↗ צור משימה</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New list form (inline modal) -->
+<div class="bl-new-list-overlay" id="blNewListOverlay" onclick="closeNewListForm()"></div>
+<div class="bl-new-list-modal" id="blNewListModal">
+  <div class="bl-new-list-title">רשימה חדשה</div>
+  <div class="bl-icon-picker" id="blIconPicker">
+    <button class="bl-icon-btn on" onclick="selectBlIcon('📋',this)">📋</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('💡',this)">💡</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('🤖',this)">🤖</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('📚',this)">📚</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('🎯',this)">🎯</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('💼',this)">💼</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('🏃',this)">🏃</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('🏠',this)">🏠</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('💰',this)">💰</button>
+    <button class="bl-icon-btn" onclick="selectBlIcon('❤️',this)">❤️</button>
+  </div>
+  <input class="rfi" id="blNewListName" type="text" placeholder="שם הרשימה..." maxlength="40" style="margin-top:8px">
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="bl-modal-cancel" onclick="closeNewListForm()">ביטול</button>
+    <button class="bl-modal-save" onclick="saveNewList()">צור ✓</button>
   </div>
 </div>
 
@@ -2793,6 +2933,257 @@ function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderC
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
 window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();});
+
+// ── Backlog ───────────────────────────────────────────────────────────────────
+let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
+let backlogItems=JSON.parse(localStorage.getItem('vt_backlog_items')||'[]');
+let _blCurrentListId=null;
+let _blFilter='all';
+let _blSort='createdAt';
+let _blEditingItemId=null;
+let _blSelectedIcon='📋';
+const BL_STATUS={idea:'💡 רעיון',active:'🔄 פעיל',blocked:'⏸ מושהה',done:'✅ בוצע'};
+const BL_STATUS_CLASS={idea:'bl-s-idea',active:'bl-s-active',blocked:'bl-s-blocked',done:'bl-s-done'};
+const BL_PRI_DOT={high:'🔴',medium:'🟡',low:'🟢'};
+const BL_PRI_ORDER={high:0,medium:1,low:2};
+const BL_STATUS_ORDER={active:0,idea:1,blocked:2,done:3};
+
+function saveBacklogLists(){localStorage.setItem('vt_backlog_lists',JSON.stringify(backlogLists));}
+function saveBacklogItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(backlogItems));}
+
+// Navigation
+function openBacklogSheet(){
+  document.getElementById('routineOverlay').classList.add('on');
+  ['backlogListSheet','backlogTopicSheet','backlogItemSheet'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
+  document.getElementById('backlogListSheet').classList.add('on');
+  renderBacklogLists();
+}
+function closeBacklogSheet(){
+  const ov=document.getElementById('routineOverlay');
+  ov.style.opacity='';ov.style.transition='';
+  ['backlogListSheet','backlogTopicSheet','backlogItemSheet'].forEach(id=>{
+    const s=document.getElementById(id);if(!s)return;
+    s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');
+  });
+  ov.classList.remove('on');
+}
+function openBacklogTopic(listId){
+  _blCurrentListId=listId;
+  _blFilter='all';
+  _blSort='createdAt';
+  document.querySelectorAll('#backlogChips .bl-chip').forEach(b=>b.classList.toggle('on',b.dataset.f==='all'));
+  document.querySelectorAll('.bl-sort-btn').forEach(b=>b.classList.toggle('on',b.dataset.s==='createdAt'));
+  const list=backlogLists.find(l=>l.id===listId);
+  document.getElementById('backlogTopicTitle').textContent=(list?.icon||'📋')+' '+(list?.name||'');
+  document.getElementById('backlogSearch').value='';
+  document.getElementById('backlogListSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('backlogTopicSheet').classList.add('on');renderBacklogItems();},40);
+}
+function backToBacklogList(){
+  document.getElementById('backlogTopicSheet').classList.remove('on');
+  document.getElementById('backlogItemSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('backlogListSheet').classList.add('on');renderBacklogLists();},40);
+}
+function closeBacklogItemSheet(){
+  document.getElementById('backlogItemSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('backlogTopicSheet').classList.add('on');renderBacklogItems();},40);
+}
+
+// Render lists
+function renderBacklogLists(){
+  const el=document.getElementById('backlogListContainer');if(!el)return;
+  if(!backlogLists.length){
+    el.innerHTML='<div class="bl-empty">עוד אין רשימות.<br>לחץ ＋ כדי ליצור את הראשונה 👇</div>';return;
+  }
+  el.innerHTML=backlogLists.map(list=>{
+    const count=backlogItems.filter(i=>i.listId===list.id&&i.status!=='done').length;
+    const total=backlogItems.filter(i=>i.listId===list.id).length;
+    return `<div class="bl-list-card" onclick="openBacklogTopic(${list.id})" oncontextmenu="deleteBacklogList(event,${list.id})">
+      <div class="bl-list-icon">${esc(list.icon||'📋')}</div>
+      <div class="bl-list-info">
+        <div class="bl-list-name">${esc(list.name)}</div>
+        <div class="bl-list-meta">${count} פעיל${total?` · ${total} סה"כ`:''}</div>
+      </div>
+      <div class="bl-list-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+// Render items
+function renderBacklogItems(){
+  const el=document.getElementById('backlogItemsContainer');if(!el)return;
+  const q=(document.getElementById('backlogSearch')?.value||'').trim().toLowerCase();
+  let items=backlogItems.filter(i=>i.listId===_blCurrentListId);
+  if(_blFilter!=='all')items=items.filter(i=>i.status===_blFilter);
+  if(q)items=items.filter(i=>(i.text+i.notes+i.url).toLowerCase().includes(q));
+  if(_blSort==='priority')items=[...items].sort((a,b)=>BL_PRI_ORDER[a.priority]-BL_PRI_ORDER[b.priority]);
+  else if(_blSort==='status')items=[...items].sort((a,b)=>BL_STATUS_ORDER[a.status]-BL_STATUS_ORDER[b.status]);
+  else items=[...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  if(!items.length){
+    el.innerHTML=`<div class="bl-empty">${q?'אין תוצאות לחיפוש':'עוד אין פריטים. לחץ ＋ כדי להוסיף 👇'}</div>`;return;
+  }
+  el.innerHTML=items.map(item=>{
+    const converted=item.convertedTaskId?`<span class="bl-converted-badge">↗ משימה</span>`:'';
+    const urlBtn=item.url?`<a class="bl-url-btn" href="${esc(item.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 קישור</a>`:'';
+    const due=item.dueDate?`<span class="bl-due">${new Date(item.dueDate).toLocaleDateString('he-IL')}</span>`:'';
+    return `<div class="bl-item-card" onclick="openBacklogItemForm(${item.id})">
+      <div class="bl-item-top">
+        <span class="bl-pri-dot">${BL_PRI_DOT[item.priority||'medium']}</span>
+        <span class="bl-item-text">${esc(item.text)}</span>
+        ${converted}
+      </div>
+      ${item.notes?`<div class="bl-item-notes">${esc(item.notes)}</div>`:''}
+      <div class="bl-item-foot">
+        <span class="bl-status-badge ${BL_STATUS_CLASS[item.status]||''}">${BL_STATUS[item.status]||''}</span>
+        ${due}${urlBtn}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setBacklogFilter(f,btn){
+  _blFilter=f;
+  document.querySelectorAll('#backlogChips .bl-chip').forEach(b=>b.classList.toggle('on',b===btn));
+  renderBacklogItems();
+}
+function setBacklogSort(s,btn){
+  _blSort=s;
+  document.querySelectorAll('.bl-sort-btn').forEach(b=>b.classList.toggle('on',b===btn));
+  renderBacklogItems();
+}
+
+// Item form
+function openBacklogItemForm(itemId){
+  _blEditingItemId=itemId;
+  const item=itemId?backlogItems.find(i=>i.id===itemId):null;
+  document.getElementById('backlogItemSheetTitle').textContent=item?'עריכת פריט':'פריט חדש';
+  document.getElementById('backlogItemDeleteBtn').style.display=item?'':'none';
+  document.getElementById('blItemText').value=item?.text||'';
+  document.getElementById('blItemNotes').value=item?.notes||'';
+  document.getElementById('blItemUrl').value=item?.url||'';
+  document.getElementById('blItemDue').value=item?.dueDate?item.dueDate.slice(0,10):'';
+  // Status buttons
+  const status=item?.status||'idea';
+  document.querySelectorAll('#blStatusRow .bl-status-btn').forEach(b=>b.classList.toggle('on',b.dataset.s===status));
+  document.getElementById('blStatusRow').dataset.v=status;
+  // Priority buttons
+  const pri=item?.priority||'medium';
+  document.querySelectorAll('#blPriRow .bl-pri-btn').forEach(b=>b.classList.toggle('on',b.dataset.p===pri));
+  document.getElementById('blPriRow').dataset.v=pri;
+  // Convert section: only show if not already converted
+  const convSection=document.getElementById('blConvertSection');
+  convSection.style.display=(item&&item.convertedTaskId)?'none':'';
+  // Reset convert fields
+  const today=new Date();
+  document.getElementById('blConvertDate').value=today.toISOString().slice(0,10);
+  document.getElementById('blConvertTime').value='09:00';
+  document.getElementById('backlogTopicSheet').classList.remove('on');
+  setTimeout(()=>document.getElementById('backlogItemSheet').classList.add('on'),40);
+}
+function selectBlStatus(s,btn){
+  document.querySelectorAll('#blStatusRow .bl-status-btn').forEach(b=>b.classList.toggle('on',b===btn));
+  document.getElementById('blStatusRow').dataset.v=s;
+}
+function selectBlPri(p,btn){
+  document.querySelectorAll('#blPriRow .bl-pri-btn').forEach(b=>b.classList.toggle('on',b===btn));
+  document.getElementById('blPriRow').dataset.v=p;
+}
+function saveBacklogItem(){
+  const text=document.getElementById('blItemText').value.trim();
+  if(!text){toast('נא למלא תיאור');return;}
+  const status=document.getElementById('blStatusRow').dataset.v||'idea';
+  const priority=document.getElementById('blPriRow').dataset.v||'medium';
+  const dueVal=document.getElementById('blItemDue').value;
+  if(_blEditingItemId){
+    const item=backlogItems.find(i=>i.id===_blEditingItemId);
+    if(item){Object.assign(item,{text,notes:document.getElementById('blItemNotes').value.trim(),url:document.getElementById('blItemUrl').value.trim(),status,priority,dueDate:dueVal||null});}
+  }else{
+    backlogItems.push({id:Date.now(),listId:_blCurrentListId,text,notes:document.getElementById('blItemNotes').value.trim(),url:document.getElementById('blItemUrl').value.trim(),status,priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null});
+  }
+  saveBacklogItems();
+  toast('נשמר ✓');
+  vibrate([10,30,10]);
+  closeBacklogItemSheet();
+}
+function deleteBacklogItemFromForm(){
+  if(!_blEditingItemId)return;
+  backlogItems=backlogItems.filter(i=>i.id!==_blEditingItemId);
+  saveBacklogItems();
+  toast('נמחק');
+  closeBacklogItemSheet();
+}
+
+// New list form
+function openNewListForm(){
+  _blSelectedIcon='📋';
+  document.getElementById('blNewListName').value='';
+  document.querySelectorAll('#blIconPicker .bl-icon-btn').forEach(b=>b.classList.toggle('on',b.textContent==='📋'));
+  document.getElementById('blNewListOverlay').style.display='block';
+  document.getElementById('blNewListModal').style.display='flex';
+  setTimeout(()=>document.getElementById('blNewListName').focus(),100);
+}
+function closeNewListForm(){
+  document.getElementById('blNewListOverlay').style.display='none';
+  document.getElementById('blNewListModal').style.display='none';
+}
+function selectBlIcon(icon,btn){
+  _blSelectedIcon=icon;
+  document.querySelectorAll('#blIconPicker .bl-icon-btn').forEach(b=>b.classList.toggle('on',b===btn));
+}
+function saveNewList(){
+  const name=document.getElementById('blNewListName').value.trim();
+  if(!name){toast('נא לתת שם לרשימה');return;}
+  backlogLists.push({id:Date.now(),name,icon:_blSelectedIcon,createdAt:new Date().toISOString()});
+  saveBacklogLists();
+  closeNewListForm();
+  renderBacklogLists();
+  vibrate([10,30,10]);
+}
+function deleteBacklogList(e,listId){
+  e.preventDefault();
+  const list=backlogLists.find(l=>l.id===listId);if(!list)return;
+  const count=backlogItems.filter(i=>i.listId===listId).length;
+  if(!confirm(`למחוק את "${list.name}"?${count?` (${count} פריטים ימחקו)`:''}`) )return;
+  backlogLists=backlogLists.filter(l=>l.id!==listId);
+  backlogItems=backlogItems.filter(i=>i.listId!==listId);
+  saveBacklogLists();saveBacklogItems();
+  renderBacklogLists();
+}
+
+// Convert to main task
+function convertBacklogToTask(){
+  const item=backlogItems.find(i=>i.id===_blEditingItemId);if(!item)return;
+  const dateVal=document.getElementById('blConvertDate').value;
+  const timeVal=document.getElementById('blConvertTime').value||'09:00';
+  if(!dateVal){toast('נא לבחור תאריך');return;}
+  const dt=new Date(dateVal+'T'+timeVal+':00');
+  const task={id:Date.now(),text:item.text+(item.notes?'\n'+item.notes:''),category:detectCat(item.text),datetime:dt.toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins:30,morningAlert:true};
+  tasks.unshift(task);save();render();
+  syncTask(task);
+  item.convertedTaskId=task.id;
+  saveBacklogItems();
+  document.getElementById('blConvertSection').style.display='none';
+  toast('✅ הועבר לרשימת המשימות');
+  vibrate([10,30,10]);
+}
+
+// Export CSV
+function exportBacklogCSV(){
+  const list=backlogLists.find(l=>l.id===_blCurrentListId);if(!list)return;
+  const items=backlogItems.filter(i=>i.listId===_blCurrentListId);
+  if(!items.length){toast('אין פריטים לייצוא');return;}
+  const STATUS_HE={idea:'רעיון',active:'פעיל',blocked:'מושהה',done:'בוצע'};
+  const PRI_HE={high:'גבוה',medium:'בינוני',low:'נמוך'};
+  const rows=[['תיאור','הערות','קישור','סטטוס','עדיפות','תאריך יעד','נוצר'],
+    ...items.map(i=>[i.text,i.notes||'',i.url||'',STATUS_HE[i.status]||'',PRI_HE[i.priority]||'',i.dueDate?new Date(i.dueDate).toLocaleDateString('he-IL'):'',new Date(i.createdAt).toLocaleDateString('he-IL')])
+  ];
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${list.name}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast('⬇ ייצוא הושלם');
+}
 </script>
 </body>
 </html>
