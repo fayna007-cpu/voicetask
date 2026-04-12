@@ -611,140 +611,142 @@
   </div>
 </div>
 
-<!-- ── Backlog Sheets ─────────────────────────────────────── -->
-<!-- Sheet 1: List of topics -->
-<div class="rsheet" id="backlogListSheet">
-  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
-  <div class="rsheet-head">
-    <button class="rsheet-close-btn" onclick="closeBacklogSheet()">✕</button>
-    <h3>הרשימות שלי</h3>
-    <div style="width:32px"></div>
-  </div>
-  <div class="rsheet-scroll">
-    <div id="backlogListContainer" class="bl-list-container"></div>
-    <div style="padding:0 20px 24px">
-      <button class="bl-add-btn" onclick="openNewListForm()">＋ רשימה חדשה</button>
-    </div>
-  </div>
-</div>
+<!-- ── Backlog Full Page ─────────────────────────────────── -->
+<div id="backlogPage">
 
-<!-- Sheet 2: Items inside a topic -->
-<div class="rsheet" id="backlogTopicSheet">
-  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
-  <div class="rsheet-head">
-    <button class="rsheet-close-btn" onclick="backToBacklogList()">←</button>
-    <h3 id="backlogTopicTitle">נושא</h3>
-    <button class="bl-export-btn" onclick="exportBacklogCSV()" title="ייצוא CSV">⬇ CSV</button>
-  </div>
-  <div style="padding:12px 20px 0">
-    <input class="bl-search" id="backlogSearch" type="text" placeholder="🔍 חיפוש..." oninput="renderBacklogItems()">
-    <div class="bl-chips" id="backlogChips">
-      <button class="bl-chip on" data-f="all" onclick="setBacklogFilter('all',this)">הכל</button>
-      <button class="bl-chip" data-f="idea" onclick="setBacklogFilter('idea',this)">💡 רעיון</button>
-      <button class="bl-chip" data-f="active" onclick="setBacklogFilter('active',this)">🔄 פעיל</button>
-      <button class="bl-chip" data-f="blocked" onclick="setBacklogFilter('blocked',this)">⏸ מושהה</button>
-      <button class="bl-chip" data-f="done" onclick="setBacklogFilter('done',this)">✅ בוצע</button>
+  <!-- View 1: Topic list -->
+  <div class="bp-view" id="bpView1">
+    <div class="bp-header">
+      <button class="bp-back-btn" onclick="closeBacklogPage()">✕</button>
+      <div class="bp-header-title">
+        <div class="bp-header-name">הרשימות שלי</div>
+        <div class="bp-header-sub" id="bpListCount">0 רשימות</div>
+      </div>
+      <div style="width:40px"></div>
     </div>
-    <div class="bl-sort-row">
-      <span class="bl-sort-lbl">מיון:</span>
-      <button class="bl-sort-btn on" data-s="createdAt" onclick="setBacklogSort('createdAt',this)">תאריך</button>
-      <button class="bl-sort-btn" data-s="priority" onclick="setBacklogSort('priority',this)">עדיפות</button>
-      <button class="bl-sort-btn" data-s="status" onclick="setBacklogSort('status',this)">סטטוס</button>
+    <div class="bp-scroll">
+      <div id="bpListsContainer"></div>
+    </div>
+    <div class="bp-footer">
+      <button class="bp-fab" onclick="openBpNewList()">＋ רשימה חדשה</button>
     </div>
   </div>
-  <div class="rsheet-scroll" style="padding-top:4px">
-    <div id="backlogItemsContainer" class="bl-items-container"></div>
-    <div style="padding:0 20px 24px">
-      <button class="bl-add-btn" onclick="openBacklogItemForm(null)">＋ הוסף פריט</button>
-    </div>
-  </div>
-</div>
 
-<!-- Sheet 3: Add / Edit item -->
-<div class="rsheet" id="backlogItemSheet">
-  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
-  <div class="rsheet-head">
-    <button class="rsheet-close-btn" onclick="closeBacklogItemSheet()">←</button>
-    <h3 id="backlogItemSheetTitle">פריט חדש</h3>
-    <button class="bl-delete-item-btn" id="backlogItemDeleteBtn" onclick="deleteBacklogItemFromForm()" style="display:none">🗑</button>
+  <!-- View 2: Items in topic -->
+  <div class="bp-view" id="bpView2">
+    <div class="bp-header">
+      <button class="bp-back-btn" onclick="bpGoTo(1)">←</button>
+      <div class="bp-header-title">
+        <div class="bp-header-name" id="bpTopicName">נושא</div>
+        <div class="bp-header-sub" id="bpTopicCount"></div>
+      </div>
+      <button class="bp-csv-btn" onclick="exportBacklogCSV()" title="ייצוא CSV">⬇ CSV</button>
+    </div>
+    <div class="bp-toolbar">
+      <input class="bp-search" id="bpSearch" type="text" placeholder="🔍 חיפוש..." oninput="renderBpItems()">
+      <div class="bp-chips">
+        <button class="bp-chip on" data-f="all" onclick="setBpFilter('all',this)">הכל</button>
+        <button class="bp-chip" data-f="idea" onclick="setBpFilter('idea',this)">💡 רעיון</button>
+        <button class="bp-chip" data-f="active" onclick="setBpFilter('active',this)">🔄 פעיל</button>
+        <button class="bp-chip" data-f="blocked" onclick="setBpFilter('blocked',this)">⏸ מושהה</button>
+        <button class="bp-chip" data-f="done" onclick="setBpFilter('done',this)">✅ בוצע</button>
+      </div>
+      <div class="bp-sort-row">
+        <span class="bp-sort-lbl">מיון:</span>
+        <button class="bp-sort-btn on" data-s="createdAt" onclick="setBpSort('createdAt',this)">תאריך</button>
+        <button class="bp-sort-btn" data-s="priority" onclick="setBpSort('priority',this)">עדיפות</button>
+        <button class="bp-sort-btn" data-s="status" onclick="setBpSort('status',this)">סטטוס</button>
+      </div>
+    </div>
+    <div class="bp-scroll">
+      <div id="bpItemsContainer"></div>
+    </div>
+    <div class="bp-footer">
+      <button class="bp-fab" onclick="openBpItemForm(null)">＋ הוסף פריט</button>
+    </div>
   </div>
-  <div class="rsheet-scroll">
-    <div class="rform">
-      <div class="rfield">
-        <div class="rform-lbl">תיאור <span style="color:var(--accent)">*</span></div>
-        <textarea class="rfi" id="blItemText" rows="2" placeholder="מה אתה רוצה לעשות?"></textarea>
+
+  <!-- View 3: Item form -->
+  <div class="bp-view" id="bpView3">
+    <div class="bp-header">
+      <button class="bp-back-btn" onclick="bpGoTo(2)">←</button>
+      <div class="bp-header-title">
+        <div class="bp-header-name" id="bpFormTitle">פריט חדש</div>
       </div>
-      <div class="rfield">
-        <div class="rform-lbl">הערות</div>
-        <textarea class="rfi" id="blItemNotes" rows="2" placeholder="פרטים נוספים..."></textarea>
-      </div>
-      <div class="rfield">
-        <div class="rform-lbl">לינק</div>
-        <input class="rfi" id="blItemUrl" type="url" placeholder="https://...">
-      </div>
-      <div class="rfield">
-        <div class="rform-lbl">סטטוס</div>
-        <div class="bl-status-row" id="blStatusRow">
-          <button class="bl-status-btn on" data-s="idea" onclick="selectBlStatus('idea',this)">💡 רעיון</button>
-          <button class="bl-status-btn" data-s="active" onclick="selectBlStatus('active',this)">🔄 פעיל</button>
-          <button class="bl-status-btn" data-s="blocked" onclick="selectBlStatus('blocked',this)">⏸ מושהה</button>
-          <button class="bl-status-btn" data-s="done" onclick="selectBlStatus('done',this)">✅ בוצע</button>
+      <button class="bp-del-btn" id="bpDelBtn" onclick="deleteBpItemFromForm()" style="visibility:hidden">🗑</button>
+    </div>
+    <div class="bp-scroll">
+      <div class="rform" style="padding-top:8px">
+        <div class="rfield">
+          <div class="rform-lbl">תיאור <span style="color:var(--accent)">*</span></div>
+          <textarea class="rfi" id="bpItemText" rows="2" placeholder="מה אתה רוצה לעשות?"></textarea>
         </div>
-      </div>
-      <div class="rfield">
-        <div class="rform-lbl">עדיפות</div>
-        <div class="bl-pri-row" id="blPriRow">
-          <button class="bl-pri-btn" data-p="high" onclick="selectBlPri('high',this)">🔴 גבוה</button>
-          <button class="bl-pri-btn on" data-p="medium" onclick="selectBlPri('medium',this)">🟡 בינוני</button>
-          <button class="bl-pri-btn" data-p="low" onclick="selectBlPri('low',this)">🟢 נמוך</button>
+        <div class="rfield">
+          <div class="rform-lbl">הערות</div>
+          <textarea class="rfi" id="bpItemNotes" rows="2" placeholder="פרטים נוספים..."></textarea>
         </div>
-      </div>
-      <div class="rfield">
-        <div class="rform-lbl">תאריך יעד (אופציונלי)</div>
-        <input class="rfi" id="blItemDue" type="date">
-      </div>
-      <button class="rform-save" onclick="saveBacklogItem()">שמור ✓</button>
-      <!-- Convert to main task -->
-      <div class="bl-convert-section" id="blConvertSection">
-        <div class="bl-convert-title">הפוך למשימה ראשית</div>
-        <div class="bl-convert-desc">הפריט יועתק לרשימת המשימות שלך ויסונכרן לגוגל קאלנדר</div>
-        <div style="display:flex;gap:10px;margin-top:10px">
-          <div class="rfield" style="flex:1;margin:0">
-            <div class="rform-lbl">תאריך</div>
-            <input class="rfi" id="blConvertDate" type="date">
-          </div>
-          <div class="rfield" style="flex:1;margin:0">
-            <div class="rform-lbl">שעה</div>
-            <input class="rfi" id="blConvertTime" type="time" value="09:00">
+        <div class="rfield">
+          <div class="rform-lbl">קישור</div>
+          <input class="rfi" id="bpItemUrl" type="url" placeholder="https://...">
+        </div>
+        <div class="rfield">
+          <div class="rform-lbl">סטטוס</div>
+          <div class="bp-seg-row" id="bpStatusRow" data-v="idea">
+            <button class="bp-seg-btn on" data-v="idea" onclick="setBpSeg('bpStatusRow','idea',this)">💡 רעיון</button>
+            <button class="bp-seg-btn" data-v="active" onclick="setBpSeg('bpStatusRow','active',this)">🔄 פעיל</button>
+            <button class="bp-seg-btn" data-v="blocked" onclick="setBpSeg('bpStatusRow','blocked',this)">⏸ מושהה</button>
+            <button class="bp-seg-btn" data-v="done" onclick="setBpSeg('bpStatusRow','done',this)">✅ בוצע</button>
           </div>
         </div>
-        <button class="bl-convert-btn" onclick="convertBacklogToTask()">↗ צור משימה</button>
+        <div class="rfield">
+          <div class="rform-lbl">עדיפות</div>
+          <div class="bp-seg-row" id="bpPriRow" data-v="medium">
+            <button class="bp-seg-btn" data-v="high" onclick="setBpSeg('bpPriRow','high',this)">🔴 גבוה</button>
+            <button class="bp-seg-btn on" data-v="medium" onclick="setBpSeg('bpPriRow','medium',this)">🟡 בינוני</button>
+            <button class="bp-seg-btn" data-v="low" onclick="setBpSeg('bpPriRow','low',this)">🟢 נמוך</button>
+          </div>
+        </div>
+        <div class="rfield">
+          <div class="rform-lbl">תאריך יעד (אופציונלי)</div>
+          <input class="rfi" id="bpItemDue" type="date">
+        </div>
+        <button class="rform-save" onclick="saveBpItem()">שמור ✓</button>
+        <div class="bp-convert-box" id="bpConvertBox">
+          <div class="bp-convert-title">↗ הפוך למשימה ראשית</div>
+          <div class="bp-convert-desc">יועתק לרשימת המשימות ויסונכרן לגוגל קאלנדר</div>
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <div class="rfield" style="flex:1;margin:0"><div class="rform-lbl">תאריך</div><input class="rfi" id="bpConvDate" type="date"></div>
+            <div class="rfield" style="flex:1;margin:0"><div class="rform-lbl">שעה</div><input class="rfi" id="bpConvTime" type="time" value="09:00"></div>
+          </div>
+          <button class="bp-convert-btn" onclick="convertBpToTask()">צור משימה</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- New list form (inline modal) -->
-<div class="bl-new-list-overlay" id="blNewListOverlay" onclick="closeNewListForm()"></div>
-<div class="bl-new-list-modal" id="blNewListModal">
-  <div class="bl-new-list-title">רשימה חדשה</div>
-  <div class="bl-icon-picker" id="blIconPicker">
-    <button class="bl-icon-btn on" onclick="selectBlIcon('📋',this)">📋</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('💡',this)">💡</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('🤖',this)">🤖</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('📚',this)">📚</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('🎯',this)">🎯</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('💼',this)">💼</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('🏃',this)">🏃</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('🏠',this)">🏠</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('💰',this)">💰</button>
-    <button class="bl-icon-btn" onclick="selectBlIcon('❤️',this)">❤️</button>
+  <!-- New list dialog (inside page, no z-index conflict) -->
+  <div class="bp-dialog-bg" id="bpDialogBg" onclick="closeBpNewList()"></div>
+  <div class="bp-dialog" id="bpDialog">
+    <div class="bp-dialog-title">רשימה חדשה</div>
+    <div class="bp-icon-grid" id="bpIconGrid">
+      <button class="bp-icon-btn on" onclick="selectBpIcon('📋',this)">📋</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('💡',this)">💡</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('🤖',this)">🤖</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('📚',this)">📚</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('🎯',this)">🎯</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('💼',this)">💼</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('🏃',this)">🏃</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('🏠',this)">🏠</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('💰',this)">💰</button>
+      <button class="bp-icon-btn" onclick="selectBpIcon('❤️',this)">❤️</button>
+    </div>
+    <input class="rfi" id="bpNewListName" type="text" placeholder="שם הרשימה..." maxlength="40" style="margin-top:10px">
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="bp-dialog-cancel" onclick="closeBpNewList()">ביטול</button>
+      <button class="bp-dialog-save" onclick="saveBpNewList()">צור ✓</button>
+    </div>
   </div>
-  <input class="rfi" id="blNewListName" type="text" placeholder="שם הרשימה..." maxlength="40" style="margin-top:8px">
-  <div style="display:flex;gap:8px;margin-top:12px">
-    <button class="bl-modal-cancel" onclick="closeNewListForm()">ביטול</button>
-    <button class="bl-modal-save" onclick="saveNewList()">צור ✓</button>
-  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1926,9 +1928,9 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheets=[document.getElementById('routineListSheet'),document.getElementById('routineFormSheet'),document.getElementById('scheduleSheet'),document.getElementById('settingsSheet')];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet'];
   ov.style.opacity='';ov.style.transition='';
-  sheets.forEach(s=>{s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
+  sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
 }
 function backToRoutineList(){
@@ -2937,252 +2939,195 @@ window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCusto
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
 let backlogItems=JSON.parse(localStorage.getItem('vt_backlog_items')||'[]');
-let _blCurrentListId=null;
-let _blFilter='all';
-let _blSort='createdAt';
-let _blEditingItemId=null;
-let _blSelectedIcon='📋';
-const BL_STATUS={idea:'💡 רעיון',active:'🔄 פעיל',blocked:'⏸ מושהה',done:'✅ בוצע'};
-const BL_STATUS_CLASS={idea:'bl-s-idea',active:'bl-s-active',blocked:'bl-s-blocked',done:'bl-s-done'};
-const BL_PRI_DOT={high:'🔴',medium:'🟡',low:'🟢'};
-const BL_PRI_ORDER={high:0,medium:1,low:2};
-const BL_STATUS_ORDER={active:0,idea:1,blocked:2,done:3};
+let _bpCurrentListId=null;
+let _bpFilter='all';
+let _bpSort='createdAt';
+let _bpEditingItemId=null;
+let _bpIcon='📋';
+let _bpCurrentView=1;
+const BP_STATUS={idea:'💡 רעיון',active:'🔄 פעיל',blocked:'⏸ מושהה',done:'✅ בוצע'};
+const BP_STATUS_CLS={idea:'bp-s-idea',active:'bp-s-active',blocked:'bp-s-blocked',done:'bp-s-done'};
+const BP_PRI_DOT={high:'🔴',medium:'🟡',low:'🟢'};
+const BP_PRI_ORD={high:0,medium:1,low:2};
+const BP_STA_ORD={active:0,idea:1,blocked:2,done:3};
+function saveBpLists(){localStorage.setItem('vt_backlog_lists',JSON.stringify(backlogLists));}
+function saveBpItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(backlogItems));}
+// keep old names as aliases for backward compat
+function saveBacklogLists(){saveBpLists();}
+function saveBacklogItems(){saveBpItems();}
 
-function saveBacklogLists(){localStorage.setItem('vt_backlog_lists',JSON.stringify(backlogLists));}
-function saveBacklogItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(backlogItems));}
+// Page navigation
+function openBacklogPage(){
+  document.getElementById('backlogPage').classList.add('on');
+  bpGoTo(1,false);
+  renderBpLists();
+}
+function closeBacklogPage(){
+  document.getElementById('backlogPage').classList.remove('on');
+}
+function openBacklogSheet(){openBacklogPage();}  // side menu alias
 
-// Navigation
-function openBacklogSheet(){
-  document.getElementById('routineOverlay').classList.add('on');
-  ['backlogListSheet','backlogTopicSheet','backlogItemSheet'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
-  document.getElementById('backlogListSheet').classList.add('on');
-  renderBacklogLists();
-}
-function closeBacklogSheet(){
-  const ov=document.getElementById('routineOverlay');
-  ov.style.opacity='';ov.style.transition='';
-  ['backlogListSheet','backlogTopicSheet','backlogItemSheet'].forEach(id=>{
-    const s=document.getElementById(id);if(!s)return;
-    s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');
-  });
-  ov.classList.remove('on');
-}
-function openBacklogTopic(listId){
-  _blCurrentListId=listId;
-  _blFilter='all';
-  _blSort='createdAt';
-  document.querySelectorAll('#backlogChips .bl-chip').forEach(b=>b.classList.toggle('on',b.dataset.f==='all'));
-  document.querySelectorAll('.bl-sort-btn').forEach(b=>b.classList.toggle('on',b.dataset.s==='createdAt'));
-  const list=backlogLists.find(l=>l.id===listId);
-  document.getElementById('backlogTopicTitle').textContent=(list?.icon||'📋')+' '+(list?.name||'');
-  document.getElementById('backlogSearch').value='';
-  document.getElementById('backlogListSheet').classList.remove('on');
-  setTimeout(()=>{document.getElementById('backlogTopicSheet').classList.add('on');renderBacklogItems();},40);
-}
-function backToBacklogList(){
-  document.getElementById('backlogTopicSheet').classList.remove('on');
-  document.getElementById('backlogItemSheet').classList.remove('on');
-  setTimeout(()=>{document.getElementById('backlogListSheet').classList.add('on');renderBacklogLists();},40);
-}
-function closeBacklogItemSheet(){
-  document.getElementById('backlogItemSheet').classList.remove('on');
-  setTimeout(()=>{document.getElementById('backlogTopicSheet').classList.add('on');renderBacklogItems();},40);
-}
-
-// Render lists
-function renderBacklogLists(){
-  const el=document.getElementById('backlogListContainer');if(!el)return;
-  if(!backlogLists.length){
-    el.innerHTML='<div class="bl-empty">עוד אין רשימות.<br>לחץ ＋ כדי ליצור את הראשונה 👇</div>';return;
+function bpGoTo(viewNum,animate=true){
+  _bpCurrentView=viewNum;
+  for(let i=1;i<=3;i++){
+    const v=document.getElementById('bpView'+i);
+    if(!v)continue;
+    v.classList.remove('active','prev');
+    if(i===viewNum)v.classList.add('active');
+    else if(i<viewNum)v.classList.add('prev');
   }
-  el.innerHTML=backlogLists.map(list=>{
-    const count=backlogItems.filter(i=>i.listId===list.id&&i.status!=='done').length;
-    const total=backlogItems.filter(i=>i.listId===list.id).length;
-    return `<div class="bl-list-card" onclick="openBacklogTopic(${list.id})" oncontextmenu="deleteBacklogList(event,${list.id})">
-      <div class="bl-list-icon">${esc(list.icon||'📋')}</div>
-      <div class="bl-list-info">
-        <div class="bl-list-name">${esc(list.name)}</div>
-        <div class="bl-list-meta">${count} פעיל${total?` · ${total} סה"כ`:''}</div>
-      </div>
-      <div class="bl-list-arrow">›</div>
-    </div>`;
+}
+// Render lists (view 1)
+function renderBpLists(){
+  const el=document.getElementById('bpListsContainer');if(!el)return;
+  const sub=document.getElementById('bpListCount');
+  if(sub)sub.textContent=backlogLists.length+' רשימות';
+  if(!backlogLists.length){el.innerHTML='<div class="bp-empty">עוד אין רשימות.<br>לחץ ＋ כדי ליצור את הראשונה 👇</div>';return;}
+  el.innerHTML=backlogLists.map(function(list){
+    const active=backlogItems.filter(function(i){return i.listId===list.id&&i.status!=='done';}).length;
+    const total=backlogItems.filter(function(i){return i.listId===list.id;}).length;
+    return '<div class="bp-list-card" onclick="bpOpenTopic('+list.id+')" oncontextmenu="bpDeleteList(event,'+list.id+')">'
+      +'<div class="bp-list-icon">'+esc(list.icon||'📋')+'</div>'
+      +'<div class="bp-list-info">'
+      +'<div class="bp-list-name">'+esc(list.name)+'</div>'
+      +'<div class="bp-list-meta">'+active+' פעיל'+(total?' · '+total+' סה"כ':'')+' </div>'
+      +'</div>'
+      +'<div class="bp-list-arr">›</div>'
+      +'</div>';
   }).join('');
 }
-
-// Render items
-function renderBacklogItems(){
-  const el=document.getElementById('backlogItemsContainer');if(!el)return;
-  const q=(document.getElementById('backlogSearch')?.value||'').trim().toLowerCase();
-  let items=backlogItems.filter(i=>i.listId===_blCurrentListId);
-  if(_blFilter!=='all')items=items.filter(i=>i.status===_blFilter);
-  if(q)items=items.filter(i=>(i.text+i.notes+i.url).toLowerCase().includes(q));
-  if(_blSort==='priority')items=[...items].sort((a,b)=>BL_PRI_ORDER[a.priority]-BL_PRI_ORDER[b.priority]);
-  else if(_blSort==='status')items=[...items].sort((a,b)=>BL_STATUS_ORDER[a.status]-BL_STATUS_ORDER[b.status]);
-  else items=[...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  if(!items.length){
-    el.innerHTML=`<div class="bl-empty">${q?'אין תוצאות לחיפוש':'עוד אין פריטים. לחץ ＋ כדי להוסיף 👇'}</div>`;return;
-  }
-  el.innerHTML=items.map(item=>{
-    const converted=item.convertedTaskId?`<span class="bl-converted-badge">↗ משימה</span>`:'';
-    const urlBtn=item.url?`<a class="bl-url-btn" href="${esc(item.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 קישור</a>`:'';
-    const due=item.dueDate?`<span class="bl-due">${new Date(item.dueDate).toLocaleDateString('he-IL')}</span>`:'';
-    return `<div class="bl-item-card" onclick="openBacklogItemForm(${item.id})">
-      <div class="bl-item-top">
-        <span class="bl-pri-dot">${BL_PRI_DOT[item.priority||'medium']}</span>
-        <span class="bl-item-text">${esc(item.text)}</span>
-        ${converted}
-      </div>
-      ${item.notes?`<div class="bl-item-notes">${esc(item.notes)}</div>`:''}
-      <div class="bl-item-foot">
-        <span class="bl-status-badge ${BL_STATUS_CLASS[item.status]||''}">${BL_STATUS[item.status]||''}</span>
-        ${due}${urlBtn}
-      </div>
-    </div>`;
+function bpOpenTopic(listId){
+  _bpCurrentListId=listId;_bpFilter='all';_bpSort='createdAt';
+  const list=backlogLists.find(function(l){return l.id===listId;});
+  document.getElementById('bpTopicName').textContent=(list&&list.icon||'📋')+' '+(list&&list.name||'');
+  document.getElementById('bpSearch').value='';
+  document.querySelectorAll('#bpView2 .bp-chip').forEach(function(b){b.classList.toggle('on',b.dataset.f==='all');});
+  document.querySelectorAll('.bp-sort-btn').forEach(function(b){b.classList.toggle('on',b.dataset.s==='createdAt');});
+  bpGoTo(2);renderBpItems();
+}
+function renderBpItems(){
+  const el=document.getElementById('bpItemsContainer');if(!el)return;
+  const q=(document.getElementById('bpSearch')&&document.getElementById('bpSearch').value||'').trim().toLowerCase();
+  let items=backlogItems.filter(function(i){return i.listId===_bpCurrentListId;});
+  if(_bpFilter!=='all')items=items.filter(function(i){return i.status===_bpFilter;});
+  if(q)items=items.filter(function(i){return (i.text+i.notes+i.url).toLowerCase().includes(q);});
+  if(_bpSort==='priority')items=items.slice().sort(function(a,b){return BP_PRI_ORD[a.priority]-BP_PRI_ORD[b.priority];});
+  else if(_bpSort==='status')items=items.slice().sort(function(a,b){return BP_STA_ORD[a.status]-BP_STA_ORD[b.status];});
+  else items=items.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+  const sub=document.getElementById('bpTopicCount');if(sub)sub.textContent=items.length+' פריטים';
+  if(!items.length){el.innerHTML='<div class="bp-empty">'+(q?'אין תוצאות לחיפוש':'עוד אין פריטים. לחץ ＋ כדי להוסיף 👇')+'</div>';return;}
+  el.innerHTML=items.map(function(item){
+    const conv=item.convertedTaskId?'<span class="bp-conv-badge">↗ משימה</span>':'';
+    const urlBtn=item.url?'<a class="bp-url-link" href="'+esc(item.url)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗</a>':'';
+    const due=item.dueDate?'<span class="bp-due">'+new Date(item.dueDate).toLocaleDateString('he-IL')+'</span>':'';
+    return '<div class="bp-item-card" onclick="openBpItemForm('+item.id+')">'
+      +'<div class="bp-item-top"><span class="bp-pdot">'+(BP_PRI_DOT[item.priority||'medium']||'')+'</span><span class="bp-item-text">'+esc(item.text)+'</span>'+conv+urlBtn+'</div>'
+      +(item.notes?'<div class="bp-item-notes">'+esc(item.notes)+'</div>':'')
+      +'<div class="bp-item-foot"><span class="bp-sbadge '+(BP_STATUS_CLS[item.status]||'')+'">'+( BP_STATUS[item.status]||'')+'</span>'+due+'</div>'
+      +'</div>';
   }).join('');
 }
-
-function setBacklogFilter(f,btn){
-  _blFilter=f;
-  document.querySelectorAll('#backlogChips .bl-chip').forEach(b=>b.classList.toggle('on',b===btn));
-  renderBacklogItems();
+function setBpFilter(f,btn){_bpFilter=f;document.querySelectorAll('#bpView2 .bp-chip').forEach(function(b){b.classList.toggle('on',b===btn);});renderBpItems();}
+function setBpSort(s,btn){_bpSort=s;document.querySelectorAll('.bp-sort-btn').forEach(function(b){b.classList.toggle('on',b===btn);});renderBpItems();}
+function openBpItemForm(itemId){
+  _bpEditingItemId=itemId;
+  const item=itemId?backlogItems.find(function(i){return i.id===itemId;}):null;
+  document.getElementById('bpFormTitle').textContent=item?'עריכת פריט':'פריט חדש';
+  const delBtn=document.getElementById('bpDelBtn');if(delBtn)delBtn.style.visibility=item?'visible':'hidden';
+  document.getElementById('bpItemText').value=(item&&item.text)||'';
+  document.getElementById('bpItemNotes').value=(item&&item.notes)||'';
+  document.getElementById('bpItemUrl').value=(item&&item.url)||'';
+  document.getElementById('bpItemDue').value=(item&&item.dueDate)?item.dueDate.slice(0,10):'';
+  setBpSeg('bpStatusRow',(item&&item.status)||'idea');
+  setBpSeg('bpPriRow',(item&&item.priority)||'medium');
+  const conv=document.getElementById('bpConvertBox');
+  if(conv)conv.style.display=(item&&item.convertedTaskId)?'none':'';
+  document.getElementById('bpConvDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bpConvTime').value='09:00';
+  bpGoTo(3);
 }
-function setBacklogSort(s,btn){
-  _blSort=s;
-  document.querySelectorAll('.bl-sort-btn').forEach(b=>b.classList.toggle('on',b===btn));
-  renderBacklogItems();
+function setBpSeg(rowId,val,btn){
+  const row=document.getElementById(rowId);if(!row)return;
+  row.dataset.v=val;
+  row.querySelectorAll('.bp-seg-btn').forEach(function(b){b.classList.toggle('on',btn?b===btn:b.dataset.v===val);});
 }
-
-// Item form
-function openBacklogItemForm(itemId){
-  _blEditingItemId=itemId;
-  const item=itemId?backlogItems.find(i=>i.id===itemId):null;
-  document.getElementById('backlogItemSheetTitle').textContent=item?'עריכת פריט':'פריט חדש';
-  document.getElementById('backlogItemDeleteBtn').style.display=item?'':'none';
-  document.getElementById('blItemText').value=item?.text||'';
-  document.getElementById('blItemNotes').value=item?.notes||'';
-  document.getElementById('blItemUrl').value=item?.url||'';
-  document.getElementById('blItemDue').value=item?.dueDate?item.dueDate.slice(0,10):'';
-  // Status buttons
-  const status=item?.status||'idea';
-  document.querySelectorAll('#blStatusRow .bl-status-btn').forEach(b=>b.classList.toggle('on',b.dataset.s===status));
-  document.getElementById('blStatusRow').dataset.v=status;
-  // Priority buttons
-  const pri=item?.priority||'medium';
-  document.querySelectorAll('#blPriRow .bl-pri-btn').forEach(b=>b.classList.toggle('on',b.dataset.p===pri));
-  document.getElementById('blPriRow').dataset.v=pri;
-  // Convert section: only show if not already converted
-  const convSection=document.getElementById('blConvertSection');
-  convSection.style.display=(item&&item.convertedTaskId)?'none':'';
-  // Reset convert fields
-  const today=new Date();
-  document.getElementById('blConvertDate').value=today.toISOString().slice(0,10);
-  document.getElementById('blConvertTime').value='09:00';
-  document.getElementById('backlogTopicSheet').classList.remove('on');
-  setTimeout(()=>document.getElementById('backlogItemSheet').classList.add('on'),40);
-}
-function selectBlStatus(s,btn){
-  document.querySelectorAll('#blStatusRow .bl-status-btn').forEach(b=>b.classList.toggle('on',b===btn));
-  document.getElementById('blStatusRow').dataset.v=s;
-}
-function selectBlPri(p,btn){
-  document.querySelectorAll('#blPriRow .bl-pri-btn').forEach(b=>b.classList.toggle('on',b===btn));
-  document.getElementById('blPriRow').dataset.v=p;
-}
-function saveBacklogItem(){
-  const text=document.getElementById('blItemText').value.trim();
+function saveBpItem(){
+  const text=document.getElementById('bpItemText').value.trim();
   if(!text){toast('נא למלא תיאור');return;}
-  const status=document.getElementById('blStatusRow').dataset.v||'idea';
-  const priority=document.getElementById('blPriRow').dataset.v||'medium';
-  const dueVal=document.getElementById('blItemDue').value;
-  if(_blEditingItemId){
-    const item=backlogItems.find(i=>i.id===_blEditingItemId);
-    if(item){Object.assign(item,{text,notes:document.getElementById('blItemNotes').value.trim(),url:document.getElementById('blItemUrl').value.trim(),status,priority,dueDate:dueVal||null});}
+  const status=document.getElementById('bpStatusRow').dataset.v||'idea';
+  const priority=document.getElementById('bpPriRow').dataset.v||'medium';
+  const dueVal=document.getElementById('bpItemDue').value;
+  const notes=document.getElementById('bpItemNotes').value.trim();
+  const url=document.getElementById('bpItemUrl').value.trim();
+  if(_bpEditingItemId){
+    const item=backlogItems.find(function(i){return i.id===_bpEditingItemId;});
+    if(item)Object.assign(item,{text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null});
   }else{
-    backlogItems.push({id:Date.now(),listId:_blCurrentListId,text,notes:document.getElementById('blItemNotes').value.trim(),url:document.getElementById('blItemUrl').value.trim(),status,priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null});
+    backlogItems.push({id:Date.now(),listId:_bpCurrentListId,text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null});
   }
-  saveBacklogItems();
-  toast('נשמר ✓');
-  vibrate([10,30,10]);
-  closeBacklogItemSheet();
+  saveBpItems();toast('נשמר ✓');vibrate([10,30,10]);bpGoTo(2);renderBpItems();
 }
-function deleteBacklogItemFromForm(){
-  if(!_blEditingItemId)return;
-  backlogItems=backlogItems.filter(i=>i.id!==_blEditingItemId);
-  saveBacklogItems();
-  toast('נמחק');
-  closeBacklogItemSheet();
+function deleteBpItemFromForm(){
+  if(!_bpEditingItemId)return;
+  backlogItems=backlogItems.filter(function(i){return i.id!==_bpEditingItemId;});
+  saveBpItems();toast('נמחק');bpGoTo(2);renderBpItems();
 }
-
-// New list form
-function openNewListForm(){
-  _blSelectedIcon='📋';
-  document.getElementById('blNewListName').value='';
-  document.querySelectorAll('#blIconPicker .bl-icon-btn').forEach(b=>b.classList.toggle('on',b.textContent==='📋'));
-  document.getElementById('blNewListOverlay').style.display='block';
-  document.getElementById('blNewListModal').style.display='flex';
-  setTimeout(()=>document.getElementById('blNewListName').focus(),100);
+function openBpNewList(){
+  _bpIcon='📋';
+  document.getElementById('bpNewListName').value='';
+  document.querySelectorAll('#bpIconGrid .bp-icon-btn').forEach(function(b){b.classList.toggle('on',b.textContent.trim()==='📋');});
+  document.getElementById('bpDialogBg').classList.add('on');
+  document.getElementById('bpDialog').classList.add('on');
+  setTimeout(function(){document.getElementById('bpNewListName').focus();},120);
 }
-function closeNewListForm(){
-  document.getElementById('blNewListOverlay').style.display='none';
-  document.getElementById('blNewListModal').style.display='none';
+function closeBpNewList(){
+  document.getElementById('bpDialogBg').classList.remove('on');
+  document.getElementById('bpDialog').classList.remove('on');
 }
-function selectBlIcon(icon,btn){
-  _blSelectedIcon=icon;
-  document.querySelectorAll('#blIconPicker .bl-icon-btn').forEach(b=>b.classList.toggle('on',b===btn));
+function selectBpIcon(icon,btn){
+  _bpIcon=icon;
+  document.querySelectorAll('#bpIconGrid .bp-icon-btn').forEach(function(b){b.classList.toggle('on',b===btn);});
 }
-function saveNewList(){
-  const name=document.getElementById('blNewListName').value.trim();
+function saveBpNewList(){
+  const name=document.getElementById('bpNewListName').value.trim();
   if(!name){toast('נא לתת שם לרשימה');return;}
-  backlogLists.push({id:Date.now(),name,icon:_blSelectedIcon,createdAt:new Date().toISOString()});
-  saveBacklogLists();
-  closeNewListForm();
-  renderBacklogLists();
-  vibrate([10,30,10]);
+  backlogLists.push({id:Date.now(),name:name,icon:_bpIcon,createdAt:new Date().toISOString()});
+  saveBpLists();closeBpNewList();renderBpLists();vibrate([10,30,10]);
 }
-function deleteBacklogList(e,listId){
+function bpDeleteList(e,listId){
   e.preventDefault();
-  const list=backlogLists.find(l=>l.id===listId);if(!list)return;
-  const count=backlogItems.filter(i=>i.listId===listId).length;
-  if(!confirm(`למחוק את "${list.name}"?${count?` (${count} פריטים ימחקו)`:''}`) )return;
-  backlogLists=backlogLists.filter(l=>l.id!==listId);
-  backlogItems=backlogItems.filter(i=>i.listId!==listId);
-  saveBacklogLists();saveBacklogItems();
-  renderBacklogLists();
+  const list=backlogLists.find(function(l){return l.id===listId;});if(!list)return;
+  const count=backlogItems.filter(function(i){return i.listId===listId;}).length;
+  if(!confirm('למחוק את "'+list.name+'"?'+(count?' ('+count+' פריטים ימחקו)':'')))return;
+  backlogLists=backlogLists.filter(function(l){return l.id!==listId;});
+  backlogItems=backlogItems.filter(function(i){return i.listId!==listId;});
+  saveBpLists();saveBpItems();renderBpLists();
 }
-
-// Convert to main task
-function convertBacklogToTask(){
-  const item=backlogItems.find(i=>i.id===_blEditingItemId);if(!item)return;
-  const dateVal=document.getElementById('blConvertDate').value;
-  const timeVal=document.getElementById('blConvertTime').value||'09:00';
-  if(!dateVal){toast('נא לבחור תאריך');return;}
+function convertBpToTask(){
+  const item=backlogItems.find(function(i){return i.id===_bpEditingItemId;});if(!item)return;
+  const dateVal=document.getElementById('bpConvDate').value;
+  const timeVal=document.getElementById('bpConvTime').value||'09:00';
+  if(!dateVal){toast('נא לבחור תאריכ');return;}
   const dt=new Date(dateVal+'T'+timeVal+':00');
   const task={id:Date.now(),text:item.text+(item.notes?'\n'+item.notes:''),category:detectCat(item.text),datetime:dt.toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins:30,morningAlert:true};
-  tasks.unshift(task);save();render();
-  syncTask(task);
-  item.convertedTaskId=task.id;
-  saveBacklogItems();
-  document.getElementById('blConvertSection').style.display='none';
-  toast('✅ הועבר לרשימת המשימות');
-  vibrate([10,30,10]);
+  tasks.unshift(task);save();render();syncTask(task);
+  item.convertedTaskId=task.id;saveBpItems();
+  document.getElementById('bpConvertBox').style.display='none';
+  toast('✅ הועבר לרשימת המשימות');vibrate([10,30,10]);
 }
-
-// Export CSV
 function exportBacklogCSV(){
-  const list=backlogLists.find(l=>l.id===_blCurrentListId);if(!list)return;
-  const items=backlogItems.filter(i=>i.listId===_blCurrentListId);
+  const list=backlogLists.find(function(l){return l.id===_bpCurrentListId;});if(!list)return;
+  const items=backlogItems.filter(function(i){return i.listId===_bpCurrentListId;});
   if(!items.length){toast('אין פריטים לייצוא');return;}
-  const STATUS_HE={idea:'רעיון',active:'פעיל',blocked:'מושהה',done:'בוצע'};
-  const PRI_HE={high:'גבוה',medium:'בינוני',low:'נמוך'};
-  const rows=[['תיאור','הערות','קישור','סטטוס','עדיפות','תאריך יעד','נוצר'],
-    ...items.map(i=>[i.text,i.notes||'',i.url||'',STATUS_HE[i.status]||'',PRI_HE[i.priority]||'',i.dueDate?new Date(i.dueDate).toLocaleDateString('he-IL'):'',new Date(i.createdAt).toLocaleDateString('he-IL')])
-  ];
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const SHE={idea:'רעיון',active:'פעיל',blocked:'מושהה',done:'בוצע'};
+  const PHE={high:'גבוה',medium:'בינוני',low:'נמוך'};
+  const rows=[['תיאור','הערות','קישור','סטטוס','עדיפות','תאריך יעד','נוצר']].concat(
+    items.map(function(i){return [i.text,i.notes||'',i.url||'',SHE[i.status]||'',PHE[i.priority]||'',i.dueDate?new Date(i.dueDate).toLocaleDateString('he-IL'):'',new Date(i.createdAt).toLocaleDateString('he-IL')];}));
+  const csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`${list.name}-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();URL.revokeObjectURL(a.href);
-  toast('⬇ ייצוא הושלם');
+  a.download=list.name+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(a.href);toast('⬇ ייצוא הושלם');
 }
 </script>
 </body>
