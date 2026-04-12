@@ -545,24 +545,20 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
   position:fixed;inset:0;z-index:250;
   background:var(--bg);
   transform:translateX(100%) translateZ(0);
-  transition:transform .38s cubic-bezier(.25,.46,.45,.94);
-  overflow:hidden;
-  max-width:480px;margin:0 auto;
-  display:block;
+  transition:transform .35s cubic-bezier(.25,.46,.45,.94);
+  visibility:hidden;pointer-events:none;
+  max-width:480px;left:0;right:0;margin:0 auto;
 }
-#backlogPage.on{transform:translateX(0) translateZ(0)}
+#backlogPage.on{transform:translateX(0) translateZ(0);visibility:visible;pointer-events:auto}
 
-/* Views — stack in place, slide left/right */
+/* Views — only active view is shown (display swap, no transform leaking) */
 .bp-view{
+  display:none;flex-direction:column;
   position:absolute;inset:0;
-  display:flex;flex-direction:column;
   background:var(--bg);
-  transform:translateX(100%) translateZ(0);
-  transition:transform .34s cubic-bezier(.25,.46,.45,.94);
   overflow:hidden;
 }
-.bp-view.active{transform:translateX(0) translateZ(0)}
-.bp-view.prev{transform:translateX(-28%) translateZ(0)}
+.bp-view.active{display:flex}
 
 /* Header */
 .bp-header{

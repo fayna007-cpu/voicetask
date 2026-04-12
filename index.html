@@ -2967,14 +2967,12 @@ function closeBacklogPage(){
 }
 function openBacklogSheet(){openBacklogPage();}  // side menu alias
 
-function bpGoTo(viewNum,animate=true){
+function bpGoTo(viewNum){
   _bpCurrentView=viewNum;
   for(let i=1;i<=3;i++){
     const v=document.getElementById('bpView'+i);
     if(!v)continue;
-    v.classList.remove('active','prev');
-    if(i===viewNum)v.classList.add('active');
-    else if(i<viewNum)v.classList.add('prev');
+    v.classList.toggle('active',i===viewNum);
   }
 }
 // Render lists (view 1)
