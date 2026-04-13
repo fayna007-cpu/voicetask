@@ -612,6 +612,7 @@
 </div>
 
 <!-- ── Backlog Full Page ───────────────────────────── -->
+<div id="bpPageWrapper">
 <div id="backlogPage">
   <div class="bp-topbar">
     <button class="bp-x-btn" onclick="closeBacklogPage()">✕</button>
@@ -725,7 +726,8 @@
       <button class="bp-dialog-save" onclick="saveBpNewList()">צור ✓</button>
     </div>
   </div>
-</div>
+</div><!-- /#backlogPage -->
+</div><!-- /#bpPageWrapper -->
 
 <div class="toast" id="toast"></div>
 
@@ -2936,7 +2938,7 @@ function saveBacklogItems(){saveBpItems();}
 
 // Page navigation
 function openBacklogPage(){
-  document.getElementById('backlogPage').classList.add('on');
+  document.getElementById('bpPageWrapper').classList.add('on');
   renderBpSidebar();
   // show empty state by default
   document.getElementById('bpContentEmpty').style.display='';
@@ -2944,7 +2946,7 @@ function openBacklogPage(){
   _bpCurrentListId=null;
 }
 function closeBacklogPage(){
-  document.getElementById('backlogPage').classList.remove('on');
+  document.getElementById('bpPageWrapper').classList.remove('on');
 }
 function openBacklogSheet(){openBacklogPage();}
 

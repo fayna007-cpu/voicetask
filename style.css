@@ -540,17 +540,24 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 /* ── Backlog Full Page ────────────────────────────────────────────────────── */
 .side-item-ico.green{background:oklch(0.40 0.12 145 / 0.25);color:oklch(0.72 0.16 145)}
 
-/* Page container — slides in from right, full flex column */
-#backlogPage{
+/* Wrapper: fixed, clips the off-screen page — prevents iOS Safari horizontal scroll leak */
+#bpPageWrapper{
   position:fixed;inset:0;z-index:250;
+  overflow:hidden;
+  pointer-events:none;
+  max-width:480px;left:0;right:0;margin:0 auto;
+}
+#bpPageWrapper.on{pointer-events:auto}
+
+/* Page: slides in from right inside the clipping wrapper */
+#backlogPage{
+  position:absolute;inset:0;
   background:var(--bg);
   transform:translateX(100%) translateZ(0);
   transition:transform .35s cubic-bezier(.25,.46,.45,.94);
-  visibility:hidden;pointer-events:none;
-  max-width:480px;left:0;right:0;margin:0 auto;
   display:flex;flex-direction:column;
 }
-#backlogPage.on{transform:translateX(0) translateZ(0);visibility:visible;pointer-events:auto}
+#bpPageWrapper.on #backlogPage{transform:translateX(0) translateZ(0)}
 
 /* Top bar */
 .bp-topbar{display:flex;align-items:center;justify-content:space-between;padding:calc(14px + var(--sat)) 16px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;direction:rtl}
