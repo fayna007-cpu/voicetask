@@ -1,13 +1,11 @@
-const V = 'vt-v3';
+const V = 'vt-v4';
 const ASSETS = ['./manifest.json', './icon.svg', './style.css'];
 
-// On install: cache only static assets (not HTML — so updates reach the user)
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
-// On activate: delete old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -17,7 +15,6 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Push from server (works when app is closed)
 self.addEventListener('push', e => {
   let data={title:'VoiceTask 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
@@ -27,7 +24,6 @@ self.addEventListener('push', e => {
   }));
 });
 
-// Notification click — open/focus the app
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(clients.matchAll({type:'window'}).then(cs=>{
@@ -36,7 +32,6 @@ self.addEventListener('notificationclick', e => {
   }));
 });
 
-// Push notification via message from main thread (fallback when app is open)
 self.addEventListener('message', event => {
   if(event.data&&event.data.type==='SHOW_NOTIFICATION'){
     self.registration.showNotification(event.data.title,{
@@ -46,29 +41,39 @@ self.addEventListener('message', event => {
   }
 });
 
-// Strategy:
-//   HTML  → network first (always get latest), fallback to cache
-//   Assets → cache first (icon, manifest don't change often)
 self.addEventListener('fetch', e => {
-  const isHTML = e.request.destination === 'document' ||
-                 e.request.url.endsWith('.html') ||
-                 e.request.url.endsWith('/');
+  const url = new URL(e.request.url);
 
+  // Share target
+  if (url.searchParams.has('share_text')) {
+    e.respondWith((async () => {
+      const text  = url.searchParams.get('share_text') || '';
+      const title = url.searchParams.get('share_title') || '';
+      const link  = url.searchParams.get('share_url') || '';
+      const cs = await self.clients.matchAll({type:'window'});
+      if (cs.length) {
+        cs[0].postMessage({type:'VT_SHARE', text, title, url: link});
+        cs[0].focus();
+      } else {
+        const cache = await caches.open(V);
+        await cache.put('/__vt_share__', new Response(JSON.stringify({text,title,url:link})));
+      }
+      return Response.redirect('./index.html', 303);
+    })());
+    return;
+  }
+
+  // HTML → network first
+  const isHTML = e.request.destination === 'document' ||
+                 url.pathname.endsWith('.html') ||
+                 url.pathname.endsWith('/');
   if (isHTML) {
-    // Network first → always get fresh app, fallback offline
     e.respondWith(
       fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(V).then(c => c.put(e.request, clone));
-          return res;
-        })
+        .then(res => { caches.open(V).then(c => c.put(e.request, res.clone())); return res; })
         .catch(() => caches.match(e.request))
     );
   } else {
-    // Cache first for assets
-    e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request))
-    );
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
   }
 });

@@ -203,6 +203,11 @@
     <div class="side-menu-email" id="sideEmail"></div>
   </div>
   <div class="side-menu-body">
+    <button class="side-item" onclick="closeSideMenu();openPendingSheet()" id="pendingSideBtn">
+      <div class="side-item-ico" style="background:oklch(0.55 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">📥</div>
+      <span>ממתינים לאישור</span>
+      <span class="pending-badge" id="pendingBadge" style="display:none"></span>
+    </button>
     <button class="side-item" onclick="closeSideMenu();openBacklogSheet()">
       <div class="side-item-ico green">📋</div>
       הרשימות שלי
@@ -735,6 +740,17 @@
 </div><!-- /#backlogPage -->
 </div><!-- /#bpPageWrapper -->
 
+<!-- Pending Sheet -->
+<div class="rsheet" id="pendingSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closePendingSheet()">✕</button>
+    <h3>📥 ממתינים לאישור</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll" id="pendingList" style="padding:12px 16px calc(32px + var(--sab))"></div>
+</div>
+
 <!-- Daily morning popup -->
 <div class="dp-overlay" id="dpOverlay" onclick="closeDailyPopup()"></div>
 <div class="dp-modal" id="dpModal">
@@ -817,7 +833,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();setTimeout(maybeShowDailyPopup,1200);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1938,7 +1954,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -3222,6 +3238,96 @@ function exportBacklogCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=list.name+'-'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();URL.revokeObjectURL(a.href);toast('⬇ ייצוא הושלם');
+}
+
+// ── Pending (Share Target) ───────────────────────────────
+let pendingItems=JSON.parse(localStorage.getItem('vt_pending')||'[]');
+function savePending(){localStorage.setItem('vt_pending',JSON.stringify(pendingItems));}
+function addPendingItem(text,title,url){
+  pendingItems.unshift({id:Date.now(),text:(title?title+'\n':'')+text,url:url||'',receivedAt:new Date().toISOString()});
+  savePending();updatePendingBadge();
+  toast('📥 התקבל — ממתין לאישורך');
+}
+function updatePendingBadge(){
+  const n=pendingItems.length;
+  const b=document.getElementById('pendingBadge');
+  if(b){b.textContent=n;b.style.display=n?'':'none';}
+}
+function openPendingSheet(){
+  renderPendingList();
+  document.getElementById('routineOverlay')?.classList.add('on');
+  document.getElementById('pendingSheet').classList.add('on');
+}
+function closePendingSheet(){
+  document.getElementById('pendingSheet').classList.remove('on');
+  document.getElementById('routineOverlay')?.classList.remove('on');
+}
+function renderPendingList(){
+  const el=document.getElementById('pendingList');if(!el)return;
+  if(!pendingItems.length){el.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--muted);font-size:14px">אין פריטים ממתינים</div>';return;}
+  el.innerHTML=pendingItems.map(item=>{
+    const urlHtml=item.url?`<a class="pend-url" href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`:'';
+    const d=new Date(item.receivedAt);
+    const when=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    return`<div class="pend-card" id="pc${item.id}">
+<div class="pend-meta">${when}</div>
+<div class="pend-text">${esc(item.text)}</div>
+${urlHtml}
+<div class="pend-actions">
+  <button class="pend-btn task" onclick="pendToTask(${item.id})">📌 משימה</button>
+  <button class="pend-btn crm" onclick="pendToCRM(${item.id})">📋 CRM</button>
+  <button class="pend-btn del" onclick="pendDelete(${item.id})">🗑</button>
+</div></div>`;
+  }).join('');
+}
+function pendDelete(id){
+  pendingItems=pendingItems.filter(i=>i.id!==id);
+  savePending();updatePendingBadge();renderPendingList();
+}
+function pendToTask(id){
+  const item=pendingItems.find(i=>i.id===id);if(!item)return;
+  const txt=item.text+(item.url?'\n'+item.url:'');
+  closePendingSheet();
+  // pre-fill siri confirm
+  document.getElementById('siriEdit').value=txt;
+  document.getElementById('siriConfirm').classList.add('on');
+  document.getElementById('siriText').textContent=txt;
+  document.getElementById('siriText').className='siri-text';
+  document.getElementById('siriOverlay').classList.add('on');
+  document.getElementById('siriHints').style.display='none';
+  pendDelete(id);
+}
+function pendToCRM(id){
+  const item=pendingItems.find(i=>i.id===id);if(!item)return;
+  closePendingSheet();
+  openBacklogPage();
+  // pre-fill item form after short delay (page animation)
+  setTimeout(()=>{
+    document.getElementById('bpItemText').value=item.text;
+    document.getElementById('bpItemUrl').value=item.url||'';
+    openBpItemForm(null);
+    document.getElementById('bpItemText').value=item.text;
+    document.getElementById('bpItemUrl').value=item.url||'';
+  },400);
+  pendDelete(id);
+}
+// Listen for share messages from SW
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='VT_SHARE'){
+      addPendingItem(e.data.text||'',e.data.title||'',e.data.url||'');
+    }
+  });
+}
+// Pick up share stored in SW cache (app was closed when shared)
+async function checkSWShare(){
+  if(!('serviceWorker' in navigator))return;
+  const reg=await navigator.serviceWorker.ready.catch(()=>null);if(!reg)return;
+  const cache=await caches.open('vt-v4').catch(()=>null);if(!cache)return;
+  const r=await cache.match('/__vt_share__').catch(()=>null);if(!r)return;
+  const data=await r.json().catch(()=>null);if(!data)return;
+  await cache.delete('/__vt_share__');
+  addPendingItem(data.text||'',data.title||'',data.url||'');
 }
 
 // ── Today Plan ──────────────────────────────────────────
