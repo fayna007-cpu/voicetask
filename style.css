@@ -679,7 +679,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bp-seg-btn.on{background:var(--surface2);border-color:oklch(0.78 0.16 72 / 0.4);color:var(--text)}
 
 /* Convert to task */
-.bp-convert-box{margin-top:16px;padding:14px;background:oklch(0.78 0.16 72 / 0.04);border:1px solid oklch(0.78 0.16 72 / 0.18);border-radius:var(--r)}
+.bp-convert-box{margin-top:16px;padding:14px;background:oklch(0.78 0.16 72 / 0.04);border:1px solid oklch(0.78 0.16 72 / 0.18);border-radius:var(--r);box-sizing:border-box;width:100%}
 .bp-convert-title{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:4px}
 .bp-convert-desc{font-size:11px;color:var(--muted);line-height:1.5}
 .bp-convert-btn{width:100%;margin-top:12px;padding:13px;border-radius:var(--r);background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
