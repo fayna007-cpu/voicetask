@@ -616,7 +616,7 @@
 <div id="backlogPage">
   <div class="bp-topbar">
     <button class="bp-x-btn" onclick="closeBacklogPage()">✕</button>
-    <h2 class="bp-title">הרשימות שלי</h2>
+    <h2 class="bp-title">הרשימות שלי <span style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px">CRM</span></h2>
     <div style="width:36px"></div>
   </div>
   <div class="bp-body">
@@ -626,8 +626,7 @@
     </nav>
     <main class="bp-content">
       <div class="bp-content-empty" id="bpContentEmpty">
-        <div class="bp-empty-ico">&#128203;</div>
-        <div>בחר רשימה<br>מהצד</div>
+        <div class="bp-crm-dashboard" id="bpDashboard"></div>
       </div>
       <div class="bp-topic-view" id="bpTopicView">
         <div class="bp-topic-hd">
@@ -672,7 +671,7 @@
       <div class="rform">
         <div class="rfield"><div class="rform-lbl">תיאור <span style="color:var(--accent)">*</span></div><textarea class="rfi" id="bpItemText" rows="2" placeholder="מה אתה רוצה לעשות?"></textarea></div>
         <div class="rfield"><div class="rform-lbl">הערות</div><textarea class="rfi" id="bpItemNotes" rows="2" placeholder="פרטים נוספים..."></textarea></div>
-        <div class="rfield"><div class="rform-lbl">קישור</div><input class="rfi" id="bpItemUrl" type="url" placeholder="https://..."></div>
+        <div class="rfield"><div class="rform-lbl">קישור</div><input class="rfi" id="bpItemUrl" type="url" placeholder="https://..." style="direction:ltr;text-align:right"></div>
         <div class="rfield">
           <div class="rform-lbl">סטטוס</div>
           <div class="bp-seg-row" id="bpStatusRow" data-v="idea">
@@ -690,14 +689,14 @@
             <button class="bp-seg-btn" data-v="low" onclick="setBpSeg('bpPriRow','low',this)">&#128994; נמוך</button>
           </div>
         </div>
-        <div class="rfield"><div class="rform-lbl">תאריך יעד (אופציונלי)</div><input class="rfi" id="bpItemDue" type="date"></div>
+        <div class="rfield"><div class="rform-lbl">תאריך יעד (אופציונלי)</div><input class="rfi" id="bpItemDue" type="date" oninput="var v=this.value;document.getElementById('bpConvDate').value=v||new Date().toISOString().slice(0,10)"></div>
         <button class="rform-save" onclick="saveBpItem()">שמור ✓</button>
         <div class="bp-convert-box" id="bpConvertBox">
           <div class="bp-convert-title">↗ הפוך למשימה ראשית</div>
           <div class="bp-convert-desc">יועתק לרשימת המשימות ויסונכרן לקאלנדר</div>
-          <div style="display:flex;gap:10px;margin-top:10px">
-            <div class="rfield" style="flex:1;margin:0"><div class="rform-lbl">תאריך</div><input class="rfi" id="bpConvDate" type="date"></div>
-            <div class="rfield" style="flex:1;margin:0"><div class="rform-lbl">שעה</div><input class="rfi" id="bpConvTime" type="time" value="09:00"></div>
+          <div class="rfield-2col" style="margin-top:10px">
+            <div class="rfield"><div class="rform-lbl">תאריך</div><input class="rfi" id="bpConvDate" type="date"></div>
+            <div class="rfield"><div class="rform-lbl">שעה</div><input class="rfi" id="bpConvTime" type="time" value="09:00"></div>
           </div>
           <button class="bp-convert-btn" onclick="convertBpToTask()">צור משימה</button>
         </div>
@@ -2936,10 +2935,65 @@ function saveBpItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(ba
 function saveBacklogLists(){saveBpLists();}
 function saveBacklogItems(){saveBpItems();}
 
+// Dashboard (empty state)
+function renderBpDashboard(){
+  const el=document.getElementById('bpDashboard');if(!el)return;
+  const today=new Date();today.setHours(0,0,0,0);
+  const in7=new Date(today);in7.setDate(in7.getDate()+7);
+  const totalLists=backlogLists.length;
+  const active=backlogItems.filter(function(i){return i.status==='active';}).length;
+  const done=backlogItems.filter(function(i){return i.status==='done';}).length;
+  const highPri=backlogItems.filter(function(i){return i.priority==='high'&&i.status!=='done';});
+  const upcoming=backlogItems.filter(function(i){
+    if(!i.dueDate||i.status==='done')return false;
+    const d=new Date(i.dueDate);d.setHours(0,0,0,0);
+    return d>=today&&d<=in7;
+  }).sort(function(a,b){return new Date(a.dueDate)-new Date(b.dueDate);});
+  if(!totalLists){
+    el.innerHTML='<div class="bp-dash-intro">'
+      +'<div class="bp-dash-intro-ico">📋</div>'
+      +'<div class="bp-dash-intro-title">ה-CRM האישי שלך</div>'
+      +'<div class="bp-dash-intro-sub">צור רשימה ראשונה עם ＋ חדש<br>ועקוב אחרי רעיונות, פרויקטים ומטרות</div>'
+      +'</div>';
+    return;
+  }
+  let html='<div class="bp-dash-stats">'
+    +'<div class="bp-dash-stat"><div class="bp-dash-num">'+totalLists+'</div><div class="bp-dash-lbl">רשימות</div></div>'
+    +'<div class="bp-dash-stat"><div class="bp-dash-num">'+active+'</div><div class="bp-dash-lbl">פעילים</div></div>'
+    +'<div class="bp-dash-stat"><div class="bp-dash-num">'+done+'</div><div class="bp-dash-lbl">בוצעו</div></div>'
+    +'</div>';
+  if(upcoming.length){
+    html+='<div class="bp-dash-section"><div class="bp-dash-sec-title">⏰ מגיע בקרוב</div>';
+    html+=upcoming.slice(0,3).map(function(i){
+      return '<div class="bp-dash-item" onclick="bpSelectTopic('+i.listId+');openBpItemForm('+i.id+')">'
+        +'<span class="bp-pdot">'+(BP_PRI_DOT[i.priority]||'')+'</span>'
+        +'<span class="bp-dash-item-text">'+esc(i.text)+'</span>'
+        +'<span class="bp-dash-item-meta">'+new Date(i.dueDate).toLocaleDateString('he-IL',{day:'numeric',month:'short'})+'</span>'
+        +'</div>';
+    }).join('');
+    html+='</div>';
+  }
+  if(highPri.length){
+    html+='<div class="bp-dash-section"><div class="bp-dash-sec-title">🔴 עדיפות גבוהה</div>';
+    html+=highPri.slice(0,3).map(function(i){
+      const list=backlogLists.find(function(l){return l.id===i.listId;});
+      return '<div class="bp-dash-item" onclick="bpSelectTopic('+i.listId+');openBpItemForm('+i.id+')">'
+        +'<span class="bp-pdot">🔴</span>'
+        +'<span class="bp-dash-item-text">'+esc(i.text)+'</span>'
+        +'<span class="bp-dash-item-meta">'+(list?esc(list.icon+' '+list.name):'')+'</span>'
+        +'</div>';
+    }).join('');
+    html+='</div>';
+  }
+  html+='<div class="bp-dash-hint">← בחר רשימה מהצד</div>';
+  el.innerHTML=html;
+}
+
 // Page navigation
 function openBacklogPage(){
   document.getElementById('bpPageWrapper').classList.add('on');
   renderBpSidebar();
+  renderBpDashboard();
   // show empty state by default
   document.getElementById('bpContentEmpty').style.display='';
   document.getElementById('bpTopicView').style.display='none';
@@ -3029,12 +3083,14 @@ function openBpItemForm(itemId){
   document.getElementById('bpItemText').value=(item&&item.text)||'';
   document.getElementById('bpItemNotes').value=(item&&item.notes)||'';
   document.getElementById('bpItemUrl').value=(item&&item.url)||'';
-  document.getElementById('bpItemDue').value=(item&&item.dueDate)?item.dueDate.slice(0,10):'';
+  const dueVal=(item&&item.dueDate)?item.dueDate.slice(0,10):'';
+  document.getElementById('bpItemDue').value=dueVal;
   setBpSeg('bpStatusRow',(item&&item.status)||'idea');
   setBpSeg('bpPriRow',(item&&item.priority)||'medium');
   const conv=document.getElementById('bpConvertBox');
   if(conv)conv.style.display=(item&&item.convertedTaskId)?'none':'';
-  document.getElementById('bpConvDate').value=new Date().toISOString().slice(0,10);
+  // sync convert date with due date (or default today)
+  document.getElementById('bpConvDate').value=dueVal||new Date().toISOString().slice(0,10);
   document.getElementById('bpConvTime').value='09:00';
   document.getElementById('bpSheetBg').classList.add('on');
   document.getElementById('bpSheet').classList.add('on');
@@ -3063,13 +3119,13 @@ function saveBpItem(){
     backlogItems.push({id:Date.now(),listId:_bpCurrentListId,text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null});
   }
   saveBpItems();toast('נשמר ✓');vibrate([10,30,10]);
-  closeBpSheet();renderBpItems();renderBpSidebar();
+  closeBpSheet();renderBpItems();renderBpSidebar();renderBpDashboard();
 }
 function deleteBpItemFromForm(){
   if(!_bpEditingItemId)return;
   backlogItems=backlogItems.filter(function(i){return i.id!==_bpEditingItemId;});
   saveBpItems();toast('נמחק');
-  closeBpSheet();renderBpItems();renderBpSidebar();
+  closeBpSheet();renderBpItems();renderBpSidebar();renderBpDashboard();
 }
 
 // New list dialog
@@ -3093,7 +3149,7 @@ function saveBpNewList(){
   const name=document.getElementById('bpNewListName').value.trim();
   if(!name){toast('נא לתת שם');return;}
   backlogLists.push({id:Date.now(),name:name,icon:_bpIcon,createdAt:new Date().toISOString()});
-  saveBpLists();closeBpNewList();renderBpSidebar();vibrate([10,30,10]);
+  saveBpLists();closeBpNewList();renderBpSidebar();renderBpDashboard();vibrate([10,30,10]);
 }
 function bpDeleteList(e,listId){
   e.preventDefault();
@@ -3108,7 +3164,7 @@ function bpDeleteList(e,listId){
     document.getElementById('bpContentEmpty').style.display='';
     document.getElementById('bpTopicView').style.display='none';
   }
-  renderBpSidebar();
+  renderBpSidebar();renderBpDashboard();
 }
 function convertBpToTask(){
   const item=backlogItems.find(function(i){return i.id===_bpEditingItemId;});if(!item)return;

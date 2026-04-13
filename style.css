@@ -588,9 +588,30 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 /* Content area */
 .bp-content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--bg)}
 
-/* Empty state (no topic selected) */
-.bp-content-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px;text-align:center;padding:20px;line-height:1.7}
-.bp-empty-ico{font-size:38px}
+/* Empty state (no topic selected) — CRM dashboard */
+.bp-content-empty{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:12px 10px;direction:rtl}
+.bp-crm-dashboard{display:flex;flex-direction:column;gap:12px;width:100%}
+
+/* Intro (no lists yet) */
+.bp-dash-intro{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px 10px;text-align:center}
+.bp-dash-intro-ico{font-size:42px}
+.bp-dash-intro-title{font-size:15px;font-weight:800;color:var(--text)}
+.bp-dash-intro-sub{font-size:12px;color:var(--muted);line-height:1.7}
+
+/* Stats row */
+.bp-dash-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.bp-dash-stat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center}
+.bp-dash-num{font-size:22px;font-weight:900;color:var(--accent);display:block;line-height:1}
+.bp-dash-lbl{font-size:9px;font-weight:700;color:var(--muted);display:block;margin-top:3px;text-transform:uppercase;letter-spacing:.4px}
+
+/* Dashboard sections */
+.bp-dash-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.bp-dash-sec-title{font-size:10px;font-weight:800;color:var(--muted);padding:8px 10px 5px;text-transform:uppercase;letter-spacing:.5px}
+.bp-dash-item{display:flex;align-items:center;gap:7px;padding:8px 10px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .12s}
+.bp-dash-item:active{background:oklch(0.24 0.010 45)}
+.bp-dash-item-text{flex:1;font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bp-dash-item-meta{font-size:10px;color:var(--muted);flex-shrink:0;white-space:nowrap}
+.bp-dash-hint{text-align:center;font-size:11px;color:var(--muted);padding:4px 0 2px}
 
 /* Topic view */
 .bp-topic-view{flex:1;display:flex;flex-direction:column;overflow:hidden}
