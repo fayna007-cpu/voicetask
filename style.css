@@ -436,7 +436,7 @@ body{
 .rtoggle input:checked~.rtoggle-sl::before{transform:translateX(-18px)}
 .routine-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;line-height:1;font-size:18px;border-radius:8px;flex-shrink:0}
 .rform-section-title{display:none}
-.rform{padding:16px;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box}
+.rform{padding:16px 16px calc(32px + var(--sab,0px));display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box}
 .rfield{display:flex;flex-direction:column;gap:6px;width:100%;box-sizing:border-box}
 .rfield-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;box-sizing:border-box}
 .rfield-3col{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;width:100%;box-sizing:border-box}
@@ -671,7 +671,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bp-sheet-close:active{background:var(--border2)}
 .bp-sheet-head h3{flex:1;font-size:17px;font-weight:800;color:var(--text);margin:0;text-align:center}
 .bp-sheet-del{width:36px;height:36px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.bp-sheet-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 16px calc(20px + var(--sab))}
+.bp-sheet-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0}
 
 /* Segment buttons (status / priority) */
 .bp-seg-row{display:flex;gap:6px;flex-wrap:wrap}
