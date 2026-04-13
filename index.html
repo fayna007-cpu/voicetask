@@ -1495,6 +1495,20 @@ if('serviceWorker' in navigator){
   });
 }
 initLightMode();
+// Read share params from URL (iOS Shortcuts / Android share target)
+(function(){
+  const p=new URLSearchParams(location.search);
+  const text=(p.get('share_text')||p.get('text')||'').trim();
+  const url=(p.get('share_url')||p.get('url')||'').trim();
+  const title=(p.get('share_title')||p.get('title')||'').trim();
+  if(text||url){
+    const pending=JSON.parse(localStorage.getItem('vt_pending')||'[]');
+    pending.unshift({id:Date.now(),text:(title?title+'\n':'')+text,url,receivedAt:new Date().toISOString()});
+    localStorage.setItem('vt_pending',JSON.stringify(pending));
+    // clean URL without reload
+    history.replaceState({},'',location.pathname);
+  }
+})();
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBar').classList.add('on')});
 window.addEventListener('appinstalled',()=>{document.getElementById('installBar').classList.remove('on');toast('🎉 האפליקציה הותקנה!')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('installBar').classList.remove('on')})}
