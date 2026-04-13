@@ -152,6 +152,7 @@
   </div>
 </div>
 
+<div id="todayPlan"></div>
 <div class="filters">
   <button class="f-btn on" onclick="setFilter('all',this)">הכל</button>
   <button class="f-btn" onclick="setFilter('אישי',this)">👤 אישי</button>
@@ -694,10 +695,8 @@
         <div class="bp-convert-box" id="bpConvertBox">
           <div class="bp-convert-title">↗ הפוך למשימה ראשית</div>
           <div class="bp-convert-desc">יועתק לרשימת המשימות ויסונכרן לקאלנדר</div>
-          <div style="display:flex;gap:8px;margin-top:10px;width:100%;box-sizing:border-box">
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><div class="rform-lbl">תאריך</div><input class="rfi bp-conv-input" id="bpConvDate" type="date"></div>
-            <div style="flex:0 0 90px;min-width:0;display:flex;flex-direction:column;gap:6px"><div class="rform-lbl">שעה</div><input class="rfi bp-conv-input" id="bpConvTime" type="time" value="09:00"></div>
-          </div>
+          <div class="rfield" style="margin-top:10px"><div class="rform-lbl">תאריך</div><input class="rfi" id="bpConvDate" type="date"></div>
+          <div class="rfield" style="margin-top:8px"><div class="rform-lbl">שעה</div><input class="rfi" id="bpConvTime" type="time" value="09:00"></div>
           <button class="bp-convert-btn" onclick="convertBpToTask()">צור משימה</button>
         </div>
       </div>
@@ -727,6 +726,17 @@
   </div>
 </div><!-- /#backlogPage -->
 </div><!-- /#bpPageWrapper -->
+
+<!-- Daily morning popup -->
+<div class="dp-overlay" id="dpOverlay" onclick="closeDailyPopup()"></div>
+<div class="dp-modal" id="dpModal">
+  <div class="dp-head">
+    <div class="dp-greeting" id="dpGreeting"></div>
+    <button class="dp-close" onclick="closeDailyPopup()">✕</button>
+  </div>
+  <div class="dp-body" id="dpBody"></div>
+  <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -799,7 +809,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();setTimeout(maybeShowDailyPopup,1200);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1742,6 +1752,7 @@ function renderRoutineInstance(inst){
 </div>`;}
 
 function render(){
+  renderTodayPlan();
   const el=document.getElementById('list');if(!el)return;
   const routineInstances=getRoutineInstances();
   let taskList=filter==='done'
@@ -3191,6 +3202,55 @@ function exportBacklogCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=list.name+'-'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();URL.revokeObjectURL(a.href);toast('⬇ ייצוא הושלם');
+}
+
+// ── Today Plan ──────────────────────────────────────────
+function getTodayItems(){
+  const now=new Date();
+  const ds=ymd(now);
+  const todayTasks=tasks.filter(t=>!t.completed&&t.datetime&&ymd(new Date(t.datetime))===ds)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  const todayRoutines=getRoutineInstances().filter(r=>!r.completed&&ymd(new Date(r.datetime))===ds)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  return{tasks:todayTasks,routines:todayRoutines};
+}
+function todayItemRow(item,isRoutine){
+  const dt=new Date(item.datetime);
+  const time=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
+  return`<div class="tp-row">`
+    +`<span class="tp-dot">${isRoutine?'🔄':'📌'}</span>`
+    +`<span class="tp-text">${esc(item.text)}</span>`
+    +`<span class="tp-time">${time}</span>`
+    +`</div>`;
+}
+function renderTodayPlan(){
+  const el=document.getElementById('todayPlan');if(!el)return;
+  const{tasks:tt,routines:rr}=getTodayItems();
+  if(!tt.length&&!rr.length){el.innerHTML='';return;}
+  const rows=[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('');
+  el.innerHTML=`<div class="tp-wrap">
+<div class="tp-hdr"><span class="tp-hdr-icon">☀️</span><span class="tp-hdr-title">היום שלי</span><span class="tp-count">${tt.length+rr.length}</span></div>
+<div class="tp-list">${rows}</div></div>`;
+}
+
+// ── Daily morning popup ──────────────────────────────────
+function closeDailyPopup(){
+  document.getElementById('dpOverlay').classList.remove('on');
+  document.getElementById('dpModal').classList.remove('on');
+}
+function maybeShowDailyPopup(){
+  const today=ymd(new Date());
+  if(localStorage.getItem('vt_dp_shown')===today)return;
+  const{tasks:tt,routines:rr}=getTodayItems();
+  if(!tt.length&&!rr.length)return;
+  localStorage.setItem('vt_dp_shown',today);
+  const h=new Date().getHours();
+  const greet=h<12?'בוקר טוב ☀️':h<17?'צהריים טובים 🌤':' ערב טוב 🌙';
+  document.getElementById('dpGreeting').textContent=greet+' — הנה היום שלך:';
+  const rows=[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('');
+  document.getElementById('dpBody').innerHTML=`<div class="tp-list">${rows}</div>`;
+  document.getElementById('dpOverlay').classList.add('on');
+  document.getElementById('dpModal').classList.add('on');
 }
 </script>
 </body>

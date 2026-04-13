@@ -538,6 +538,30 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .notif-test-btn{flex:1;min-width:72px;padding:10px 8px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .15s}
 .notif-test-btn:active{background:var(--accent);color:oklch(0.12 0.007 45)}
 
+/* ── Today Plan ──────────────────────────────────────────────────────────── */
+.tp-wrap{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.tp-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px 8px;border-bottom:1px solid var(--border);direction:rtl}
+.tp-hdr-icon{font-size:15px}
+.tp-hdr-title{font-size:13px;font-weight:800;color:var(--text);flex:1}
+.tp-count{font-size:11px;font-weight:700;background:var(--accent);color:oklch(0.12 0.007 45);border-radius:20px;padding:1px 7px}
+.tp-list{display:flex;flex-direction:column}
+.tp-row{display:flex;align-items:center;gap:8px;padding:8px 14px;direction:rtl}
+.tp-row:not(:last-child){border-bottom:1px solid var(--border)}
+.tp-dot{font-size:12px;flex-shrink:0}
+.tp-text{flex:1;font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-time{font-size:11px;color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
+
+/* ── Daily Popup ─────────────────────────────────────────────────────────── */
+.dp-overlay{display:none;position:fixed;inset:0;background:oklch(0 0 0 / 0.55);z-index:300;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.dp-overlay.on{display:block}
+.dp-modal{display:none;position:fixed;bottom:-100%;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-radius:24px 24px 0 0;border-top:1px solid var(--border2);z-index:301;padding:20px 20px calc(20px + var(--sab));box-sizing:border-box;transition:bottom .35s cubic-bezier(.25,.46,.45,.94)}
+.dp-modal.on{display:block;bottom:0}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;direction:rtl}
+.dp-greeting{font-size:16px;font-weight:800;color:var(--text)}
+.dp-close{width:32px;height:32px;border-radius:50%;background:var(--surface2);border:none;color:var(--muted);font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+.dp-body{background:var(--surface2);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.dp-btn{width:100%;padding:14px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
 /* ── Backlog Full Page ────────────────────────────────────────────────────── */
 .side-item-ico.green{background:oklch(0.40 0.12 145 / 0.25);color:oklch(0.72 0.16 145)}
 
