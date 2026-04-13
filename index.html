@@ -3205,12 +3205,13 @@ function exportBacklogCSV(){
 }
 
 // ── Today Plan ──────────────────────────────────────────
+function _ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function getTodayItems(){
   const now=new Date();
-  const ds=ymd(now);
-  const todayTasks=tasks.filter(t=>!t.completed&&t.datetime&&ymd(new Date(t.datetime))===ds)
+  const ds=_ymd(now);
+  const todayTasks=tasks.filter(t=>!t.completed&&t.datetime&&_ymd(new Date(t.datetime))===ds)
     .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
-  const todayRoutines=getRoutineInstances().filter(r=>!r.completed&&ymd(new Date(r.datetime))===ds)
+  const todayRoutines=getRoutineInstances().filter(r=>!r.completed&&_ymd(new Date(r.datetime))===ds)
     .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
   return{tasks:todayTasks,routines:todayRoutines};
 }
@@ -3226,10 +3227,13 @@ function todayItemRow(item,isRoutine){
 function renderTodayPlan(){
   const el=document.getElementById('todayPlan');if(!el)return;
   const{tasks:tt,routines:rr}=getTodayItems();
-  if(!tt.length&&!rr.length){el.innerHTML='';return;}
-  const rows=[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('');
+  const total=tt.length+rr.length;
+  const countBadge=total?`<span class="tp-count">${total}</span>`:'';
+  const rows=total
+    ?[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('')
+    :`<div class="tp-row tp-empty"><span class="tp-text" style="color:var(--muted)">לא זוהו משימות להיום</span></div>`;
   el.innerHTML=`<div class="tp-wrap">
-<div class="tp-hdr"><span class="tp-hdr-icon">☀️</span><span class="tp-hdr-title">היום שלי</span><span class="tp-count">${tt.length+rr.length}</span></div>
+<div class="tp-hdr"><span class="tp-hdr-icon">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
 <div class="tp-list">${rows}</div></div>`;
 }
 
@@ -3239,7 +3243,7 @@ function closeDailyPopup(){
   document.getElementById('dpModal').classList.remove('on');
 }
 function maybeShowDailyPopup(){
-  const today=ymd(new Date());
+  const today=_ymd(new Date());
   if(localStorage.getItem('vt_dp_shown')===today)return;
   const{tasks:tt,routines:rr}=getTodayItems();
   if(!tt.length&&!rr.length)return;
