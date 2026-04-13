@@ -694,9 +694,9 @@
         <div class="bp-convert-box" id="bpConvertBox">
           <div class="bp-convert-title">↗ הפוך למשימה ראשית</div>
           <div class="bp-convert-desc">יועתק לרשימת המשימות ויסונכרן לקאלנדר</div>
-          <div class="rfield-2col" style="margin-top:10px">
-            <div class="rfield"><div class="rform-lbl">תאריך</div><input class="rfi" id="bpConvDate" type="date"></div>
-            <div class="rfield"><div class="rform-lbl">שעה</div><input class="rfi" id="bpConvTime" type="time" value="09:00"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;width:100%;box-sizing:border-box">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><div class="rform-lbl">תאריך</div><input class="rfi bp-conv-input" id="bpConvDate" type="date"></div>
+            <div style="flex:0 0 90px;min-width:0;display:flex;flex-direction:column;gap:6px"><div class="rform-lbl">שעה</div><input class="rfi bp-conv-input" id="bpConvTime" type="time" value="09:00"></div>
           </div>
           <button class="bp-convert-btn" onclick="convertBpToTask()">צור משימה</button>
         </div>
