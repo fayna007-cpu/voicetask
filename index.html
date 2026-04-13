@@ -748,6 +748,9 @@
     <h3>📥 ממתינים לאישור</h3>
     <div style="width:32px"></div>
   </div>
+  <div style="padding:12px 16px 0;direction:rtl">
+    <button class="pend-paste-btn" onclick="pasteFromClipboard()">📋 הדבק מהלוח (העתק מוואטסאפ ← לחץ כאן)</button>
+  </div>
   <div class="rsheet-scroll" id="pendingList" style="padding:12px 16px calc(32px + var(--sab))"></div>
 </div>
 
@@ -3310,6 +3313,16 @@ function pendToCRM(id){
     document.getElementById('bpItemUrl').value=item.url||'';
   },400);
   pendDelete(id);
+}
+function pasteFromClipboard(){
+  navigator.clipboard.readText().then(text=>{
+    text=text.trim();
+    if(!text){toast('הלוח ריק');return;}
+    // try to extract URL from text
+    const urlMatch=text.match(/https?:\/\/[^\s]+/);
+    const url=urlMatch?urlMatch[0]:'';
+    addPendingItem(text,'',url);
+  }).catch(()=>toast('לא ניתן לגשת ללוח — אשר גישה'));
 }
 // Listen for share messages from SW
 if('serviceWorker' in navigator){

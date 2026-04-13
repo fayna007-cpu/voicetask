@@ -564,6 +564,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .pend-btn.crm:active,.pend-btn.crm:hover{background:oklch(0.72 0.16 145 / 0.1);border-color:oklch(0.72 0.16 145);color:oklch(0.72 0.16 145)}
 .pend-btn.del{flex:0 0 40px;color:var(--muted)}
 .pend-btn.del:active{color:oklch(0.65 0.18 25)}
+.pend-paste-btn{width:100%;padding:12px;border-radius:var(--r);border:1.5px dashed var(--accent);background:oklch(0.78 0.16 72 / 0.07);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;direction:rtl}
 
 /* ── Today Plan ──────────────────────────────────────────────────────────── */
 .tp-wrap{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
