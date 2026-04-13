@@ -236,6 +236,14 @@
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
+    <div class="settings-section">מראה</div>
+    <div class="settings-cards">
+      <div class="settings-row">
+        <div class="settings-row-ico" style="background:oklch(0.78 0.16 72 / 0.15);color:var(--accent)">🌓</div>
+        <div class="settings-row-body"><div class="settings-row-title">מצב בהיר</div><div class="settings-row-sub">החלף בין עיצוב כהה לבהיר</div></div>
+        <label class="rtoggle"><input type="checkbox" id="lightModeToggle" onchange="toggleLightMode(this.checked)"><span class="rtoggle-sl"></span></label>
+      </div>
+    </div>
     <div class="settings-section">סטטיסטיקה</div>
     <div class="settings-stat-row" id="settingsStats"></div>
     <div class="settings-section">גיבוי ושחזור</div>
@@ -835,7 +843,18 @@ function closeSideMenu(){
 function confirmSignOut(){if(confirm('להתנתק?'))signOut()}
 
 // ── Settings ──────────────────────────────────────────────────────────────────
+function toggleLightMode(on){
+  document.body.classList.toggle('light',on);
+  localStorage.setItem('vt_light',on?'1':'');
+  const tog=document.getElementById('lightModeToggle');if(tog)tog.checked=on;
+}
+function initLightMode(){
+  const on=localStorage.getItem('vt_light')==='1';
+  if(on)document.body.classList.add('light');
+  const tog=document.getElementById('lightModeToggle');if(tog)tog.checked=on;
+}
 function openSettings(){
+  document.getElementById('lightModeToggle').checked=document.body.classList.contains('light');
   // stats
   const done=tasks.filter(t=>t.completed).length;
   document.getElementById('settingsStats').innerHTML=`
@@ -1456,6 +1475,7 @@ if('serviceWorker' in navigator){
     if(e.data&&e.data.type==='SHOW_NOTIFICATION')playNotifSound();
   });
 }
+initLightMode();
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBar').classList.add('on')});
 window.addEventListener('appinstalled',()=>{document.getElementById('installBar').classList.remove('on');toast('🎉 האפליקציה הותקנה!')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('installBar').classList.remove('on')})}
