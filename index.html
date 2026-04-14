@@ -271,6 +271,22 @@
     <div class="settings-stat-row" id="settingsStats"></div>
     <div class="settings-section">גיבוי ושחזור</div>
     <div class="settings-cards">
+      <div class="settings-row" onclick="driveBackup(true)">
+        <div class="settings-row-ico" style="background:oklch(0.45 0.15 250 / 0.2);color:oklch(0.65 0.18 250)">☁️</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">גיבוי ל-Google Drive</div>
+          <div class="settings-row-sub" id="driveBackupSub">טרם גובה</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-row" onclick="driveRestore()">
+        <div class="settings-row-ico" style="background:oklch(0.45 0.15 250 / 0.2);color:oklch(0.65 0.18 250)">🔄</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">שחזור מ-Google Drive</div>
+          <div class="settings-row-sub">ייבא את הגיבוי האחרון מהדרייב</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
       <div class="settings-row" onclick="exportData()">
         <div class="settings-row-ico green">📤</div>
         <div class="settings-row-body">
@@ -789,7 +805,7 @@
 
 <script>
 const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.appdata';
 const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
 const PUSH_SERVER='https://voicetask-push.fayna007.workers.dev';
 const VAPID_PUBLIC_KEY='BCkBcRLfmYljHezmWoubFdRMxuL1ExrkzilYUAaz47dR390m1PR_LvXwMDdZDAHQpCNU58V8mvoJ-BD2jrxvgIM';
@@ -856,7 +872,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -894,7 +910,7 @@ function initLightMode(){
 }
 function openSettings(){
   document.getElementById('lightModeToggle').checked=document.body.classList.contains('light');
-  loadDpSettings();
+  loadDpSettings();updateBackupStatus();
   // stats
   const done=tasks.filter(t=>t.completed).length;
   document.getElementById('settingsStats').innerHTML=`
@@ -3276,6 +3292,67 @@ function exportBacklogCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=list.name+'-'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();URL.revokeObjectURL(a.href);toast('⬇ ייצוא הושלם');
+}
+
+// ── Google Drive Auto Backup ─────────────────────────────
+async function driveBackup(manual=false){
+  if(!gAuth?.access_token){if(manual)toast('יש להתחבר עם גוגל');return;}
+  try{
+    const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,backlogLists,backlogItems});
+    const fileName='voicetask-backup.json';
+    // Find existing file in appDataFolder
+    const search=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27'+fileName+'%27&fields=files(id)',
+      {headers:{Authorization:'Bearer '+gAuth.access_token}});
+    const {files}=await search.json();
+    const existingId=files&&files[0]?.id;
+    const meta={name:fileName,parents:existingId?undefined:['appDataFolder']};
+    const blob=new Blob([data],{type:'application/json'});
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify(existingId?{name:fileName}:meta)],{type:'application/json'}));
+    form.append('file',blob);
+    const url=existingId
+      ?`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+      :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&spaces=appDataFolder';
+    const method=existingId?'PATCH':'POST';
+    const res=await fetch(url,{method,headers:{Authorization:'Bearer '+gAuth.access_token},body:form});
+    if(!res.ok)throw new Error(res.status);
+    localStorage.setItem('vt_backup_last',new Date().toISOString());
+    updateBackupStatus();
+    if(manual)toast('✅ גובה ל-Google Drive');
+  }catch(e){
+    console.warn('Drive backup error:',e);
+    if(manual)toast('❌ גיבוי נכשל — '+e.message);
+  }
+}
+async function driveRestore(){
+  if(!gAuth?.access_token){toast('יש להתחבר עם גוגל');return;}
+  try{
+    toast('⏳ מחזיר גיבוי...');
+    const search=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27voicetask-backup.json%27&fields=files(id)',
+      {headers:{Authorization:'Bearer '+gAuth.access_token}});
+    const {files}=await search.json();
+    if(!files||!files[0]){{toast('לא נמצא גיבוי בדרייב');return;}}
+    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${files[0].id}?alt=media`,
+      {headers:{Authorization:'Bearer '+gAuth.access_token}});
+    const data=await res.json();
+    if(data.tasks)tasks=[...data.tasks,...tasks.filter(t=>!data.tasks.find(x=>x.id===t.id))];
+    if(data.routines)routines=[...data.routines,...routines.filter(r=>!data.routines.find(x=>x.id===r.id))];
+    if(data.backlogLists)backlogLists=[...data.backlogLists,...backlogLists.filter(l=>!data.backlogLists.find(x=>x.id===l.id))];
+    if(data.backlogItems)backlogItems=[...data.backlogItems,...backlogItems.filter(i=>!data.backlogItems.find(x=>x.id===i.id))];
+    save();saveRoutines();saveBpLists();saveBpItems();render();
+    toast('✅ גיבוי שוחזר — '+((data.tasks||[]).length)+' משימות');
+  }catch(e){toast('❌ שחזור נכשל');}
+}
+function updateBackupStatus(){
+  const el=document.getElementById('driveBackupSub');if(!el)return;
+  const last=localStorage.getItem('vt_backup_last');
+  el.textContent=last?'גיבוי אחרון: '+new Date(last).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'טרם גובה';
+}
+function maybeAutoDriveBackup(){
+  if(!gAuth?.access_token)return;
+  const last=localStorage.getItem('vt_backup_last');
+  if(last&&(Date.now()-new Date(last).getTime())<20*3600000)return; // once per 20h
+  driveBackup(false);
 }
 
 // ── Pending (Share Target) ───────────────────────────────
