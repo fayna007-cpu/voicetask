@@ -241,6 +241,24 @@
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
+    <div class="settings-section">פופ-אפ בוקר / ערב</div>
+    <div class="settings-cards">
+      <div class="settings-row">
+        <div class="settings-row-ico" style="background:oklch(0.78 0.16 72 / 0.15);color:var(--accent)">⏰</div>
+        <div class="settings-row-body"><div class="settings-row-title">שעת הצגה</div><div class="settings-row-sub">מתי להציג את הפופ-אפ היומי</div></div>
+        <input type="time" class="settings-select" id="dp-time" value="07:00" onchange="saveDpSettings()" style="background-image:none">
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-ico" style="background:oklch(0.72 0.16 145 / 0.15);color:oklch(0.72 0.16 145)">▶️</div>
+        <div class="settings-row-body"><div class="settings-row-title">סרטון מוטיבציה</div><div class="settings-row-sub">URL של סרטון יוטיוב להצגה בפופ-אפ</div></div>
+      </div>
+      <div style="padding:0 14px 12px"><input class="rfi" id="dp-video-url" type="url" placeholder="https://www.youtube.com/watch?v=..." oninput="saveDpSettings()" style="font-size:13px;padding:9px 12px;direction:ltr"></div>
+      <div class="settings-row" onclick="testDailyPopup()" style="cursor:pointer">
+        <div class="settings-row-ico" style="background:oklch(0.68 0.18 65 / 0.15);color:var(--accent2)">🧪</div>
+        <div class="settings-row-body"><div class="settings-row-title">בדוק פופ-אפ עכשיו</div><div class="settings-row-sub">הצג את הפופ-אפ מיידית לבדיקה</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
     <div class="settings-section">מראה</div>
     <div class="settings-cards">
       <div class="settings-row">
@@ -761,7 +779,9 @@
     <div class="dp-greeting" id="dpGreeting"></div>
     <button class="dp-close" onclick="closeDailyPopup()">✕</button>
   </div>
-  <div class="dp-body" id="dpBody"></div>
+  <div class="dp-scroll">
+    <div class="dp-body" id="dpBody"></div>
+  </div>
   <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
 </div>
 
@@ -874,6 +894,7 @@ function initLightMode(){
 }
 function openSettings(){
   document.getElementById('lightModeToggle').checked=document.body.classList.contains('light');
+  loadDpSettings();
   // stats
   const done=tasks.filter(t=>t.completed).length;
   document.getElementById('settingsStats').innerHTML=`
@@ -3391,23 +3412,96 @@ function renderTodayPlan(){
 }
 
 // ── Daily morning popup ──────────────────────────────────
+const NAVAL_QUOTES=[
+  'העושר האמיתי הוא להיות בעל הזמן שלך.',
+  'בנה משהו שיכול להתרחב ממך — עסק, נכסים, ידע.',
+  'אושר הוא המצב הטבעי שלך כשאתה מפסיק לחפש אושר.',
+  'לדעת לעבוד קשה חשוב פחות מלדעת על מה לעבוד.',
+  'קרא את כל מה שאתה יכול. אל תסיים ספרים שמשעממים אותך.',
+  'הדרך לכסף: ייחודיות + אחריות + מנוף.',
+  'הכסף הגדול לא נמצא בהחלפת זמן בכסף.',
+  'למד כלכלה, לימוד כיצד ללמוד, ולמד כיצד לעשות.',
+  'שקט מוח הוא המטרה. כל השאר הוא כלי.',
+  'אל תשכח — אם אתה לא מרוצה ממה שיש לך, לא תהיה מרוצה ממה שתקבל.',
+  'תעדוף את הבריאות, הנפש, ואז הכסף. בסדר הזה.',
+  'להיות יזם פירושו לפתור בעיות של אנשים בקנה מידה גדול.',
+  'הנחת היסוד הפשוטה: תן ערך לאנשים, אל תסתכל על התגמול.',
+  'כישורי המאה ה-21: קוד, מדיה, מנהיגות.',
+  'אם אתה לא ב-top 10% בתחומך — בחר תחום שונה.'
+];
+
+function getDpSettings(){
+  return JSON.parse(localStorage.getItem('vt_dp_settings')||'{"time":"07:00","videoUrl":""}');
+}
+function saveDpSettings(){
+  const s={time:document.getElementById('dp-time')?.value||'07:00',videoUrl:document.getElementById('dp-video-url')?.value||''};
+  localStorage.setItem('vt_dp_settings',JSON.stringify(s));
+}
+function loadDpSettings(){
+  const s=getDpSettings();
+  const t=document.getElementById('dp-time');if(t)t.value=s.time||'07:00';
+  const v=document.getElementById('dp-video-url');if(v)v.value=s.videoUrl||'';
+}
+function getYoutubeEmbedId(url){
+  if(!url)return'';
+  const m=url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  return m?m[1]:'';
+}
+function buildDailyPopupContent(){
+  const{tasks:tt,routines:rr}=getTodayItems();
+  const s=getDpSettings();
+  let html='';
+  // Quote
+  const q=NAVAL_QUOTES[Math.floor((_ymd(new Date()).replace(/-/g,'')*1)%NAVAL_QUOTES.length)];
+  html+=`<div class="dp-quote"><div class="dp-quote-ico">💬</div><div class="dp-quote-text">"${q}"</div><div class="dp-quote-attr">— Naval Ravikant</div></div>`;
+  // Video
+  const vid=getYoutubeEmbedId(s.videoUrl);
+  if(vid){
+    html+=`<div class="dp-video-wrap"><iframe class="dp-video" src="https://www.youtube.com/embed/${vid}?rel=0" frameborder="0" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe></div>`;
+  }
+  // High priority CRM
+  const urgent=backlogItems.filter(i=>i.priority==='high'&&i.status!=='done').slice(0,2);
+  if(urgent.length){
+    html+=`<div class="dp-section-title">🔴 דחוף מהרשימות שלי</div><div class="tp-list">`;
+    urgent.forEach(i=>{html+=`<div class="tp-row"><span class="tp-dot">🔴</span><span class="tp-text">${esc(i.text)}</span></div>`;});
+    html+=`</div>`;
+  }
+  // Today tasks
+  const total=tt.length+rr.length;
+  html+=`<div class="dp-section-title">☀️ משימות היום${total?` (${total})`:''}:</div>`;
+  if(total){
+    const rows=[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('');
+    html+=`<div class="tp-list">${rows}</div>`;
+  }else{
+    html+=`<div class="tp-row"><span class="tp-text" style="color:var(--muted)">אין משימות מוגדרות להיום</span></div>`;
+  }
+  return html;
+}
+function showDailyPopup(){
+  const h=new Date().getHours();
+  const greet=h<12?'בוקר טוב ☀️':h<17?'צהריים טובים 🌤':'ערב טוב 🌙';
+  document.getElementById('dpGreeting').textContent=greet;
+  document.getElementById('dpBody').innerHTML=buildDailyPopupContent();
+  document.getElementById('dpOverlay').classList.add('on');
+  document.getElementById('dpModal').classList.add('on');
+}
 function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+function testDailyPopup(){
+  closeSettings();
+  setTimeout(showDailyPopup,300);
+}
 function maybeShowDailyPopup(){
   const today=_ymd(new Date());
   if(localStorage.getItem('vt_dp_shown')===today)return;
-  const{tasks:tt,routines:rr}=getTodayItems();
-  if(!tt.length&&!rr.length)return;
+  const s=getDpSettings();
+  const[sh,sm]=(s.time||'07:00').split(':').map(Number);
+  const now=new Date();
+  if(now.getHours()<sh||(now.getHours()===sh&&now.getMinutes()<sm))return;
   localStorage.setItem('vt_dp_shown',today);
-  const h=new Date().getHours();
-  const greet=h<12?'בוקר טוב ☀️':h<17?'צהריים טובים 🌤':' ערב טוב 🌙';
-  document.getElementById('dpGreeting').textContent=greet+' — הנה היום שלך:';
-  const rows=[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('');
-  document.getElementById('dpBody').innerHTML=`<div class="tp-list">${rows}</div>`;
-  document.getElementById('dpOverlay').classList.add('on');
-  document.getElementById('dpModal').classList.add('on');
+  showDailyPopup();
 }
 </script>
 </body>
