@@ -805,7 +805,7 @@
 
 <script>
 const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.appdata';
+const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
 const PUSH_SERVER='https://voicetask-push.fayna007.workers.dev';
 const VAPID_PUBLIC_KEY='BCkBcRLfmYljHezmWoubFdRMxuL1ExrkzilYUAaz47dR390m1PR_LvXwMDdZDAHQpCNU58V8mvoJ-BD2jrxvgIM';
@@ -3295,33 +3295,45 @@ function exportBacklogCSV(){
 }
 
 // ── Google Drive Auto Backup ─────────────────────────────
+const DRIVE_FILE_NAME='voicetask-backup.json';
+async function driveGetToken(){
+  // Ensure token has drive.file scope — request fresh if needed
+  return new Promise((resolve)=>{
+    if(!tokenClient){resolve(gAuth?.access_token||null);return;}
+    const prev=tokenClient.callback;
+    tokenClient.callback=(resp)=>{
+      tokenClient.callback=prev;
+      if(resp.error){resolve(null);return;}
+      gAuth={...gAuth,access_token:resp.access_token,expiry:Date.now()+(+(resp.expires_in||3600))*1000};
+      localStorage.setItem('vt_auth',JSON.stringify(gAuth));
+      resolve(resp.access_token);
+    };
+    tokenClient.requestAccessToken({prompt:''});
+  });
+}
+async function driveFindFile(token){
+  const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=name%3D%27${DRIVE_FILE_NAME}%27+and+trashed%3Dfalse&fields=files(id)`,
+    {headers:{Authorization:'Bearer '+token}});
+  const j=await r.json();
+  return j.files&&j.files[0]?.id||null;
+}
 async function driveBackup(manual=false){
   if(!gAuth?.access_token){if(manual)toast('יש להתחבר עם גוגל');return;}
   try{
+    if(manual)toast('⏳ מגבה...');
+    const token=await driveGetToken();
+    if(!token){toast('❌ לא ניתן לקבל הרשאה');return;}
     const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,backlogLists,backlogItems});
-    const fileName='voicetask-backup.json';
-    // Find existing file in appDataFolder
-    const search=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27'+fileName+'%27&fields=files(id)',
-      {headers:{Authorization:'Bearer '+gAuth.access_token}});
-    const {files}=await search.json();
-    const existingId=files&&files[0]?.id;
-    const meta={name:fileName,parents:existingId?undefined:['appDataFolder']};
+    const existingId=await driveFindFile(token);
     const blob=new Blob([data],{type:'application/json'});
     const form=new FormData();
-    form.append('metadata',new Blob([JSON.stringify(existingId?{name:fileName}:meta)],{type:'application/json'}));
+    form.append('metadata',new Blob([JSON.stringify(existingId?{name:DRIVE_FILE_NAME}:{name:DRIVE_FILE_NAME})],{type:'application/json'}));
     form.append('file',blob);
     const url=existingId
       ?`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
-      :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&spaces=appDataFolder';
-    const method=existingId?'PATCH':'POST';
-    const res=await fetch(url,{method,headers:{Authorization:'Bearer '+gAuth.access_token},body:form});
-    if(res.status===401||res.status===403){
-      // Token missing drive scope — request new token silently
-      if(tokenClient){tokenClient.requestAccessToken({prompt:''});toast('מחדש הרשאה — נסה שוב בעוד שניה');}
-      else toast('יש לצאת ולהתחבר מחדש לאישור הרשאת Drive');
-      return;
-    }
-    if(!res.ok)throw new Error(res.status);
+      :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const res=await fetch(url,{method:existingId?'PATCH':'POST',headers:{Authorization:'Bearer '+token},body:form});
+    if(!res.ok){const t=await res.text();throw new Error(res.status+' '+t.slice(0,80));}
     localStorage.setItem('vt_backup_last',new Date().toISOString());
     updateBackupStatus();
     if(manual)toast('✅ גובה ל-Google Drive');
@@ -3334,12 +3346,12 @@ async function driveRestore(){
   if(!gAuth?.access_token){toast('יש להתחבר עם גוגל');return;}
   try{
     toast('⏳ מחזיר גיבוי...');
-    const search=await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27voicetask-backup.json%27&fields=files(id)',
-      {headers:{Authorization:'Bearer '+gAuth.access_token}});
-    const {files}=await search.json();
-    if(!files||!files[0]){{toast('לא נמצא גיבוי בדרייב');return;}}
-    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${files[0].id}?alt=media`,
-      {headers:{Authorization:'Bearer '+gAuth.access_token}});
+    const token=await driveGetToken();
+    if(!token){toast('❌ לא ניתן לקבל הרשאה');return;}
+    const id=await driveFindFile(token);
+    if(!id){toast('לא נמצא גיבוי בדרייב');return;}
+    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+      {headers:{Authorization:'Bearer '+token}});
     const data=await res.json();
     if(data.tasks)tasks=[...data.tasks,...tasks.filter(t=>!data.tasks.find(x=>x.id===t.id))];
     if(data.routines)routines=[...data.routines,...routines.filter(r=>!data.routines.find(x=>x.id===r.id))];
@@ -3347,7 +3359,7 @@ async function driveRestore(){
     if(data.backlogItems)backlogItems=[...data.backlogItems,...backlogItems.filter(i=>!data.backlogItems.find(x=>x.id===i.id))];
     save();saveRoutines();saveBpLists();saveBpItems();render();
     toast('✅ גיבוי שוחזר — '+((data.tasks||[]).length)+' משימות');
-  }catch(e){toast('❌ שחזור נכשל');}
+  }catch(e){console.warn(e);toast('❌ שחזור נכשל');}
 }
 function updateBackupStatus(){
   const el=document.getElementById('driveBackupSub');if(!el)return;
