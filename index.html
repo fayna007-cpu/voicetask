@@ -3297,9 +3297,10 @@ function exportBacklogCSV(){
 // ── Google Drive Auto Backup ─────────────────────────────
 const DRIVE_FILE_NAME='voicetask-backup.json';
 async function driveGetToken(){
-  // Ensure token has drive.file scope — request fresh if needed
+  // Always request fresh token with consent to ensure drive.file scope is included
   return new Promise((resolve)=>{
-    if(!tokenClient){resolve(gAuth?.access_token||null);return;}
+    if(!window.google){resolve(null);return;}
+    if(!tokenClient)tokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:SCOPES,callback:()=>{}});
     const prev=tokenClient.callback;
     tokenClient.callback=(resp)=>{
       tokenClient.callback=prev;
@@ -3308,7 +3309,7 @@ async function driveGetToken(){
       localStorage.setItem('vt_auth',JSON.stringify(gAuth));
       resolve(resp.access_token);
     };
-    tokenClient.requestAccessToken({prompt:''});
+    tokenClient.requestAccessToken({prompt:'consent'});
   });
 }
 async function driveFindFile(token){
