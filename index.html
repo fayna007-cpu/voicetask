@@ -3315,6 +3315,12 @@ async function driveBackup(manual=false){
       :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&spaces=appDataFolder';
     const method=existingId?'PATCH':'POST';
     const res=await fetch(url,{method,headers:{Authorization:'Bearer '+gAuth.access_token},body:form});
+    if(res.status===401||res.status===403){
+      // Token missing drive scope — request new token silently
+      if(tokenClient){tokenClient.requestAccessToken({prompt:''});toast('מחדש הרשאה — נסה שוב בעוד שניה');}
+      else toast('יש לצאת ולהתחבר מחדש לאישור הרשאת Drive');
+      return;
+    }
     if(!res.ok)throw new Error(res.status);
     localStorage.setItem('vt_backup_last',new Date().toISOString());
     updateBackupStatus();
