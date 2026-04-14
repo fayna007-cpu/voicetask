@@ -3333,7 +3333,7 @@ async function driveBackup(manual=false){
       ?`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
       :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
     const res=await fetch(url,{method:existingId?'PATCH':'POST',headers:{Authorization:'Bearer '+token},body:form});
-    if(!res.ok){const t=await res.text();throw new Error(res.status+' '+t.slice(0,80));}
+    if(!res.ok){const t=await res.text();const msg=t.includes('has not been')?'Drive API לא מופעל — הפעל ב-Google Cloud Console':res.status+' '+t.slice(0,60);throw new Error(msg);}
     localStorage.setItem('vt_backup_last',new Date().toISOString());
     updateBackupStatus();
     if(manual)toast('✅ גובה ל-Google Drive');
