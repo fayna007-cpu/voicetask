@@ -1832,7 +1832,7 @@ function renderTaskCard(task){
     <button class="act done-btn" onclick="toggleDone(${task.id})">${task.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="editTask(${task.id})">${ICO.edit}</button>
     ${extraBtn}
-    <button class="act focus-task-btn" onclick="startFocusTimer(${task.id},${JSON.stringify(task.text)})" title="פוקוס טיימר">⏱</button>
+    <button class="act focus-task-btn" onclick="startFocusById(${task.id})" title="פוקוס טיימר">⏱</button>
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
     <button class="act cal-btn" onclick="cal(${task.id})">${ICO.cal}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
@@ -3559,7 +3559,7 @@ function renderOneThing(){
     </div>`;
     return;
   }
-  const focusBtn=`<button class="ot-focus-btn" onclick="startFocusTimer(null,${JSON.stringify(d.text)})">⏱ פוקוס</button>`;
+  const focusBtn=`<button class="ot-focus-btn" onclick="startFocusOT()">⏱ פוקוס</button>`;
   el.innerHTML=`<div class="ot-active">
     <div class="ot-label">🎯 המשימה האחת להיום</div>
     <div class="ot-text">${esc(d.text)}</div>
@@ -3610,6 +3610,14 @@ function setOneThingCustom(){
 // ── Focus Timer ──────────────────────────────────────────
 let _ft={active:false,paused:false,taskText:'',duration:25*60,remaining:25*60,interval:null,session:1};
 const FT_CIRC=2*Math.PI*88;
+function startFocusById(id){
+  const t=tasks.find(x=>x.id===id);
+  if(t)startFocusTimer(id,t.text);
+}
+function startFocusOT(){
+  const d=getOneThing();
+  if(d)startFocusTimer(d.taskId||null,d.text);
+}
 function startFocusTimer(taskId,taskText){
   if(_ft.active)stopFocusTimer();
   _ft={active:true,paused:false,taskText,duration:25*60,remaining:25*60,interval:null,session:1};

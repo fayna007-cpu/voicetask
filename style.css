@@ -26,15 +26,21 @@ body.light{
   --accent:oklch(0.68 0.18 65);
   --accent2:oklch(0.58 0.20 62);
 }
-html{height:100%;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+html,body{height:100%;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 body{
   font-family:'Rubik',-apple-system,'SF Pro Display','Segoe UI',sans-serif;
   background:var(--bg);color:var(--text);
-  min-height:100svh;max-width:480px;margin:0 auto;
-  padding:0 0 calc(88px + var(--sab));
-  padding-left:var(--sal);padding-right:var(--sar);
-  direction:rtl;overflow-x:clip;
-  overscroll-behavior-y:none;-webkit-user-select:none;user-select:none;
+  direction:rtl;-webkit-user-select:none;user-select:none;
+}
+#app{
+  position:fixed;inset:0;
+  max-width:480px;left:0;right:0;margin:0 auto;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:none;
+  padding:0 0 calc(88px + var(--sab,0px));
+  padding-left:var(--sal,0px);padding-right:var(--sar,0px);
+  box-sizing:border-box;
 }
 .ico{display:block;flex-shrink:0}
 
@@ -522,7 +528,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .routine-clear-btn:active{background:oklch(0.65 0.18 25 / 0.2)}
 
 /* ── Bottom Nav ── */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:8px 0 calc(10px + var(--sab));z-index:50;transform:translateZ(0);-webkit-transform:translateZ(0)}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:8px 0 calc(10px + var(--sab,0px));z-index:50}
 .bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0;border:none;background:none;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .bnav-item.active{color:var(--accent)}
 .bnav-icon{font-size:20px;line-height:1}
