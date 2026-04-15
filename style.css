@@ -836,8 +836,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 #gePageWrapper.on #gePage{transform:translateX(0)}
 /* leave room for bottom nav */
 #gePageWrapper .ge-scroll{padding-bottom:calc(88px + var(--sab,0px))}
-.ge-topbar{display:flex;align-items:center;padding:calc(12px + var(--sat,0px)) 12px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
-.ge-back{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation}
+.ge-topbar{display:flex;align-items:center;direction:rtl;padding:calc(12px + var(--sat,0px)) 16px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
+.ge-back{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation}
 .ge-title{flex:1;font-size:17px;font-weight:800;color:var(--text);text-align:center}
 .ge-refresh{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:opacity .2s}
 .ge-tabs{display:flex;overflow-x:auto;gap:6px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;scrollbar-width:none}
