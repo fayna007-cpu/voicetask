@@ -832,10 +832,18 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 /* ── Growth Engine ───────────────────────────────────────────────────────── */
 #gePageWrapper{position:fixed;inset:0;z-index:45;overflow:hidden;pointer-events:none;max-width:480px;left:0;right:0;margin:0 auto}
 #gePageWrapper.on{pointer-events:auto}
-#gePage{position:absolute;inset:0;background:var(--bg);transform:translateX(100%);transition:transform .38s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#gePage{
+  position:fixed;
+  top:0;bottom:0;left:0;right:0;
+  max-width:480px;margin:0 auto;
+  background:var(--bg);
+  transform:translateX(100%);
+  transition:transform .38s cubic-bezier(.25,.46,.45,.94);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
 #gePageWrapper.on #gePage{transform:translateX(0)}
-/* leave room for bottom nav */
-#gePageWrapper .ge-scroll{padding-bottom:calc(88px + var(--sab,0px))}
+.ge-scroll{overflow-y:auto;flex:1;min-height:0;padding:16px 16px calc(96px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .ge-topbar{display:flex;align-items:center;direction:rtl;padding:calc(12px + var(--sat,0px)) 16px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
 .ge-back{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation}
 .ge-title{flex:1;font-size:17px;font-weight:800;color:var(--text);text-align:center}
@@ -844,7 +852,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-tabs::-webkit-scrollbar{display:none}
 .ge-tab{flex-shrink:0;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap}
 .ge-tab.on{background:var(--accent);color:oklch(0.12 0.007 45);border-color:var(--accent)}
-.ge-body{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.ge-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .ge-scroll{overflow-y:auto;flex:1;min-height:0;padding:16px 16px 32px;box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
 /* KPIs */
