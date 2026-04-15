@@ -822,8 +822,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-tabs::-webkit-scrollbar{display:none}
 .ge-tab{flex-shrink:0;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap}
 .ge-tab.on{background:var(--accent);color:oklch(0.12 0.007 45);border-color:var(--accent)}
-.ge-body{flex:1;overflow:hidden;position:relative}
-.ge-scroll{overflow-y:auto;height:100%;padding:16px 16px calc(32px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.ge-body{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.ge-scroll{overflow-y:auto;flex:1;padding:16px 16px calc(32px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
 /* KPIs */
 .ge-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
