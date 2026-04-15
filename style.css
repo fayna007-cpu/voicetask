@@ -830,18 +830,26 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .focus-btn-pause{padding:14px 36px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
 
 /* ── Growth Engine ───────────────────────────────────────────────────────── */
-#gePageWrapper{position:fixed;inset:0;z-index:45;overflow:hidden;pointer-events:none;max-width:480px;left:0;right:0;margin:0 auto}
+#gePageWrapper{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:100%;
+  height:-webkit-fill-available;
+  z-index:45;
+  overflow:hidden;
+  pointer-events:none;
+  max-width:480px;
+  margin:0 auto;
+}
 #gePageWrapper.on{pointer-events:auto}
 #gePage{
-  position:fixed;
+  position:absolute;
   top:0;left:0;right:0;bottom:0;
-  max-width:480px;margin:0 auto;
   background:var(--bg);
   transform:translateX(110%);
   transition:transform .38s cubic-bezier(.25,.46,.45,.94);
   display:flex;flex-direction:column;
   overflow:hidden;
-  will-change:transform;
 }
 #gePageWrapper.on #gePage{transform:translateX(0)}
 .ge-scroll{overflow-y:auto;flex:1;min-height:0;padding:16px 16px calc(96px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}

@@ -3888,36 +3888,12 @@ let _geTab='dashboard';
 
 function openGrowthEngine(){
   document.getElementById('gePageWrapper').classList.add('on');
-  _gePinViewport(true);
   const p=geLoad();
   if(!p||!p.onboarded){geRenderOnboarding();return;}
   geSetTab(_geTab,null);
 }
 function closeGrowthEngine(){
   document.getElementById('gePageWrapper').classList.remove('on');
-  _gePinViewport(false);
-}
-let _geVpHandler=null;
-function _gePinViewport(on){
-  const page=document.getElementById('gePage');if(!page)return;
-  if(!on){
-    page.style.cssText='';
-    if(_geVpHandler&&window.visualViewport)window.visualViewport.removeEventListener('resize',_geVpHandler);
-    _geVpHandler=null;
-    return;
-  }
-  function pin(){
-    const vp=window.visualViewport||{width:window.innerWidth,height:window.innerHeight,offsetTop:0};
-    page.style.position='fixed';
-    page.style.top=vp.offsetTop+'px';
-    page.style.left='0';page.style.right='0';
-    page.style.width=Math.min(vp.width,480)+'px';
-    page.style.margin='0 auto';
-    page.style.height=vp.height+'px';
-  }
-  pin();
-  _geVpHandler=pin;
-  if(window.visualViewport)window.visualViewport.addEventListener('resize',pin);
 }
 function geSetTab(tab,btn){
   _geTab=tab;
