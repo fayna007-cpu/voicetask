@@ -955,3 +955,87 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-onboard-hint{font-size:12px;color:var(--muted);direction:rtl;margin-bottom:8px}
 /* Stock avg cost field */
 .ge-stock-avg{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:10px;outline:none;text-align:center}
+
+/* ── Energy Check-in Popup ── */
+.energy-overlay{position:fixed;inset:0;z-index:300;background:oklch(0 0 0 / 0.55);backdrop-filter:blur(4px);display:none}
+.energy-overlay.on{display:block}
+.energy-popup{
+  position:fixed;bottom:0;left:0;right:0;z-index:301;
+  max-width:480px;margin:0 auto;
+  background:var(--surface);border-radius:24px 24px 0 0;
+  padding:24px 20px calc(28px + var(--sab,0px));
+  direction:rtl;
+  transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.9,.3,1);
+}
+.energy-popup.on{transform:translateY(0)}
+.energy-title{font-size:17px;font-weight:800;color:var(--text);text-align:center;margin-bottom:6px}
+.energy-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px;line-height:1.5}
+.energy-btns{display:flex;gap:10px;justify-content:center;margin-bottom:16px}
+.energy-btn{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:14px 20px;border-radius:16px;border:1.5px solid var(--border2);
+  background:var(--surface2);cursor:pointer;touch-action:manipulation;
+  transition:background .15s,border-color .15s,transform .12s;
+  min-width:68px;
+}
+.energy-btn:active{transform:scale(.93)}
+.energy-btn.sel{background:oklch(0.78 0.16 72 / 0.15);border-color:var(--accent)}
+.energy-btn{font-size:24px}
+.energy-btn span{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:4px}
+.energy-skip{width:100%;padding:12px;border:none;background:transparent;color:var(--muted);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
+/* ── Weekly Pattern Card ── */
+.wpc-overlay{position:fixed;inset:0;z-index:300;background:oklch(0 0 0 / 0.55);backdrop-filter:blur(4px);display:none}
+.wpc-overlay.on{display:block}
+.wpc-modal{
+  position:fixed;top:50%;left:0;right:0;z-index:301;
+  max-width:440px;margin:0 auto;
+  background:var(--surface);border-radius:20px;
+  padding:22px 18px;direction:rtl;
+  transform:translateY(calc(-50% + 12px));opacity:0;transition:transform .3s cubic-bezier(.2,.9,.3,1),opacity .3s ease;
+  pointer-events:none;
+}
+.wpc-modal.on{transform:translateY(-50%);opacity:1;pointer-events:auto}
+.wpc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.wpc-title{font-size:16px;font-weight:800;color:var(--text)}
+.wpc-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;line-height:1}
+.wpc-line{padding:10px 12px;border-radius:12px;background:var(--surface2);margin-bottom:6px;font-size:13px;color:var(--text);line-height:1.5;direction:rtl}
+.wpc-ok{
+  width:100%;margin-top:16px;padding:13px;border-radius:50px;
+  background:var(--accent);border:none;color:oklch(0.12 0.007 45);
+  font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;
+}
+
+/* ── Recovery Protocol Popup ── */
+.recovery-overlay{position:fixed;inset:0;z-index:300;background:oklch(0 0 0 / 0.55);backdrop-filter:blur(4px);display:none}
+.recovery-overlay.on{display:block}
+.recovery-popup{
+  position:fixed;bottom:0;left:0;right:0;z-index:301;
+  max-width:480px;margin:0 auto;
+  background:var(--surface);border-radius:24px 24px 0 0;
+  padding:24px 20px calc(28px + var(--sab,0px));
+  direction:rtl;
+  transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.9,.3,1);
+}
+.recovery-popup.on{transform:translateY(0)}
+.recovery-ico{font-size:32px;text-align:center;margin-bottom:6px}
+.recovery-title{font-size:17px;font-weight:800;color:var(--text);text-align:center;margin-bottom:4px}
+.recovery-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:18px;line-height:1.5}
+.recovery-slots{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.recovery-slot{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:14px;
+  padding:12px 14px;cursor:pointer;touch-action:manipulation;
+  transition:background .15s,border-color .15s;
+}
+.recovery-slot:active{background:oklch(0.78 0.16 72 / 0.1)}
+.recovery-slot-info{font-size:13px;font-weight:700;color:var(--text)}
+.recovery-slot-time{font-size:12px;color:var(--muted);margin-top:2px}
+.recovery-slot-btn{font-size:12px;font-weight:800;color:var(--accent);background:oklch(0.78 0.16 72 / 0.12);border-radius:20px;padding:5px 12px;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.recovery-skip{width:100%;padding:12px;border:none;background:transparent;color:var(--muted);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
+/* ── Routine Consistency Bar ── */
+.routine-cons-wrap{margin-top:6px;direction:rtl}
+.routine-cons-track{height:4px;background:var(--border2);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.routine-cons-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.routine-cons-label{font-size:10px;font-weight:700;color:var(--muted)}
