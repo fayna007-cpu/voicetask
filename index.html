@@ -209,6 +209,10 @@
       <span>ממתינים לאישור</span>
       <span class="pending-badge" id="pendingBadge" style="display:none"></span>
     </button>
+    <button class="side-item" onclick="closeSideMenu();openGrowthEngine()">
+      <div class="side-item-ico" style="background:oklch(0.45 0.18 145 / 0.2);color:oklch(0.72 0.20 145)">🚀</div>
+      מנוע הצמיחה
+    </button>
     <button class="side-item" onclick="closeSideMenu();openBacklogSheet()">
       <div class="side-item-ico green">📋</div>
       הרשימות שלי
@@ -774,6 +778,29 @@
   </div>
 </div><!-- /#backlogPage -->
 </div><!-- /#bpPageWrapper -->
+
+<!-- Growth Engine Full Page -->
+<div id="gePageWrapper">
+<div id="gePage">
+  <div class="ge-topbar">
+    <button class="ge-back" onclick="closeGrowthEngine()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="ge-title">🚀 מנוע הצמיחה</div>
+    <button class="ge-refresh" onclick="geRefreshAll()" id="geRefreshBtn" title="רענן נתונים">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+    </button>
+  </div>
+  <div class="ge-tabs">
+    <button class="ge-tab on" onclick="geSetTab('dashboard',this)">📊 מצב</button>
+    <button class="ge-tab" onclick="geSetTab('pipeline',this)">💼 פייפליין</button>
+    <button class="ge-tab" onclick="geSetTab('assets',this)">📈 נכסים</button>
+    <button class="ge-tab" onclick="geSetTab('skills',this)">🧠 כישורים</button>
+    <button class="ge-tab" onclick="geSetTab('insights',this)">💡 תובנות</button>
+  </div>
+  <div class="ge-body" id="geBody"></div>
+</div>
+</div><!-- /#gePageWrapper -->
 
 <!-- Pending Sheet -->
 <div class="rsheet" id="pendingSheet">
@@ -3378,6 +3405,530 @@ function exportBacklogCSV(){
   a.click();URL.revokeObjectURL(a.href);toast('⬇ ייצוא הושלם');
 }
 
+// ── Growth Engine ────────────────────────────────────────
+const GE_KEY='vt_growth';
+const GE_PIPE_KEY='vt_ge_pipe';
+const GE_SKILLS_KEY='vt_ge_skills';
+
+function geLoad(){return JSON.parse(localStorage.getItem(GE_KEY)||'null');}
+function geSave(d){localStorage.setItem(GE_KEY,JSON.stringify(d));}
+function gePipeLoad(){return JSON.parse(localStorage.getItem(GE_PIPE_KEY)||'[]');}
+function gePipeSave(d){localStorage.setItem(GE_PIPE_KEY,JSON.stringify(d));}
+function geSkillsLoad(){return JSON.parse(localStorage.getItem(GE_SKILLS_KEY)||'[]');}
+function geSkillsSave(d){localStorage.setItem(GE_SKILLS_KEY,JSON.stringify(d));}
+
+let _geTab='dashboard';
+
+function openGrowthEngine(){
+  document.getElementById('gePageWrapper').classList.add('on');
+  const p=geLoad();
+  if(!p||!p.onboarded){geRenderOnboarding();return;}
+  geSetTab(_geTab,null);
+}
+function closeGrowthEngine(){
+  document.getElementById('gePageWrapper').classList.remove('on');
+}
+function geSetTab(tab,btn){
+  _geTab=tab;
+  document.querySelectorAll('.ge-tab').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  else{const tabs={dashboard:0,pipeline:1,assets:2,skills:3,insights:4};
+    document.querySelectorAll('.ge-tab')[tabs[tab]]?.classList.add('on');}
+  const body=document.getElementById('geBody');
+  if(!body)return;
+  if(tab==='dashboard')geRenderDashboard();
+  else if(tab==='pipeline')geRenderPipeline();
+  else if(tab==='assets')geRenderAssets();
+  else if(tab==='skills')geRenderSkills();
+  else if(tab==='insights')geRenderInsights();
+}
+
+// ── Onboarding ──
+function geRenderOnboarding(){
+  const body=document.getElementById('geBody');if(!body)return;
+  body.innerHTML=`
+<div class="ge-onboard">
+  <div class="ge-onboard-title">נתחיל להכיר אותך 👋</div>
+  <div class="ge-onboard-sub">כמה שאלות כדי שהמנוע יהיה מותאם אישית לחלוטין</div>
+
+  <div class="ge-section-title">💰 מצב פיננסי</div>
+  <div class="ge-field"><label>הכנסה חודשית נטו (₪)</label><input type="number" id="ge_income" placeholder="18000" inputmode="numeric"></div>
+  <div class="ge-field"><label>חיסכון חודשי (₪)</label><input type="number" id="ge_saving" placeholder="3500" inputmode="numeric"></div>
+  <div class="ge-field"><label>חיסכון נזיל כולל (₪)</label><input type="number" id="ge_liquid" placeholder="120000" inputmode="numeric"></div>
+  <div class="ge-field"><label>קרן פנסיה / השתלמות (₪)</label><input type="number" id="ge_pension" placeholder="80000" inputmode="numeric"></div>
+
+  <div class="ge-section-title">🏠 דירה (אם יש)</div>
+  <div class="ge-field"><label>שווי משוער (₪)</label><input type="number" id="ge_propval" placeholder="1800000" inputmode="numeric"></div>
+  <div class="ge-field"><label>יתרת משכנתא (₪)</label><input type="number" id="ge_mortgage" placeholder="850000" inputmode="numeric"></div>
+  <div class="ge-field"><label>שכירות שנגבית (₪/חודש, 0 אם גר שם)</label><input type="number" id="ge_rent" placeholder="0" inputmode="numeric"></div>
+
+  <div class="ge-section-title">📈 תיק השקעות</div>
+  <div class="ge-onboard-sub" style="margin-bottom:10px">הוסף נכסים — טיקר + כמות (לדוגמה: VOO, 15)</div>
+  <div id="ge_stocks_wrap"></div>
+  <button class="ge-add-stock-btn" onclick="geAddStockRow()">+ הוסף נייר ערך</button>
+
+  <div class="ge-section-title">🎯 מטרות</div>
+  <div class="ge-field"><label>מטרה קצרת טווח (12 חודש)</label><input type="text" id="ge_goal_short" placeholder="הכנסה צדדית ראשונה של 2,000 ₪/חודש" dir="rtl"></div>
+  <div class="ge-field"><label>מטרה ארוכת טווח (5 שנה)</label><input type="text" id="ge_goal_long" placeholder="עצמאות ממעסיק" dir="rtl"></div>
+  <div class="ge-field"><label>תחום שאתה רוצה למנף להכנסה</label>
+    <select id="ge_focus_skill" style="direction:rtl">
+      <option value="ai_automation">אוטומציות AI / n8n</option>
+      <option value="digital_marketing">דיגיטל / מרקטינג</option>
+      <option value="consulting">ייעוץ / הדרכה</option>
+      <option value="content">תוכן / כתיבה</option>
+      <option value="other">אחר</option>
+    </select>
+  </div>
+
+  <button class="ge-onboard-save" onclick="geOnboardSave()">שמור והתחל 🚀</button>
+</div>`;
+  // seed one stock row
+  geAddStockRow();
+}
+function geAddStockRow(){
+  const wrap=document.getElementById('ge_stocks_wrap');if(!wrap)return;
+  const idx=wrap.children.length;
+  const row=document.createElement('div');row.className='ge-stock-row';
+  row.innerHTML=`<input class="ge-stock-ticker" type="text" placeholder="VOO" style="text-transform:uppercase">
+<input class="ge-stock-qty" type="number" placeholder="כמות" inputmode="numeric">
+<button onclick="this.parentNode.remove()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 4px">✕</button>`;
+  wrap.appendChild(row);
+}
+function geOnboardSave(){
+  const stocks=[];
+  document.querySelectorAll('.ge-stock-row').forEach(row=>{
+    const t=row.querySelector('.ge-stock-ticker')?.value.trim().toUpperCase();
+    const q=parseFloat(row.querySelector('.ge-stock-qty')?.value)||0;
+    if(t&&q>0)stocks.push({ticker:t,qty:q});
+  });
+  const d={
+    onboarded:true,
+    createdAt:new Date().toISOString(),
+    income:parseFloat(document.getElementById('ge_income')?.value)||0,
+    saving:parseFloat(document.getElementById('ge_saving')?.value)||0,
+    liquid:parseFloat(document.getElementById('ge_liquid')?.value)||0,
+    pension:parseFloat(document.getElementById('ge_pension')?.value)||0,
+    propVal:parseFloat(document.getElementById('ge_propval')?.value)||0,
+    mortgage:parseFloat(document.getElementById('ge_mortgage')?.value)||0,
+    propRent:parseFloat(document.getElementById('ge_rent')?.value)||0,
+    stocks,
+    goalShort:document.getElementById('ge_goal_short')?.value.trim()||'',
+    goalLong:document.getElementById('ge_goal_long')?.value.trim()||'',
+    focusSkill:document.getElementById('ge_focus_skill')?.value||'ai_automation',
+    stockPrices:{},lastRefresh:null
+  };
+  geSave(d);
+  // seed default skills
+  geSkillsSave(geDefaultSkills(d.focusSkill));
+  // seed default pipeline
+  gePipeSave(geDefaultPipeline(d));
+  geSetTab('dashboard',null);
+  toast('🚀 מנוע הצמיחה מוכן!');
+}
+function geDefaultSkills(focus){
+  const base=[
+    {id:1,name:'AI / Claude / Automation',level:3,hoursPerWeek:5,potential:'3000-8000',monetized:'learning'},
+    {id:2,name:'דיגיטל / מרקטינג',level:3,hoursPerWeek:3,potential:'2000-5000',monetized:'learning'},
+    {id:3,name:'n8n / Integrations',level:3,hoursPerWeek:2,potential:'1500-4000',monetized:'learning'},
+  ];
+  return base;
+}
+function geDefaultPipeline(profile){
+  const items=[];
+  if(profile.focusSkill==='ai_automation'||profile.focusSkill==='digital_marketing'){
+    items.push({id:Date.now(),title:'אוטומציית לידים לעסק קטן',desc:'וואטסאפ → CRM → תזכורות אוטומטיות',potential:2500,hoursWeek:8,status:'idea',nextStep:'בנה דוגמה עובדת אחת',createdAt:new Date().toISOString()});
+    items.push({id:Date.now()+1,title:'ייעוץ AI לעסקים',desc:'הדרכת שימוש ב-ChatGPT/Claude לצוותים',potential:1500,hoursWeek:4,status:'idea',nextStep:'פנה ל-3 אנשי קשר עם עסקים',createdAt:new Date().toISOString()});
+  }
+  if(profile.propRent===0&&profile.propVal>0){
+    items.push({id:Date.now()+2,title:'שכירות חלקית / Airbnb',desc:'מינוף הדירה הקיימת',potential:1200,hoursWeek:2,status:'idea',nextStep:'בדוק כדאיות ב-Airbnb',createdAt:new Date().toISOString()});
+  }
+  return items;
+}
+
+// ── Real-time data ──
+async function geFetchPrice(ticker){
+  try{
+    const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`);
+    const j=await r.json();
+    const price=j?.chart?.result?.[0]?.meta?.regularMarketPrice||null;
+    return price;
+  }catch(e){return null;}
+}
+async function geFetchUSDILS(){
+  try{
+    const r=await fetch('https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS?lastNObservations=1&format=json');
+    const j=await r.json();
+    const val=j?.data?.dataSets?.[0]?.series?.['0:0:0:0:0']?.observations?.['0']?.[0]||null;
+    return val;
+  }catch(e){return null;}
+}
+async function geRefreshAll(){
+  const p=geLoad();if(!p)return;
+  const btn=document.getElementById('geRefreshBtn');
+  if(btn)btn.style.opacity='0.4';
+  toast('⏳ מרענן נתונים...');
+  const prices={};
+  for(const s of(p.stocks||[])){
+    const price=await geFetchPrice(s.ticker);
+    if(price)prices[s.ticker]=price;
+  }
+  // also fetch S&P500
+  const sp=await geFetchPrice('%5EGSPC');
+  if(sp)prices['SPX']=sp;
+  const usd=await geFetchUSDILS();
+  if(usd)prices['USDILS']=usd;
+  p.stockPrices=prices;p.lastRefresh=new Date().toISOString();
+  geSave(p);
+  if(btn)btn.style.opacity='1';
+  toast('✅ נתונים עודכנו');
+  geSetTab(_geTab,null);
+}
+
+// ── Calculations ──
+function geCalcNetWorth(p){
+  const stockVal=(p.stocks||[]).reduce((sum,s)=>{
+    const price=p.stockPrices?.[s.ticker]||0;
+    const usd=p.stockPrices?.['USDILS']||3.7;
+    return sum+s.qty*price*usd;
+  },0);
+  const propEquity=Math.max(0,(p.propVal||0)-(p.mortgage||0));
+  return (p.liquid||0)+(p.pension||0)+stockVal+propEquity;
+}
+function geCalcFIYears(p){
+  const nw=geCalcNetWorth(p);
+  const monthSaving=(p.saving||0);
+  const target=(p.income||0)*12*25; // 4% rule
+  if(target<=0)return null;
+  if(nw>=target)return 0;
+  // simple projection with 7% annual return
+  let acc=nw;let years=0;
+  while(acc<target&&years<50){acc=acc*1.07+monthSaving*12;years++;}
+  return years;
+}
+function geFmt(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(0)+'K':Math.round(n).toString();}
+
+// ── Dashboard ──
+function geRenderDashboard(){
+  const p=geLoad();const body=document.getElementById('geBody');if(!body)return;
+  const nw=geCalcNetWorth(p);
+  const fiYears=geCalcFIYears(p);
+  const pipe=gePipeLoad();
+  const activePipe=pipe.filter(x=>x.status!=='rejected').length;
+  const lastRefresh=p.lastRefresh?new Date(p.lastRefresh).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'טרם עודכן';
+  const weeklyStep=geGetWeeklyStep(p);
+
+  body.innerHTML=`
+<div class="ge-scroll">
+  <div class="ge-kpi-row">
+    <div class="ge-kpi">
+      <div class="ge-kpi-val">₪${geFmt(nw)}</div>
+      <div class="ge-kpi-lbl">שווי נטו</div>
+    </div>
+    <div class="ge-kpi">
+      <div class="ge-kpi-val">${fiYears!==null?fiYears+'y':'—'}</div>
+      <div class="ge-kpi-lbl">לעצמאות כלכלית</div>
+    </div>
+    <div class="ge-kpi">
+      <div class="ge-kpi-val">${activePipe}</div>
+      <div class="ge-kpi-lbl">הזדמנויות פעילות</div>
+    </div>
+  </div>
+  <div class="ge-refresh-note">עודכן: ${lastRefresh}</div>
+
+  ${weeklyStep?`<div class="ge-weekly-step">
+    <div class="ge-weekly-step-label">⚡ הצעד הכספי השבועי</div>
+    <div class="ge-weekly-step-text">${weeklyStep.text}</div>
+    <button class="ge-weekly-step-btn" onclick="geWeeklyToOneThing(${JSON.stringify(weeklyStep.text).replace(/"/g,'&quot;')})">הפוך ל-One Thing →</button>
+  </div>`:''}
+
+  <div class="ge-section-title">🎯 המטרות שלך</div>
+  <div class="ge-goal-card">
+    <div class="ge-goal-label">קצר טווח (12 חודש)</div>
+    <div class="ge-goal-text">${esc(p.goalShort||'לא הוגדר')}</div>
+  </div>
+  <div class="ge-goal-card">
+    <div class="ge-goal-label">ארוך טווח (5 שנה)</div>
+    <div class="ge-goal-text">${esc(p.goalLong||'לא הוגדר')}</div>
+  </div>
+
+  <div class="ge-section-title">💰 תזרים חודשי</div>
+  <div class="ge-flow-row"><span class="ge-flow-lbl">הכנסה</span><span class="ge-flow-val green">+₪${geFmt(p.income||0)}</span></div>
+  <div class="ge-flow-row"><span class="ge-flow-lbl">חיסכון</span><span class="ge-flow-val">₪${geFmt(p.saving||0)}</span></div>
+  <div class="ge-flow-row"><span class="ge-flow-lbl">הוצאות</span><span class="ge-flow-val muted">₪${geFmt((p.income||0)-(p.saving||0))}</span></div>
+  ${p.propRent>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">שכירות</span><span class="ge-flow-val green">+₪${geFmt(p.propRent)}</span></div>`:''}
+
+  <button class="ge-edit-profile-btn" onclick="geEditProfile()">✏️ עדכן פרטים</button>
+</div>`;
+}
+
+function geGetWeeklyStep(p){
+  const pipe=gePipeLoad();
+  const idea=pipe.find(x=>x.status==='idea');
+  if(idea)return{text:`קדם את "${idea.title}" — ${idea.nextStep}`};
+  const nw=geCalcNetWorth(p);
+  if((p.saving||0)>0)return{text:`חיסכון ₪${geFmt(p.saving)} החודש — שקול להשקיע ב-ETF`};
+  return null;
+}
+function geWeeklyToOneThing(text){
+  setOneThing(text,null);
+  toast('✅ נוסף כ-One Thing');
+  closeGrowthEngine();
+}
+function geEditProfile(){
+  geSave({...geLoad(),onboarded:false});
+  geRenderOnboarding();
+}
+
+// ── Pipeline ──
+const GE_STATUS={idea:{label:'💡 רעיון',cls:'idea'},active:{label:'🔄 בבדיקה',cls:'active'},talking:{label:'📞 בשיחות',cls:'talking'},done:{label:'✅ פעיל',cls:'done'},rejected:{label:'❌ נדחה',cls:'rejected'}};
+function geRenderPipeline(){
+  const pipe=gePipeLoad();
+  const body=document.getElementById('geBody');if(!body)return;
+  const cards=pipe.length?pipe.map(geRenderPipeCard).join(''):`<div class="ge-empty">אין הזדמנויות עדיין.<br>לחץ + להוסיף.</div>`;
+  body.innerHTML=`<div class="ge-scroll">${cards}<button class="ge-fab-add" onclick="geOpenPipeForm(null)">+ הזדמנות חדשה</button></div>`;
+}
+function geRenderPipeCard(item){
+  const st=GE_STATUS[item.status]||GE_STATUS.idea;
+  return `<div class="ge-pipe-card">
+  <div class="ge-pipe-top">
+    <div class="ge-pipe-title">${esc(item.title)}</div>
+    <span class="ge-status-badge ${st.cls}">${st.label}</span>
+  </div>
+  <div class="ge-pipe-desc">${esc(item.desc||'')}</div>
+  <div class="ge-pipe-meta">
+    <span>💰 ₪${geFmt(item.potential||0)}/חודש</span>
+    <span>⏱ ${item.hoursWeek||0}ש׳/שבוע</span>
+    <span>ROI: ${item.hoursWeek?Math.round((item.potential||0)/item.hoursWeek):0}₪/ש׳</span>
+  </div>
+  ${item.nextStep?`<div class="ge-pipe-next">👉 ${esc(item.nextStep)}</div>`:''}
+  <div class="ge-pipe-actions">
+    <button class="ge-pipe-btn" onclick="geNextStepToTask(${item.id})">→ משימה</button>
+    <button class="ge-pipe-btn" onclick="geOpenPipeForm(${item.id})">✏️</button>
+    <button class="ge-pipe-btn danger" onclick="geDeletePipe(${item.id})">✕</button>
+  </div>
+  <div class="ge-pipe-status-row">${Object.entries(GE_STATUS).map(([k,v])=>`<button class="ge-st-btn${item.status===k?' on':''}" onclick="gePipeStatus(${item.id},'${k}')">${v.label}</button>`).join('')}</div>
+</div>`;
+}
+function geNextStepToTask(id){
+  const pipe=gePipeLoad();const item=pipe.find(x=>x.id===id);if(!item||!item.nextStep)return;
+  const dt=new Date();dt.setHours(9,0,0,0);dt.setDate(dt.getDate()+1);
+  const task={id:Date.now(),text:item.nextStep,datetime:dt.toISOString(),category:'מקצועי',completed:false,calendarEventId:null};
+  tasks.unshift(task);save();render();toast('✅ נוסף כמשימה');
+}
+function gePipeStatus(id,status){
+  const pipe=gePipeLoad();const item=pipe.find(x=>x.id===id);if(!item)return;
+  item.status=status;gePipeSave(pipe);geRenderPipeline();
+}
+function geDeletePipe(id){
+  gePipeSave(gePipeLoad().filter(x=>x.id!==id));geRenderPipeline();
+}
+function geOpenPipeForm(id){
+  const pipe=gePipeLoad();
+  const item=id?pipe.find(x=>x.id===id):{id:Date.now(),title:'',desc:'',potential:0,hoursWeek:0,status:'idea',nextStep:''};
+  const body=document.getElementById('geBody');if(!body)return;
+  body.innerHTML=`<div class="ge-scroll ge-form">
+  <div class="ge-form-title">${id?'עריכת':'הזדמנות חדשה'}</div>
+  <div class="ge-field"><label>שם</label><input type="text" id="gpf_title" value="${esc(item.title||'')}" dir="rtl"></div>
+  <div class="ge-field"><label>תיאור</label><textarea id="gpf_desc" rows="2" dir="rtl">${esc(item.desc||'')}</textarea></div>
+  <div class="ge-field"><label>פוטנציאל (₪/חודש)</label><input type="number" id="gpf_pot" value="${item.potential||0}" inputmode="numeric"></div>
+  <div class="ge-field"><label>שעות שבועיות נדרשות</label><input type="number" id="gpf_hrs" value="${item.hoursWeek||0}" inputmode="numeric"></div>
+  <div class="ge-field"><label>הצעד הבא</label><input type="text" id="gpf_next" value="${esc(item.nextStep||'')}" dir="rtl"></div>
+  <div class="ge-field"><label>סטטוס</label><select id="gpf_status" style="direction:rtl">${Object.entries(GE_STATUS).map(([k,v])=>`<option value="${k}"${item.status===k?' selected':''}>${v.label}</option>`).join('')}</select></div>
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button class="ge-cancel-btn" onclick="geSetTab('pipeline',null)">ביטול</button>
+    <button class="ge-save-btn" onclick="geSavePipeForm(${item.id},${!!id})">שמור ✓</button>
+  </div>
+</div>`;
+}
+function geSavePipeForm(id,isEdit){
+  const pipe=isEdit?gePipeLoad():gePipeLoad();
+  const item={id,title:document.getElementById('gpf_title')?.value.trim(),desc:document.getElementById('gpf_desc')?.value.trim(),potential:parseFloat(document.getElementById('gpf_pot')?.value)||0,hoursWeek:parseFloat(document.getElementById('gpf_hrs')?.value)||0,nextStep:document.getElementById('gpf_next')?.value.trim(),status:document.getElementById('gpf_status')?.value||'idea',createdAt:new Date().toISOString()};
+  if(!item.title){toast('הוסף שם');return;}
+  if(isEdit){const idx=pipe.findIndex(x=>x.id===id);if(idx!==-1)pipe[idx]=item;else pipe.push(item);}
+  else pipe.push(item);
+  gePipeSave(pipe);geSetTab('pipeline',null);toast('✅ נשמר');
+}
+
+// ── Assets ──
+async function geRenderAssets(){
+  const p=geLoad();const body=document.getElementById('geBody');if(!body)return;
+  const usd=p.stockPrices?.['USDILS']||3.7;
+  const stockRows=(p.stocks||[]).map(s=>{
+    const price=p.stockPrices?.[s.ticker];
+    const valUSD=price?s.qty*price:null;
+    const valILS=valUSD?valUSD*usd:null;
+    return `<div class="ge-asset-row">
+      <div class="ge-asset-ticker">${esc(s.ticker)}</div>
+      <div class="ge-asset-qty">${s.qty} יח׳</div>
+      <div class="ge-asset-price">${price?'$'+price.toFixed(2):'—'}</div>
+      <div class="ge-asset-val">${valILS?'₪'+geFmt(valILS):'—'}</div>
+    </div>`;
+  }).join('');
+  const stockTotal=(p.stocks||[]).reduce((sum,s)=>{
+    const price=p.stockPrices?.[s.ticker]||0;
+    return sum+s.qty*price*usd;
+  },0);
+  const propEquity=Math.max(0,(p.propVal||0)-(p.mortgage||0));
+  const sp=p.stockPrices?.['SPX'];
+
+  body.innerHTML=`<div class="ge-scroll">
+  ${sp?`<div class="ge-market-bar">S&P 500: ${sp.toLocaleString()} | ₪/$: ${usd.toFixed(2)}</div>`:''}
+
+  <div class="ge-section-title">🏠 נדל"ן</div>
+  <div class="ge-asset-block">
+    <div class="ge-asset-row"><span class="ge-flow-lbl">שווי דירה</span><span class="ge-flow-val">₪${geFmt(p.propVal||0)}</span></div>
+    <div class="ge-asset-row"><span class="ge-flow-lbl">משכנתא</span><span class="ge-flow-val muted">-₪${geFmt(p.mortgage||0)}</span></div>
+    <div class="ge-asset-row"><span class="ge-flow-lbl">הון עצמי</span><span class="ge-flow-val green">₪${geFmt(propEquity)}</span></div>
+    ${p.propRent>0?`<div class="ge-asset-row"><span class="ge-flow-lbl">תשואת שכירות</span><span class="ge-flow-val">${((p.propRent*12/(p.propVal||1))*100).toFixed(1)}%</span></div>`:''}
+  </div>
+
+  <div class="ge-section-title">📈 תיק השקעות</div>
+  <div class="ge-asset-block">
+    <div class="ge-asset-header"><span>טיקר</span><span>כמות</span><span>מחיר</span><span>שווי ₪</span></div>
+    ${stockRows||'<div class="ge-empty" style="padding:12px">לא הוגדרו ניירות</div>'}
+    <div class="ge-asset-total"><span>סה"כ תיק</span><span class="ge-flow-val green">₪${geFmt(stockTotal)}</span></div>
+  </div>
+
+  <div class="ge-section-title">💰 נזילות</div>
+  <div class="ge-asset-block">
+    <div class="ge-asset-row"><span class="ge-flow-lbl">חיסכון נזיל</span><span class="ge-flow-val">₪${geFmt(p.liquid||0)}</span></div>
+    <div class="ge-asset-row"><span class="ge-flow-lbl">פנסיה / השתלמות</span><span class="ge-flow-val">₪${geFmt(p.pension||0)}</span></div>
+  </div>
+
+  <div class="ge-section-title">📊 שווי נטו כולל</div>
+  <div class="ge-net-worth-big">₪${geFmt(geCalcNetWorth(p))}</div>
+
+  <button class="ge-edit-profile-btn" onclick="geSetTab('dashboard',null);setTimeout(()=>document.querySelector('.ge-edit-profile-btn')?.click(),50)">✏️ עדכן נתונים</button>
+</div>`;
+}
+
+// ── Skills ──
+const GE_SKILL_LEVELS=['מתחיל','לומד','יודע','מנוסה','מומחה'];
+const GE_MON_STATUS={no:'לא ממונף',learning:'בתהליך',yes:'ממונף ✅'};
+function geRenderSkills(){
+  const skills=geSkillsLoad();const body=document.getElementById('geBody');if(!body)return;
+  const cards=skills.map(s=>`<div class="ge-skill-card">
+  <div class="ge-skill-top">
+    <div class="ge-skill-name">${esc(s.name)}</div>
+    <div class="ge-skill-level">${GE_SKILL_LEVELS[s.level-1]||'?'}</div>
+  </div>
+  <div class="ge-skill-bar-wrap"><div class="ge-skill-bar" style="width:${(s.level/5)*100}%"></div></div>
+  <div class="ge-skill-meta">
+    <span>⏱ ${s.hoursPerWeek}ש׳/שבוע</span>
+    <span>💰 ${s.potential} ₪/חודש</span>
+  </div>
+  <div class="ge-skill-track">
+    <div class="ge-track-step${s.monetized==='no'?' now':''}">לומד</div>
+    <div class="ge-track-arrow">→</div>
+    <div class="ge-track-step${s.monetized==='learning'?' now':''}">דוגמה</div>
+    <div class="ge-track-arrow">→</div>
+    <div class="ge-track-step${s.monetized==='yes'?' now':''} last">הכנסה ✅</div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="ge-pipe-btn" onclick="geEditSkill(${s.id})">✏️</button>
+    <button class="ge-pipe-btn danger" onclick="geDeleteSkill(${s.id})">✕</button>
+  </div>
+</div>`).join('');
+  body.innerHTML=`<div class="ge-scroll">${cards}<button class="ge-fab-add" onclick="geOpenSkillForm(null)">+ כישור חדש</button></div>`;
+}
+function geDeleteSkill(id){geSkillsSave(geSkillsLoad().filter(x=>x.id!==id));geRenderSkills();}
+function geEditSkill(id){geOpenSkillForm(id);}
+function geOpenSkillForm(id){
+  const skills=geSkillsLoad();
+  const item=id?skills.find(x=>x.id===id):{id:Date.now(),name:'',level:2,hoursPerWeek:2,potential:'',monetized:'no'};
+  const body=document.getElementById('geBody');if(!body)return;
+  body.innerHTML=`<div class="ge-scroll ge-form">
+  <div class="ge-form-title">${id?'ערוך כישור':'כישור חדש'}</div>
+  <div class="ge-field"><label>שם הכישור</label><input type="text" id="gsf_name" value="${esc(item.name||'')}" dir="rtl"></div>
+  <div class="ge-field"><label>רמה (1-5)</label><input type="range" id="gsf_level" min="1" max="5" value="${item.level||2}" oninput="document.getElementById('gsf_lvl_show').textContent=GE_SKILL_LEVELS[this.value-1]"><span id="gsf_lvl_show">${GE_SKILL_LEVELS[(item.level||2)-1]}</span></div>
+  <div class="ge-field"><label>שעות שבועיות</label><input type="number" id="gsf_hrs" value="${item.hoursPerWeek||0}" inputmode="numeric"></div>
+  <div class="ge-field"><label>פוטנציאל הכנסה (טווח)</label><input type="text" id="gsf_pot" value="${esc(item.potential||'')}" placeholder="2000-5000" dir="rtl"></div>
+  <div class="ge-field"><label>סטטוס מינוף</label><select id="gsf_mon" style="direction:rtl">${Object.entries(GE_MON_STATUS).map(([k,v])=>`<option value="${k}"${item.monetized===k?' selected':''}>${v}</option>`).join('')}</select></div>
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button class="ge-cancel-btn" onclick="geSetTab('skills',null)">ביטול</button>
+    <button class="ge-save-btn" onclick="geSaveSkillForm(${item.id},${!!id})">שמור ✓</button>
+  </div>
+</div>`;
+}
+function geSaveSkillForm(id,isEdit){
+  const skills=isEdit?geSkillsLoad():geSkillsLoad();
+  const item={id,name:document.getElementById('gsf_name')?.value.trim(),level:parseInt(document.getElementById('gsf_level')?.value)||2,hoursPerWeek:parseFloat(document.getElementById('gsf_hrs')?.value)||0,potential:document.getElementById('gsf_pot')?.value.trim(),monetized:document.getElementById('gsf_mon')?.value||'no'};
+  if(!item.name){toast('הוסף שם');return;}
+  if(isEdit){const idx=skills.findIndex(x=>x.id===id);if(idx!==-1)skills[idx]=item;else skills.push(item);}
+  else skills.push(item);
+  geSkillsSave(skills);geSetTab('skills',null);toast('✅ נשמר');
+}
+
+// ── Insights ──
+function geRenderInsights(){
+  const p=geLoad();const body=document.getElementById('geBody');if(!body)return;
+  const insights=geBuildInsights(p);
+  body.innerHTML=`<div class="ge-scroll">${insights.map(ins=>`
+  <div class="ge-insight-card">
+    <div class="ge-insight-ico">${ins.ico}</div>
+    <div class="ge-insight-body">
+      <div class="ge-insight-title">${ins.title}</div>
+      <div class="ge-insight-text">${ins.text}</div>
+      ${ins.action?`<button class="ge-pipe-btn" style="margin-top:8px" onclick="${ins.action.fn}">${ins.action.label}</button>`:''}
+    </div>
+  </div>`).join('')}</div>`;
+}
+function geBuildInsights(p){
+  const insights=[];
+  const usd=p.stockPrices?.['USDILS']||3.7;
+  const nw=geCalcNetWorth(p);
+  const fiYears=geCalcFIYears(p);
+  const pipe=gePipeLoad();
+  const skills=geSkillsLoad();
+  const sp=p.stockPrices?.['SPX'];
+
+  // Savings projection
+  if(p.saving>0){
+    const annual=p.saving*12;
+    const in10=p.saving*12*((Math.pow(1.07,10)-1)/0.07);
+    insights.push({ico:'💰',title:'הכסף שלך עובד',text:`חיסכון של ₪${geFmt(p.saving)}/חודש בתשואה 7% שנתית = ₪${geFmt(in10)} בעוד 10 שנים.`});
+  }
+  // FI timeline
+  if(fiYears!==null){
+    insights.push({ico:'🏁',title:'הדרך לעצמאות כלכלית',text:`בקצב הנוכחי — ${fiYears} שנים. אם תוסיף הכנסה צדדית של ₪3,000/חודש — ${Math.max(0,fiYears-4)} שנים בלבד.`});
+  }
+  // Property yield
+  if(p.propVal>0&&p.propRent===0){
+    insights.push({ico:'🏠',title:'הדירה שלך — מה עוד אפשר?',text:`הון עצמי של ₪${geFmt(Math.max(0,p.propVal-p.mortgage))} "ישן". האם שכירות חלקית / refinancing רלוונטי?`,action:{label:'הוסף להזדמנויות →',fn:"geAddInsightToPipe('שכירות/Airbnb','מינוף הדירה הקיימת',1500,2)"}});
+  }
+  // Skills not monetized
+  const unleashed=skills.filter(s=>s.monetized==='no'||s.monetized==='learning');
+  if(unleashed.length){
+    insights.push({ico:'🧠',title:'כישורים שעוד לא ממונפים',text:`יש לך ${unleashed.length} כישורים בתהליך מינוף. הכישור עם פוטנציאל גבוה ביותר: ${unleashed[0]?.name}. מה הצעד הבא?`,action:{label:'הוסף לפייפליין →',fn:`geAddInsightToPipe('${unleashed[0]?.name||'כישור'}','מינוף כישור קיים',2500,6)`}});
+  }
+  // S&P compare
+  if(sp&&p.stocks?.length){
+    const stockVal=(p.stocks||[]).reduce((sum,s)=>sum+s.qty*(p.stockPrices?.[s.ticker]||0)*usd,0);
+    insights.push({ico:'📈',title:'תיק vs S&P 500',text:`S&P 500 עומד על ${Math.round(sp).toLocaleString()}. תיק ההשקעות שלך שווה ₪${geFmt(stockVal)}.`});
+  }
+  // Pipeline empty
+  const activePipe=pipe.filter(x=>x.status==='idea'||x.status==='active');
+  if(activePipe.length===0){
+    insights.push({ico:'⚠️',title:'אין הזדמנויות פעילות',text:'הפייפליין שלך ריק. הדרך הכי מהירה לפעולה: בחר כישור → הוסף הזדמנות → הגדר צעד הבא.',action:{label:'פתח פייפליין →',fn:"geSetTab('pipeline',null)"}});
+  }
+  // App data: tasks/focus
+  const completedThisWeek=tasks.filter(t=>{
+    if(!t.completed)return false;
+    const d=new Date(t.datetime);const now=new Date();
+    return(now-d)<7*24*3600000;
+  }).length;
+  if(completedThisWeek>0){
+    insights.push({ico:'⚡',title:'הפרודוקטיביות שלך השבוע',text:`השלמת ${completedThisWeek} משימות השבוע. כמה מהן הובילו לקידום הכנסה?`});
+  }
+  if(!insights.length)insights.push({ico:'💡',title:'תובנות יתעדכנו',text:'לאחר שתוסיף נתונים ותעדכן את המחירים, תובנות יופיעו כאן.'});
+  return insights;
+}
+function geAddInsightToPipe(title,desc,potential,hoursWeek){
+  const pipe=gePipeLoad();
+  pipe.push({id:Date.now(),title,desc,potential,hoursWeek,status:'idea',nextStep:'הגדר צעד ראשון',createdAt:new Date().toISOString()});
+  gePipeSave(pipe);toast('✅ נוסף לפייפליין');geSetTab('pipeline',null);
+}
+
 // ── Google Drive Auto Backup ─────────────────────────────
 const DRIVE_FILE_NAME='voicetask-backup.json';
 async function driveGetToken(){
@@ -3408,7 +3959,7 @@ async function driveBackup(manual=false){
     if(manual)toast('⏳ מגבה...');
     const token=await driveGetToken();
     if(!token){toast('❌ לא ניתן לקבל הרשאה');return;}
-    const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,backlogLists,backlogItems});
+    const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,backlogLists,backlogItems,geProfile:geLoad(),gePipeline:gePipeLoad(),geSkills:geSkillsLoad()});
     const existingId=await driveFindFile(token);
     const blob=new Blob([data],{type:'application/json'});
     const form=new FormData();
@@ -3442,6 +3993,9 @@ async function driveRestore(){
     if(data.routines)routines=[...data.routines,...routines.filter(r=>!data.routines.find(x=>x.id===r.id))];
     if(data.backlogLists)backlogLists=[...data.backlogLists,...backlogLists.filter(l=>!data.backlogLists.find(x=>x.id===l.id))];
     if(data.backlogItems)backlogItems=[...data.backlogItems,...backlogItems.filter(i=>!data.backlogItems.find(x=>x.id===i.id))];
+    if(data.geProfile)geSave(data.geProfile);
+    if(data.gePipeline)gePipeSave(data.gePipeline);
+    if(data.geSkills)geSkillsSave(data.geSkills);
     save();saveRoutines();saveBpLists();saveBpItems();render();
     toast('✅ גיבוי שוחזר — '+((data.tasks||[]).length)+' משימות');
   }catch(e){console.warn(e);toast('❌ שחזור נכשל');}

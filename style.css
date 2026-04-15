@@ -808,3 +808,125 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .focus-btns{display:flex;gap:12px}
 .focus-btn-stop{padding:14px 28px;border-radius:50px;background:oklch(0.20 0.01 45);border:1px solid oklch(0.28 0.02 45);color:oklch(0.55 0.02 45);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .focus-btn-pause{padding:14px 36px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
+/* ── Growth Engine ───────────────────────────────────────────────────────── */
+#gePageWrapper{position:fixed;inset:0;z-index:260;overflow:hidden;pointer-events:none;max-width:480px;left:0;right:0;margin:0 auto}
+#gePageWrapper.on{pointer-events:auto}
+#gePage{position:absolute;inset:0;background:var(--bg);transform:translateX(100%);transition:transform .38s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column;overflow:hidden}
+#gePageWrapper.on #gePage{transform:translateX(0)}
+.ge-topbar{display:flex;align-items:center;padding:calc(12px + var(--sat,0px)) 12px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
+.ge-back{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation}
+.ge-title{flex:1;font-size:17px;font-weight:800;color:var(--text);text-align:center}
+.ge-refresh{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:opacity .2s}
+.ge-tabs{display:flex;overflow-x:auto;gap:6px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;scrollbar-width:none}
+.ge-tabs::-webkit-scrollbar{display:none}
+.ge-tab{flex-shrink:0;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap}
+.ge-tab.on{background:var(--accent);color:oklch(0.12 0.007 45);border-color:var(--accent)}
+.ge-body{flex:1;overflow:hidden;position:relative}
+.ge-scroll{overflow-y:auto;height:100%;padding:16px 16px calc(32px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+/* KPIs */
+.ge-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
+.ge-kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 8px;text-align:center}
+.ge-kpi-val{font-size:22px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.ge-kpi-lbl{font-size:10px;font-weight:700;color:var(--muted);margin-top:3px}
+.ge-refresh-note{font-size:10px;color:var(--muted);text-align:center;margin-bottom:14px}
+
+/* Section titles */
+.ge-section-title{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.6px;margin:18px 0 8px;direction:rtl}
+
+/* Weekly step */
+.ge-weekly-step{background:oklch(0.78 0.16 72 / 0.08);border:1.5px solid oklch(0.78 0.16 72 / 0.3);border-radius:14px;padding:14px;direction:rtl;margin-bottom:4px}
+.ge-weekly-step-label{font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.5px;margin-bottom:6px}
+.ge-weekly-step-text{font-size:14px;font-weight:700;color:var(--text);line-height:1.5;margin-bottom:10px}
+.ge-weekly-step-btn{padding:9px 18px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
+/* Goals */
+.ge-goal-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;direction:rtl;margin-bottom:8px}
+.ge-goal-label{font-size:10px;font-weight:800;color:var(--muted);margin-bottom:4px}
+.ge-goal-text{font-size:14px;font-weight:700;color:var(--text)}
+
+/* Flow rows */
+.ge-flow-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);direction:rtl}
+.ge-flow-lbl{font-size:13px;color:var(--muted);font-weight:500}
+.ge-flow-val{font-size:14px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.ge-flow-val.green{color:oklch(0.72 0.18 145)}
+.ge-flow-val.muted{color:var(--muted)}
+
+/* Pipeline */
+.ge-pipe-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;direction:rtl}
+.ge-pipe-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.ge-pipe-title{font-size:15px;font-weight:800;color:var(--text);flex:1}
+.ge-pipe-desc{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.ge-pipe-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.ge-pipe-next{font-size:12px;font-weight:700;color:var(--text);background:var(--surface2);border-radius:8px;padding:7px 10px;margin-bottom:8px}
+.ge-pipe-actions{display:flex;gap:8px;margin-bottom:10px}
+.ge-pipe-btn{padding:7px 14px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ge-pipe-btn.danger{color:oklch(0.65 0.22 25);border-color:oklch(0.65 0.22 25 / 0.3)}
+.ge-pipe-status-row{display:flex;gap:5px;flex-wrap:wrap}
+.ge-st-btn{padding:5px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ge-st-btn.on{background:var(--accent);color:oklch(0.12 0.007 45);border-color:var(--accent)}
+
+/* Status badges */
+.ge-status-badge{flex-shrink:0;font-size:10px;font-weight:800;padding:4px 9px;border-radius:20px}
+.ge-status-badge.idea{background:oklch(0.78 0.16 72 / 0.12);color:var(--accent)}
+.ge-status-badge.active{background:oklch(0.45 0.18 250 / 0.12);color:oklch(0.65 0.18 250)}
+.ge-status-badge.talking{background:oklch(0.45 0.18 300 / 0.12);color:oklch(0.65 0.18 300)}
+.ge-status-badge.done{background:oklch(0.45 0.18 145 / 0.12);color:oklch(0.72 0.18 145)}
+.ge-status-badge.rejected{background:oklch(0.22 0.01 45);color:var(--muted)}
+
+/* Assets */
+.ge-market-bar{background:oklch(0.45 0.18 250 / 0.1);border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;color:oklch(0.65 0.18 250);text-align:center;margin-bottom:12px}
+.ge-asset-block{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px}
+.ge-asset-header{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:8px 12px;font-size:10px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--border);direction:rtl}
+.ge-asset-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:10px 12px;border-bottom:1px solid var(--border);direction:rtl;align-items:center}
+.ge-asset-row:last-child{border-bottom:none}
+.ge-asset-ticker{font-size:13px;font-weight:800;color:var(--text)}
+.ge-asset-qty{font-size:12px;color:var(--muted)}
+.ge-asset-price{font-size:12px;color:var(--muted)}
+.ge-asset-val{font-size:13px;font-weight:800;color:oklch(0.72 0.18 145)}
+.ge-asset-total{display:flex;justify-content:space-between;padding:10px 12px;font-size:13px;font-weight:800;color:var(--text);border-top:1px solid var(--border);direction:rtl}
+.ge-net-worth-big{font-size:42px;font-weight:900;color:var(--text);text-align:center;padding:20px 0;font-variant-numeric:tabular-nums}
+
+/* Skills */
+.ge-skill-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;direction:rtl}
+.ge-skill-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ge-skill-name{font-size:15px;font-weight:800;color:var(--text)}
+.ge-skill-level{font-size:11px;font-weight:700;color:var(--accent)}
+.ge-skill-bar-wrap{height:4px;background:var(--border2);border-radius:2px;margin-bottom:8px;overflow:hidden}
+.ge-skill-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease}
+.ge-skill-meta{display:flex;gap:12px;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.ge-skill-track{display:flex;align-items:center;gap:4px}
+.ge-track-step{padding:5px 10px;border-radius:20px;font-size:10px;font-weight:700;background:var(--surface2);color:var(--muted)}
+.ge-track-step.now{background:oklch(0.78 0.16 72 / 0.15);color:var(--accent)}
+.ge-track-step.last.now{background:oklch(0.45 0.18 145 / 0.15);color:oklch(0.72 0.18 145)}
+.ge-track-arrow{font-size:11px;color:var(--muted)}
+
+/* Insights */
+.ge-insight-card{display:flex;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;direction:rtl;align-items:flex-start}
+.ge-insight-ico{font-size:22px;flex-shrink:0}
+.ge-insight-body{flex:1}
+.ge-insight-title{font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px}
+.ge-insight-text{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* Onboarding */
+.ge-onboard{padding-bottom:40px}
+.ge-onboard-title{font-size:22px;font-weight:900;color:var(--text);text-align:center;margin-bottom:6px;direction:rtl}
+.ge-onboard-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px;direction:rtl;line-height:1.6}
+.ge-onboard-save{width:100%;padding:15px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:16px;font-weight:900;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:20px}
+.ge-field{margin-bottom:14px;direction:rtl}
+.ge-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.ge-field input,.ge-field textarea,.ge-field select{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:11px 12px;outline:none;direction:rtl}
+.ge-field textarea{resize:none}
+.ge-stock-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.ge-stock-ticker{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:10px;outline:none;text-align:center;font-weight:800;letter-spacing:1px}
+.ge-stock-qty{width:80px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:10px;outline:none;text-align:center}
+.ge-add-stock-btn{width:100%;padding:11px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:6px}
+
+/* Shared form */
+.ge-form-title{font-size:18px;font-weight:900;color:var(--text);text-align:center;margin-bottom:20px;direction:rtl}
+.ge-save-btn{flex:1;padding:13px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ge-cancel-btn{flex:1;padding:13px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.ge-fab-add{width:100%;padding:13px;border-radius:50px;background:var(--surface);border:1.5px dashed var(--border2);color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:6px}
+.ge-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;line-height:1.8;direction:rtl}
+.ge-edit-profile-btn{width:100%;margin-top:20px;padding:12px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
