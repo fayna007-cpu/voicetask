@@ -1857,6 +1857,9 @@ function renderRoutineInstance(inst){
   const endDt=new Date(dt.getTime()+inst.duration*60000);
   const endStr=endDt.getHours().toString().padStart(2,'0')+':'+endDt.getMinutes().toString().padStart(2,'0');
   const durTxt=inst.duration<60?inst.duration+'דק׳':inst.duration===60?'שעה':inst.duration===90?'שעה וחצי':(inst.duration/60)+'שעות';
+  const pad=n=>n.toString().padStart(2,'0');
+  const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  const safeId=`${inst.routineId}_${inst.dateStr.replace(/[:.]/g,'-')}`;
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
   <div class="routine-badge">🔄 שגרה</div>
   <div class="card-row">
@@ -1872,10 +1875,18 @@ function renderRoutineInstance(inst){
   </div>
   <div class="actions">
     <button class="act done-btn" onclick="toggleRoutineComplete('${inst.routineId}','${inst.dateStr}')">${inst.completed?ICO.undo:ICO.check}</button>
-    <button class="act edit-btn" onclick="editRoutine(${inst.routineId})" title="ערוך שגרה">${ICO.edit}</button>
+    <button class="act edit-btn" onclick="openRoutineTimeEdit('${safeId}')" title="שנה שעה">${ICO.edit}</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
   <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
+  <div class="card-edit" id="redit-${safeId}">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;direction:rtl">שינוי מועד לאירוע זה בלבד</div>
+    <input class="edit-dt" id="redt-${safeId}" type="datetime-local" value="${dtLocal}">
+    <div class="edit-actions">
+      <button class="edit-save" onclick="saveRoutineInstanceTime('${safeId}','${inst.routineId}','${inst.dateStr}')">שמור</button>
+      <button class="edit-cancel" onclick="closeRoutineTimeEdit('${safeId}')">בטל</button>
+    </div>
+  </div>
 </div>`;}
 
 function render(){
@@ -2293,6 +2304,41 @@ function skipRoutineInstance(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   if(!r.skippedDates)r.skippedDates=[];
   r.skippedDates.push(dateStr);saveRoutines();render();toast('דולג');
+}
+function openRoutineTimeEdit(safeId){
+  document.querySelectorAll('.card-edit').forEach(el=>el.classList.remove('on'));
+  const el=document.getElementById('redit-'+safeId);
+  if(el)el.classList.add('on');
+}
+function closeRoutineTimeEdit(safeId){
+  const el=document.getElementById('redit-'+safeId);
+  if(el)el.classList.remove('on');
+}
+function saveRoutineInstanceTime(safeId,routineId,oldDateStr){
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  const inp=document.getElementById('redt-'+safeId);if(!inp||!inp.value)return;
+  const newDt=new Date(inp.value).toISOString();
+  // Replace in scheduledWeeks
+  let replaced=false;
+  Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+    const arr=r.scheduledWeeks[wk];
+    arr.forEach((item,i)=>{
+      const dt=typeof item==='string'?item:item?.dt;
+      if(dt===oldDateStr){
+        r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};
+        replaced=true;
+      }
+    });
+  });
+  if(!replaced){toast('לא נמצא האירוע');return;}
+  // Update completedDates / skippedDates refs
+  [r.completedDates,r.skippedDates].forEach(arr=>{
+    if(!arr)return;
+    const idx=arr.indexOf(oldDateStr);
+    if(idx!==-1)arr[idx]=newDt;
+  });
+  saveRoutines();render();
+  toast('✅ מועד עודכן');
 }
 
 // Voice for routine form
