@@ -834,13 +834,14 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 #gePageWrapper.on{pointer-events:auto}
 #gePage{
   position:fixed;
-  top:0;bottom:0;left:0;right:0;
+  top:0;left:0;right:0;bottom:0;
   max-width:480px;margin:0 auto;
   background:var(--bg);
-  transform:translateX(100%);
+  transform:translateX(110%);
   transition:transform .38s cubic-bezier(.25,.46,.45,.94);
   display:flex;flex-direction:column;
   overflow:hidden;
+  will-change:transform;
 }
 #gePageWrapper.on #gePage{transform:translateX(0)}
 .ge-scroll{overflow-y:auto;flex:1;min-height:0;padding:16px 16px calc(96px + var(--sab,0px));box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
