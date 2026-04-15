@@ -930,3 +930,28 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-fab-add{width:100%;padding:13px;border-radius:50px;background:var(--surface);border:1.5px dashed var(--border2);color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:6px}
 .ge-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;line-height:1.8;direction:rtl}
 .ge-edit-profile-btn{width:100%;margin-top:20px;padding:12px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+/* FI progress bar */
+.ge-fi-bar-wrap{margin:2px 0 8px;direction:rtl}
+.ge-fi-bar-track{height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-bottom:5px}
+.ge-fi-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .6s ease}
+.ge-fi-bar-label{font-size:11px;font-weight:700;color:var(--muted);text-align:center}
+/* KPI colors */
+.ge-kpi.positive .ge-kpi-val{color:oklch(0.72 0.18 145)}
+.ge-kpi.negative .ge-kpi-val{color:oklch(0.65 0.22 25)}
+/* Flow separator */
+.ge-flow-separator{margin-top:4px}
+.ge-flow-total{border-top:2px solid var(--border2);margin-top:4px;padding-top:10px}
+.ge-flow-val.red{color:oklch(0.65 0.22 25)}
+/* Gain/loss card */
+.ge-gain-card{border-radius:12px;padding:12px 14px;direction:rtl;margin-bottom:4px}
+.ge-gain-card.gain{background:oklch(0.45 0.18 145 / 0.1);border:1px solid oklch(0.45 0.18 145 / 0.25)}
+.ge-gain-card.loss{background:oklch(0.45 0.18 25 / 0.1);border:1px solid oklch(0.45 0.18 25 / 0.25)}
+.ge-gain-label{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.ge-gain-val{font-size:18px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.ge-gain-card.gain .ge-gain-val{color:oklch(0.72 0.18 145)}
+.ge-gain-card.loss .ge-gain-val{color:oklch(0.65 0.22 25)}
+/* Onboarding two-column row */
+.ge-field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ge-onboard-hint{font-size:12px;color:var(--muted);direction:rtl;margin-bottom:8px}
+/* Stock avg cost field */
+.ge-stock-avg{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:10px;outline:none;text-align:center}

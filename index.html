@@ -3446,51 +3446,79 @@ function geSetTab(tab,btn){
 // ── Onboarding ──
 function geRenderOnboarding(){
   const body=document.getElementById('geBody');if(!body)return;
+  const prev=geLoad()||{};
+  const v=f=>prev[f]||'';
   body.innerHTML=`
 <div class="ge-onboard">
-  <div class="ge-onboard-title">נתחיל להכיר אותך 👋</div>
-  <div class="ge-onboard-sub">כמה שאלות כדי שהמנוע יהיה מותאם אישית לחלוטין</div>
+  <div class="ge-onboard-title">מנוע הצמיחה 🚀</div>
+  <div class="ge-onboard-sub">מלא את הפרטים — מומלץ לעדכן אחת לחודש כדי לקבל תמונת מצב מדויקת</div>
 
-  <div class="ge-section-title">💰 מצב פיננסי</div>
-  <div class="ge-field"><label>הכנסה חודשית נטו (₪)</label><input type="number" id="ge_income" placeholder="18000" inputmode="numeric"></div>
-  <div class="ge-field"><label>חיסכון חודשי (₪)</label><input type="number" id="ge_saving" placeholder="3500" inputmode="numeric"></div>
-  <div class="ge-field"><label>חיסכון נזיל כולל (₪)</label><input type="number" id="ge_liquid" placeholder="120000" inputmode="numeric"></div>
-  <div class="ge-field"><label>קרן פנסיה / השתלמות (₪)</label><input type="number" id="ge_pension" placeholder="80000" inputmode="numeric"></div>
+  <div class="ge-section-title">👤 אישי</div>
+  <div class="ge-field-row">
+    <div class="ge-field"><label>גיל נוכחי</label><input type="number" id="ge_age" value="${v('age')}" placeholder="30" inputmode="numeric"></div>
+    <div class="ge-field"><label>גיל יעד לעצמאות</label><input type="number" id="ge_target_age" value="${v('targetAge')}" placeholder="45" inputmode="numeric"></div>
+  </div>
 
-  <div class="ge-section-title">🏠 דירה (אם יש)</div>
-  <div class="ge-field"><label>שווי משוער (₪)</label><input type="number" id="ge_propval" placeholder="1800000" inputmode="numeric"></div>
-  <div class="ge-field"><label>יתרת משכנתא (₪)</label><input type="number" id="ge_mortgage" placeholder="850000" inputmode="numeric"></div>
-  <div class="ge-field"><label>שכירות שנגבית (₪/חודש, 0 אם גר שם)</label><input type="number" id="ge_rent" placeholder="0" inputmode="numeric"></div>
+  <div class="ge-section-title">💰 הכנסות</div>
+  <div class="ge-field"><label>הכנסה חודשית נטו (₪)</label><input type="number" id="ge_income" value="${v('income')}" placeholder="18000" inputmode="numeric"></div>
+  <div class="ge-field"><label>הכנסות נוספות — בונוס / פרילנס (₪/חודש ממוצע)</label><input type="number" id="ge_income_extra" value="${v('incomeExtra')}" placeholder="0" inputmode="numeric"></div>
+
+  <div class="ge-section-title">💳 הוצאות</div>
+  <div class="ge-field"><label>הוצאות אשראי חודשיות (₪)</label><input type="number" id="ge_credit_exp" value="${v('creditExp')}" placeholder="5000" inputmode="numeric"></div>
+  <div class="ge-field"><label>הוצאות קבועות אחרות — ביטוחים, מנויים (₪)</label><input type="number" id="ge_fixed_exp" value="${v('fixedExp')}" placeholder="1500" inputmode="numeric"></div>
+
+  <div class="ge-section-title">🏦 מזומן ואשראי</div>
+  <div class="ge-field"><label>סכום עו"ש (₪)</label><input type="number" id="ge_checking" value="${v('checking')}" placeholder="25000" inputmode="numeric"></div>
+  <div class="ge-field"><label>מסגרת אשראי בשימוש (₪)</label><input type="number" id="ge_credit_used" value="${v('creditUsed')}" placeholder="0" inputmode="numeric"></div>
+
+  <div class="ge-section-title">🏠 נדל"ן</div>
+  <div class="ge-field"><label>שנת רכישה</label><input type="number" id="ge_prop_year" value="${v('propYear')}" placeholder="2020" inputmode="numeric"></div>
+  <div class="ge-field"><label>מחיר קנייה + שיפוץ (₪) — עלות בסיס</label><input type="number" id="ge_prop_cost" value="${v('propCost')}" placeholder="1400000" inputmode="numeric"></div>
+  <div class="ge-field"><label>שווי נוכחי משוער (₪)</label><input type="number" id="ge_propval" value="${v('propVal')}" placeholder="1800000" inputmode="numeric"></div>
+  <div class="ge-field"><label>תשלום משכנתא חודשי (₪)</label><input type="number" id="ge_mortgage_payment" value="${v('mortgagePayment')}" placeholder="4500" inputmode="numeric"></div>
+  <div class="ge-field"><label>יתרת הלוואות על הנכס (₪)</label><input type="number" id="ge_mortgage" value="${v('mortgage')}" placeholder="850000" inputmode="numeric"></div>
+  <div class="ge-field"><label>שכירות שנגבית (₪/חודש, 0 אם גר שם)</label><input type="number" id="ge_rent" value="${v('propRent')}" placeholder="0" inputmode="numeric"></div>
 
   <div class="ge-section-title">📈 תיק השקעות</div>
-  <div class="ge-onboard-sub" style="margin-bottom:10px">הוסף נכסים — טיקר + כמות (לדוגמה: VOO, 15)</div>
+  <div class="ge-onboard-hint">טיקר + כמות + מחיר קנייה ממוצע (לחישוב רווח/הפסד)</div>
   <div id="ge_stocks_wrap"></div>
   <button class="ge-add-stock-btn" onclick="geAddStockRow()">+ הוסף נייר ערך</button>
 
+  <div class="ge-section-title">🏛️ נכסי פנסיה</div>
+  <div class="ge-field"><label>קרן פנסיה — סכום צבור (₪)</label><input type="number" id="ge_pension" value="${v('pension')}" placeholder="120000" inputmode="numeric"></div>
+  <div class="ge-field"><label>קרן השתלמות (₪)</label><input type="number" id="ge_keren" value="${v('keren')}" placeholder="50000" inputmode="numeric"></div>
+  <div class="ge-field"><label>ביטוח מנהלים (₪)</label><input type="number" id="ge_bituach" value="${v('bituach')}" placeholder="0" inputmode="numeric"></div>
+
+  <div class="ge-section-title">💳 חובות</div>
+  <div class="ge-field"><label>הלוואות אחרות סה"כ — רכב, אישי (₪)</label><input type="number" id="ge_loans" value="${v('loans')}" placeholder="0" inputmode="numeric"></div>
+  <div class="ge-field"><label>תשלום חודשי על הלוואות (₪)</label><input type="number" id="ge_loans_payment" value="${v('loansPayment')}" placeholder="0" inputmode="numeric"></div>
+
   <div class="ge-section-title">🎯 מטרות</div>
-  <div class="ge-field"><label>מטרה קצרת טווח (12 חודש)</label><input type="text" id="ge_goal_short" placeholder="הכנסה צדדית ראשונה של 2,000 ₪/חודש" dir="rtl"></div>
-  <div class="ge-field"><label>מטרה ארוכת טווח (5 שנה)</label><input type="text" id="ge_goal_long" placeholder="עצמאות ממעסיק" dir="rtl"></div>
+  <div class="ge-field"><label>מטרה קצרת טווח (12 חודש)</label><input type="text" id="ge_goal_short" value="${esc(v('goalShort'))}" placeholder="הכנסה צדדית ראשונה של 2,000 ₪/חודש" dir="rtl"></div>
+  <div class="ge-field"><label>מטרה ארוכת טווח</label><input type="text" id="ge_goal_long" value="${esc(v('goalLong'))}" placeholder="עצמאות ממעסיק" dir="rtl"></div>
   <div class="ge-field"><label>תחום שאתה רוצה למנף להכנסה</label>
     <select id="ge_focus_skill" style="direction:rtl">
-      <option value="ai_automation">אוטומציות AI / n8n</option>
-      <option value="digital_marketing">דיגיטל / מרקטינג</option>
-      <option value="consulting">ייעוץ / הדרכה</option>
-      <option value="content">תוכן / כתיבה</option>
-      <option value="other">אחר</option>
+      <option value="ai_automation"${v('focusSkill')==='ai_automation'?' selected':''}>אוטומציות AI / n8n</option>
+      <option value="digital_marketing"${v('focusSkill')==='digital_marketing'?' selected':''}>דיגיטל / מרקטינג</option>
+      <option value="consulting"${v('focusSkill')==='consulting'?' selected':''}>ייעוץ / הדרכה</option>
+      <option value="content"${v('focusSkill')==='content'?' selected':''}>תוכן / כתיבה</option>
+      <option value="other"${v('focusSkill')==='other'?' selected':''}>אחר</option>
     </select>
   </div>
 
-  <button class="ge-onboard-save" onclick="geOnboardSave()">שמור והתחל 🚀</button>
+  <button class="ge-onboard-save" onclick="geOnboardSave()">${prev.onboarded?'עדכן ✓':'שמור והתחל 🚀'}</button>
 </div>`;
-  // seed one stock row
-  geAddStockRow();
+  // pre-fill stocks
+  const stocks=prev.stocks||[];
+  if(stocks.length){stocks.forEach(s=>geAddStockRow(s));}
+  else geAddStockRow();
 }
-function geAddStockRow(){
+function geAddStockRow(s){
   const wrap=document.getElementById('ge_stocks_wrap');if(!wrap)return;
-  const idx=wrap.children.length;
   const row=document.createElement('div');row.className='ge-stock-row';
-  row.innerHTML=`<input class="ge-stock-ticker" type="text" placeholder="VOO" style="text-transform:uppercase">
-<input class="ge-stock-qty" type="number" placeholder="כמות" inputmode="numeric">
+  row.innerHTML=`<input class="ge-stock-ticker" type="text" placeholder="VOO" value="${s?.ticker||''}" style="text-transform:uppercase">
+<input class="ge-stock-qty" type="number" placeholder="כמות" value="${s?.qty||''}" inputmode="numeric">
+<input class="ge-stock-avg" type="number" placeholder="מחיר קנייה $" value="${s?.avgCost||''}" inputmode="numeric" style="width:90px">
 <button onclick="this.parentNode.remove()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 4px">✕</button>`;
   wrap.appendChild(row);
 }
@@ -3499,31 +3527,47 @@ function geOnboardSave(){
   document.querySelectorAll('.ge-stock-row').forEach(row=>{
     const t=row.querySelector('.ge-stock-ticker')?.value.trim().toUpperCase();
     const q=parseFloat(row.querySelector('.ge-stock-qty')?.value)||0;
-    if(t&&q>0)stocks.push({ticker:t,qty:q});
+    const avg=parseFloat(row.querySelector('.ge-stock-avg')?.value)||0;
+    if(t&&q>0)stocks.push({ticker:t,qty:q,avgCost:avg});
   });
+  const prev=geLoad()||{};
   const d={
+    ...prev,
     onboarded:true,
-    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString(),
+    createdAt:prev.createdAt||new Date().toISOString(),
+    age:parseInt(document.getElementById('ge_age')?.value)||0,
+    targetAge:parseInt(document.getElementById('ge_target_age')?.value)||55,
     income:parseFloat(document.getElementById('ge_income')?.value)||0,
-    saving:parseFloat(document.getElementById('ge_saving')?.value)||0,
-    liquid:parseFloat(document.getElementById('ge_liquid')?.value)||0,
-    pension:parseFloat(document.getElementById('ge_pension')?.value)||0,
+    incomeExtra:parseFloat(document.getElementById('ge_income_extra')?.value)||0,
+    creditExp:parseFloat(document.getElementById('ge_credit_exp')?.value)||0,
+    fixedExp:parseFloat(document.getElementById('ge_fixed_exp')?.value)||0,
+    checking:parseFloat(document.getElementById('ge_checking')?.value)||0,
+    creditUsed:parseFloat(document.getElementById('ge_credit_used')?.value)||0,
+    propYear:parseInt(document.getElementById('ge_prop_year')?.value)||0,
+    propCost:parseFloat(document.getElementById('ge_prop_cost')?.value)||0,
     propVal:parseFloat(document.getElementById('ge_propval')?.value)||0,
+    mortgagePayment:parseFloat(document.getElementById('ge_mortgage_payment')?.value)||0,
     mortgage:parseFloat(document.getElementById('ge_mortgage')?.value)||0,
     propRent:parseFloat(document.getElementById('ge_rent')?.value)||0,
     stocks,
+    pension:parseFloat(document.getElementById('ge_pension')?.value)||0,
+    keren:parseFloat(document.getElementById('ge_keren')?.value)||0,
+    bituach:parseFloat(document.getElementById('ge_bituach')?.value)||0,
+    loans:parseFloat(document.getElementById('ge_loans')?.value)||0,
+    loansPayment:parseFloat(document.getElementById('ge_loans_payment')?.value)||0,
     goalShort:document.getElementById('ge_goal_short')?.value.trim()||'',
     goalLong:document.getElementById('ge_goal_long')?.value.trim()||'',
     focusSkill:document.getElementById('ge_focus_skill')?.value||'ai_automation',
-    stockPrices:{},lastRefresh:null
+    stockPrices:prev.stockPrices||{},lastRefresh:prev.lastRefresh||null
   };
   geSave(d);
-  // seed default skills
-  geSkillsSave(geDefaultSkills(d.focusSkill));
-  // seed default pipeline
-  gePipeSave(geDefaultPipeline(d));
+  if(!prev.onboarded){
+    geSkillsSave(geDefaultSkills(d.focusSkill));
+    gePipeSave(geDefaultPipeline(d));
+  }
   geSetTab('dashboard',null);
-  toast('🚀 מנוע הצמיחה מוכן!');
+  toast(prev.onboarded?'✅ פרטים עודכנו':'🚀 מנוע הצמיחה מוכן!');
 }
 function geDefaultSkills(focus){
   const base=[
@@ -3586,36 +3630,65 @@ async function geRefreshAll(){
 
 // ── Calculations ──
 function geCalcNetWorth(p){
+  const usd=p.stockPrices?.['USDILS']||3.7;
   const stockVal=(p.stocks||[]).reduce((sum,s)=>{
     const price=p.stockPrices?.[s.ticker]||0;
-    const usd=p.stockPrices?.['USDILS']||3.7;
     return sum+s.qty*price*usd;
   },0);
   const propEquity=Math.max(0,(p.propVal||0)-(p.mortgage||0));
-  return (p.liquid||0)+(p.pension||0)+stockVal+propEquity;
+  const liquid=(p.checking||0);
+  const pension=(p.pension||0)+(p.keren||0)+(p.bituach||0);
+  const debts=(p.loans||0)+(p.creditUsed||0);
+  return liquid+pension+stockVal+propEquity-debts;
+}
+function geCalcMonthlyCashflow(p){
+  const income=(p.income||0)+(p.incomeExtra||0)+(p.propRent||0);
+  const expenses=(p.creditExp||0)+(p.fixedExp||0)+(p.mortgagePayment||0)+(p.loansPayment||0);
+  return income-expenses;
+}
+function geCalcStockUnrealizedPnL(p){
+  const usd=p.stockPrices?.['USDILS']||3.7;
+  let totalCost=0,totalVal=0;
+  (p.stocks||[]).forEach(s=>{
+    const price=p.stockPrices?.[s.ticker]||0;
+    if(s.avgCost&&price){totalCost+=s.qty*s.avgCost*usd;totalVal+=s.qty*price*usd;}
+  });
+  return totalCost>0?{pnl:totalVal-totalCost,pct:((totalVal-totalCost)/totalCost)*100}:null;
+}
+function geCalcPropGain(p){
+  if(!p.propCost||!p.propVal)return null;
+  return{gain:p.propVal-p.propCost,pct:((p.propVal-p.propCost)/p.propCost)*100};
 }
 function geCalcFIYears(p){
   const nw=geCalcNetWorth(p);
-  const monthSaving=(p.saving||0);
-  const target=(p.income||0)*12*25; // 4% rule
+  const monthSaving=geCalcMonthlyCashflow(p);
+  const annualExpenses=((p.creditExp||0)+(p.fixedExp||0)+(p.mortgagePayment||0)+(p.loansPayment||0))*12;
+  const target=Math.max(annualExpenses*25,(p.income||0)*12*25);
   if(target<=0)return null;
   if(nw>=target)return 0;
-  // simple projection with 7% annual return
+  if(monthSaving<=0)return null;
   let acc=nw;let years=0;
   while(acc<target&&years<50){acc=acc*1.07+monthSaving*12;years++;}
   return years;
 }
-function geFmt(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(0)+'K':Math.round(n).toString();}
+function geFmt(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(0)+'K':Math.round(Math.abs(n)).toString();}
+function geFmtSigned(n){return(n>=0?'+':'-')+'₪'+geFmt(Math.abs(n));}
 
 // ── Dashboard ──
 function geRenderDashboard(){
   const p=geLoad();const body=document.getElementById('geBody');if(!body)return;
   const nw=geCalcNetWorth(p);
   const fiYears=geCalcFIYears(p);
+  const cashflow=geCalcMonthlyCashflow(p);
+  const pnl=geCalcStockUnrealizedPnL(p);
+  const propGain=geCalcPropGain(p);
   const pipe=gePipeLoad();
   const activePipe=pipe.filter(x=>x.status!=='rejected').length;
   const lastRefresh=p.lastRefresh?new Date(p.lastRefresh).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'טרם עודכן';
   const weeklyStep=geGetWeeklyStep(p);
+  const totalIncome=(p.income||0)+(p.incomeExtra||0)+(p.propRent||0);
+  const totalExpenses=(p.creditExp||0)+(p.fixedExp||0)+(p.mortgagePayment||0)+(p.loansPayment||0);
+  const fiPct=fiYears!==null?Math.min(100,Math.round((nw/((totalExpenses*12*25)||1))*100)):null;
 
   body.innerHTML=`
 <div class="ge-scroll">
@@ -3628,11 +3701,15 @@ function geRenderDashboard(){
       <div class="ge-kpi-val">${fiYears!==null?fiYears+'y':'—'}</div>
       <div class="ge-kpi-lbl">לעצמאות כלכלית</div>
     </div>
-    <div class="ge-kpi">
-      <div class="ge-kpi-val">${activePipe}</div>
-      <div class="ge-kpi-lbl">הזדמנויות פעילות</div>
+    <div class="ge-kpi ${cashflow>=0?'positive':'negative'}">
+      <div class="ge-kpi-val">${cashflow>=0?'+':''}₪${geFmt(cashflow)}</div>
+      <div class="ge-kpi-lbl">תזרים חודשי</div>
     </div>
   </div>
+  ${fiPct!==null?`<div class="ge-fi-bar-wrap">
+    <div class="ge-fi-bar-track"><div class="ge-fi-bar-fill" style="width:${fiPct}%"></div></div>
+    <div class="ge-fi-bar-label">${fiPct}% מהדרך לעצמאות כלכלית</div>
+  </div>`:''}
   <div class="ge-refresh-note">עודכן: ${lastRefresh}</div>
 
   ${weeklyStep?`<div class="ge-weekly-step">
@@ -3641,23 +3718,39 @@ function geRenderDashboard(){
     <button class="ge-weekly-step-btn" onclick="geWeeklyToOneThing(${JSON.stringify(weeklyStep.text).replace(/"/g,'&quot;')})">הפוך ל-One Thing →</button>
   </div>`:''}
 
+  <div class="ge-section-title">💰 תזרים חודשי</div>
+  <div class="ge-flow-row"><span class="ge-flow-lbl">הכנסה ממשכורת</span><span class="ge-flow-val green">+₪${geFmt(p.income||0)}</span></div>
+  ${(p.incomeExtra||0)>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">הכנסות נוספות</span><span class="ge-flow-val green">+₪${geFmt(p.incomeExtra)}</span></div>`:''}
+  ${(p.propRent||0)>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">שכירות</span><span class="ge-flow-val green">+₪${geFmt(p.propRent)}</span></div>`:''}
+  <div class="ge-flow-row ge-flow-separator"><span class="ge-flow-lbl">הוצאות אשראי</span><span class="ge-flow-val muted">-₪${geFmt(p.creditExp||0)}</span></div>
+  ${(p.fixedExp||0)>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">הוצאות קבועות</span><span class="ge-flow-val muted">-₪${geFmt(p.fixedExp)}</span></div>`:''}
+  ${(p.mortgagePayment||0)>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">משכנתא</span><span class="ge-flow-val muted">-₪${geFmt(p.mortgagePayment)}</span></div>`:''}
+  ${(p.loansPayment||0)>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">הלוואות</span><span class="ge-flow-val muted">-₪${geFmt(p.loansPayment)}</span></div>`:''}
+  <div class="ge-flow-row ge-flow-total"><span class="ge-flow-lbl" style="font-weight:800">נשאר</span><span class="ge-flow-val ${cashflow>=0?'green':'red'}">${cashflow>=0?'+':'-'}₪${geFmt(Math.abs(cashflow))}</span></div>
+
+  ${pnl?`<div class="ge-section-title">📈 תיק השקעות</div>
+  <div class="ge-gain-card ${pnl.pnl>=0?'gain':'loss'}">
+    <div class="ge-gain-label">רווח/הפסד לא ממומש</div>
+    <div class="ge-gain-val">${geFmtSigned(pnl.pnl)} (${pnl.pct>=0?'+':''}${pnl.pct.toFixed(1)}%)</div>
+  </div>`:''}
+
+  ${propGain?`<div class="ge-section-title">🏠 עליית ערך הנכס</div>
+  <div class="ge-gain-card gain">
+    <div class="ge-gain-label">מאז הרכישה${p.propYear?' ('+p.propYear+')':''}</div>
+    <div class="ge-gain-val">+₪${geFmt(propGain.gain)} (+${propGain.pct.toFixed(1)}%)</div>
+  </div>`:''}
+
   <div class="ge-section-title">🎯 המטרות שלך</div>
   <div class="ge-goal-card">
     <div class="ge-goal-label">קצר טווח (12 חודש)</div>
     <div class="ge-goal-text">${esc(p.goalShort||'לא הוגדר')}</div>
   </div>
   <div class="ge-goal-card">
-    <div class="ge-goal-label">ארוך טווח (5 שנה)</div>
+    <div class="ge-goal-label">ארוך טווח</div>
     <div class="ge-goal-text">${esc(p.goalLong||'לא הוגדר')}</div>
   </div>
 
-  <div class="ge-section-title">💰 תזרים חודשי</div>
-  <div class="ge-flow-row"><span class="ge-flow-lbl">הכנסה</span><span class="ge-flow-val green">+₪${geFmt(p.income||0)}</span></div>
-  <div class="ge-flow-row"><span class="ge-flow-lbl">חיסכון</span><span class="ge-flow-val">₪${geFmt(p.saving||0)}</span></div>
-  <div class="ge-flow-row"><span class="ge-flow-lbl">הוצאות</span><span class="ge-flow-val muted">₪${geFmt((p.income||0)-(p.saving||0))}</span></div>
-  ${p.propRent>0?`<div class="ge-flow-row"><span class="ge-flow-lbl">שכירות</span><span class="ge-flow-val green">+₪${geFmt(p.propRent)}</span></div>`:''}
-
-  <button class="ge-edit-profile-btn" onclick="geEditProfile()">✏️ עדכן פרטים</button>
+  <button class="ge-edit-profile-btn" onclick="geEditProfile()">✏️ עדכן פרטים חודשיים</button>
 </div>`;
 }
 
@@ -3878,49 +3971,89 @@ function geBuildInsights(p){
   const usd=p.stockPrices?.['USDILS']||3.7;
   const nw=geCalcNetWorth(p);
   const fiYears=geCalcFIYears(p);
+  const cashflow=geCalcMonthlyCashflow(p);
+  const pnl=geCalcStockUnrealizedPnL(p);
+  const propGain=geCalcPropGain(p);
   const pipe=gePipeLoad();
   const skills=geSkillsLoad();
   const sp=p.stockPrices?.['SPX'];
 
-  // Savings projection
-  if(p.saving>0){
-    const annual=p.saving*12;
-    const in10=p.saving*12*((Math.pow(1.07,10)-1)/0.07);
-    insights.push({ico:'💰',title:'הכסף שלך עובד',text:`חיסכון של ₪${geFmt(p.saving)}/חודש בתשואה 7% שנתית = ₪${geFmt(in10)} בעוד 10 שנים.`});
+  // Cashflow warning
+  if(cashflow<0){
+    insights.push({ico:'🚨',title:'תזרים שלילי',text:`ההוצאות גבוהות מההכנסות ב-₪${geFmt(Math.abs(cashflow))}/חודש. זה ₪${geFmt(Math.abs(cashflow)*12)} בשנה. כדאי לבדוק מה ניתן לצמצם.`});
+  } else if(cashflow>0){
+    const in10=cashflow*12*((Math.pow(1.07,10)-1)/0.07);
+    insights.push({ico:'💰',title:'הכסף שנשאר עובד',text:`₪${geFmt(cashflow)}/חודש פנוי — בתשואה 7% שנתית זה ₪${geFmt(in10)} בעוד 10 שנים.`});
   }
-  // FI timeline
-  if(fiYears!==null){
-    insights.push({ico:'🏁',title:'הדרך לעצמאות כלכלית',text:`בקצב הנוכחי — ${fiYears} שנים. אם תוסיף הכנסה צדדית של ₪3,000/חודש — ${Math.max(0,fiYears-4)} שנים בלבד.`});
+
+  // FI timeline with age context
+  if(fiYears!==null&&p.age){
+    const fiAge=p.age+fiYears;
+    const targetAge=p.targetAge||55;
+    const diff=targetAge-fiAge;
+    insights.push({ico:'🏁',title:'הדרך לעצמאות כלכלית',
+      text:diff>=0
+        ?`לפי הקצב הנוכחי תגיע לעצמאות כלכלית בגיל ${fiAge} — ${diff} שנים לפני היעד שלך (${targetAge}). ${diff>3?'אפשר להאיץ עם הכנסה צדדית.':''}`
+        :`לפי הקצב הנוכחי תגיע בגיל ${fiAge} — ${Math.abs(diff)} שנים אחרי היעד שלך. הכנסה צדדית של ₪${geFmt(Math.abs(diff)*500)}/חודש תסגור את הפער.`});
+  } else if(fiYears!==null){
+    insights.push({ico:'🏁',title:'הדרך לעצמאות כלכלית',text:`בקצב הנוכחי — ${fiYears} שנים. הכנסה צדדית של ₪3,000/חודש תחסוך לך ${Math.max(1,Math.round(fiYears*0.2))} שנים.`});
   }
-  // Property yield
-  if(p.propVal>0&&p.propRent===0){
-    insights.push({ico:'🏠',title:'הדירה שלך — מה עוד אפשר?',text:`הון עצמי של ₪${geFmt(Math.max(0,p.propVal-p.mortgage))} "ישן". האם שכירות חלקית / refinancing רלוונטי?`,action:{label:'הוסף להזדמנויות →',fn:"geAddInsightToPipe('שכירות/Airbnb','מינוף הדירה הקיימת',1500,2)"}});
+
+  // Unrealized P&L
+  if(pnl){
+    const sign=pnl.pnl>=0?'gain':'loss';
+    insights.push({ico:pnl.pnl>=0?'📈':'📉',title:pnl.pnl>=0?'תיק בצבע ירוק':'תיק בצבע אדום',
+      text:`רווח/הפסד לא ממומש: ${geFmtSigned(pnl.pnl)} (${pnl.pct>=0?'+':''}${pnl.pct.toFixed(1)}%). ${pnl.pnl<0?'שקול האם מימוש ההפסד לצורך מס רלוונטי.':'המשך להחזיק לטווח הארוך.'}`});
   }
+
+  // Property gain
+  if(propGain&&propGain.gain>0){
+    const equity=Math.max(0,(p.propVal||0)-(p.mortgage||0));
+    const propYield=p.propRent>0?((p.propRent*12/p.propVal)*100).toFixed(1):null;
+    insights.push({ico:'🏠',title:'הנכס שלך צמח',
+      text:`עלייה של ₪${geFmt(propGain.gain)} (+${propGain.pct.toFixed(1)}%) מאז הרכישה. הון עצמי: ₪${geFmt(equity)}.${propYield?` תשואת שכירות: ${propYield}%.`:p.propRent===0?' הנכס לא מניב — האם Airbnb רלוונטי?':''}`,
+      action:p.propRent===0?{label:'הוסף לפייפליין →',fn:"geAddInsightToPipe('שכירות/Airbnb','מינוף הדירה הקיימת',1500,2)"}:null});
+  }
+
   // Skills not monetized
   const unleashed=skills.filter(s=>s.monetized==='no'||s.monetized==='learning');
   if(unleashed.length){
-    insights.push({ico:'🧠',title:'כישורים שעוד לא ממונפים',text:`יש לך ${unleashed.length} כישורים בתהליך מינוף. הכישור עם פוטנציאל גבוה ביותר: ${unleashed[0]?.name}. מה הצעד הבא?`,action:{label:'הוסף לפייפליין →',fn:`geAddInsightToPipe('${unleashed[0]?.name||'כישור'}','מינוף כישור קיים',2500,6)`}});
+    insights.push({ico:'🧠',title:'כישורים שעוד לא ממונפים',
+      text:`${unleashed.length} כישורים בתהליך. הכי ממוקד: ${unleashed[0]?.name}. לקוח ראשון אחד שווה יותר מ-100 שעות לימוד נוספות.`,
+      action:{label:'הוסף לפייפליין →',fn:`geAddInsightToPipe('${unleashed[0]?.name||'כישור'}','מינוף כישור קיים',2500,6)`}});
   }
+
   // S&P compare
   if(sp&&p.stocks?.length){
     const stockVal=(p.stocks||[]).reduce((sum,s)=>sum+s.qty*(p.stockPrices?.[s.ticker]||0)*usd,0);
-    insights.push({ico:'📈',title:'תיק vs S&P 500',text:`S&P 500 עומד על ${Math.round(sp).toLocaleString()}. תיק ההשקעות שלך שווה ₪${geFmt(stockVal)}.`});
+    const spPct=sp>4500?((sp-4500)/4500*100).toFixed(1):null;
+    insights.push({ico:'📊',title:'תיק vs שוק',text:`S&P 500: ${Math.round(sp).toLocaleString()}. תיק: ₪${geFmt(stockVal)}. ${pnl&&pnl.pct>0&&pnl.pct>parseFloat(spPct||0)?'אתה מכה את השוק 🎉':'השוואה שנתית תהיה זמינה לאחר רענון.'}`});
   }
+
   // Pipeline empty
   const activePipe=pipe.filter(x=>x.status==='idea'||x.status==='active');
   if(activePipe.length===0){
-    insights.push({ico:'⚠️',title:'אין הזדמנויות פעילות',text:'הפייפליין שלך ריק. הדרך הכי מהירה לפעולה: בחר כישור → הוסף הזדמנות → הגדר צעד הבא.',action:{label:'פתח פייפליין →',fn:"geSetTab('pipeline',null)"}});
+    insights.push({ico:'⚠️',title:'אין הזדמנויות פעילות',
+      text:'הפייפליין שלך ריק. צעד אחד: בחר כישור → הוסף הזדמנות → הגדר צעד הבא.',
+      action:{label:'פתח פייפליין →',fn:"geSetTab('pipeline',null)"}});
   }
-  // App data: tasks/focus
+
+  // Loans vs cashflow
+  if((p.loans||0)>0){
+    const monthsToRepay=Math.ceil((p.loans||0)/(p.loansPayment||1));
+    insights.push({ico:'💳',title:'הלוואות',text:`יתרת הלוואות: ₪${geFmt(p.loans)}. בתשלום קבוע הנוכחי — פירעון בעוד ${monthsToRepay} חודשים. פירעון מוקדם יחסוך ריבית.`});
+  }
+
+  // App productivity
   const completedThisWeek=tasks.filter(t=>{
     if(!t.completed)return false;
-    const d=new Date(t.datetime);const now=new Date();
-    return(now-d)<7*24*3600000;
+    return(Date.now()-new Date(t.datetime).getTime())<7*24*3600000;
   }).length;
   if(completedThisWeek>0){
-    insights.push({ico:'⚡',title:'הפרודוקטיביות שלך השבוע',text:`השלמת ${completedThisWeek} משימות השבוע. כמה מהן הובילו לקידום הכנסה?`});
+    insights.push({ico:'⚡',title:'פרודוקטיביות השבוע',text:`השלמת ${completedThisWeek} משימות השבוע. כמה מהן קידמו ישירות הכנסה?`});
   }
-  if(!insights.length)insights.push({ico:'💡',title:'תובנות יתעדכנו',text:'לאחר שתוסיף נתונים ותעדכן את המחירים, תובנות יופיעו כאן.'});
+
+  if(!insights.length)insights.push({ico:'💡',title:'תובנות יתעדכנו',text:'לאחר שתמלא את הנתונים ותרענן מחירים — תובנות מחושבות יופיעו כאן.'});
   return insights;
 }
 function geAddInsightToPipe(title,desc,potential,hoursWeek){
