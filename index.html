@@ -415,7 +415,27 @@
     <h3>🔄 השגרות שלי</h3>
     <button class="rsheet-add-btn" onclick="openRoutineForm(null,null)">+ הוסף</button>
   </div>
+  <div style="padding:8px 16px 0;display:flex;gap:8px">
+    <button class="ss-suggest-btn" onclick="openSmartSuggest()">✨ הצע שבוע חכם</button>
+  </div>
   <div class="rsheet-scroll" id="routineList"></div>
+</div>
+
+<!-- Sheet: Smart Suggest -->
+<div class="rsheet" id="smartSuggestSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeSmartSuggest()">←</button>
+    <h3>✨ שבוע חכם</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll">
+    <div style="padding:4px 16px 8px;font-size:12px;color:var(--muted);direction:rtl;line-height:1.5">מבוסס על ימי אנרגיה גבוהה ואחוזי השלמה היסטוריים. בחר/בטל כל מופע.</div>
+    <div id="smartSuggestBody" style="padding:0 16px 8px"></div>
+    <div style="padding:8px 16px 20px">
+      <button class="sched-confirm-btn" id="ssConfirmBtn" onclick="confirmSmartSuggest()">אשר הכל ✓</button>
+    </div>
+  </div>
 </div>
 
 <!-- Sheet: Routine Form -->
@@ -1946,6 +1966,7 @@ function renderRoutineInstance(inst){
   <div class="actions">
     <button class="act done-btn" onclick="toggleRoutineComplete('${inst.routineId}','${inst.dateStr}')">${inst.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="openRoutineTimeEdit('${safeId}')" title="שנה שעה">${ICO.edit}</button>
+    <button class="act add-inst-btn" onclick="quickAddInstance('${inst.routineId}')" title="הוסף מופע נוסף">＋</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
   <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
@@ -2054,12 +2075,185 @@ function migrateRoutine(r){
 }
 function saveRoutines(){localStorage.setItem('vt_routines',JSON.stringify(routines));}
 
+function getPrevWeekKey(){
+  const d=new Date();d.setDate(d.getDate()-7);return getWeekKey(d);
+}
 function getWeekKey(d=new Date()){
   const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
   const day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);
   const yr=dt.getUTCFullYear();
   const wk=Math.ceil((((dt-new Date(Date.UTC(yr,0,1)))/86400000)+1)/7);
   return`${yr}-W${String(wk).padStart(2,'0')}`;
+}
+
+// ── Copy last week ──────────────────────────────────────────
+async function copyLastWeek(routineId){
+  const r=routines.find(x=>x.id===routineId);if(!r)return;
+  const prevWk=getPrevWeekKey();
+  const prevSlots=r.scheduledWeeks?.[prevWk]||[];
+  if(!prevSlots.length){toast('אין תזמון מהשבוע הקודם');return;}
+  const wk=getWeekKey();
+  if(!r.scheduledWeeks)r.scheduledWeeks={};
+  toast('מעתיק...');
+  const created=[];
+  for(const item of prevSlots){
+    const oldDt=typeof item==='string'?item:item.dt;
+    const newD=new Date(oldDt);newD.setDate(newD.getDate()+7);
+    const ev=await createCalendarEvent(r,newD.toISOString());
+    created.push({dt:newD.toISOString(),eventId:ev?.id||null});
+  }
+  r.scheduledWeeks[wk]=created;
+  saveRoutines();renderRoutineList();render();
+  toast(`✓ הועתקו ${created.length} פגישות לשבוע הזה`);
+}
+
+// ── Quick add instance ──────────────────────────────────────
+function quickAddInstance(routineId){
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  // Build a mini datetime-local picker in a toast-like popup
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const defVal=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate()+1)}T${r.specificTime||'09:00'}`;
+  const existing=document.getElementById('quickAddPopup');
+  if(existing)existing.remove();
+  const pop=document.createElement('div');
+  pop.id='quickAddPopup';
+  pop.style.cssText='position:fixed;bottom:calc(96px + var(--sab,0px));left:16px;right:16px;max-width:448px;margin:0 auto;background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:16px;z-index:700;direction:rtl;box-shadow:0 8px 32px oklch(0 0 0/.5)';
+  pop.innerHTML=`<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">＋ מופע נוסף — ${esc(r.name||r.text)}</div>
+<input id="qaDate" type="datetime-local" value="${defVal}" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:14px;padding:10px;box-sizing:border-box;font-family:inherit;direction:ltr">
+<div style="display:flex;gap:8px;margin-top:10px">
+  <button onclick="confirmQuickAdd('${routineId}')" style="flex:1;padding:11px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">הוסף ✓</button>
+  <button onclick="document.getElementById('quickAddPopup').remove()" style="flex:1;padding:11px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">ביטול</button>
+</div>`;
+  document.body.appendChild(pop);
+}
+async function confirmQuickAdd(routineId){
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  const val=document.getElementById('qaDate')?.value;if(!val){toast('בחר תאריך ושעה');return;}
+  const dt=new Date(val).toISOString();
+  const wk=getWeekKey(new Date(val));
+  if(!r.scheduledWeeks)r.scheduledWeeks={};
+  if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
+  toast('מוסיף...');
+  const ev=await createCalendarEvent(r,dt);
+  r.scheduledWeeks[wk].push({dt,eventId:ev?.id||null});
+  saveRoutines();render();renderRoutineList();
+  document.getElementById('quickAddPopup')?.remove();
+  toast(`✓ נוסף ${new Date(dt).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'})}`);
+}
+
+// ── Smart week suggestion ────────────────────────────────────
+function openSmartSuggest(){
+  const el=document.getElementById('smartSuggestSheet');if(!el)return;
+  renderSmartSuggest();
+  document.getElementById('routineOverlay').classList.add('on');
+  el.classList.add('on');
+  ['routineListSheet'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
+}
+function closeSmartSuggest(){
+  document.getElementById('smartSuggestSheet')?.classList.remove('on');
+  setTimeout(()=>{document.getElementById('routineListSheet').classList.add('on');renderRoutineList();},40);
+}
+function renderSmartSuggest(){
+  const el=document.getElementById('smartSuggestBody');if(!el)return;
+  const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const log=energyLoad();
+  const enabledRoutines=routines.filter(r=>r.enabled);
+  if(!enabledRoutines.length){el.innerHTML=`<div class="ss-empty">אין שגרות פעילות</div>`;return;}
+
+  // For each routine, analyze best days based on energy + completion history
+  const suggestions=enabledRoutines.map(r=>{
+    const rLog=log.filter(e=>e.routineId==r.id);
+    // Day score: energy score (high=3,mid=2,low=1) per day-of-week
+    const dayScore={};
+    rLog.forEach(e=>{
+      const day=new Date(e.ts).getDay();
+      dayScore[day]=(dayScore[day]||0)+({high:3,mid:2,low:1}[e.level]||2);
+    });
+    // Completion rate per day from scheduledWeeks history
+    const compByDay={};const schedByDay={};
+    Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item?.dt;if(!dt)return;
+      const day=new Date(dt).getDay();
+      schedByDay[day]=(schedByDay[day]||0)+1;
+      if((r.completedDates||[]).includes(dt))compByDay[day]=(compByDay[day]||0)+1;
+    });
+    // Combined score: energy (if available) + completion rate
+    const scoredDays=[0,1,2,3,4,5,6].map(day=>{
+      const e=dayScore[day]||0;
+      const comp=schedByDay[day]?((compByDay[day]||0)/schedByDay[day])*3:0;
+      const base=r.preferredDays?.includes(day)?1:0;
+      return{day,score:e+comp+base};
+    }).sort((a,b)=>b.score-a.score);
+
+    // Pick best N days (timesPerWeek)
+    const count=r.timesPerWeek||3;
+    const bestDays=scoredDays.slice(0,count).map(x=>x.day).sort((a,b)=>a-b);
+    const h=windowStartHour(r);
+    const m=r.timeWindow==='specific'?+(r.specificTime||'09:00').split(':')[1]:0;
+
+    // Build proposed slots for next 7 days starting tomorrow
+    const slots=[];
+    const now=new Date();
+    for(let d=1;d<=14&&slots.length<count;d++){
+      const date=new Date(now);date.setDate(now.getDate()+d);date.setHours(h,m,0,0);
+      if(bestDays.includes(date.getDay()))slots.push(date);
+    }
+    const hasData=rLog.length>0||Object.keys(schedByDay).length>0;
+    const basis=hasData
+      ?`על בסיס ${rLog.length} תגובות אנרגיה${Object.keys(schedByDay).length?' ו-'+Object.values(schedByDay).reduce((a,b)=>a+b,0)+' מופעים':''}`
+      :'לפי הגדרות השגרה';
+    return{r,slots,basis};
+  });
+
+  _smartSuggestSlots=suggestions;
+  el.innerHTML=suggestions.map((s,si)=>{
+    const name=esc(s.r.name||s.r.text);
+    const h=windowStartHour(s.r);
+    const m=s.r.timeWindow==='specific'?+(s.r.specificTime||'09:00').split(':')[1]:0;
+    const timeLbl=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    return`<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-name">${name}</div>
+    <div class="ss-card-basis">${s.basis}</div>
+  </div>
+  <div class="ss-slots">
+    ${s.slots.map((d,di)=>`<div class="ss-slot on" id="ss_${si}_${di}" onclick="toggleSsSlot(${si},${di})">
+      <span class="ss-slot-check">✓</span>
+      <span class="ss-slot-day">${DAY_NAMES[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}</span>
+      <span class="ss-slot-time">${timeLbl}</span>
+    </div>`).join('')}
+  </div>
+</div>`;
+  }).join('');
+}
+let _smartSuggestSlots=[];
+function toggleSsSlot(si,di){
+  const el=document.getElementById(`ss_${si}_${di}`);if(!el)return;
+  el.classList.toggle('on');
+}
+async function confirmSmartSuggest(){
+  const btn=document.getElementById('ssConfirmBtn');
+  if(btn){btn.textContent='מוסיף...';btn.disabled=true;}
+  let total=0;
+  for(let si=0;si<_smartSuggestSlots.length;si++){
+    const{r,slots}=_smartSuggestSlots[si];
+    const chosen=slots.filter((_,di)=>document.getElementById(`ss_${si}_${di}`)?.classList.contains('on'));
+    if(!chosen.length)continue;
+    for(const date of chosen){
+      const dt=date.toISOString();
+      const wk=getWeekKey(date);
+      if(!r.scheduledWeeks)r.scheduledWeeks={};
+      if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
+      const ev=await createCalendarEvent(r,dt);
+      r.scheduledWeeks[wk].push({dt,eventId:ev?.id||null});
+      total++;
+    }
+  }
+  saveRoutines();render();
+  if(btn){btn.textContent='אשר הכל ✓';btn.disabled=false;}
+  toast(`✓ ${total} מופעים תוזמנו`);
+  setTimeout(()=>closeSmartSuggest(),600);
 }
 
 function windowStartHour(r){
@@ -2136,7 +2330,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -2165,9 +2359,11 @@ function renderRoutineList(){
     const win=WIN_LABEL[r.timeWindow]||'בוקר';
     const scheduled=r.scheduledWeeks?.[wk]||[];
     const schedCount=scheduled.length;
+    const prevWk=getPrevWeekKey();
+    const hasPrevWeek=(r.scheduledWeeks?.[prevWk]||[]).length>0;
     const schedBtn=schedCount
-      ?`<span class="routine-sched-done">✓ מתוזמן ${schedCount} פגישות</span><button class="routine-clear-btn" onclick="clearRoutineEvents(${r.id})">🗑 נקה אירועים</button>`
-      :(r.enabled?`<button class="routine-sched-btn" onclick="openScheduleSheet(${r.id})">⚡ תזמן השבוע</button>`:'');
+      ?`<span class="routine-sched-done">✓ מתוזמן ${schedCount} פגישות</span><button class="routine-clear-btn" onclick="clearRoutineEvents(${r.id})">🗑 נקה</button>`
+      :(r.enabled?`<button class="routine-sched-btn" onclick="openScheduleSheet(${r.id})">⚡ תזמן</button>${hasPrevWeek?`<button class="routine-copy-btn" onclick="copyLastWeek(${r.id})">⟳ שבוע שעבר</button>`:''}`:``);
     return`<div class="routine-item">
   <label class="rtoggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRoutineEnabled(${r.id},this.checked)"><span class="rtoggle-sl"></span></label>
   <div class="routine-item-body" onclick="editRoutine(${r.id})">
@@ -3196,6 +3392,7 @@ function initSwipeGestures(){
   initSheetSwipe(document.getElementById('routineListSheet'),ov);
   initSheetSwipe(document.getElementById('routineFormSheet'),ov);
   initSheetSwipe(document.getElementById('scheduleSheet'),ov);
+  initSheetSwipe(document.getElementById('smartSuggestSheet'),ov);
   initSheetSwipe(document.getElementById('notifManagerSheet'),ov);
   initSheetSwipe(document.getElementById('notifFormSheet'),ov);
   initSheetSwipe(document.getElementById('calGcalEditSheet'),ov);
