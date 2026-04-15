@@ -957,10 +957,10 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-stock-avg{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;padding:10px;outline:none;text-align:center}
 
 /* ── Energy Check-in Popup ── */
-.energy-overlay{position:fixed;inset:0;z-index:300;background:oklch(0 0 0 / 0.55);backdrop-filter:blur(4px);display:none}
+.energy-overlay{position:fixed;inset:0;z-index:600;background:oklch(0 0 0 / 0.55);backdrop-filter:blur(4px);display:none}
 .energy-overlay.on{display:block}
 .energy-popup{
-  position:fixed;bottom:0;left:0;right:0;z-index:301;
+  position:fixed;bottom:0;left:0;right:0;z-index:601;
   max-width:480px;margin:0 auto;
   background:var(--surface);border-radius:24px 24px 0 0;
   padding:24px 20px calc(28px + var(--sab,0px));

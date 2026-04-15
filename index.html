@@ -2069,8 +2069,14 @@ function windowStartHour(r){
 
 function generateWeekSlots(routine,weekOffset=0,startDate=null){
   const now=new Date();
-  const ref=startDate||now;
-  const effectiveNow=ref>now?ref:now;
+  // Parse date picker value as local midnight (avoid UTC shift)
+  let ref;
+  if(startDate){
+    ref=new Date(startDate.getFullYear(),startDate.getMonth(),startDate.getDate());
+  } else {
+    ref=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  }
+  const effectiveNow=now; // always compare against actual current time
   const weekStart=new Date(ref);
   weekStart.setDate(ref.getDate()-ref.getDay()+weekOffset*7);
   weekStart.setHours(0,0,0,0);
@@ -2082,15 +2088,18 @@ function generateWeekSlots(routine,weekOffset=0,startDate=null){
   const startH=windowStartHour(routine);
   const startM=routine.timeWindow==='specific'?+(routine.specificTime||'07:00').split(':')[1]:0;
   const slots=[];
-  for(let d=0;d<7&&slots.length<count;d++){
+  // Pass 1: preferred days only — scan up to 14 days to handle week boundary
+  for(let d=0;d<14&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
-    if(date<effectiveNow)continue;
-    if(prefDays.includes(date.getDay())){date.setHours(startH,startM,0,0);slots.push(date.toISOString());}
+    date.setHours(startH,startM,0,0); // set time BEFORE comparing
+    if(date<=effectiveNow)continue;
+    if(prefDays.includes(date.getDay()))slots.push(date.toISOString());
   }
-  for(let d=0;d<7&&slots.length<count;d++){
+  // Pass 2: any day fallback if still not enough slots
+  for(let d=0;d<14&&slots.length<count;d++){
     const date=new Date(weekStart);date.setDate(weekStart.getDate()+d);
-    if(date<effectiveNow)continue;
     date.setHours(startH,startM,0,0);
+    if(date<=effectiveNow)continue;
     if(!slots.includes(date.toISOString()))slots.push(date.toISOString());
   }
   return slots.slice(0,count);
@@ -2178,7 +2187,8 @@ function renderRoutineList(){
 function refreshScheduleSlots(){
   const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
   const pickerVal=document.getElementById('schedStartDate').value;
-  const startDate=pickerVal?new Date(pickerVal):null;
+  let startDate=null;
+  if(pickerVal){const[y,m,d]=pickerVal.split('-').map(Number);startDate=new Date(y,m-1,d);}
   const slots=generateWeekSlots(r,0,startDate);
   schedulingSlots=slots.map(dt=>({dt,selected:true}));
   const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -2368,9 +2378,10 @@ function toggleRoutineComplete(routineId,dateStr){
   const idx=r.completedDates.indexOf(dateStr);
   if(idx===-1){
     r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');
-    saveRoutines();render();
+    saveRoutines();
+    try{render();}catch(e){console.error('render error in toggleRoutineComplete',e);}
     // Show energy check-in after short delay
-    setTimeout(()=>openEnergyPopup(routineId,dateStr),500);
+    setTimeout(()=>openEnergyPopup(routineId,dateStr),600);
   } else {
     r.completedDates.splice(idx,1);
     saveRoutines();render();
@@ -2425,16 +2436,13 @@ function energyLoad(){return JSON.parse(localStorage.getItem(ENERGY_KEY)||'[]');
 function energySave(log){localStorage.setItem(ENERGY_KEY,JSON.stringify(log));}
 
 function openEnergyPopup(routineId,dateStr){
-  const r=routines.find(x=>x.id==routineId);
-  if(!r){console.warn('openEnergyPopup: routine not found',routineId,routines.map(x=>x.id));return;}
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
   _energyContext={routineId,dateStr};
   const el=document.getElementById('energyPopup');
   const nameEl=document.getElementById('energyRoutineName');
   if(nameEl)nameEl.textContent=r.name||r.text||'השגרה';
-  const ov=document.getElementById('energyOverlay');
-  if(ov)ov.classList.add('on');
-  if(el){el.classList.add('on');console.log('energy popup opened',el.className,el.style.cssText);}
-  else{console.warn('energyPopup element not found');}
+  document.getElementById('energyOverlay')?.classList.add('on');
+  if(el)el.classList.add('on');
 }
 function closeEnergyPopup(){
   document.getElementById('energyPopup')?.classList.remove('on');
