@@ -152,6 +152,7 @@
   </div>
 </div>
 
+<div id="oneThing"></div>
 <div id="todayPlan"></div>
 <div class="filters">
   <button class="f-btn on" onclick="setFilter('all',this)">הכל</button>
@@ -786,6 +787,41 @@
     <button class="pend-paste-btn" onclick="pasteFromClipboard()">📋 הדבק מהלוח (העתק מוואטסאפ ← לחץ כאן)</button>
   </div>
   <div class="rsheet-scroll" id="pendingList" style="padding:12px 16px calc(32px + var(--sab))"></div>
+</div>
+
+<!-- One Thing Picker Sheet -->
+<div class="rsheet" id="otSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeOtSheet()">✕</button>
+    <h3>🎯 המשימה האחת להיום</h3>
+    <div style="width:32px"></div>
+  </div>
+  <div class="rsheet-scroll" style="padding:16px 16px calc(32px + var(--sab,0px))">
+    <p class="ot-picker-desc">בחר משימה אחת שאם תעשה אותה היום — היום היה שווה.</p>
+    <textarea class="ot-custom-input" id="otCustomText" rows="2" placeholder="כתוב משימה חופשית..."></textarea>
+    <button class="ot-custom-btn" onclick="setOneThingCustom()">✓ בחר זה</button>
+    <div class="ot-divider"><span>או בחר ממשימות היום</span></div>
+    <div id="otTaskList"></div>
+  </div>
+</div>
+
+<!-- Focus Timer Overlay -->
+<div class="focus-overlay" id="focusOverlay">
+  <button class="focus-close" onclick="stopFocusTimer()">✕</button>
+  <div class="focus-task-name" id="focusTaskName"></div>
+  <div class="focus-ring-wrap">
+    <svg class="focus-ring-svg" viewBox="0 0 200 200">
+      <circle class="focus-ring-bg" cx="100" cy="100" r="88"/>
+      <circle class="focus-ring-progress" id="focusRingProgress" cx="100" cy="100" r="88"/>
+    </svg>
+    <div class="focus-time" id="focusTime">25:00</div>
+  </div>
+  <div class="focus-session" id="focusSession">פומודורו 1</div>
+  <div class="focus-btns">
+    <button class="focus-btn-stop" onclick="stopFocusTimer()">✕ הפסק</button>
+    <button class="focus-btn-pause" id="focusPauseBtn" onclick="toggleFocusPause()">⏸ השהה</button>
+  </div>
 </div>
 
 <!-- Daily morning popup -->
@@ -1796,6 +1832,7 @@ function renderTaskCard(task){
     <button class="act done-btn" onclick="toggleDone(${task.id})">${task.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="editTask(${task.id})">${ICO.edit}</button>
     ${extraBtn}
+    <button class="act focus-task-btn" onclick="startFocusTimer(${task.id},${JSON.stringify(task.text)})" title="פוקוס טיימר">⏱</button>
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
     <button class="act cal-btn" onclick="cal(${task.id})">${ICO.cal}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
@@ -1842,6 +1879,7 @@ function renderRoutineInstance(inst){
 </div>`;}
 
 function render(){
+  renderOneThing();
   renderTodayPlan();
   const el=document.getElementById('list');if(!el)return;
   const routineInstances=getRoutineInstances();
@@ -2008,7 +2046,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -3494,6 +3532,131 @@ function todayItemRow(item,isRoutine){
     +`<span class="tp-time">${time}</span>`
     +`</div>`;
 }
+// ── One Thing ────────────────────────────────────────────
+const OT_KEY='vt_one_thing';
+function getOneThing(){
+  const d=JSON.parse(localStorage.getItem(OT_KEY)||'null');
+  if(!d||d.date!==_ymd(new Date()))return null;
+  return d;
+}
+function saveOneThing(d){localStorage.setItem(OT_KEY,JSON.stringify(d));}
+function renderOneThing(){
+  const el=document.getElementById('oneThing');if(!el)return;
+  const d=getOneThing();
+  if(!d){
+    el.innerHTML=`<div class="ot-empty" onclick="openOtSheet()">
+      <span class="ot-empty-icon">🎯</span>
+      <span class="ot-empty-text">מה המשימה האחת שלך היום?</span>
+      <span class="ot-empty-arrow">←</span>
+    </div>`;
+    return;
+  }
+  if(d.completed){
+    el.innerHTML=`<div class="ot-done">
+      <span class="ot-done-icon">🏆</span>
+      <div class="ot-done-text">${esc(d.text)}</div>
+      <button class="ot-change" onclick="openOtSheet()">שנה</button>
+    </div>`;
+    return;
+  }
+  const focusBtn=`<button class="ot-focus-btn" onclick="startFocusTimer(null,${JSON.stringify(d.text)})">⏱ פוקוס</button>`;
+  el.innerHTML=`<div class="ot-active">
+    <div class="ot-label">🎯 המשימה האחת להיום</div>
+    <div class="ot-text">${esc(d.text)}</div>
+    <div class="ot-actions">
+      <button class="ot-done-btn" onclick="completeOneThing()">✓ סיימתי</button>
+      ${focusBtn}
+      <button class="ot-change" onclick="openOtSheet()">שנה</button>
+    </div>
+  </div>`;
+}
+function completeOneThing(){
+  const d=getOneThing();if(!d)return;
+  d.completed=true;saveOneThing(d);renderOneThing();
+  toast('🏆 מצוין! השגת את המשימה האחת שלך היום!');
+}
+function openOtSheet(){
+  const el=document.getElementById('otTaskList');
+  if(el){
+    const today=getTodayItems();
+    const all=[...today.tasks,...today.routines];
+    if(all.length){
+      el.innerHTML=all.map(t=>`<div class="ot-task-row" onclick="setOneThing(${JSON.stringify(t.text)},${t.id||'null'})">
+        <span class="ot-task-ico">${t.routineId?'🔄':'📌'}</span>
+        <span class="ot-task-txt">${esc(t.text)}</span>
+      </div>`).join('');
+    }else{
+      el.innerHTML=`<div style="color:var(--muted);font-size:13px;padding:12px 0;direction:rtl">אין משימות להיום — כתוב בעצמך למעלה</div>`;
+    }
+  }
+  document.getElementById('routineOverlay').classList.add('on');
+  document.getElementById('otSheet').classList.add('on');
+}
+function closeOtSheet(){
+  document.getElementById('otSheet').classList.remove('on');
+  document.getElementById('routineOverlay').classList.remove('on');
+}
+function setOneThing(text,taskId=null){
+  saveOneThing({text,taskId,date:_ymd(new Date()),completed:false});
+  closeOtSheet();renderOneThing();
+}
+function setOneThingCustom(){
+  const t=document.getElementById('otCustomText')?.value.trim();
+  if(!t){toast('כתוב משימה');return;}
+  setOneThing(t,null);
+  document.getElementById('otCustomText').value='';
+}
+
+// ── Focus Timer ──────────────────────────────────────────
+let _ft={active:false,paused:false,taskText:'',duration:25*60,remaining:25*60,interval:null,session:1};
+const FT_CIRC=2*Math.PI*88;
+function startFocusTimer(taskId,taskText){
+  if(_ft.active)stopFocusTimer();
+  _ft={active:true,paused:false,taskText,duration:25*60,remaining:25*60,interval:null,session:1};
+  const nameEl=document.getElementById('focusTaskName');
+  if(nameEl)nameEl.textContent=taskText;
+  const sesEl=document.getElementById('focusSession');
+  if(sesEl)sesEl.textContent='פומודורו 1';
+  const pbtn=document.getElementById('focusPauseBtn');
+  if(pbtn)pbtn.textContent='⏸ השהה';
+  document.getElementById('focusOverlay').classList.add('on');
+  _updateFocusDisplay();
+  _ft.interval=setInterval(_focusTick,1000);
+}
+function _focusTick(){
+  if(_ft.paused)return;
+  _ft.remaining--;
+  _updateFocusDisplay();
+  if(_ft.remaining<=0){
+    clearInterval(_ft.interval);
+    toast('✅ פומודורו הושלם! זמן לנוח 5 דקות.');
+    navigator.serviceWorker?.ready.then(sw=>sw.showNotification('VoiceTask ⏱',{body:'25 דקות הושלמו! קח הפסקה.',icon:'./icon.svg',badge:'./icon.svg',vibrate:[300,100,300]})).catch(()=>{});
+    stopFocusTimer();
+  }
+}
+function _updateFocusDisplay(){
+  const min=Math.floor(_ft.remaining/60).toString().padStart(2,'0');
+  const sec=(_ft.remaining%60).toString().padStart(2,'0');
+  const el=document.getElementById('focusTime');if(el)el.textContent=`${min}:${sec}`;
+  const ring=document.getElementById('focusRingProgress');
+  if(ring){
+    const offset=FT_CIRC*(1-(_ft.remaining/_ft.duration));
+    ring.style.strokeDashoffset=offset;
+    // color: green→amber→red as time runs low
+    const pct=_ft.remaining/_ft.duration;
+    ring.style.stroke=pct>0.5?'var(--accent)':pct>0.2?'oklch(0.72 0.18 55)':'oklch(0.65 0.22 25)';
+  }
+}
+function toggleFocusPause(){
+  _ft.paused=!_ft.paused;
+  const btn=document.getElementById('focusPauseBtn');
+  if(btn)btn.textContent=_ft.paused?'▶ המשך':'⏸ השהה';
+}
+function stopFocusTimer(){
+  clearInterval(_ft.interval);_ft.active=false;
+  document.getElementById('focusOverlay').classList.remove('on');
+}
+
 function renderTodayPlan(){
   const el=document.getElementById('todayPlan');if(!el)return;
   const{tasks:tt,routines:rr}=getTodayItems();

@@ -757,3 +757,48 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bp-icon-btn.on{background:oklch(0.78 0.16 72 / 0.15);border-color:var(--accent)}
 .bp-dialog-cancel{flex:1;padding:13px;border-radius:var(--r);border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
 .bp-dialog-save{flex:1;padding:13px;border-radius:var(--r);border:none;background:var(--accent);color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+
+/* ── One Thing ───────────────────────────────────────────────────────────── */
+.ot-empty{margin:10px 16px 0;padding:14px 16px;background:var(--surface);border:1.5px dashed var(--border2);border-radius:var(--r);display:flex;align-items:center;gap:10px;direction:rtl;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ot-empty:active{opacity:.7}
+.ot-empty-icon{font-size:18px;flex-shrink:0}
+.ot-empty-text{flex:1;font-size:14px;font-weight:600;color:var(--muted)}
+.ot-empty-arrow{font-size:16px;color:var(--muted)}
+.ot-active{margin:10px 16px 0;padding:16px;background:oklch(0.78 0.16 72 / 0.07);border:1.5px solid oklch(0.78 0.16 72 / 0.35);border-radius:var(--r);direction:rtl}
+.ot-label{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.5px;margin-bottom:8px}
+.ot-text{font-size:20px;font-weight:800;color:var(--text);line-height:1.35;margin-bottom:14px}
+.ot-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ot-done-btn{flex:1;padding:11px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ot-focus-btn{padding:11px 18px;border-radius:50px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ot-change{padding:8px 12px;border-radius:50px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ot-done{margin:10px 16px 0;padding:14px 16px;background:oklch(0.45 0.12 145 / 0.1);border:1px solid oklch(0.45 0.12 145 / 0.25);border-radius:var(--r);display:flex;align-items:center;gap:10px;direction:rtl}
+.ot-done-icon{font-size:20px;flex-shrink:0}
+.ot-done-text{flex:1;font-size:14px;font-weight:700;color:var(--text);opacity:.6;text-decoration:line-through}
+/* Picker sheet internals */
+.ot-picker-desc{font-size:13px;color:var(--muted);direction:rtl;margin:0 0 14px;line-height:1.6}
+.ot-custom-input{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-family:inherit;font-size:15px;padding:12px;resize:none;direction:rtl;outline:none}
+.ot-custom-btn{width:100%;margin-top:10px;padding:13px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ot-divider{text-align:center;color:var(--muted);font-size:12px;font-weight:700;margin:18px 0 12px;position:relative}
+.ot-divider::before,.ot-divider::after{content:'';position:absolute;top:50%;width:30%;height:1px;background:var(--border)}
+.ot-divider::before{right:0}.ot-divider::after{left:0}
+.ot-task-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);direction:rtl;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ot-task-row:active{opacity:.7}
+.ot-task-ico{font-size:16px;flex-shrink:0}
+.ot-task-txt{font-size:14px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Focus button on task card */
+.act.focus-task-btn{font-size:14px;background:var(--surface2)}
+
+/* ── Focus Timer Overlay ─────────────────────────────────────────────────── */
+.focus-overlay{position:fixed;inset:0;z-index:500;background:oklch(0.10 0.012 45);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:translateY(100%);transition:transform .4s cubic-bezier(.25,.46,.45,.94);padding:40px 24px;box-sizing:border-box}
+.focus-overlay.on{transform:translateY(0)}
+.focus-close{position:absolute;top:calc(16px + var(--sat,0px));left:16px;width:36px;height:36px;border-radius:50%;background:oklch(0.20 0.01 45);border:none;color:oklch(0.55 0.02 45);font-size:16px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+.focus-task-name{font-size:15px;font-weight:700;color:oklch(0.55 0.04 72);text-align:center;margin-bottom:40px;max-width:280px;direction:rtl;line-height:1.4}
+.focus-ring-wrap{position:relative;width:220px;height:220px;margin-bottom:20px}
+.focus-ring-svg{width:100%;height:100%;transform:rotate(-90deg)}
+.focus-ring-bg{fill:none;stroke:oklch(0.22 0.01 45);stroke-width:8}
+.focus-ring-progress{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;stroke-dasharray:552.92;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear,stroke .5s ease}
+.focus-time{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:54px;font-weight:900;color:oklch(0.95 0.02 72);font-variant-numeric:tabular-nums;letter-spacing:-2px}
+.focus-session{font-size:13px;font-weight:700;color:oklch(0.45 0.03 72);margin-bottom:48px;letter-spacing:.5px}
+.focus-btns{display:flex;gap:12px}
+.focus-btn-stop{padding:14px 28px;border-radius:50px;background:oklch(0.20 0.01 45);border:1px solid oklch(0.28 0.02 45);color:oklch(0.55 0.02 45);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.focus-btn-pause{padding:14px 36px;border-radius:50px;background:var(--accent);border:none;color:oklch(0.12 0.007 45);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
