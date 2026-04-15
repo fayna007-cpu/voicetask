@@ -851,6 +851,40 @@
   </div>
 </div>
 
+<!-- Energy Check-in -->
+<div class="energy-overlay" id="energyOverlay"></div>
+<div class="energy-popup" id="energyPopup">
+  <div class="energy-title" id="energyTitle">איך הרגשת?</div>
+  <div class="energy-sub">אחרי <span id="energyRoutineName"></span></div>
+  <div class="energy-btns">
+    <button class="energy-btn" onclick="saveEnergy('high')">⚡<span>טעון</span></button>
+    <button class="energy-btn" onclick="saveEnergy('mid')">😐<span>רגיל</span></button>
+    <button class="energy-btn" onclick="saveEnergy('low')">😴<span>עייף</span></button>
+  </div>
+  <button class="energy-skip" onclick="closeEnergyPopup()">דלג</button>
+</div>
+
+<!-- Weekly Pattern Card -->
+<div class="wpc-overlay" id="wpcOverlay" onclick="closeWeeklyPattern()"></div>
+<div class="wpc-modal" id="wpcModal">
+  <div class="wpc-head">
+    <div class="wpc-title">📊 דפוס השבוע שלך</div>
+    <button class="wpc-close" onclick="closeWeeklyPattern()">✕</button>
+  </div>
+  <div id="wpcBody"></div>
+  <button class="wpc-ok" onclick="closeWeeklyPattern()">הבנתי ✓</button>
+</div>
+
+<!-- Recovery Protocol -->
+<div class="recovery-overlay" id="recoveryOverlay" onclick="closeRecovery()"></div>
+<div class="recovery-popup" id="recoveryPopup">
+  <div class="recovery-ico">😬</div>
+  <div class="recovery-title" id="recoveryTitle">פספסת שגרה</div>
+  <div class="recovery-sub" id="recoverySub"></div>
+  <div class="recovery-slots" id="recoverySlots"></div>
+  <button class="recovery-skip" onclick="closeRecovery()">לא עכשיו</button>
+</div>
+
 <!-- Daily morning popup -->
 <div class="dp-overlay" id="dpOverlay" onclick="closeDailyPopup()"></div>
 <div class="dp-modal" id="dpModal">
@@ -935,7 +969,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1887,6 +1921,14 @@ function renderRoutineInstance(inst){
   const pad=n=>n.toString().padStart(2,'0');
   const dtLocal=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   const safeId=`${inst.routineId}_${inst.dateStr.replace(/[:.]/g,'-')}`;
+  // Consistency + energy
+  const cons=getRoutineConsistency(inst.routineId,30);
+  const avgE=getRoutineEnergyAvg(inst.routineId);
+  const energyIco={high:'⚡',mid:'😐',low:'😴'};
+  const consBar=cons?`<div class="routine-cons-wrap">
+    <div class="routine-cons-track"><div class="routine-cons-fill" style="width:${cons.pct}%;background:${cons.pct>=80?'oklch(0.72 0.18 145)':cons.pct>=50?'var(--accent)':'oklch(0.65 0.22 25)'}"></div></div>
+    <span class="routine-cons-label">${cons.pct}% עקביות${avgE?` · ${energyIco[avgE]}`:''}</span>
+  </div>`:'';
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
   <div class="routine-badge">🔄 שגרה</div>
   <div class="card-row">
@@ -1900,6 +1942,7 @@ function renderRoutineInstance(inst){
     </div>
     <div class="card-time">${timeStr}<br><span style="font-size:12px;font-weight:500;color:var(--muted)">–${endStr}</span></div>
   </div>
+  ${consBar}
   <div class="actions">
     <button class="act done-btn" onclick="toggleRoutineComplete('${inst.routineId}','${inst.dateStr}')">${inst.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="openRoutineTimeEdit('${safeId}')" title="שנה שעה">${ICO.edit}</button>
@@ -2323,9 +2366,15 @@ function toggleRoutineComplete(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   if(!r.completedDates)r.completedDates=[];
   const idx=r.completedDates.indexOf(dateStr);
-  if(idx===-1){r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');}
-  else r.completedDates.splice(idx,1);
-  saveRoutines();render();
+  if(idx===-1){
+    r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');
+    saveRoutines();render();
+    // Show energy check-in after short delay
+    setTimeout(()=>openEnergyPopup(routineId,dateStr),500);
+  } else {
+    r.completedDates.splice(idx,1);
+    saveRoutines();render();
+  }
 }
 function skipRoutineInstance(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
@@ -2366,6 +2415,221 @@ function saveRoutineInstanceTime(safeId,routineId,oldDateStr){
   });
   saveRoutines();render();
   toast('✅ מועד עודכן');
+}
+
+// ── Energy System ────────────────────────────────────────
+const ENERGY_KEY='vt_energy_log';
+let _energyContext={routineId:null,dateStr:null};
+
+function energyLoad(){return JSON.parse(localStorage.getItem(ENERGY_KEY)||'[]');}
+function energySave(log){localStorage.setItem(ENERGY_KEY,JSON.stringify(log));}
+
+function openEnergyPopup(routineId,dateStr){
+  const r=routines.find(x=>x.id==routineId);
+  if(!r){console.warn('openEnergyPopup: routine not found',routineId,routines.map(x=>x.id));return;}
+  _energyContext={routineId,dateStr};
+  const el=document.getElementById('energyPopup');
+  const nameEl=document.getElementById('energyRoutineName');
+  if(nameEl)nameEl.textContent=r.name||r.text||'השגרה';
+  const ov=document.getElementById('energyOverlay');
+  if(ov)ov.classList.add('on');
+  if(el){el.classList.add('on');console.log('energy popup opened',el.className,el.style.cssText);}
+  else{console.warn('energyPopup element not found');}
+}
+function closeEnergyPopup(){
+  document.getElementById('energyPopup')?.classList.remove('on');
+  document.getElementById('energyOverlay')?.classList.remove('on');
+  _energyContext={routineId:null,dateStr:null};
+}
+function saveEnergy(level){
+  const{routineId,dateStr}=_energyContext;
+  if(!routineId||!dateStr){closeEnergyPopup();return;}
+  const log=energyLoad();
+  // remove existing entry for same instance
+  const filtered=log.filter(e=>!(e.routineId==routineId&&e.dateStr===dateStr));
+  filtered.push({routineId,dateStr,level,ts:new Date().toISOString()});
+  energySave(filtered);
+  closeEnergyPopup();
+  const labels={high:'⚡ מעולה!',mid:'😐 בסדר',low:'😴 נחנק'};
+  toast(labels[level]||'נשמר');
+}
+
+// ── Routine Analytics ─────────────────────────────────────
+function getRoutineConsistency(routineId,days=30){
+  const r=routines.find(x=>x.id==routineId);if(!r)return null;
+  const now=new Date();
+  const cutoff=new Date(now.getTime()-days*24*3600000);
+  // Count scheduled instances in window
+  let scheduled=0,completed=0;
+  Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+    const dt=typeof item==='string'?item:item?.dt;
+    if(!dt)return;
+    const d=new Date(dt);
+    if(d<cutoff||d>now)return;
+    if((r.skippedDates||[]).includes(dt))return;
+    scheduled++;
+    if((r.completedDates||[]).includes(dt))completed++;
+  });
+  if(scheduled===0)return null;
+  return{scheduled,completed,pct:Math.round((completed/scheduled)*100)};
+}
+function getRoutineEnergyAvg(routineId){
+  const log=energyLoad().filter(e=>e.routineId==routineId);
+  if(!log.length)return null;
+  const scores={high:3,mid:2,low:1};
+  const avg=log.reduce((s,e)=>s+(scores[e.level]||2),0)/log.length;
+  if(avg>=2.5)return'high';if(avg>=1.5)return'mid';return'low';
+}
+function getBestEnergyDay(routineId){
+  const log=energyLoad().filter(e=>e.routineId==routineId&&e.level==='high');
+  if(log.length<2)return null;
+  const dayCount={};
+  const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  log.forEach(e=>{
+    const d=new Date(e.dateStr||e.ts);
+    const day=d.getDay();
+    dayCount[day]=(dayCount[day]||0)+1;
+  });
+  const best=Object.entries(dayCount).sort((a,b)=>b[1]-a[1])[0];
+  return best?dayNames[+best[0]]:null;
+}
+
+// ── Weekly Pattern Card ───────────────────────────────────
+function maybeShowWeeklyRoutinePattern(){
+  const today=new Date();
+  if(today.getDay()!==0)return; // only Sunday
+  const key='vt_wpc_shown';
+  const lastShown=localStorage.getItem(key);
+  const thisWeek=_ymd(today);
+  if(lastShown===thisWeek)return;
+  const lines=buildWeeklyPatternLines();
+  if(!lines.length)return;
+  localStorage.setItem(key,thisWeek);
+  showWeeklyPattern(lines);
+}
+function buildWeeklyPatternLines(){
+  const lines=[];
+  const energyLabels={high:'⚡',mid:'😐',low:'😴'};
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const c=getRoutineConsistency(r.id,7);
+    if(!c||c.scheduled===0)return;
+    const avgEnergy=getRoutineEnergyAvg(r.id);
+    const bestDay=getBestEnergyDay(r.id);
+    const name=r.name||r.text||'שגרה';
+    let line=`${name}: ${c.completed}/${c.scheduled} פעמים`;
+    if(avgEnergy)line+=`, אנרגיה ממוצעת: ${energyLabels[avgEnergy]}`;
+    if(bestDay)line+=`. הכי טוב: יום ${bestDay}`;
+    lines.push(line);
+  });
+  return lines;
+}
+function showWeeklyPattern(lines){
+  const body=document.getElementById('wpcBody');if(!body)return;
+  body.innerHTML=lines.map(l=>`<div class="wpc-line">${l}</div>`).join('');
+  document.getElementById('wpcOverlay')?.classList.add('on');
+  document.getElementById('wpcModal')?.classList.add('on');
+}
+function closeWeeklyPattern(){
+  document.getElementById('wpcOverlay')?.classList.remove('on');
+  document.getElementById('wpcModal')?.classList.remove('on');
+}
+
+// ── Suggestion Engine ─────────────────────────────────────
+function getRoutineSuggestions(){
+  const suggestions=[];
+  const log=energyLoad();
+  if(log.length<14)return suggestions; // need enough data
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const bestDay=getBestEnergyDay(r.id);
+    const avgEnergy=getRoutineEnergyAvg(r.id);
+    if(bestDay&&avgEnergy==='high'){
+      suggestions.push(`לפי הדאטא שלך, אחרי ${r.name||r.text} ביום ${bestDay} אתה בשיא — שים שם את המשימה הכבדה ביותר.`);
+    }
+    const c=getRoutineConsistency(r.id,30);
+    if(c&&c.pct<60){
+      suggestions.push(`עקביות ב${r.name||r.text}: ${c.pct}% — שקול לשנות שעה או תדירות כדי להתאים טוב יותר.`);
+    }
+  });
+  return suggestions;
+}
+
+// ── Recovery Protocol ─────────────────────────────────────
+function checkMissedRoutines(){
+  const now=new Date();
+  const yesterday=new Date(now.getTime()-24*3600000);
+  const missed=[];
+  routines.filter(r=>r.enabled).forEach(r=>{
+    Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item?.dt;if(!dt)return;
+      const d=new Date(dt);
+      if(d>yesterday||d>now)return;
+      if((r.completedDates||[]).includes(dt))return;
+      if((r.skippedDates||[]).includes(dt))return;
+      // missed within last 48h
+      if(now-d<48*3600000)missed.push({routine:r,dateStr:dt});
+    });
+  });
+  return missed;
+}
+function showRecoveryIfNeeded(){
+  const missed=checkMissedRoutines();if(!missed.length)return;
+  const{routine,dateStr}=missed[0];
+  const title=document.getElementById('recoveryTitle');
+  const sub=document.getElementById('recoverySub');
+  const slots=document.getElementById('recoverySlots');
+  if(title)title.textContent=`פספסת: ${routine.name||routine.text}`;
+  if(sub)sub.textContent='מתי הפעם הקרובה?';
+  if(slots){
+    // suggest next 3 slots: today, tomorrow, day after
+    const options=[];
+    for(let i=0;i<3;i++){
+      const d=new Date();d.setDate(d.getDate()+i);
+      const time=routine.specificTime||'09:00';
+      const[h,m]=time.split(':');d.setHours(+h,+m,0,0);
+      const label=i===0?`היום ${time}`:i===1?`מחר ${time}`:d.toLocaleDateString('he-IL',{weekday:'short'})+' '+time;
+      options.push({label,dt:d.toISOString(),routineId:routine.id,oldDateStr:dateStr});
+    }
+    slots.innerHTML=options.map(o=>`<button class="recovery-slot" onclick="rescheduleRecovery('${o.routineId}','${o.oldDateStr}','${o.dt}')">${o.label}</button>`).join('');
+  }
+  document.getElementById('recoveryOverlay')?.classList.add('on');
+  document.getElementById('recoveryPopup')?.classList.add('on');
+}
+function rescheduleRecovery(routineId,oldDateStr,newDt){
+  // Replace the old dateStr with new datetime in scheduledWeeks
+  const r=routines.find(x=>x.id==routineId);if(!r)return;
+  Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+    const arr=r.scheduledWeeks[wk];
+    arr.forEach((item,i)=>{
+      const dt=typeof item==='string'?item:item?.dt;
+      if(dt===oldDateStr)r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};
+    });
+  });
+  saveRoutines();render();closeRecovery();toast('✅ שגרה תוזמנה מחדש');
+}
+function closeRecovery(){
+  document.getElementById('recoveryOverlay')?.classList.remove('on');
+  document.getElementById('recoveryPopup')?.classList.remove('on');
+}
+
+// ── GE Monthly Reminder ───────────────────────────────────
+function maybeShowGEReminder(){
+  const p=geLoad();if(!p?.onboarded)return;
+  const key='vt_ge_reminder';
+  const last=localStorage.getItem(key);
+  const now=new Date();
+  if(last){
+    const diff=(now-new Date(last))/(1000*60*60*24);
+    if(diff<28)return; // less than 28 days ago
+  }
+  // Show reminder toast with action
+  localStorage.setItem(key,now.toISOString());
+  setTimeout(()=>{
+    const t=document.getElementById('toast');
+    if(!t)return;
+    t.innerHTML='📊 עדכן את המנוע הפיננסי <button onclick="closeSideMenu();openGrowthEngine();geEditProfile()" style="background:var(--accent);color:oklch(0.12 0.007 45);border:none;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;margin-right:8px;font-family:inherit">עדכן →</button>';
+    t.className='toast on';
+    setTimeout(()=>{t.className='toast';t.innerHTML='';},8000);
+  },500);
 }
 
 // Voice for routine form
