@@ -2057,7 +2057,15 @@ function phoneAction(id){const t=tasks.find(x=>x.id===id);if(!t)return;const p=t
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
-function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2400)}
+function toast(msg,dur=2400){
+  const el=document.getElementById('toast');if(!el)return;
+  clearTimeout(el._t);
+  el.classList.remove('on');
+  void el.offsetHeight; // force reflow so transition restarts
+  el.innerHTML=typeof msg==='string'?msg.replace(/</g,'&lt;'):msg;
+  el.classList.add('on');
+  el._t=setTimeout(()=>{el.classList.remove('on');},dur);
+}
 
 // ── Routines ──────────────────────────────────────────────────────────────────
 let rFreqCount=3;
@@ -2828,9 +2836,7 @@ function maybeShowGEReminder(){
   setTimeout(()=>{
     const t=document.getElementById('toast');
     if(!t)return;
-    t.innerHTML='📊 עדכן את המנוע הפיננסי <button onclick="closeSideMenu();openGrowthEngine();geEditProfile()" style="background:var(--accent);color:oklch(0.12 0.007 45);border:none;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;margin-right:8px;font-family:inherit">עדכן →</button>';
-    t.className='toast on';
-    setTimeout(()=>{t.className='toast';t.innerHTML='';},8000);
+    toast('📊 עדכן את המנוע הפיננסי <button onclick="closeSideMenu();openGrowthEngine();geEditProfile()" style="background:var(--accent);color:oklch(0.12 0.007 45);border:none;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;margin-right:8px;font-family:inherit">עדכן →</button>',8000);
   },500);
 }
 

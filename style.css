@@ -424,8 +424,8 @@ body{
 .empty-icon{font-size:40px;display:block;margin-bottom:14px;opacity:.2}
 .empty p{font-size:14px;line-height:1.7}
 .divider{height:1px;background:var(--border);margin:4px 20px 12px;opacity:.6}
-.toast{position:fixed;bottom:calc(84px + var(--sab));left:50%;transform:translateX(-50%) translateY(120px);background:var(--surface2);color:var(--text);border:1px solid var(--border2);padding:12px 26px;border-radius:50px;font-size:14px;font-weight:600;box-shadow:0 8px 32px oklch(0 0 0 / 0.5);z-index:200;transition:transform .32s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap}
-.toast.on{transform:translateX(-50%) translateY(0)}
+.toast{position:fixed;bottom:calc(84px + var(--sab));left:16px;right:16px;max-width:448px;margin:0 auto;transform:translateY(120px);background:var(--surface2);color:var(--text);border:1px solid var(--border2);padding:12px 20px;border-radius:20px;font-size:14px;font-weight:600;box-shadow:0 8px 32px oklch(0 0 0 / 0.5);z-index:200;transition:transform .32s cubic-bezier(.34,1.56,.64,1);pointer-events:none;text-align:center;direction:rtl}
+.toast.on{transform:translateY(0);pointer-events:auto}
 @keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ── Routines ── */
