@@ -1,4 +1,4 @@
-const V = 'vt-v7';
+const V = 'vt-v8';
 const ASSETS = ['./manifest.json', './icon.svg', './style.css'];
 
 self.addEventListener('install', e => {
