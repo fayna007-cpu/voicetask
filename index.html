@@ -4061,10 +4061,14 @@ function geDefaultPipeline(profile){
 // ── Real-time data ──
 async function geFetchPrice(ticker){
   try{
-    const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`);
+    const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`);
     const j=await r.json();
-    const price=j?.chart?.result?.[0]?.meta?.regularMarketPrice||null;
-    return price;
+    const meta=j?.chart?.result?.[0]?.meta;
+    const price=meta?.regularMarketPrice||null;
+    const prev=meta?.chartPreviousClose||meta?.previousClose||null;
+    const chg=price&&prev?price-prev:null;
+    const chgPct=chg&&prev?(chg/prev*100):null;
+    return price?{price,prev,chg,chgPct}:null;
   }catch(e){return null;}
 }
 async function geFetchUSDILS(){
@@ -4080,17 +4084,16 @@ async function geRefreshAll(){
   const btn=document.getElementById('geRefreshBtn');
   if(btn)btn.style.opacity='0.4';
   toast('⏳ מרענן נתונים...');
-  const prices={};
+  const prices={};const priceData={};
   for(const s of(p.stocks||[])){
-    const price=await geFetchPrice(s.ticker);
-    if(price)prices[s.ticker]=price;
+    const d=await geFetchPrice(s.ticker);
+    if(d){prices[s.ticker]=d.price;priceData[s.ticker]=d;}
   }
-  // also fetch S&P500
-  const sp=await geFetchPrice('%5EGSPC');
-  if(sp)prices['SPX']=sp;
+  const spd=await geFetchPrice('%5EGSPC');
+  if(spd){prices['SPX']=spd.price;priceData['SPX']=spd;}
   const usd=await geFetchUSDILS();
   if(usd)prices['USDILS']=usd;
-  p.stockPrices=prices;p.lastRefresh=new Date().toISOString();
+  p.stockPrices=prices;p.stockPriceData=priceData;p.lastRefresh=new Date().toISOString();
   geSave(p);
   if(btn)btn.style.opacity='1';
   toast('✅ נתונים עודכנו');
@@ -4312,56 +4315,136 @@ function geSavePipeForm(id,isEdit){
 }
 
 // ── Assets ──
+let _geStockRefreshTimer=null;
 async function geRenderAssets(){
   const p=geLoad();const body=document.getElementById('geBody');if(!body)return;
   const usd=p.stockPrices?.['USDILS']||3.7;
-  const stockRows=(p.stocks||[]).map(s=>{
-    const price=p.stockPrices?.[s.ticker];
-    const valUSD=price?s.qty*price:null;
-    const valILS=valUSD?valUSD*usd:null;
-    return `<div class="ge-asset-row">
-      <div class="ge-asset-ticker">${esc(s.ticker)}</div>
-      <div class="ge-asset-qty">${s.qty} יח׳</div>
-      <div class="ge-asset-price">${price?'$'+price.toFixed(2):'—'}</div>
-      <div class="ge-asset-val">${valILS?'₪'+geFmt(valILS):'—'}</div>
-    </div>`;
-  }).join('');
-  const stockTotal=(p.stocks||[]).reduce((sum,s)=>{
-    const price=p.stockPrices?.[s.ticker]||0;
-    return sum+s.qty*price*usd;
-  },0);
-  const propEquity=Math.max(0,(p.propVal||0)-(p.mortgage||0));
-  const sp=p.stockPrices?.['SPX'];
+  const spd=p.stockPriceData?.['SPX'];
+  const lastRefresh=p.lastRefresh?new Date(p.lastRefresh).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'—';
+
+  function buildStockCards(p){
+    const usd=p.stockPrices?.['USDILS']||3.7;
+    if(!(p.stocks||[]).length)return`<div class="ge-stock-empty">לא הוגדרו ניירות — עדכן בשאלון</div>`;
+    let totalCost=0,totalVal=0;
+    const cards=(p.stocks||[]).map(s=>{
+      const d=p.stockPriceData?.[s.ticker];
+      const price=d?.price||p.stockPrices?.[s.ticker]||null;
+      const chgPct=d?.chgPct||null;
+      const chg=d?.chg||null;
+      const valUSD=price?s.qty*price:null;
+      const valILS=valUSD?valUSD*usd:null;
+      const costILS=s.avgCost?s.qty*s.avgCost*usd:null;
+      const pnlILS=valILS&&costILS?valILS-costILS:null;
+      const pnlPct=pnlILS&&costILS?(pnlILS/costILS*100):null;
+      if(costILS)totalCost+=costILS;
+      if(valILS)totalVal+=valILS;
+      const up=chgPct>=0;
+      const noData=!price;
+      return`<div class="ge-stock-card${noData?' ge-stock-no-data':''}">
+  <div class="ge-stock-card-top">
+    <div class="ge-stock-card-ticker">${esc(s.ticker)}</div>
+    <div class="ge-stock-card-price${noData?'':up?' up':' down'}">${price?'$'+price.toFixed(2):'טוען...'}</div>
+  </div>
+  <div class="ge-stock-card-mid">
+    <div class="ge-stock-card-qty">${s.qty} יח׳${s.avgCost?' · קנייה $'+s.avgCost:''}</div>
+    ${chgPct!=null?`<div class="ge-stock-card-chg${up?' up':' down'}">${up?'▲':'▼'} ${Math.abs(chgPct).toFixed(2)}% היום</div>`:''}
+  </div>
+  <div class="ge-stock-card-bot">
+    <div class="ge-stock-card-val">${valILS?'₪'+geFmt(valILS):'—'}</div>
+    ${pnlILS!=null?`<div class="ge-stock-card-pnl${pnlILS>=0?' up':' down'}">${pnlILS>=0?'+':''}₪${geFmt(Math.round(pnlILS))} (${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</div>`:''}
+  </div>
+</div>`;
+    }).join('');
+    const totalPnl=totalVal-totalCost;
+    const totalPnlPct=totalCost?(totalPnl/totalCost*100):null;
+    const summary=totalVal?`<div class="ge-stock-summary">
+  <div class="ge-stock-sum-row"><span>שווי תיק</span><span class="ge-stock-sum-val">₪${geFmt(Math.round(totalVal))}</span></div>
+  ${totalPnl?`<div class="ge-stock-sum-row"><span>רווח/הפסד כולל</span><span class="ge-stock-sum-val${totalPnl>=0?' up':' down'}">${totalPnl>=0?'+':''}₪${geFmt(Math.round(totalPnl))} (${totalPnlPct>=0?'+':''}${totalPnlPct.toFixed(1)}%)</span></div>`:''}
+</div>`:'';
+    return cards+summary;
+  }
 
   body.innerHTML=`<div class="ge-scroll">
-  ${sp?`<div class="ge-market-bar">S&P 500: ${sp.toLocaleString()} | ₪/$: ${usd.toFixed(2)}</div>`:''}
-
-  <div class="ge-section-title">🏠 נדל"ן</div>
+  <div class="ge-stock-topbar">
+    <div class="ge-stock-market${spd?spd.chgPct>=0?' up':' down':''}">${spd?`S&P 500 · $${Math.round(spd.price).toLocaleString()} · ${spd.chgPct>=0?'▲':'▼'}${Math.abs(spd.chgPct).toFixed(2)}%`:'S&P 500 · —'}</div>
+    <div class="ge-stock-usd">₪/$: ${usd.toFixed(2)}</div>
+  </div>
+  <div class="ge-stock-refresh-row">
+    <span class="ge-stock-last">עודכן: ${lastRefresh}</span>
+    <button class="ge-stock-refresh-btn" id="geStockRefreshBtn" onclick="geRefreshStocksNow()">⟳ רענן</button>
+  </div>
+  <div id="geStockCards">${buildStockCards(p)}</div>
+  <div class="ge-section-title" style="margin-top:20px">🏠 נדל"ן</div>
   <div class="ge-asset-block">
     <div class="ge-asset-row"><span class="ge-flow-lbl">שווי דירה</span><span class="ge-flow-val">₪${geFmt(p.propVal||0)}</span></div>
-    <div class="ge-asset-row"><span class="ge-flow-lbl">משכנתא</span><span class="ge-flow-val muted">-₪${geFmt(p.mortgage||0)}</span></div>
-    <div class="ge-asset-row"><span class="ge-flow-lbl">הון עצמי</span><span class="ge-flow-val green">₪${geFmt(propEquity)}</span></div>
-    ${p.propRent>0?`<div class="ge-asset-row"><span class="ge-flow-lbl">תשואת שכירות</span><span class="ge-flow-val">${((p.propRent*12/(p.propVal||1))*100).toFixed(1)}%</span></div>`:''}
+    <div class="ge-asset-row"><span class="ge-flow-lbl">הון עצמי</span><span class="ge-flow-val">₪${geFmt(Math.max(0,(p.propVal||0)-(p.mortgage||0)))}</span></div>
   </div>
-
-  <div class="ge-section-title">📈 תיק השקעות</div>
-  <div class="ge-asset-block">
-    <div class="ge-asset-header"><span>טיקר</span><span>כמות</span><span>מחיר</span><span>שווי ₪</span></div>
-    ${stockRows||'<div class="ge-empty" style="padding:12px">לא הוגדרו ניירות</div>'}
-    <div class="ge-asset-total"><span>סה"כ תיק</span><span class="ge-flow-val green">₪${geFmt(stockTotal)}</span></div>
-  </div>
-
-  <div class="ge-section-title">💰 נזילות</div>
-  <div class="ge-asset-block">
-    <div class="ge-asset-row"><span class="ge-flow-lbl">חיסכון נזיל</span><span class="ge-flow-val">₪${geFmt(p.liquid||0)}</span></div>
-    <div class="ge-asset-row"><span class="ge-flow-lbl">פנסיה / השתלמות</span><span class="ge-flow-val">₪${geFmt(p.pension||0)}</span></div>
-  </div>
-
-  <div class="ge-section-title">📊 שווי נטו כולל</div>
-  <div class="ge-net-worth-big">₪${geFmt(geCalcNetWorth(p))}</div>
-
-  <button class="ge-edit-profile-btn" onclick="geSetTab('dashboard',null);setTimeout(()=>document.querySelector('.ge-edit-profile-btn')?.click(),50)">✏️ עדכן נתונים</button>
+  <button class="ge-edit-profile-btn" onclick="geEditProfile()">✏️ עדכן נתונים</button>
 </div>`;
+
+  // auto-refresh every 60s while tab is open
+  clearInterval(_geStockRefreshTimer);
+  _geStockRefreshTimer=setInterval(()=>{
+    if(document.getElementById('geStockCards'))geRefreshStocksNow(true);
+    else clearInterval(_geStockRefreshTimer);
+  },60000);
+}
+async function geRefreshStocksNow(silent=false){
+  const btn=document.getElementById('geStockRefreshBtn');
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
+  const p=geLoad();if(!p)return;
+  const prices={};const priceData={};
+  for(const s of(p.stocks||[])){
+    const d=await geFetchPrice(s.ticker);
+    if(d){prices[s.ticker]=d.price;priceData[s.ticker]=d;}
+  }
+  const spd=await geFetchPrice('%5EGSPC');
+  if(spd){prices['SPX']=spd.price;priceData['SPX']=spd;}
+  const usd=await geFetchUSDILS();
+  if(usd)prices['USDILS']=usd;
+  p.stockPrices=prices;p.stockPriceData=priceData;
+  p.lastRefresh=new Date().toISOString();
+  geSave(p);
+  // patch in-place without full re-render
+  const usdVal=prices['USDILS']||3.7;
+  const lastT=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  const lastEl=document.querySelector('.ge-stock-last');
+  if(lastEl)lastEl.textContent='עודכן: '+lastT;
+  const spEl=document.querySelector('.ge-stock-market');
+  if(spEl&&spd){
+    spEl.className='ge-stock-market'+(spd.chgPct>=0?' up':' down');
+    spEl.textContent=`S&P 500 · $${Math.round(spd.price).toLocaleString()} · ${spd.chgPct>=0?'▲':'▼'}${Math.abs(spd.chgPct).toFixed(2)}%`;
+  }
+  const usdEl=document.querySelector('.ge-stock-usd');
+  if(usdEl)usdEl.textContent=`₪/$: ${usdVal.toFixed(2)}`;
+  // re-render stock cards only
+  const cardsEl=document.getElementById('geStockCards');
+  if(cardsEl){
+    let totalCost=0,totalVal=0;
+    const cards=(p.stocks||[]).map(s=>{
+      const d=priceData[s.ticker];
+      const price=d?.price||null;
+      const chgPct=d?.chgPct||null;
+      const valUSD=price?s.qty*price:null;
+      const valILS=valUSD?valUSD*usdVal:null;
+      const costILS=s.avgCost?s.qty*s.avgCost*usdVal:null;
+      const pnlILS=valILS&&costILS?valILS-costILS:null;
+      const pnlPct=pnlILS&&costILS?(pnlILS/costILS*100):null;
+      if(costILS)totalCost+=costILS;if(valILS)totalVal+=valILS;
+      const up=chgPct>=0;
+      return`<div class="ge-stock-card">
+  <div class="ge-stock-card-top"><div class="ge-stock-card-ticker">${esc(s.ticker)}</div><div class="ge-stock-card-price${up?' up':' down'}">${price?'$'+price.toFixed(2):'—'}</div></div>
+  <div class="ge-stock-card-mid"><div class="ge-stock-card-qty">${s.qty} יח׳${s.avgCost?' · קנייה $'+s.avgCost:''}</div>${chgPct!=null?`<div class="ge-stock-card-chg${up?' up':' down'}">${up?'▲':'▼'} ${Math.abs(chgPct).toFixed(2)}%</div>`:''}</div>
+  <div class="ge-stock-card-bot"><div class="ge-stock-card-val">${valILS?'₪'+geFmt(valILS):'—'}</div>${pnlILS!=null?`<div class="ge-stock-card-pnl${pnlILS>=0?' up':' down'}">${pnlILS>=0?'+':''}₪${geFmt(Math.round(pnlILS))} (${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</div>`:''}</div>
+</div>`;
+    }).join('');
+    const totalPnl=totalVal-totalCost;
+    const totalPnlPct=totalCost?(totalPnl/totalCost*100):null;
+    const summary=totalVal?`<div class="ge-stock-summary"><div class="ge-stock-sum-row"><span>שווי תיק</span><span class="ge-stock-sum-val">₪${geFmt(Math.round(totalVal))}</span></div>${totalPnl?`<div class="ge-stock-sum-row"><span>רווח/הפסד</span><span class="ge-stock-sum-val${totalPnl>=0?' up':' down'}">${totalPnl>=0?'+':''}₪${geFmt(Math.round(totalPnl))} (${totalPnlPct>=0?'+':''}${totalPnlPct.toFixed(1)}%)</span></div>`:''}</div>`:'';
+    cardsEl.innerHTML=cards+summary;
+  }
+  if(btn){btn.textContent='⟳ רענן';btn.disabled=false;}
+  if(!silent)toast('✅ מחירים עודכנו');
 }
 
 // ── Skills ──

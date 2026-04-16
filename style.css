@@ -861,7 +861,6 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-tab{flex-shrink:0;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap}
 .ge-tab.on{background:var(--accent);color:oklch(0.12 0.007 45);border-color:var(--accent)}
 .ge-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.ge-scroll{overflow-y:auto;flex:1;min-height:0;padding:16px 16px 32px;box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
 /* KPIs */
 .ge-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
@@ -914,6 +913,39 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ge-status-badge.rejected{background:oklch(0.22 0.01 45);color:var(--muted)}
 
 /* Assets */
+/* Stock real-time view */
+.ge-stock-topbar{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:12px;padding:10px 14px;margin-bottom:8px;direction:rtl}
+.ge-stock-market{font-size:12px;font-weight:800;color:var(--muted)}
+.ge-stock-market.up{color:oklch(0.72 0.18 145)}
+.ge-stock-market.down{color:oklch(0.65 0.22 25)}
+.ge-stock-usd{font-size:11px;font-weight:700;color:var(--muted)}
+.ge-stock-refresh-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;direction:rtl}
+.ge-stock-last{font-size:11px;color:var(--muted)}
+.ge-stock-refresh-btn{padding:5px 14px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.ge-stock-refresh-btn:active{background:var(--border)}
+.ge-stock-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:10px;direction:rtl}
+.ge-stock-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.ge-stock-card-ticker{font-size:18px;font-weight:900;color:var(--text);letter-spacing:.5px}
+.ge-stock-card-price{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums}
+.ge-stock-card-price.up{color:oklch(0.72 0.18 145)}
+.ge-stock-card-price.down{color:oklch(0.65 0.22 25)}
+.ge-stock-card-mid{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ge-stock-card-qty{font-size:12px;color:var(--muted)}
+.ge-stock-card-chg{font-size:12px;font-weight:800}
+.ge-stock-card-chg.up{color:oklch(0.72 0.18 145)}
+.ge-stock-card-chg.down{color:oklch(0.65 0.22 25)}
+.ge-stock-card-bot{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)}
+.ge-stock-card-val{font-size:15px;font-weight:800;color:var(--text)}
+.ge-stock-card-pnl{font-size:12px;font-weight:700}
+.ge-stock-card-pnl.up{color:oklch(0.72 0.18 145)}
+.ge-stock-card-pnl.down{color:oklch(0.65 0.22 25)}
+.ge-stock-no-data{opacity:.6}
+.ge-stock-summary{background:var(--surface2);border-radius:14px;padding:14px 16px;margin-bottom:4px;direction:rtl}
+.ge-stock-sum-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:var(--muted)}
+.ge-stock-sum-val{font-weight:800;color:var(--text)}
+.ge-stock-sum-val.up{color:oklch(0.72 0.18 145)}
+.ge-stock-sum-val.down{color:oklch(0.65 0.22 25)}
+.ge-stock-empty{text-align:center;padding:32px;color:var(--muted);font-size:13px}
 .ge-market-bar{background:oklch(0.45 0.18 250 / 0.1);border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;color:oklch(0.65 0.18 250);text-align:center;margin-bottom:12px}
 .ge-asset-block{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .ge-asset-header{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:8px 12px;font-size:10px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--border);direction:rtl}
