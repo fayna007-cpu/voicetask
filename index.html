@@ -916,7 +916,7 @@
   <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button class="toast-close" onclick="closeToast()">✕</button></div>
 
 <script>
 const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.googleusercontent.com';
@@ -2059,12 +2059,18 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 function toast(msg,dur=2400){
   const el=document.getElementById('toast');if(!el)return;
+  const msgEl=document.getElementById('toastMsg');
   clearTimeout(el._t);
   el.classList.remove('on');
-  void el.offsetHeight; // force reflow so transition restarts
-  el.innerHTML=typeof msg==='string'?msg.replace(/</g,'&lt;'):msg;
+  void el.offsetHeight;
+  if(msgEl)msgEl.innerHTML=msg;
   el.classList.add('on');
-  el._t=setTimeout(()=>{el.classList.remove('on');},dur);
+  el._t=setTimeout(closeToast,dur);
+}
+function closeToast(){
+  const el=document.getElementById('toast');if(!el)return;
+  clearTimeout(el._t);
+  el.classList.remove('on');
 }
 
 // ── Routines ──────────────────────────────────────────────────────────────────
