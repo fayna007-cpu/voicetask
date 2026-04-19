@@ -1,8 +1,8 @@
-const V = 'vt-v8';
-const ASSETS = ['./manifest.json', './icon.svg', './style.css'];
+const V = 'vt-v16';
+const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(V).then(c => c.addAll(ASSETS)));
+  e.waitUntil(caches.open(V).then(c => c.addAll(STATIC)));
   self.skipWaiting();
 });
 
@@ -63,17 +63,25 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML → network first
-  const isHTML = e.request.destination === 'document' ||
-                 url.pathname.endsWith('.html') ||
-                 url.pathname.endsWith('/');
-  if (isHTML) {
+  // HTML, CSS, JS — always network first, fallback to cache
+  const isNetworkFirst =
+    e.request.destination === 'document' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.js');
+
+  if (isNetworkFirst) {
     e.respondWith(
       fetch(e.request)
-        .then(res => { caches.open(V).then(c => c.put(e.request, res.clone())); return res; })
+        .then(res => {
+          if (res.ok) caches.open(V).then(c => c.put(e.request, res.clone()));
+          return res;
+        })
         .catch(() => caches.match(e.request))
     );
   } else {
+    // Static assets (images, icons) — cache first
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
   }
 });

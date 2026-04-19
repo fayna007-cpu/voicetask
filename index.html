@@ -77,6 +77,14 @@
           <span>תזכורת בוקר</span>
         </label>
       </div>
+      <div class="siri-attach-row">
+        <input class="siri-url-input" id="siriUrlInput" type="url" placeholder="🔗 הוסף לינק (אופציונלי)">
+        <label class="siri-img-btn" id="siriImgLabel">
+          <span id="siriImgLabelTxt">📷</span>
+          <input type="file" accept="image/*" style="display:none" id="siriImgInput" onchange="handleSiriImage(this)">
+        </label>
+      </div>
+      <img class="siri-img-preview" id="siriImgPreview" src="" alt="" style="display:none">
       <div class="siri-confirm-actions">
         <button class="siri-confirm-save" onclick="confirmSiri()">שמור משימה</button>
         <button class="siri-confirm-cancel" onclick="cancelSiriConfirm()">בטל</button>
@@ -746,6 +754,15 @@
         <div class="rfield"><div class="rform-lbl">הערות</div><textarea class="rfi" id="bpItemNotes" rows="2" placeholder="פרטים נוספים..."></textarea></div>
         <div class="rfield"><div class="rform-lbl">קישור</div><input class="rfi" id="bpItemUrl" type="url" placeholder="https://..." style="direction:ltr;text-align:right"></div>
         <div class="rfield">
+          <div class="rform-lbl">תמונה (אופציונלי)</div>
+          <label class="bp-img-upload-label" id="bpImgLabel">
+            <span id="bpImgLabelTxt">📷 לחץ לצירוף תמונה</span>
+            <input type="file" accept="image/*" style="display:none" id="bpItemImageInput" onchange="handleBpImage(this)">
+          </label>
+          <img class="bp-img-preview" id="bpItemImagePreview" src="" alt="" style="display:none">
+          <button class="bp-img-remove" id="bpItemImageRemove" style="display:none" onclick="removeBpImage()">✕ הסר תמונה</button>
+        </div>
+        <div class="rfield">
           <div class="rform-lbl">סטטוס</div>
           <div class="bp-seg-row" id="bpStatusRow" data-v="idea">
             <button class="bp-seg-btn on" data-v="idea" onclick="setBpSeg('bpStatusRow','idea',this)">&#128161; רעיון</button>
@@ -914,6 +931,23 @@
     <div class="dp-body" id="dpBody"></div>
   </div>
   <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
+</div>
+
+<!-- Postpone popup -->
+<div class="postpone-overlay" id="postponeOverlay" onclick="closePostpone()"></div>
+<div class="postpone-popup" id="postponePopup">
+  <div class="postpone-title">📅 דחה ל...</div>
+  <input class="postpone-dt" id="postponeDtInput" type="datetime-local">
+  <div class="postpone-actions">
+    <button class="postpone-confirm" onclick="confirmPostpone()">דחה</button>
+    <button class="postpone-cancel" onclick="closePostpone()">בטל</button>
+  </div>
+</div>
+
+<!-- Full-screen image viewer -->
+<div class="img-viewer-overlay" id="imgViewerOverlay" onclick="closeTaskImgFull()">
+  <img class="img-viewer-img" id="imgViewerImg" alt="">
+  <button class="img-viewer-close" onclick="closeTaskImgFull()">✕</button>
 </div>
 
 <div class="toast" id="toast"><span id="toastMsg"></span><button class="toast-close" onclick="closeToast()">✕</button></div>
@@ -1455,10 +1489,16 @@ function startSiri(){
 
 function stopSiri(){
   stopRec();
-  stopVis(); // always release mic — stopRec may have returned early if siriLive was already false
+  stopVis();
   document.getElementById('siriOverlay').classList.remove('on');
   document.getElementById('siriConfirm').classList.remove('on');
   document.getElementById('siriEdit').value='';
+  // reset attach fields
+  _siriPendingImage=null;
+  const ui=document.getElementById('siriUrlInput');if(ui)ui.value='';
+  const ii=document.getElementById('siriImgInput');if(ii)ii.value='';
+  const lbl=document.getElementById('siriImgLabelTxt');if(lbl)lbl.textContent='📷';
+  const prev=document.getElementById('siriImgPreview');if(prev){prev.src='';prev.style.display='none';}
 }
 
 function quickSiri(template){
@@ -1495,9 +1535,21 @@ function showSiriFinal(text){
   setTimeout(()=>document.getElementById('siriEdit').focus(),350);
 }
 
+let _siriPendingImage=null;
+async function handleSiriImage(inp){
+  const file=inp.files[0];if(!file)return;
+  _siriPendingImage=await compressImage(file,800,0.7);
+  document.getElementById('siriImgLabelTxt').textContent='📷✓';
+  const prev=document.getElementById('siriImgPreview');
+  if(prev){prev.src=_siriPendingImage;prev.style.display='block';}
+}
 function confirmSiri(){
   const txt=document.getElementById('siriEdit').value.trim();
-  if(txt)addTask(txt);
+  if(txt){
+    const url=(document.getElementById('siriUrlInput')?.value||'').trim()||null;
+    const image=_siriPendingImage||null;
+    addTask(txt,{url,image});
+  }
   stopSiri();
 }
 function cancelSiriConfirm(){
@@ -1744,12 +1796,12 @@ function to24hText(text){
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
-function addTask(text){
+function addTask(text,extras){
   if(!text.trim())return;
   const n=to24hText(text.trim());
   const reminderMins=+(document.getElementById('siriReminderMins')?.value||0);
   const morningAlert=document.getElementById('siriMorningAlert')?.checked!==false;
-  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert};
+  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
   tasks.unshift(task);save();render();toast('משימה נוספה');vibrate([10,30,10]);syncTask(task);
   scheduleSmartPushNotifs();
 }
@@ -1820,9 +1872,141 @@ async function saveEdit(id){
   if(t.calendarEventId)await deleteFromCalendar(t);
   t.text=txt;t.category=detectCat(txt);
   if(dt)t.datetime=new Date(dt).toISOString();
+  const urlEl=document.getElementById('eurl-'+id);
+  if(urlEl)t.url=urlEl.value.trim()||null;
   t.calendarEventId=null;save();render();await syncTask(t);toast('משימה עודכנה');
 }
 function cancelEdit(id){const el=document.getElementById('edit-'+id);if(el)el.classList.remove('on')}
+
+// ── Image helpers ──────────────────────────────────────────────────────────────
+function compressImage(file,maxSide,quality){
+  return new Promise(resolve=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const scale=Math.min(1,maxSide/Math.max(img.width,img.height));
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',quality));
+    };
+    img.src=url;
+  });
+}
+async function attachTaskImage(id,inp){
+  const file=inp.files[0];if(!file)return;
+  const data=await compressImage(file,800,0.7);
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.image=data;save();render();
+  // reopen edit panel
+  setTimeout(()=>{const el=document.getElementById('edit-'+id);if(el)el.classList.add('on');},50);
+}
+function removeTaskImage(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.image=null;save();render();
+  setTimeout(()=>{const el=document.getElementById('edit-'+id);if(el)el.classList.add('on');},50);
+}
+function openTaskImgFull(id){
+  const t=tasks.find(x=>x.id===id);if(!t||!t.image)return;
+  const ov=document.getElementById('imgViewerOverlay');
+  const img=document.getElementById('imgViewerImg');
+  if(!ov||!img)return;
+  img.src=t.image;ov.classList.add('on');
+}
+function closeTaskImgFull(){
+  const ov=document.getElementById('imgViewerOverlay');if(ov)ov.classList.remove('on');
+}
+
+// ── Postpone ───────────────────────────────────────────────────────────────────
+let _postponeCtx={type:null,taskId:null,routineId:null,dateStr:null};
+function openPostpone(type,a,b){
+  _postponeCtx={type,taskId:null,routineId:null,dateStr:null};
+  const inp=document.getElementById('postponeDtInput');
+  const popup=document.getElementById('postponePopup');
+  const ov=document.getElementById('postponeOverlay');
+  if(!inp||!popup||!ov)return;
+  if(type==='task'){
+    _postponeCtx.taskId=a;
+    const t=tasks.find(x=>x.id===a);
+    const dt=t?new Date(t.datetime):new Date();
+    dt.setDate(dt.getDate()+1);
+    inp.type='datetime-local';
+    const pad=n=>n.toString().padStart(2,'0');
+    inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  } else if(type==='routine'){
+    _postponeCtx.routineId=a;_postponeCtx.dateStr=b;
+    const dt=new Date(b);
+    dt.setDate(dt.getDate()+1);
+    inp.type='datetime-local';
+    const pad=n=>n.toString().padStart(2,'0');
+    inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  } else if(type==='crm'){
+    _postponeCtx.bpItemId=a;
+    inp.type='date';
+    const dt=new Date();dt.setDate(dt.getDate()+1);
+    inp.value=dt.toISOString().slice(0,10);
+  }
+  ov.classList.add('on');popup.classList.add('on');
+}
+function closePostpone(){
+  document.getElementById('postponeOverlay')?.classList.remove('on');
+  document.getElementById('postponePopup')?.classList.remove('on');
+}
+async function confirmPostpone(){
+  const inp=document.getElementById('postponeDtInput');
+  if(!inp||!inp.value){toast('בחר תאריך');return;}
+  const {type,taskId,routineId,dateStr,bpItemId}=_postponeCtx;
+  if(type==='task'){
+    const t=tasks.find(x=>x.id===taskId);if(!t)return;
+    if(t.calendarEventId)await deleteFromCalendar(t);
+    t.datetime=new Date(inp.value).toISOString();
+    t.calendarEventId=null;t.completed=false;
+    save();render();closePostpone();await syncTask(t);toast('📅 נדחתה בהצלחה');
+  } else if(type==='routine'){
+    // Reuse existing saveRoutineInstanceTime logic directly
+    const r=routines.find(x=>x.id==routineId);if(!r)return;
+    const newDt=new Date(inp.value).toISOString();
+    let replaced=false;
+    Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+      (r.scheduledWeeks[wk]||[]).forEach((item,i)=>{
+        const dt=typeof item==='string'?item:item?.dt;
+        if(dt===dateStr){r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};replaced=true;}
+      });
+    });
+    if(!replaced){toast('לא נמצא האירוע');return;}
+    [r.completedDates,r.skippedDates].forEach(arr=>{
+      if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
+    });
+    saveRoutines();render();closePostpone();toast('📅 שגרה נדחתה');
+  } else if(type==='crm'){
+    const item=backlogItems.find(i=>i.id===bpItemId);if(!item)return;
+    item.dueDate=inp.value;
+    saveBpItems();renderBpItems();closePostpone();toast('📅 תאריך עודכן');
+  }
+}
+
+// ── CRM image ──────────────────────────────────────────────────────────────────
+let _bpPendingImage=null;
+async function handleBpImage(inp){
+  const file=inp.files[0];if(!file)return;
+  _bpPendingImage=await compressImage(file,800,0.7);
+  document.getElementById('bpImgLabelTxt').textContent='📷 תמונה מצורפת';
+  const prev=document.getElementById('bpItemImagePreview');
+  if(prev){prev.src=_bpPendingImage;prev.style.display='block';}
+  const rem=document.getElementById('bpItemImageRemove');
+  if(rem)rem.style.display='block';
+}
+function removeBpImage(){
+  _bpPendingImage=null;
+  document.getElementById('bpImgLabelTxt').textContent='📷 לחץ לצירוף תמונה';
+  const prev=document.getElementById('bpItemImagePreview');
+  if(prev){prev.src='';prev.style.display='none';}
+  const rem=document.getElementById('bpItemImageRemove');
+  if(rem)rem.style.display='none';
+  const inp=document.getElementById('bpItemImageInput');
+  if(inp)inp.value='';
+}
 function clearDone(){tasks=tasks.filter(x=>!x.completed);save();render();toast('הושלמו נוקו')}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render()}
 function updateBadge(){
@@ -1903,23 +2087,35 @@ function renderTaskCard(task){
         <span class="card-date">${dateStr}</span>
         ${calBadge}
         <select class="cat-sel" onchange="setCat(${task.id},this.value)">${opts}</select>
+        ${!task.completed?`<button class="defer-chip" onclick="openPostpone('task',${task.id})">דחייה</button>`:''}
       </div>
     </div>
     <div class="card-time">${timeStr}</div>
   </div>
+  ${(task.url||task.image)?`<div class="card-attachments">${task.url?`<a class="card-link-chip" href="${esc(task.url)}" target="_blank" rel="noopener">🔗 ${esc(task.url.replace(/^https?:\/\//,'').split('/')[0])}</a>`:''}${task.image?`<button class="card-img-chip" onclick="openTaskImgFull(${task.id})">📷 תמונה</button>`:''}</div>`:''}
   <div class="actions">
     <button class="act done-btn" onclick="toggleDone(${task.id})">${task.completed?ICO.undo:ICO.check}</button>
     <button class="act edit-btn" onclick="editTask(${task.id})">${ICO.edit}</button>
     ${extraBtn}
     <button class="act focus-task-btn" onclick="startFocusById(${task.id})" title="פוקוס טיימר">⏱</button>
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
-    <button class="act cal-btn" onclick="cal(${task.id})">${ICO.cal}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
   <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
     <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
+    <div class="edit-link-row">
+      <input class="edit-url" id="eurl-${task.id}" type="url" placeholder="🔗 לינק (אופציונלי)" value="${esc(task.url||'')}">
+    </div>
+    <div class="edit-img-row">
+      <label class="edit-img-label">
+        <span id="eimg-lbl-${task.id}">${task.image?'📷 תמונה מצורפת':'📷 הוסף תמונה'}</span>
+        <input type="file" accept="image/*" style="display:none" onchange="attachTaskImage(${task.id},this)">
+      </label>
+      ${task.image?`<button class="edit-img-remove" onclick="removeTaskImage(${task.id})">הסר</button>`:''}
+    </div>
+    ${task.image?`<img class="task-img-preview" src="${task.image}" alt="תמונה" onclick="openTaskImgFull(${task.id})">`:''}
     <div class="edit-actions">
       <button class="edit-save" onclick="saveEdit(${task.id})">שמור שינויים</button>
       <button class="edit-cancel" onclick="cancelEdit(${task.id})">בטל</button>
@@ -1956,6 +2152,7 @@ function renderRoutineInstance(inst){
         <span class="card-date">${dateStr}</span>
         <span class="dur-tag">${durTxt}</span>
         ${inst.notes?`<span class="card-date">📝 ${esc(inst.notes)}<\/span>`:''}
+        ${!inst.completed?`<button class="defer-chip" onclick="openPostpone('routine','${inst.routineId}','${inst.dateStr}')">דחייה</button>`:''}
       </div>
     </div>
     <div class="card-time">${timeStr}<br><span style="font-size:12px;font-weight:500;color:var(--muted)">–${endStr}</span></div>
@@ -3687,7 +3884,7 @@ function openBacklogPage(){
   renderBpDashboard();
   // show empty state by default
   document.getElementById('bpContentEmpty').style.display='';
-  document.getElementById('bpTopicView').style.display='none';
+  document.getElementById('bpTopicView').classList.remove('visible');
   _bpCurrentListId=null;
 }
 function closeBacklogPage(){
@@ -3725,7 +3922,7 @@ function bpSelectTopic(listId){
   document.getElementById('bpTopicTitle').textContent=(list&&list.icon||'')+' '+(list&&list.name||'');
   // show content
   document.getElementById('bpContentEmpty').style.display='none';
-  document.getElementById('bpTopicView').style.display='flex';
+  document.getElementById('bpTopicView').classList.add('visible');
   // highlight sidebar
   document.querySelectorAll('.bp-topic-btn').forEach(function(b){
     b.classList.toggle('active',b.getAttribute('onclick')==='bpSelectTopic('+listId+')');
@@ -3750,6 +3947,8 @@ function renderBpItems(){
     const conv=item.convertedTaskId?'<span class="bp-conv-badge">↗</span>':'';
     const urlBtn=item.url?'<a class="bp-url-dot" href="'+esc(item.url)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗</a>':'';
     const due=item.dueDate?'<span class="bp-due">'+new Date(item.dueDate).toLocaleDateString('he-IL')+'</span>':'';
+    const deferBtn=item.status!=='done'?'<button class="bp-defer-btn" onclick="event.stopPropagation();openPostpone(\'crm\','+item.id+')" title="דחה">📅 דחה</button>':'';
+    const imgThumb=item.image?'<img class="bp-item-card-img" src="'+item.image+'" alt="" onclick="event.stopPropagation();openBpImgFull('+item.id+')">'  :'';
     return '<div class="bp-item-card" onclick="openBpItemForm('+item.id+')">'
       +'<div class="bp-item-top">'
       +'<span class="bp-pdot">'+(BP_PRI_DOT[item.priority||'medium']||'')+'</span>'
@@ -3757,7 +3956,8 @@ function renderBpItems(){
       +conv+urlBtn
       +'</div>'
       +(item.notes?'<div class="bp-item-notes">'+esc(item.notes)+'</div>':'')
-      +'<div class="bp-item-foot"><span class="bp-sbadge '+(BP_STATUS_CLS[item.status]||'')+'">'+( BP_STATUS[item.status]||'')+'</span>'+due+'</div>'
+      +imgThumb
+      +'<div class="bp-item-foot"><span class="bp-sbadge '+(BP_STATUS_CLS[item.status]||'')+'">'+( BP_STATUS[item.status]||'')+'</span>'+due+deferBtn+'</div>'
       +'</div>';
   }).join('');
 }
@@ -3780,15 +3980,39 @@ function openBpItemForm(itemId){
   setBpSeg('bpPriRow',(item&&item.priority)||'medium');
   const conv=document.getElementById('bpConvertBox');
   if(conv)conv.style.display=(item&&item.convertedTaskId)?'none':'';
-  // sync convert date with due date (or default today)
   document.getElementById('bpConvDate').value=dueVal||new Date().toISOString().slice(0,10);
   document.getElementById('bpConvTime').value='09:00';
+  // image state
+  _bpPendingImage=(item&&item.image)||null;
+  const prev=document.getElementById('bpItemImagePreview');
+  const rem=document.getElementById('bpItemImageRemove');
+  const lbl=document.getElementById('bpImgLabelTxt');
+  const inp=document.getElementById('bpItemImageInput');
+  if(inp)inp.value='';
+  if(_bpPendingImage){
+    if(prev){prev.src=_bpPendingImage;prev.style.display='block';}
+    if(rem)rem.style.display='block';
+    if(lbl)lbl.textContent='📷 תמונה מצורפת';
+  }else{
+    if(prev){prev.src='';prev.style.display='none';}
+    if(rem)rem.style.display='none';
+    if(lbl)lbl.textContent='📷 לחץ לצירוף תמונה';
+  }
   document.getElementById('bpSheetBg').classList.add('on');
   document.getElementById('bpSheet').classList.add('on');
 }
 function closeBpSheet(){
   document.getElementById('bpSheetBg').classList.remove('on');
   document.getElementById('bpSheet').classList.remove('on');
+  _bpPendingImage=null;
+}
+function openBpImgFull(id){
+  const item=backlogItems.find(function(i){return i.id===id;});
+  if(!item||!item.image)return;
+  const ov=document.getElementById('imgViewerOverlay');
+  const img=document.getElementById('imgViewerImg');
+  if(!ov||!img)return;
+  img.src=item.image;ov.classList.add('on');
 }
 function setBpSeg(rowId,val,btn){
   const row=document.getElementById(rowId);if(!row)return;
@@ -3803,11 +4027,12 @@ function saveBpItem(){
   const notes=document.getElementById('bpItemNotes').value.trim();
   const url=document.getElementById('bpItemUrl').value.trim();
   const dueVal=document.getElementById('bpItemDue').value;
+  const image=_bpPendingImage||null;
   if(_bpEditingItemId){
     const item=backlogItems.find(function(i){return i.id===_bpEditingItemId;});
-    if(item)Object.assign(item,{text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null});
+    if(item)Object.assign(item,{text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null,image:image});
   }else{
-    backlogItems.push({id:Date.now(),listId:_bpCurrentListId,text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null});
+    backlogItems.push({id:Date.now(),listId:_bpCurrentListId,text:text,notes:notes,url:url,status:status,priority:priority,dueDate:dueVal||null,createdAt:new Date().toISOString(),convertedTaskId:null,image:image});
   }
   saveBpItems();toast('נשמר ✓');vibrate([10,30,10]);
   closeBpSheet();renderBpItems();renderBpSidebar();renderBpDashboard();
@@ -3853,7 +4078,7 @@ function bpDeleteList(e,listId){
   if(_bpCurrentListId===listId){
     _bpCurrentListId=null;
     document.getElementById('bpContentEmpty').style.display='';
-    document.getElementById('bpTopicView').style.display='none';
+    document.getElementById('bpTopicView').classList.remove('visible');
   }
   renderBpSidebar();renderBpDashboard();
 }
@@ -4071,25 +4296,55 @@ function geDefaultPipeline(profile){
 }
 
 // ── Real-time data ──
+// Fetch via Stooq (free, CORS-friendly financial data)
 async function geFetchPrice(ticker){
   try{
-    const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`);
-    const j=await r.json();
-    const meta=j?.chart?.result?.[0]?.meta;
-    const price=meta?.regularMarketPrice||null;
-    const prev=meta?.chartPreviousClose||meta?.previousClose||null;
-    const chg=price&&prev?price-prev:null;
+    // Map ticker to Stooq symbol format
+    let sym;
+    if(ticker==='%5EGSPC'||ticker==='^GSPC'){sym='%5Espx';}
+    else{sym=ticker.toLowerCase()+'.us';}
+
+    // Fetch last 5 trading days of daily data
+    const stooqUrl=`https://stooq.com/q/d/l/?s=${sym}&i=d`;
+    let text=null;
+    try{const r=await fetch(stooqUrl);if(r.ok)text=await r.text();}catch(e){}
+    // Fallback via proxy if Stooq blocked
+    if(!text||text.includes('No data')){
+      try{const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(stooqUrl));if(r.ok)text=await r.text();}catch(e){}
+    }
+    if(!text)return null;
+
+    // Parse CSV — header line + data rows (oldest→newest)
+    const lines=text.trim().split('\n').filter(l=>l.trim());
+    if(lines.length<2)return null;
+    const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
+    const ci=headers.indexOf('close');
+    if(ci<0)return null;
+    const rows=lines.slice(1).filter(l=>l.trim()).sort(); // sort by date asc
+    const last=rows[rows.length-1].split(',');
+    const prev_row=rows.length>=2?rows[rows.length-2].split(','):null;
+    const price=parseFloat(last[ci]);
+    const prev=prev_row?parseFloat(prev_row[ci]):null;
+    if(!price||isNaN(price))return null;
+    const chg=prev?price-prev:null;
     const chgPct=chg&&prev?(chg/prev*100):null;
-    return price?{price,prev,chg,chgPct}:null;
+    return{price,prev,chg,chgPct};
   }catch(e){return null;}
 }
 async function geFetchUSDILS(){
   try{
-    const r=await fetch('https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS?lastNObservations=1&format=json');
+    // ExchangeRate-API — free, no key, CORS-friendly
+    const r=await fetch('https://open.er-api.com/v6/latest/USD');
     const j=await r.json();
-    const val=j?.data?.dataSets?.[0]?.series?.['0:0:0:0:0']?.observations?.['0']?.[0]||null;
-    return val;
-  }catch(e){return null;}
+    return j?.rates?.ILS||null;
+  }catch(e){
+    // Fallback: Bank of Israel
+    try{
+      const r=await fetch('https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS?lastNObservations=1&format=json');
+      const j=await r.json();
+      return j?.data?.dataSets?.[0]?.series?.['0:0:0:0:0']?.observations?.['0']?.[0]||null;
+    }catch(e2){return null;}
+  }
 }
 async function geRefreshAll(){
   const p=geLoad();if(!p)return;
