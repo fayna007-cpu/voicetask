@@ -1174,3 +1174,68 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 /* ── CRM defer button ── */
 .bp-defer-btn{padding:3px 10px;background:oklch(0.78 0.16 72 / 0.1);border-radius:20px;border:1px solid oklch(0.78 0.16 72 / 0.3);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-right:auto}
 .bp-defer-btn:active{background:oklch(0.78 0.16 72 / 0.22)}
+
+/* ── Bills ── */
+.bills-side-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;background:oklch(0.55 0.22 25);color:#fff;border-radius:10px;font-size:11px;font-weight:800;margin-inline-start:auto}
+.bills-summary{padding:0 16px 8px}
+.bills-sum-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bills-sum-card{background:var(--surface2);border-radius:14px;padding:12px 8px;text-align:center}
+.bills-sum-card.warn{background:oklch(0.55 0.2 25 / 0.12)}
+.bills-sum-card.ok{background:oklch(0.55 0.18 145 / 0.12)}
+.bills-sum-num{font-size:16px;font-weight:800;color:var(--text)}
+.bills-sum-card.warn .bills-sum-num{color:oklch(0.75 0.2 25)}
+.bills-sum-card.ok .bills-sum-num{color:oklch(0.72 0.2 145)}
+.bills-sum-lbl{font-size:10px;color:var(--muted);margin-top:2px;font-weight:600}
+
+.bill-card{background:var(--surface2);border-radius:16px;padding:14px 16px;margin:0 16px 10px;cursor:pointer;touch-action:manipulation}
+.bill-card:active{background:var(--surface)}
+.bill-card.overdue{background:oklch(0.55 0.18 25 / 0.08)}
+.bill-card.paid{opacity:0.6}
+.bill-card-top{display:flex;align-items:flex-start;gap:10px}
+.bill-cat-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.bill-card-info{flex:1;min-width:0}
+.bill-card-name{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bill-recurring-tag{font-size:10px;font-weight:700;color:oklch(0.72 0.16 200);background:oklch(0.72 0.16 200 / 0.12);padding:1px 7px;border-radius:8px}
+.bill-card-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.bill-card-right{text-align:left;flex-shrink:0}
+.bill-card-amount{font-size:15px;font-weight:800;color:var(--text);direction:ltr;text-align:left}
+.bill-card-actions{display:flex;gap:8px;margin-top:10px}
+.bill-pay-btn{padding:5px 14px;background:oklch(0.55 0.18 145 / 0.15);border:1px solid oklch(0.55 0.18 145 / 0.3);border-radius:12px;color:oklch(0.72 0.2 145);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.bill-pay-btn:active{background:oklch(0.55 0.18 145 / 0.3)}
+
+.bill-days-badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:var(--surface);color:var(--muted);margin-top:4px}
+.bill-days-badge.overdue{background:oklch(0.55 0.22 25 / 0.15);color:oklch(0.75 0.2 25)}
+.bill-days-badge.today{background:oklch(0.78 0.16 72 / 0.2);color:var(--accent)}
+.bill-days-badge.urgent{background:oklch(0.65 0.2 50 / 0.15);color:oklch(0.78 0.18 50)}
+.bill-days-badge.paid{background:oklch(0.55 0.18 145 / 0.15);color:oklch(0.72 0.2 145)}
+
+/* Bill form */
+.bill-form-body{padding:0 16px;display:flex;flex-direction:column;gap:14px}
+.bill-form-group{display:flex;flex-direction:column;gap:4px}
+.bill-form-lbl{font-size:12px;font-weight:700;color:var(--muted)}
+.bill-form-input{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;font-size:14px;color:var(--text);font-family:inherit;outline:none;width:100%}
+.bill-form-input:focus{border-color:var(--accent)}
+.bill-form-select{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;font-size:14px;color:var(--text);font-family:inherit;outline:none;width:100%;appearance:auto}
+.bill-form-row2{display:flex;gap:10px}
+.bill-form-actions{display:flex;gap:10px;padding-top:8px}
+.bill-form-save{flex:1;padding:12px;background:var(--accent);border:none;border-radius:var(--r-sm);color:#000;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.bill-form-save:active{filter:brightness(0.85)}
+.bill-form-import{flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.bill-form-import:active{background:var(--surface)}
+.bill-img-preview{width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-top:6px}
+
+/* Bill email picker */
+.bill-email-picker{background:var(--surface2);border-radius:16px;margin:12px 0;overflow:hidden}
+.bill-email-picker-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:14px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border)}
+.bill-email-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border)}
+.bill-email-item:active{background:var(--surface)}
+.bill-email-item:last-child{border-bottom:none}
+.bill-email-subject{font-size:13px;font-weight:600;color:var(--text)}
+.bill-email-from{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* Bill mini cards on main screen */
+.bill-mini-card{display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:12px;padding:10px 14px;cursor:pointer;touch-action:manipulation}
+.bill-mini-card:active{background:var(--surface)}
+.bill-mini-card.overdue{background:oklch(0.55 0.18 25 / 0.08)}
+.bill-mini-name{flex:1;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bill-mini-amount{font-size:13px;font-weight:800;color:var(--accent);direction:ltr;flex-shrink:0}

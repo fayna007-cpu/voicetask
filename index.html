@@ -221,6 +221,11 @@
       <div class="side-item-ico" style="background:oklch(0.45 0.18 145 / 0.2);color:oklch(0.72 0.20 145)">🚀</div>
       מנוע הצמיחה
     </button>
+    <button class="side-item" onclick="closeSideMenu();openBillsSheet()">
+      <div class="side-item-ico" style="background:oklch(0.45 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">💳</div>
+      חשבונות
+      <span class="bills-side-badge" id="billsSideBadge" style="display:none"></span>
+    </button>
     <button class="side-item" onclick="closeSideMenu();openBacklogSheet()">
       <div class="side-item-ico green">📋</div>
       הרשימות שלי
@@ -384,6 +389,22 @@
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">סיכום שגרות בבוקר</div><div class="settings-row-sub">שעת שליחה</div></div>
         <input type="time" class="settings-select" id="ns-routines-morningTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">💳 חשבונות</div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תזכורת ביום תשלום</div><div class="settings-row-sub">שעת שליחה</div></div>
+        <input type="time" class="settings-select" id="ns-bills-payDayTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תזכורת מוקדמת</div><div class="settings-row-sub">ימים לפני הדדליין</div></div>
+        <select class="settings-select" id="ns-bills-earlyReminderDays" onchange="saveNotifSettings()">
+          <option value="0">כבוי</option><option value="1">יום לפני</option><option value="2">יומיים לפני</option>
+          <option value="3">3 ימים</option><option value="5">5 ימים</option><option value="7">שבוע</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">התראת פיגור חשבון</div><div class="settings-row-sub">חשבון שעבר דדליין ולא שולם</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-bills-overdueAlert" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">📈 פרודוקטיביות</div>
       <div class="settings-row" style="cursor:default">
@@ -944,6 +965,102 @@
   </div>
 </div>
 
+<!-- Bills overlay & sheets -->
+<div class="routine-overlay" id="billsOverlay" onclick="closeBillsSheet()"></div>
+<div class="rsheet bills-sheet" id="billsListSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeBillsSheet()">✕</button>
+    <h3>💳 חשבונות</h3>
+    <button class="rsheet-action-btn" onclick="openBillForm(null)" style="font-size:22px;background:none;border:none;color:var(--accent);cursor:pointer">＋</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="bills-summary" id="billsSummary"></div>
+    <div class="bills-filter-row" id="billsFilterRow">
+      <button class="bp-chip on" data-bf="pending" onclick="setBillFilter('pending')">ממתינים</button>
+      <button class="bp-chip" data-bf="paid" onclick="setBillFilter('paid')">שולמו</button>
+      <button class="bp-chip" data-bf="all" onclick="setBillFilter('all')">הכל</button>
+      <button class="bp-chip" data-bf="recurring" onclick="setBillFilter('recurring')">חוזרים</button>
+    </div>
+    <div id="billsList"></div>
+    <div style="height:120px"></div>
+  </div>
+</div>
+
+<!-- Bill form sheet -->
+<div class="rsheet bills-sheet" id="billFormSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeBillForm()">✕</button>
+    <h3 id="billFormTitle">חשבון חדש</h3>
+    <button class="rsheet-action-btn" id="billFormDelete" onclick="deleteBill()" style="font-size:14px;background:none;border:none;color:oklch(0.65 0.2 25);cursor:pointer;display:none">🗑️ מחק</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="bill-form-body">
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">שם החשבון *</label>
+        <input class="bill-form-input" id="billName" type="text" placeholder="חשמל, מים, אינטרנט..." maxlength="100">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">סכום (₪)</label>
+        <input class="bill-form-input" id="billAmount" type="number" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">קטגוריה</label>
+        <select class="bill-form-select" id="billCategory">
+          <option value="חשמל">⚡ חשמל</option>
+          <option value="מים">💧 מים</option>
+          <option value="אינטרנט">🌐 אינטרנט</option>
+          <option value="סלולר">📱 סלולר</option>
+          <option value="ביטוח">🛡️ ביטוח</option>
+          <option value="ארנונה">🏠 ארנונה</option>
+          <option value="ועד בית">🏢 ועד בית</option>
+          <option value="כרטיס אשראי">💳 כרטיס אשראי</option>
+          <option value="הלוואה">🏦 הלוואה</option>
+          <option value="מנוי">📺 מנוי</option>
+          <option value="כללי" selected>📄 כללי</option>
+        </select>
+      </div>
+      <div class="bill-form-row2">
+        <div class="bill-form-group" style="flex:1">
+          <label class="bill-form-lbl">תאריך יעד (דדליין)</label>
+          <input class="bill-form-input" id="billDeadline" type="date">
+        </div>
+        <div class="bill-form-group" style="flex:1">
+          <label class="bill-form-lbl">תאריך תשלום מתוכנן</label>
+          <input class="bill-form-input" id="billPayDate" type="date">
+        </div>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">🔗 לינק לתשלום</label>
+        <input class="bill-form-input" id="billUrl" type="url" placeholder="https://..." dir="ltr">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">📷 תמונה / צילום חשבונית</label>
+        <label class="edit-img-label" id="billImgLabel">
+          <span id="billImgLabelTxt">📷 הוסף תמונה</span>
+          <input type="file" accept="image/*" style="display:none" id="billImgInput" onchange="handleBillImage(this)">
+        </label>
+        <img class="bill-img-preview" id="billImgPreview" src="" alt="" style="display:none">
+        <button class="bp-img-remove" id="billImgRemove" onclick="removeBillImage()" style="display:none">הסר תמונה</button>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">📝 הערות</label>
+        <textarea class="bill-form-input" id="billNotes" rows="2" placeholder="הערות (אופציונלי)"></textarea>
+      </div>
+      <div class="bill-form-group" style="flex-direction:row;align-items:center;gap:12px">
+        <label class="rtoggle"><input type="checkbox" id="billRecurring"><span class="rtoggle-sl"></span></label>
+        <span class="bill-form-lbl" style="margin:0">🔄 חשבון חוזר (חודשי)</span>
+      </div>
+      <div class="bill-form-actions">
+        <button class="bill-form-save" onclick="saveBill()">💾 שמור</button>
+        <button class="bill-form-import" onclick="openBillEmailImport()">📧 ייבא מהמייל</button>
+      </div>
+    </div>
+    <div style="height:80px"></div>
+  </div>
+</div>
+
 <!-- Full-screen image viewer -->
 <div class="img-viewer-overlay" id="imgViewerOverlay" onclick="closeTaskImgFull()">
   <img class="img-viewer-img" id="imgViewerImg" alt="">
@@ -1099,11 +1216,14 @@ function editFromJourney(notifId){
     }else if(notifId.startsWith('task_')||notifId.startsWith('tmorning_')||notifId.startsWith('overdue_')){
       const parts=notifId.split('_');const tid=parseInt(parts[parts.length-1]);
       editTask(tid);
+    }else if(notifId.startsWith('bill_')){
+      const parts=notifId.split('_');const bid=parseInt(parts[parts.length-1]);
+      openBillsSheet();setTimeout(()=>openBillForm(bid),200);
     }
   },400);
 }
 function exportData(){
-  const data={version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs};
+  const data={version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1133,6 +1253,11 @@ function importData(e){
         const newN=data.customNotifs.filter(n=>!existIds.has(n.id));
         customNotifs=[...newN,...customNotifs];saveCustomNotifsData();added+=newN.length;
       }
+      if(Array.isArray(data.bills)){
+        const existIds=new Set(bills.map(b=>b.id));
+        const newB=data.bills.filter(b=>!existIds.has(b.id));
+        bills=[...newB,...bills];saveBills();added+=newB.length;
+      }
       render();scheduleCustomNotifs();
       toast(`✅ יובאו ${added} פריטים חדשים`);
     }catch(_){toast('❌ קובץ לא תקין');}
@@ -1148,13 +1273,13 @@ function confirmClearData(){
 }
 // ── Smart Push Notification Settings ─────────────────────────────────────────
 let notifSettings=null;
-const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},productivity:{eveningTime:'21:00',weeklyReview:true}};
+const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true},productivity:{eveningTime:'21:00',weeklyReview:true}};
 function loadNotifSettings(){
   try{const s=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');
-    notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},productivity:{...NS_DEFAULTS.productivity}};
+    notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},bills:{...NS_DEFAULTS.bills,...(s.bills||{})},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},bills:{...NS_DEFAULTS.bills},productivity:{...NS_DEFAULTS.productivity}};
   }catch(e){notifSettings=JSON.parse(JSON.stringify(NS_DEFAULTS));}
   // Sync values to DOM elements (if settings sheet already rendered)
-  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
+  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
   pairs.forEach(([id,section,key,prop])=>{const el=document.getElementById(id);if(!el)return;if(prop==='checked')el.checked=!!notifSettings[section][key];else el.value=notifSettings[section][key];});
 }
 function saveNotifSettings(){
@@ -1162,6 +1287,7 @@ function saveNotifSettings(){
   notifSettings={
     tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked},
     routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00'},
+    bills:{payDayTime:g('ns-bills-payDayTime')?.value||'08:00',earlyReminderDays:+(g('ns-bills-earlyReminderDays')?.value||2),overdueAlert:!!g('ns-bills-overdueAlert')?.checked},
     productivity:{eveningTime:g('ns-productivity-eveningTime')?.value||'21:00',weeklyReview:!!g('ns-productivity-weeklyReview')?.checked}
   };
   localStorage.setItem('vt_notif_settings',JSON.stringify(notifSettings));
@@ -1243,6 +1369,50 @@ function buildSmartPushBatch(windowMs){
       }
     });});
   });
+  // Bill reminders
+  if(s.bills){
+    const pendingBills=bills.filter(b=>b.status==='pending');
+    pendingBills.forEach(b=>{
+      const [bh,bm]=(s.bills.payDayTime||'08:00').split(':').map(Number);
+      // Pay day reminder
+      if(b.payDate){
+        const payD=new Date(b.payDate);payD.setHours(bh,bm,0,0);
+        queue('bill_pay_'+b.id,'💳 יום תשלום: '+b.name,(b.amount?'₪'+b.amount+' — ':'')+'מגיע היום לתשלום',payD);
+      }
+      // Early reminder (X days before deadline)
+      if(b.deadline&&s.bills.earlyReminderDays>0){
+        const dl=new Date(b.deadline);dl.setHours(bh,bm,0,0);
+        const early=new Date(dl-s.bills.earlyReminderDays*86400000);
+        const daysLeft=Math.ceil((dl-now)/(86400000));
+        queue('bill_early_'+b.id,'⏰ חשבון מתקרב: '+b.name,`עוד ${daysLeft} ימים לתשלום`+(b.amount?' — ₪'+b.amount:''),early);
+      }
+      // Overdue alert
+      if(s.bills.overdueAlert&&b.deadline){
+        const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
+        if(dl<now){
+          const overdueDays=Math.ceil((now-dl)/(86400000));
+          queue('bill_overdue_'+b.id,'🚨 חשבון באיחור: '+b.name,`${overdueDays} ימים באיחור`+(b.amount?' — ₪'+b.amount:''),new Date(now+60000));
+        }
+      }
+    });
+    // Morning briefing with bills count
+    const billCount=pendingBills.length;
+    if(billCount>0){
+      [0,1].forEach(off=>{
+        const base=new Date(now);base.setDate(now.getDate()+off);
+        const fire=new Date(base);fire.setHours(bh,bm+5,0,0);
+        const ds=ymd(fire);
+        const todayBills=pendingBills.filter(b=>{
+          if(!b.payDate)return false;
+          const pd=new Date(b.payDate);pd.setHours(0,0,0,0);
+          const day=new Date(base);day.setHours(0,0,0,0);
+          return pd.getTime()===day.getTime();
+        });
+        if(todayBills.length)
+          queue('bill_morning_'+ds,'💳 חשבונות היום',todayBills.length+' חשבונות לתשלום היום',fire);
+      });
+    }
+  }
   // Evening planning
   if(s.productivity.eveningTime){
     [0,1].forEach(off=>{
@@ -1322,12 +1492,13 @@ async function renderPushJourney(){
   if(pjSelectedDay){
     const dayN2=batch.filter(n=>n.fireAt.startsWith(pjSelectedDay));
     if(dayN2.length){
-      const groups=[{label:'📅 לוח שנה',items:[]},{label:'🔄 שגרות',items:[]},{label:'📌 משימות שוטפות',items:[]},{label:'⚡ אוטומטי',items:[]}];
+      const groups=[{label:'📅 לוח שנה',items:[]},{label:'🔄 שגרות',items:[]},{label:'📌 משימות שוטפות',items:[]},{label:'💳 חשבונות',items:[]},{label:'⚡ אוטומטי',items:[]}];
       dayN2.forEach(n=>{
         if(n.id.startsWith('gcal_'))groups[0].items.push(n);
         else if(n.id.startsWith('rmorning_')||n.id.startsWith('rslot_'))groups[1].items.push(n);
         else if(n.id.startsWith('task_')||n.id.startsWith('tmorning_')||n.id.startsWith('overdue_'))groups[2].items.push(n);
-        else groups[3].items.push(n);
+        else if(n.id.startsWith('bill_'))groups[3].items.push(n);
+        else groups[4].items.push(n);
       });
       const renderRow=n=>{
         const fire=new Date(n.fireAt);const t=fire.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
@@ -1527,6 +1698,20 @@ function showSiriFinal(text){
   document.getElementById('siriWave').classList.remove('speaking');
   const cmd=parseVoiceCommand(text);
   if(cmd){executeCommand(cmd);return;}
+  // Bill detection — if user says "חשבון" redirect to bill form
+  if(detectBillVoice(text)){
+    stopSiri();
+    const parsed=parseBillFromVoice(text);
+    openBillsSheet();
+    setTimeout(()=>{
+      openBillForm(null);
+      setTimeout(()=>{
+        document.getElementById('billName').value=parsed.name;
+        if(parsed.amount)document.getElementById('billAmount').value=parsed.amount;
+      },100);
+    },100);
+    return;
+  }
   document.getElementById('siriText').textContent=text;
   document.getElementById('siriEdit').value=text;
   document.getElementById('siriConfirm').classList.add('on');
@@ -1941,6 +2126,13 @@ function openPostpone(type,a,b){
     inp.type='datetime-local';
     const pad=n=>n.toString().padStart(2,'0');
     inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  } else if(type==='bill'){
+    _postponeCtx.taskId=a;
+    inp.type='date';
+    const b=bills.find(x=>x.id===a);
+    const dt=b&&b.payDate?new Date(b.payDate):new Date();
+    dt.setDate(dt.getDate()+1);
+    inp.value=dt.toISOString().slice(0,10);
   } else if(type==='crm'){
     _postponeCtx.bpItemId=a;
     inp.type='date';
@@ -1979,6 +2171,13 @@ async function confirmPostpone(){
       if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
     });
     saveRoutines();render();closePostpone();toast('📅 שגרה נדחתה');
+  } else if(type==='bill'){
+    const b=bills.find(x=>x.id===taskId);if(!b)return;
+    b.payDate=inp.value;
+    if(b.calendarEventId)await deleteCalendarEvent(b.calendarEventId);
+    b.calendarEventId=null;
+    saveBills();renderBillsList();render();closePostpone();
+    syncBillToCalendar(b);toast('📅 חשבון נדחה');
   } else if(type==='crm'){
     const item=backlogItems.find(i=>i.id===bpItemId);if(!item)return;
     item.dueDate=inp.value;
@@ -2228,9 +2427,12 @@ function render(){
 <div class="section-cards">${routineList.map(renderRoutineInstance).join('')}</div>
 </div>`;
   }
+  // Section 3: Bills
+  html+=renderBillsSection();
   el.innerHTML=html;
   updateGreeting();
   renderCalView();
+  updateBillsSideBadge();
 }
 
 function updateGreeting(){
@@ -2244,7 +2446,12 @@ function updateGreeting(){
   dateEl.textContent=`${greet}${name?' '+name:''}!`;
   const active=tasks.filter(t=>!t.completed).length;
   const routineCount=routines.filter(r=>r.enabled).length;
-  subEl.textContent=active?`${active} משימות פעילות · ${routineCount} שגרות`:routineCount?`${routineCount} שגרות פעילות`:'אין משימות — לחץ 🎤 להוספה';
+  const billCount=bills.filter(b=>b.status==='pending').length;
+  const parts=[];
+  if(active)parts.push(active+' משימות');
+  if(routineCount)parts.push(routineCount+' שגרות');
+  if(billCount)parts.push(billCount+' חשבונות');
+  subEl.textContent=parts.length?parts.join(' · '):' אין משימות — לחץ 🎤 להוספה';
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
@@ -2539,7 +2746,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -3603,6 +3810,10 @@ function initSwipeGestures(){
   initSheetSwipe(document.getElementById('notifManagerSheet'),ov);
   initSheetSwipe(document.getElementById('notifFormSheet'),ov);
   initSheetSwipe(document.getElementById('calGcalEditSheet'),ov);
+  // Bills sheets
+  const billsOv=document.getElementById('billsOverlay');
+  initSheetSwipe(document.getElementById('billsListSheet'),billsOv);
+  initSheetSwipe(document.getElementById('billFormSheet'),billsOv);
 }
 
 // ── Calendar Panel ────────────────────────────────────────────────────────────
@@ -5285,6 +5496,19 @@ function buildDailyPopupContent(){
     urgent.forEach(i=>{html+=`<div class="tp-row"><span class="tp-dot">🔴</span><span class="tp-text">${esc(i.text)}</span></div>`;});
     html+=`</div>`;
   }
+  // Pending bills
+  const now=new Date();now.setHours(0,0,0,0);
+  const todayBills=bills.filter(b=>{
+    if(b.status!=='paid'&&b.payDate){const pd=new Date(b.payDate);pd.setHours(0,0,0,0);return pd.getTime()===now.getTime();}
+    return false;
+  });
+  const overdueBills=bills.filter(b=>b.status==='pending'&&b.deadline&&new Date(b.deadline)<now);
+  if(todayBills.length||overdueBills.length){
+    html+=`<div class="dp-section-title">💳 חשבונות</div><div class="tp-list">`;
+    todayBills.forEach(b=>{html+=`<div class="tp-row"><span class="tp-dot">💳</span><span class="tp-text">${esc(b.name)}${b.amount?' — ₪'+b.amount:''}</span><span style="font-size:11px;color:var(--accent);font-weight:700">היום</span></div>`;});
+    overdueBills.forEach(b=>{const days=Math.ceil((now-new Date(b.deadline))/(86400000));html+=`<div class="tp-row"><span class="tp-dot">🚨</span><span class="tp-text">${esc(b.name)}${b.amount?' — ₪'+b.amount:''}</span><span style="font-size:11px;color:oklch(0.75 0.2 25);font-weight:700">איחור ${days}d</span></div>`;});
+    html+=`</div>`;
+  }
   // Today tasks
   const total=tt.length+rr.length;
   html+=`<div class="dp-section-title">☀️ משימות היום${total?` (${total})`:''}:</div>`;
@@ -5308,6 +5532,423 @@ function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+// ── Bills ─────────────────────────────────────────────────────────────────────
+let bills=JSON.parse(localStorage.getItem('vt_bills')||'[]');
+let _billEditId=null;
+let _billPendingImage=null;
+let _billFilter='pending';
+const BILL_CATS={'חשמל':'⚡','מים':'💧','אינטרנט':'🌐','סלולר':'📱','ביטוח':'🛡️','ארנונה':'🏠','ועד בית':'🏢','כרטיס אשראי':'💳','הלוואה':'🏦','מנוי':'📺','כללי':'📄'};
+
+function saveBills(){localStorage.setItem('vt_bills',JSON.stringify(bills));}
+
+function openBillsSheet(){
+  document.getElementById('billsOverlay').classList.add('on');
+  document.getElementById('billsListSheet').classList.add('on');
+  document.getElementById('billFormSheet').classList.remove('on');
+  _billFilter='pending';
+  document.querySelectorAll('#billsFilterRow .bp-chip').forEach(b=>b.classList.toggle('on',b.dataset.bf==='pending'));
+  renderBillsList();
+  updateBillsSideBadge();
+}
+function closeBillsSheet(){
+  document.getElementById('billsOverlay').classList.remove('on');
+  document.getElementById('billsListSheet').classList.remove('on');
+  document.getElementById('billFormSheet').classList.remove('on');
+}
+function setBillFilter(f){
+  _billFilter=f;
+  document.querySelectorAll('#billsFilterRow .bp-chip').forEach(b=>b.classList.toggle('on',b.dataset.bf===f));
+  renderBillsList();
+}
+
+function renderBillsSummary(){
+  const el=document.getElementById('billsSummary');if(!el)return;
+  const pending=bills.filter(b=>b.status==='pending');
+  const paid=bills.filter(b=>b.status==='paid');
+  const now=new Date();now.setHours(0,0,0,0);
+  const overdue=pending.filter(b=>b.deadline&&new Date(b.deadline)<now);
+  const totalPending=pending.reduce((s,b)=>s+(b.amount||0),0);
+  const totalPaid=paid.filter(b=>{const d=new Date(b.paidAt||b.createdAt);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,b)=>s+(b.amount||0),0);
+  el.innerHTML=`<div class="bills-sum-row">
+    <div class="bills-sum-card"><div class="bills-sum-num">${pending.length}</div><div class="bills-sum-lbl">ממתינים</div></div>
+    <div class="bills-sum-card warn"><div class="bills-sum-num">${overdue.length}</div><div class="bills-sum-lbl">באיחור</div></div>
+    <div class="bills-sum-card"><div class="bills-sum-num">₪${totalPending.toLocaleString('he-IL')}</div><div class="bills-sum-lbl">לתשלום</div></div>
+    <div class="bills-sum-card ok"><div class="bills-sum-num">₪${totalPaid.toLocaleString('he-IL')}</div><div class="bills-sum-lbl">שולם החודש</div></div>
+  </div>`;
+}
+
+function renderBillsList(){
+  renderBillsSummary();
+  const el=document.getElementById('billsList');if(!el)return;
+  let list=bills;
+  if(_billFilter==='pending')list=bills.filter(b=>b.status==='pending');
+  else if(_billFilter==='paid')list=bills.filter(b=>b.status==='paid');
+  else if(_billFilter==='recurring')list=bills.filter(b=>b.recurring);
+  // sort: pending first by deadline, paid by paidAt desc
+  list=list.slice().sort((a,b)=>{
+    if(a.status!==b.status)return a.status==='pending'?-1:1;
+    if(a.status==='pending')return new Date(a.deadline||'9999')-new Date(b.deadline||'9999');
+    return new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt);
+  });
+  if(!list.length){
+    el.innerHTML=`<div class="empty" style="padding:40px 16px"><span class="empty-icon">💳</span><p>${_billFilter==='paid'?'אין חשבונות ששולמו':'אין חשבונות'}<br>לחץ ＋ להוספה</p></div>`;
+    return;
+  }
+  el.innerHTML=list.map(renderBillCard).join('');
+}
+
+function renderBillCard(bill){
+  const cat=BILL_CATS[bill.category]||'📄';
+  const now=new Date();now.setHours(0,0,0,0);
+  const deadline=bill.deadline?new Date(bill.deadline):null;
+  if(deadline)deadline.setHours(0,0,0,0);
+  const payDate=bill.payDate?new Date(bill.payDate):null;
+  const daysLeft=deadline?Math.ceil((deadline-now)/(1000*60*60*24)):null;
+  const isOverdue=bill.status==='pending'&&daysLeft!==null&&daysLeft<0;
+  const isPaid=bill.status==='paid';
+  let daysLabel='';
+  if(isPaid)daysLabel='<span class="bill-days-badge paid">שולם ✓</span>';
+  else if(daysLeft===null)daysLabel='';
+  else if(daysLeft<0)daysLabel=`<span class="bill-days-badge overdue">איחור ${Math.abs(daysLeft)} ימים</span>`;
+  else if(daysLeft===0)daysLabel='<span class="bill-days-badge today">היום!</span>';
+  else if(daysLeft<=3)daysLabel=`<span class="bill-days-badge urgent">עוד ${daysLeft} ימים</span>`;
+  else daysLabel=`<span class="bill-days-badge">עוד ${daysLeft} ימים</span>`;
+
+  const deadlineStr=deadline?deadline.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
+  const payDateStr=payDate?payDate.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
+  const amountStr=bill.amount?`₪${Number(bill.amount).toLocaleString('he-IL')}`:'';
+
+  return `<div class="bill-card${isPaid?' paid':''}${isOverdue?' overdue':''}" onclick="openBillForm(${bill.id})">
+  <div class="bill-card-top">
+    <span class="bill-cat-icon">${cat}</span>
+    <div class="bill-card-info">
+      <div class="bill-card-name">${esc(bill.name)}${bill.recurring?'<span class="bill-recurring-tag">🔄 חוזר</span>':''}</div>
+      <div class="bill-card-meta">${bill.category}${deadlineStr?' · יעד: '+deadlineStr:''}${payDateStr?' · תשלום: '+payDateStr:''}</div>
+    </div>
+    <div class="bill-card-right">
+      <div class="bill-card-amount">${amountStr}</div>
+      ${daysLabel}
+    </div>
+  </div>
+  ${bill.url?`<a class="card-link-chip" href="${esc(bill.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 לינק לתשלום</a>`:''}
+  ${!isPaid?`<div class="bill-card-actions">
+    <button class="bill-pay-btn" onclick="event.stopPropagation();markBillPaid(${bill.id})">✓ שולם</button>
+    <button class="defer-chip" onclick="event.stopPropagation();openPostpone('bill',${bill.id})">דחייה</button>
+  </div>`:''}
+</div>`;
+}
+
+function openBillForm(id){
+  _billEditId=id;
+  _billPendingImage=null;
+  const sheet=document.getElementById('billFormSheet');
+  const title=document.getElementById('billFormTitle');
+  const delBtn=document.getElementById('billFormDelete');
+  // reset
+  document.getElementById('billName').value='';
+  document.getElementById('billAmount').value='';
+  document.getElementById('billCategory').value='כללי';
+  document.getElementById('billDeadline').value='';
+  document.getElementById('billPayDate').value='';
+  document.getElementById('billUrl').value='';
+  document.getElementById('billNotes').value='';
+  document.getElementById('billRecurring').checked=false;
+  document.getElementById('billImgPreview').style.display='none';
+  document.getElementById('billImgPreview').src='';
+  document.getElementById('billImgRemove').style.display='none';
+  document.getElementById('billImgLabelTxt').textContent='📷 הוסף תמונה';
+  if(id){
+    const b=bills.find(x=>x.id===id);
+    if(!b)return;
+    title.textContent='עריכת חשבון';
+    delBtn.style.display='';
+    document.getElementById('billName').value=b.name||'';
+    document.getElementById('billAmount').value=b.amount||'';
+    document.getElementById('billCategory').value=b.category||'כללי';
+    document.getElementById('billDeadline').value=b.deadline||'';
+    document.getElementById('billPayDate').value=b.payDate||'';
+    document.getElementById('billUrl').value=b.url||'';
+    document.getElementById('billNotes').value=b.notes||'';
+    document.getElementById('billRecurring').checked=!!b.recurring;
+    if(b.image){
+      _billPendingImage=b.image;
+      document.getElementById('billImgPreview').src=b.image;
+      document.getElementById('billImgPreview').style.display='block';
+      document.getElementById('billImgRemove').style.display='block';
+      document.getElementById('billImgLabelTxt').textContent='📷 החלף תמונה';
+    }
+  }else{
+    title.textContent='חשבון חדש';
+    delBtn.style.display='none';
+  }
+  document.getElementById('billsListSheet').classList.remove('on');
+  setTimeout(()=>sheet.classList.add('on'),40);
+}
+function closeBillForm(){
+  document.getElementById('billFormSheet').classList.remove('on');
+  setTimeout(()=>{document.getElementById('billsListSheet').classList.add('on');renderBillsList();},40);
+}
+
+async function handleBillImage(inp){
+  const file=inp.files[0];if(!file)return;
+  _billPendingImage=await compressImage(file,800,0.7);
+  document.getElementById('billImgLabelTxt').textContent='📷 תמונה מצורפת';
+  document.getElementById('billImgPreview').src=_billPendingImage;
+  document.getElementById('billImgPreview').style.display='block';
+  document.getElementById('billImgRemove').style.display='block';
+}
+function removeBillImage(){
+  _billPendingImage=null;
+  document.getElementById('billImgPreview').style.display='none';
+  document.getElementById('billImgPreview').src='';
+  document.getElementById('billImgRemove').style.display='none';
+  document.getElementById('billImgLabelTxt').textContent='📷 הוסף תמונה';
+  document.getElementById('billImgInput').value='';
+}
+
+function saveBill(){
+  const name=document.getElementById('billName').value.trim();
+  if(!name){toast('⚠️ יש להזין שם חשבון');return;}
+  const amount=parseFloat(document.getElementById('billAmount').value)||0;
+  const category=document.getElementById('billCategory').value;
+  const deadline=document.getElementById('billDeadline').value||null;
+  const payDate=document.getElementById('billPayDate').value||null;
+  const url=document.getElementById('billUrl').value.trim()||null;
+  const notes=document.getElementById('billNotes').value.trim()||'';
+  const recurring=document.getElementById('billRecurring').checked;
+  const image=_billPendingImage||null;
+
+  if(_billEditId){
+    const b=bills.find(x=>x.id===_billEditId);
+    if(b){
+      b.name=name;b.amount=amount;b.category=category;b.deadline=deadline;b.payDate=payDate;
+      b.url=url;b.notes=notes;b.recurring=recurring;b.image=image;
+    }
+  }else{
+    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null});
+  }
+  saveBills();
+  // sync to calendar if payDate set
+  const bill=_billEditId?bills.find(x=>x.id===_billEditId):bills[0];
+  if(bill&&bill.payDate)syncBillToCalendar(bill);
+  toast('✅ חשבון נשמר');
+  closeBillForm();
+  scheduleSmartPushNotifs();
+  render();// refresh main screen bills section
+}
+
+function deleteBill(){
+  if(!_billEditId)return;
+  if(!confirm('למחוק את החשבון?'))return;
+  const b=bills.find(x=>x.id===_billEditId);
+  if(b&&b.calendarEventId)deleteCalendarEvent(b.calendarEventId);
+  bills=bills.filter(x=>x.id!==_billEditId);
+  saveBills();
+  toast('🗑️ חשבון נמחק');
+  closeBillForm();
+  scheduleSmartPushNotifs();
+  render();
+}
+
+function markBillPaid(id){
+  const b=bills.find(x=>x.id===id);if(!b)return;
+  b.status='paid';
+  b.paidAt=new Date().toISOString();
+  saveBills();
+  toast('✅ סומן כשולם!');
+  renderBillsList();
+  render();
+  scheduleSmartPushNotifs();
+  // if recurring, create next month's bill
+  if(b.recurring)createNextRecurringBill(b);
+}
+
+function createNextRecurringBill(bill){
+  const nextDeadline=bill.deadline?new Date(bill.deadline):new Date();
+  nextDeadline.setMonth(nextDeadline.getMonth()+1);
+  const nextPayDate=bill.payDate?new Date(bill.payDate):null;
+  if(nextPayDate)nextPayDate.setMonth(nextPayDate.getMonth()+1);
+  const nb={id:Date.now(),name:bill.name,amount:bill.amount,category:bill.category,
+    deadline:nextDeadline.toISOString().split('T')[0],
+    payDate:nextPayDate?nextPayDate.toISOString().split('T')[0]:null,
+    url:bill.url,notes:bill.notes,recurring:true,image:null,status:'pending',
+    createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null};
+  bills.unshift(nb);
+  saveBills();
+  if(nb.payDate)syncBillToCalendar(nb);
+  toast('🔄 חשבון חוזר נוצר לחודש הבא');
+}
+
+async function syncBillToCalendar(bill){
+  const token=await getToken();if(!token)return;
+  // delete old event if exists
+  if(bill.calendarEventId)await deleteCalendarEvent(bill.calendarEventId);
+  const dt=new Date(bill.payDate+'T09:00:00');
+  const end=new Date(dt.getTime()+3600000);
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({summary:'💳 '+bill.name+(bill.amount?' — ₪'+bill.amount:''),
+        description:`קטגוריה: ${bill.category}\nיעד: ${bill.deadline||'—'}\nנוצר מ-VoiceTask 💳\nvt_bill_id:${bill.id}`,
+        start:{dateTime:dt.toISOString()},end:{dateTime:end.toISOString()}})
+    });
+    if(res.ok){const d=await res.json();bill.calendarEventId=d.id||null;saveBills();}
+  }catch(e){}
+}
+
+// Email import — search Gmail for bills/invoices
+async function openBillEmailImport(){
+  const token=await getToken();
+  if(!token){toast('⚠️ יש להתחבר ל-Google תחילה');return;}
+  // Request Gmail scope if needed
+  if(!SCOPES.includes('gmail.readonly')){
+    toast('⏳ מבקש הרשאת Gmail...');
+    try{
+      await new Promise((resolve,reject)=>{
+        const tc=google.accounts.oauth2.initTokenClient({
+          client_id:GOOGLE_CLIENT_ID,
+          scope:SCOPES+' https://www.googleapis.com/auth/gmail.readonly',
+          callback:resp=>{
+            if(resp.error)reject(resp.error);
+            else{gAuth.access_token=resp.access_token;gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+              localStorage.setItem('vt_auth',JSON.stringify(gAuth));resolve();}
+          }
+        });
+        tc.requestAccessToken();
+      });
+    }catch(e){toast('❌ הרשאת Gmail נדחתה');return;}
+  }
+  toast('⏳ מחפש חשבוניות במייל...');
+  try{
+    const q=encodeURIComponent('subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:60d');
+    const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+    if(!r.ok){toast('❌ שגיאה בחיפוש מייל');return;}
+    const data=await r.json();
+    if(!data.messages||!data.messages.length){toast('לא נמצאו חשבוניות ב-60 יום אחרונים');return;}
+    // Fetch details for each message
+    const msgs=await Promise.all(data.messages.slice(0,8).map(async m=>{
+      const mr=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+      if(!mr.ok)return null;
+      const md=await mr.json();
+      const headers=md.payload?.headers||[];
+      const subject=headers.find(h=>h.name==='Subject')?.value||'(ללא נושא)';
+      const from=headers.find(h=>h.name==='From')?.value||'';
+      const date=headers.find(h=>h.name==='Date')?.value||'';
+      return{id:m.id,subject,from,date};
+    }));
+    const valid=msgs.filter(Boolean);
+    if(!valid.length){toast('לא נמצאו חשבוניות');return;}
+    showEmailPickerForBills(valid);
+  }catch(e){toast('❌ שגיאה: '+e.message);}
+}
+
+function showEmailPickerForBills(emails){
+  const html=emails.map(e=>{
+    const fromShort=(e.from||'').replace(/<.*>/,'').trim().slice(0,30);
+    const dateStr=e.date?new Date(e.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
+    return `<div class="bill-email-item" onclick="importBillFromEmail('${e.id}','${esc(e.subject)}','${esc(fromShort)}')">
+      <div class="bill-email-subject">${esc(e.subject)}</div>
+      <div class="bill-email-from">${esc(fromShort)} · ${dateStr}</div>
+    </div>`;
+  }).join('');
+  // show in a simple modal
+  const existing=document.getElementById('billEmailPicker');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='billEmailPicker';
+  div.className='bill-email-picker on';
+  div.innerHTML=`<div class="bill-email-picker-head"><span>📧 בחר חשבונית מהמייל</span><button onclick="this.closest('.bill-email-picker').remove()" style="background:none;border:none;color:var(--text);font-size:18px;cursor:pointer">✕</button></div>${html}`;
+  document.getElementById('billFormSheet').querySelector('.rsheet-scroll').appendChild(div);
+}
+
+function importBillFromEmail(msgId,subject,from){
+  // auto-detect category from subject/from
+  const s=(subject+' '+from).toLowerCase();
+  let cat='כללי';
+  if(/חשמל|electric|iec/.test(s))cat='חשמל';
+  else if(/מים|water|מקורות/.test(s))cat='מים';
+  else if(/אינטרנט|internet|בזק|פרטנר|הוט|cellcom|partner/.test(s))cat='אינטרנט';
+  else if(/סלולר|cellular|פלאפון|גולן/.test(s))cat='סלולר';
+  else if(/ביטוח|insurance/.test(s))cat='ביטוח';
+  else if(/ארנונה|עירייה|municipality/.test(s))cat='ארנונה';
+  else if(/ועד.?בית/.test(s))cat='ועד בית';
+  else if(/אשראי|visa|mastercard|cal|max|לאומי.?קארד/.test(s))cat='כרטיס אשראי';
+  else if(/הלוואה|loan|משכנתא|mortgage/.test(s))cat='הלוואה';
+  else if(/מנוי|netflix|spotify|subscription/.test(s))cat='מנוי';
+
+  document.getElementById('billName').value=subject;
+  document.getElementById('billCategory').value=cat;
+  // remove picker
+  const picker=document.getElementById('billEmailPicker');if(picker)picker.remove();
+  toast('📧 חשבון יובא — השלם פרטים ושמור');
+}
+
+// Voice detection — redirect "חשבון" phrases to bill form
+function detectBillVoice(text){
+  return /חשבון\s|חשבונית|לשלם\s|תשלום\s/.test(text);
+}
+function parseBillFromVoice(text){
+  const name=text.replace(/^(חשבון|חשבונית|תשלום)\s*/,'').trim();
+  const amountMatch=text.match(/(\d+[\d,.]*)\s*(שקל|₪|ש"ח|שח)/);
+  const amount=amountMatch?parseFloat(amountMatch[1].replace(',','')):0;
+  return{name:name||text,amount};
+}
+
+// Bills section on main screen
+function renderBillsSection(){
+  const pending=bills.filter(b=>b.status==='pending');
+  if(!pending.length)return '';
+  const now=new Date();now.setHours(0,0,0,0);
+  pending.sort((a,b)=>new Date(a.deadline||'9999')-new Date(b.deadline||'9999'));
+  let html=`<div class="task-section">
+<div class="section-hdr">
+  <div class="section-hdr-left">
+    <span class="section-hdr-icon">💳</span>
+    <span class="section-hdr-title">חשבונות פתוחים</span>
+    <span class="section-count" style="background:oklch(0.65 0.2 25 / 0.2);color:oklch(0.75 0.2 25)">${pending.length}</span>
+  </div>
+  <button class="sec-btn" onclick="openBillsSheet()">הצג הכל ←</button>
+</div>
+<div class="section-cards">`;
+  pending.slice(0,5).forEach(b=>{
+    const deadline=b.deadline?new Date(b.deadline):null;
+    if(deadline)deadline.setHours(0,0,0,0);
+    const daysLeft=deadline?Math.ceil((deadline-now)/(1000*60*60*24)):null;
+    const isOverdue=daysLeft!==null&&daysLeft<0;
+    const cat=BILL_CATS[b.category]||'📄';
+    let badge='';
+    if(daysLeft===null)badge='';
+    else if(daysLeft<0)badge=`<span class="bill-days-badge overdue">איחור ${Math.abs(daysLeft)}d</span>`;
+    else if(daysLeft===0)badge='<span class="bill-days-badge today">היום!</span>';
+    else if(daysLeft<=3)badge=`<span class="bill-days-badge urgent">עוד ${daysLeft}d</span>`;
+    else badge=`<span class="bill-days-badge">עוד ${daysLeft}d</span>`;
+    html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
+      <span class="bill-cat-icon">${cat}</span>
+      <span class="bill-mini-name">${esc(b.name)}</span>
+      ${b.amount?`<span class="bill-mini-amount">₪${Number(b.amount).toLocaleString('he-IL')}</span>`:''}
+      ${badge}
+    </div>`;
+  });
+  html+=`</div></div>`;
+  return html;
+}
+
+function updateBillsSideBadge(){
+  const badge=document.getElementById('billsSideBadge');if(!badge)return;
+  const count=bills.filter(b=>b.status==='pending').length;
+  if(count>0){badge.textContent=count;badge.style.display='inline-flex';}
+  else badge.style.display='none';
+}
+
+// Init swipe for bills sheets
+function initBillsSwipe(){
+  const ov=document.getElementById('billsOverlay');
+  ['billsListSheet','billFormSheet'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)initSheetSwipe(el,ov);
+  });
+}
+
 function testDailyPopup(){
   closeSettings();
   setTimeout(showDailyPopup,300);
