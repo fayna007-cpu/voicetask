@@ -2395,6 +2395,8 @@ function render(){
     return;
   }
   let html='';
+  // Section 0: Open bills (above tasks)
+  html+=renderBillsSection();
   // Section 1: Regular tasks
   if(taskList.length||filter==='all'||filter==='done'){
     const countBadge=taskList.length?`<span class="section-count">${taskList.length}</span>`:'';
@@ -2427,8 +2429,6 @@ function render(){
 <div class="section-cards">${routineList.map(renderRoutineInstance).join('')}</div>
 </div>`;
   }
-  // Section 3: Bills
-  html+=renderBillsSection();
   el.innerHTML=html;
   updateGreeting();
   renderCalView();
