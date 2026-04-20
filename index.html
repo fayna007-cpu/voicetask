@@ -5842,45 +5842,125 @@ async function openBillEmailImport(){
   }catch(e){toast('❌ שגיאה: '+e.message);}
 }
 
+let _billEmailCache=[];
 function showEmailPickerForBills(emails){
-  const html=emails.map(e=>{
+  _billEmailCache=emails;
+  const html=emails.map((e,i)=>{
     const fromShort=(e.from||'').replace(/<.*>/,'').trim().slice(0,30);
     const dateStr=e.date?new Date(e.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
-    return `<div class="bill-email-item" onclick="importBillFromEmail('${e.id}','${esc(e.subject)}','${esc(fromShort)}')">
+    return `<div class="bill-email-item" data-idx="${i}" onclick="selectBillEmail(${i})">
       <div class="bill-email-subject">${esc(e.subject)}</div>
       <div class="bill-email-from">${esc(fromShort)} · ${dateStr}</div>
     </div>`;
   }).join('');
-  // show in a simple modal
   const existing=document.getElementById('billEmailPicker');
   if(existing)existing.remove();
   const div=document.createElement('div');
   div.id='billEmailPicker';
   div.className='bill-email-picker on';
-  div.innerHTML=`<div class="bill-email-picker-head"><span>📧 בחר חשבונית מהמייל</span><button onclick="this.closest('.bill-email-picker').remove()" style="background:none;border:none;color:var(--text);font-size:18px;cursor:pointer">✕</button></div>${html}`;
+  div.innerHTML=`<div class="bill-email-picker-head"><span>📧 בחר חשבונית מהמייל</span><button onclick="this.closest('.bill-email-picker').remove()" style="background:none;border:none;color:var(--text);font-size:18px;cursor:pointer">✕</button></div>
+  <div class="bill-email-extract-row"><label class="bill-email-extract-label"><input type="checkbox" id="billExtractData" checked><span>נסה לחלץ פרטים אוטומטית מהמייל</span></label></div>
+  ${html}`;
   document.getElementById('billFormSheet').querySelector('.rsheet-scroll').appendChild(div);
 }
 
-function importBillFromEmail(msgId,subject,from){
-  // auto-detect category from subject/from
-  const s=(subject+' '+from).toLowerCase();
-  let cat='כללי';
-  if(/חשמל|electric|iec/.test(s))cat='חשמל';
-  else if(/מים|water|מקורות/.test(s))cat='מים';
-  else if(/אינטרנט|internet|בזק|פרטנר|הוט|cellcom|partner/.test(s))cat='אינטרנט';
-  else if(/סלולר|cellular|פלאפון|גולן/.test(s))cat='סלולר';
-  else if(/ביטוח|insurance/.test(s))cat='ביטוח';
-  else if(/ארנונה|עירייה|municipality/.test(s))cat='ארנונה';
-  else if(/ועד.?בית/.test(s))cat='ועד בית';
-  else if(/אשראי|visa|mastercard|cal|max|לאומי.?קארד/.test(s))cat='כרטיס אשראי';
-  else if(/הלוואה|loan|משכנתא|mortgage/.test(s))cat='הלוואה';
-  else if(/מנוי|netflix|spotify|subscription/.test(s))cat='מנוי';
+function detectBillCategory(text){
+  const s=text.toLowerCase();
+  if(/חשמל|electric|iec|חברת חשמל/.test(s))return 'חשמל';
+  if(/מים|water|מקורות|תאגיד/.test(s))return 'מים';
+  if(/אינטרנט|internet|בזק|פרטנר|הוט|cellcom|partner|yes/.test(s))return 'אינטרנט';
+  if(/סלולר|cellular|פלאפון|גולן|פלאפון/.test(s))return 'סלולר';
+  if(/ביטוח|insurance|הראל|מגדל|כלל|הפניקס|מנורה/.test(s))return 'ביטוח';
+  if(/ארנונה|עירייה|municipality|עיריית/.test(s))return 'ארנונה';
+  if(/ועד.?בית/.test(s))return 'ועד בית';
+  if(/אשראי|visa|mastercard|cal\b|max\b|לאומי.?קארד|ישראכרט|אמריקן/.test(s))return 'כרטיס אשראי';
+  if(/הלוואה|loan|משכנתא|mortgage/.test(s))return 'הלוואה';
+  if(/מנוי|netflix|spotify|subscription|apple|google play/.test(s))return 'מנוי';
+  return 'כללי';
+}
 
-  document.getElementById('billName').value=subject;
+function extractAmountFromText(text){
+  // look for ₪ or שקל patterns
+  const patterns=[
+    /(?:סה"כ|סכום|לתשלום|total|amount)[:\s]*[₪]?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /[₪]\s*([\d,]+(?:\.\d{1,2})?)/,
+    /([\d,]+(?:\.\d{1,2})?)\s*(?:₪|ש"ח|שקל|שח|ILS|NIS)/i,
+    /(?:סה"כ|לתשלום|total)[:\s]*([\d,]+(?:\.\d{1,2})?)/i
+  ];
+  for(const p of patterns){
+    const m=text.match(p);
+    if(m)return parseFloat(m[1].replace(/,/g,''));
+  }
+  return 0;
+}
+
+function extractDateFromText(text){
+  // dd/mm/yyyy or dd.mm.yyyy or dd-mm-yyyy
+  const m=text.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if(m){
+    const d=parseInt(m[1]),mo=parseInt(m[2]),y=m[3].length===2?2000+parseInt(m[3]):parseInt(m[3]);
+    if(d>=1&&d<=31&&mo>=1&&mo<=12){
+      return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+  }
+  return null;
+}
+
+async function selectBillEmail(idx){
+  const e=_billEmailCache[idx];if(!e)return;
+  const extract=document.getElementById('billExtractData')?.checked;
+  const fromShort=(e.from||'').replace(/<.*>/,'').trim();
+  const cat=detectBillCategory(e.subject+' '+e.from);
+  const gmailLink='https://mail.google.com/mail/u/0/#inbox/'+e.id;
+
+  // Always set: name, category, gmail link as URL reference
+  document.getElementById('billName').value=e.subject;
   document.getElementById('billCategory').value=cat;
-  // remove picker
+  document.getElementById('billUrl').value=gmailLink;
+  document.getElementById('billNotes').value='מקור: '+fromShort;
+
+  // Remove picker
   const picker=document.getElementById('billEmailPicker');if(picker)picker.remove();
-  toast('📧 חשבון יובא — השלם פרטים ושמור');
+
+  if(!extract){
+    toast('📧 מייל נבחר — השלם פרטים ושמור');
+    return;
+  }
+
+  // Try to extract data from email body
+  toast('⏳ מחלץ פרטים מהמייל...');
+  try{
+    const mr=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${e.id}?format=full`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+    if(!mr.ok){toast('⚠️ לא הצלחתי לקרוא את המייל');return;}
+    const md=await mr.json();
+    // Extract text from body
+    let bodyText='';
+    function extractText(part){
+      if(part.mimeType==='text/plain'&&part.body?.data){
+        bodyText+=atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/'));
+      }
+      if(part.mimeType==='text/html'&&part.body?.data&&!bodyText){
+        const html=atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/'));
+        bodyText+=html.replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
+      }
+      if(part.parts)part.parts.forEach(extractText);
+    }
+    if(md.payload)extractText(md.payload);
+
+    const fullText=e.subject+' '+bodyText;
+    const amount=extractAmountFromText(fullText);
+    const deadline=extractDateFromText(bodyText);
+
+    if(amount)document.getElementById('billAmount').value=amount;
+    if(deadline)document.getElementById('billDeadline').value=deadline;
+
+    const parts=[];
+    if(amount)parts.push('₪'+amount);
+    if(deadline)parts.push('תאריך: '+deadline);
+    toast(parts.length?'📧 חולצו: '+parts.join(', '):'📧 מייל נבחר — לא נמצאו פרטים נוספים');
+  }catch(err){
+    toast('⚠️ שגיאה בחילוץ: '+err.message);
+  }
 }
 
 // Voice detection — redirect "חשבון" phrases to bill form

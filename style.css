@@ -1230,6 +1230,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-email-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border)}
 .bill-email-item:active{background:var(--surface)}
 .bill-email-item:last-child{border-bottom:none}
+.bill-email-extract-row{padding:10px 16px;border-bottom:1px solid var(--border)}
+.bill-email-extract-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer}
+.bill-email-extract-label input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
 .bill-email-subject{font-size:13px;font-weight:600;color:var(--text)}
 .bill-email-from{font-size:11px;color:var(--muted);margin-top:2px}
 
