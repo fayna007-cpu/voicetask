@@ -1048,9 +1048,22 @@
         <label class="bill-form-lbl">📝 הערות</label>
         <textarea class="bill-form-input" id="billNotes" rows="2" placeholder="הערות (אופציונלי)"></textarea>
       </div>
-      <div class="bill-form-group" style="flex-direction:row;align-items:center;gap:12px">
-        <label class="rtoggle"><input type="checkbox" id="billRecurring"><span class="rtoggle-sl"></span></label>
-        <span class="bill-form-lbl" style="margin:0">🔄 חשבון חוזר (חודשי)</span>
+      <div class="bill-form-row2">
+        <div class="bill-form-group" style="flex:1">
+          <label class="bill-form-lbl">🔄 תדירות</label>
+          <select class="bill-form-select" id="billRecurring">
+            <option value="none">חד פעמי</option>
+            <option value="monthly">חודשי</option>
+            <option value="bimonthly">דו-חודשי</option>
+          </select>
+        </div>
+        <div class="bill-form-group" style="flex:1">
+          <label class="bill-form-lbl">💰 סוג סכום</label>
+          <select class="bill-form-select" id="billAmountType">
+            <option value="fixed">קבוע</option>
+            <option value="variable">משתנה (צריכה)</option>
+          </select>
+        </div>
       </div>
       <div class="bill-form-actions">
         <button class="bill-form-save" onclick="saveBill()">💾 שמור</button>
@@ -5583,7 +5596,7 @@ function renderBillsList(){
   let list=bills;
   if(_billFilter==='pending')list=bills.filter(b=>b.status==='pending');
   else if(_billFilter==='paid')list=bills.filter(b=>b.status==='paid');
-  else if(_billFilter==='recurring')list=bills.filter(b=>b.recurring);
+  else if(_billFilter==='recurring')list=bills.filter(b=>b.recurring&&b.recurring!=='none');
   // sort: pending first by deadline, paid by paidAt desc
   list=list.slice().sort((a,b)=>{
     if(a.status!==b.status)return a.status==='pending'?-1:1;
@@ -5622,7 +5635,7 @@ function renderBillCard(bill){
   <div class="bill-card-top">
     <span class="bill-cat-icon">${cat}</span>
     <div class="bill-card-info">
-      <div class="bill-card-name">${esc(bill.name)}${bill.recurring?'<span class="bill-recurring-tag">🔄 חוזר</span>':''}</div>
+      <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}</div>
       <div class="bill-card-meta">${bill.category}${deadlineStr?' · יעד: '+deadlineStr:''}${payDateStr?' · תשלום: '+payDateStr:''}</div>
     </div>
     <div class="bill-card-right">
@@ -5652,7 +5665,8 @@ function openBillForm(id){
   document.getElementById('billPayDate').value='';
   document.getElementById('billUrl').value='';
   document.getElementById('billNotes').value='';
-  document.getElementById('billRecurring').checked=false;
+  document.getElementById('billRecurring').value='none';
+  document.getElementById('billAmountType').value='fixed';
   document.getElementById('billImgPreview').style.display='none';
   document.getElementById('billImgPreview').src='';
   document.getElementById('billImgRemove').style.display='none';
@@ -5669,7 +5683,8 @@ function openBillForm(id){
     document.getElementById('billPayDate').value=b.payDate||'';
     document.getElementById('billUrl').value=b.url||'';
     document.getElementById('billNotes').value=b.notes||'';
-    document.getElementById('billRecurring').checked=!!b.recurring;
+    document.getElementById('billRecurring').value=b.recurring||'none';
+    document.getElementById('billAmountType').value=b.amountType||'fixed';
     if(b.image){
       _billPendingImage=b.image;
       document.getElementById('billImgPreview').src=b.image;
@@ -5715,17 +5730,18 @@ function saveBill(){
   const payDate=document.getElementById('billPayDate').value||null;
   const url=document.getElementById('billUrl').value.trim()||null;
   const notes=document.getElementById('billNotes').value.trim()||'';
-  const recurring=document.getElementById('billRecurring').checked;
+  const recurring=document.getElementById('billRecurring').value;
+  const amountType=document.getElementById('billAmountType').value;
   const image=_billPendingImage||null;
 
   if(_billEditId){
     const b=bills.find(x=>x.id===_billEditId);
     if(b){
       b.name=name;b.amount=amount;b.category=category;b.deadline=deadline;b.payDate=payDate;
-      b.url=url;b.notes=notes;b.recurring=recurring;b.image=image;
+      b.url=url;b.notes=notes;b.recurring=recurring;b.amountType=amountType;b.image=image;
     }
   }else{
-    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null});
+    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null});
   }
   saveBills();
   // sync to calendar if payDate set
@@ -5759,24 +5775,32 @@ function markBillPaid(id){
   renderBillsList();
   render();
   scheduleSmartPushNotifs();
-  // if recurring, create next month's bill
-  if(b.recurring)createNextRecurringBill(b);
+  // if recurring, create next cycle's bill
+  if(b.recurring&&b.recurring!=='none')createNextRecurringBill(b);
 }
 
 function createNextRecurringBill(bill){
+  const months=bill.recurring==='bimonthly'?2:1;
   const nextDeadline=bill.deadline?new Date(bill.deadline):new Date();
-  nextDeadline.setMonth(nextDeadline.getMonth()+1);
+  nextDeadline.setMonth(nextDeadline.getMonth()+months);
   const nextPayDate=bill.payDate?new Date(bill.payDate):null;
-  if(nextPayDate)nextPayDate.setMonth(nextPayDate.getMonth()+1);
-  const nb={id:Date.now(),name:bill.name,amount:bill.amount,category:bill.category,
+  if(nextPayDate)nextPayDate.setMonth(nextPayDate.getMonth()+months);
+  const isVariable=bill.amountType==='variable';
+  const nextAmount=isVariable?0:bill.amount;
+  const nextNotes=isVariable
+    ?(bill.notes?bill.notes+'\n':'')+'סכום קודם: ₪'+(bill.amount||0)
+    :bill.notes;
+  const freqLabel=months===2?'דו-חודשי':'חודשי';
+  const nb={id:Date.now(),name:bill.name,amount:nextAmount,category:bill.category,
     deadline:nextDeadline.toISOString().split('T')[0],
     payDate:nextPayDate?nextPayDate.toISOString().split('T')[0]:null,
-    url:bill.url,notes:bill.notes,recurring:true,image:null,status:'pending',
+    url:bill.url,notes:nextNotes,recurring:bill.recurring,amountType:bill.amountType||'fixed',
+    image:null,status:'pending',
     createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null};
   bills.unshift(nb);
   saveBills();
   if(nb.payDate)syncBillToCalendar(nb);
-  toast('🔄 חשבון חוזר נוצר לחודש הבא');
+  toast(`🔄 חשבון ${freqLabel} נוצר${isVariable?' — עדכן סכום חדש':''}`);
 }
 
 async function syncBillToCalendar(bill){

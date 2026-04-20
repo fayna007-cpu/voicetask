@@ -1,4 +1,4 @@
-const V = 'vt-v19';
+const V = 'vt-v20';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {

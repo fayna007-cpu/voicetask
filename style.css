@@ -1196,6 +1196,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-card-info{flex:1;min-width:0}
 .bill-card-name{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .bill-recurring-tag{font-size:10px;font-weight:700;color:oklch(0.72 0.16 200);background:oklch(0.72 0.16 200 / 0.12);padding:1px 7px;border-radius:8px}
+.bill-variable-tag{font-size:10px;font-weight:700;color:oklch(0.72 0.16 72);background:oklch(0.72 0.16 72 / 0.12);padding:1px 7px;border-radius:8px}
 .bill-card-meta{font-size:11px;color:var(--muted);margin-top:2px}
 .bill-card-right{text-align:left;flex-shrink:0}
 .bill-card-amount{font-size:15px;font-weight:800;color:var(--text);direction:ltr;text-align:left}
