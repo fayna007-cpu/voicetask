@@ -1205,10 +1205,19 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-pay-btn:active{background:oklch(0.55 0.18 145 / 0.3)}
 
 .bill-days-badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:var(--surface);color:var(--muted);margin-top:4px}
+.bill-days-badge.big{font-size:14px;font-weight:900;padding:5px 11px;border-radius:10px;letter-spacing:0.2px;min-width:42px;text-align:center;line-height:1.1}
 .bill-days-badge.overdue{background:oklch(0.55 0.22 25 / 0.15);color:oklch(0.75 0.2 25)}
 .bill-days-badge.today{background:oklch(0.78 0.16 72 / 0.2);color:var(--accent)}
 .bill-days-badge.urgent{background:oklch(0.65 0.2 50 / 0.15);color:oklch(0.78 0.18 50)}
 .bill-days-badge.paid{background:oklch(0.55 0.18 145 / 0.15);color:oklch(0.72 0.2 145)}
+.bill-days-badge.big.overdue{background:oklch(0.55 0.22 25 / 0.22);box-shadow:0 0 0 1px oklch(0.65 0.22 25 / 0.4) inset}
+.bill-days-badge.big.today{background:oklch(0.78 0.16 72 / 0.28);box-shadow:0 0 0 1px oklch(0.78 0.16 72 / 0.5) inset}
+.bill-days-badge.big.urgent{background:oklch(0.65 0.2 50 / 0.22);box-shadow:0 0 0 1px oklch(0.7 0.2 50 / 0.4) inset}
+.bill-days-badge.pulse{animation:billPulse 1.8s ease-in-out infinite}
+@keyframes billPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:0.85}}
+
+.bill-sync-btn{padding:5px 12px;background:oklch(0.28 0.08 250);border:1px solid oklch(0.50 0.14 250 / 0.5);border-radius:12px;color:oklch(0.82 0.12 250);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-right:auto}
+.bill-sync-btn:active{background:oklch(0.35 0.10 250)}
 
 /* Bill form */
 .bill-form-body{padding:0 16px;display:flex;flex-direction:column;gap:14px}

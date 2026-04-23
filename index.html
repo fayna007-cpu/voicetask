@@ -5622,10 +5622,11 @@ function renderBillCard(bill){
   let daysLabel='';
   if(isPaid)daysLabel='<span class="bill-days-badge paid">שולם ✓</span>';
   else if(daysLeft===null)daysLabel='';
-  else if(daysLeft<0)daysLabel=`<span class="bill-days-badge overdue">איחור ${Math.abs(daysLeft)} ימים</span>`;
-  else if(daysLeft===0)daysLabel='<span class="bill-days-badge today">היום!</span>';
-  else if(daysLeft<=3)daysLabel=`<span class="bill-days-badge urgent">עוד ${daysLeft} ימים</span>`;
-  else daysLabel=`<span class="bill-days-badge">עוד ${daysLeft} ימים</span>`;
+  else if(daysLeft<0)daysLabel=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(daysLeft)}ד׳</span>`;
+  else if(daysLeft===0)daysLabel='<span class="bill-days-badge big today pulse">היום!</span>';
+  else if(daysLeft<=3)daysLabel=`<span class="bill-days-badge big urgent pulse">${daysLeft}ד׳</span>`;
+  else if(daysLeft<=7)daysLabel=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
+  else daysLabel=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
 
   const deadlineStr=deadline?deadline.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
   const payDateStr=payDate?payDate.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
@@ -5647,6 +5648,7 @@ function renderBillCard(bill){
   ${!isPaid?`<div class="bill-card-actions">
     <button class="bill-pay-btn" onclick="event.stopPropagation();markBillPaid(${bill.id})">✓ שולם</button>
     <button class="defer-chip" onclick="event.stopPropagation();openPostpone('bill',${bill.id})">דחייה</button>
+    <button class="bill-sync-btn" onclick="event.stopPropagation();syncBillNow(${bill.id})" title="סנכרן ליומן">${bill.calendarEventId||bill.deadlineEventId?'📅 מסונכרן':'📅 סנכרן ליומן'}</button>
   </div>`:''}
 </div>`;
 }
@@ -5805,6 +5807,30 @@ function createNextRecurringBill(bill){
   if(nb.payDate||nb.deadline)syncBillToCalendar(nb);
   toast(`🔄 חשבון ${freqLabel} נוצר${isVariable?' — עדכן סכום חדש':''}`);
 }
+
+async function syncBillNow(id){
+  const b=bills.find(x=>x.id===id);if(!b)return;
+  if(!b.payDate&&!b.deadline){toast('⚠️ חסרים תאריכים לסנכרון');return;}
+  toast('⏳ מסנכרן ליומן...');
+  await syncBillToCalendar(b);
+  const synced=b.calendarEventId||b.deadlineEventId;
+  toast(synced?'✅ סונכרן ליומן גוגל':'❌ סנכרון נכשל — בדוק חיבור');
+  renderBillsList();render();
+}
+
+// Re-render bill cards daily (handles countdown update across midnight and on app focus)
+let _billLastDay=new Date().toDateString();
+function checkBillDayChange(){
+  const today=new Date().toDateString();
+  if(today!==_billLastDay){
+    _billLastDay=today;
+    render();
+    if(document.getElementById('billsListSheet')?.classList.contains('on'))renderBillsList();
+  }
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkBillDayChange();});
+window.addEventListener('focus',checkBillDayChange);
+setInterval(checkBillDayChange,60*1000);// every minute
 
 async function syncBillToCalendar(bill){
   const token=await getToken();if(!token)return;
@@ -6048,10 +6074,10 @@ function renderBillsSection(){
     const cat=BILL_CATS[b.category]||'📄';
     let badge='';
     if(daysLeft===null)badge='';
-    else if(daysLeft<0)badge=`<span class="bill-days-badge overdue">איחור ${Math.abs(daysLeft)}d</span>`;
-    else if(daysLeft===0)badge='<span class="bill-days-badge today">היום!</span>';
-    else if(daysLeft<=3)badge=`<span class="bill-days-badge urgent">עוד ${daysLeft}d</span>`;
-    else badge=`<span class="bill-days-badge">עוד ${daysLeft}d</span>`;
+    else if(daysLeft<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(daysLeft)}ד׳</span>`;
+    else if(daysLeft===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
+    else if(daysLeft<=3)badge=`<span class="bill-days-badge big urgent pulse">${daysLeft}ד׳</span>`;
+    else badge=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
     html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
       <span class="bill-cat-icon">${cat}</span>
       <span class="bill-mini-name">${esc(b.name)}</span>
