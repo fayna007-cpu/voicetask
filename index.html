@@ -406,6 +406,11 @@
         <div class="settings-row-body"><div class="settings-row-title">התראת פיגור חשבון</div><div class="settings-row-sub">חשבון שעבר דדליין ולא שולם</div></div>
         <label class="rtoggle"><input type="checkbox" id="ns-bills-overdueAlert" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
+      <div class="settings-row" onclick="testBillNotifs()">
+        <div class="settings-row-ico" style="background:oklch(0.45 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">🧪</div>
+        <div class="settings-row-body"><div class="settings-row-title">בדוק התראות חשבונות</div><div class="settings-row-sub">שלח התראה + הצג מה מתוזמן</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">📈 פרודוקטיביות</div>
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">תכנון ערב</div><div class="settings-row-sub">תזכורת יומית לתכנן את מחר</div></div>
@@ -5619,14 +5624,29 @@ function renderBillCard(bill){
   const daysLeft=deadline?Math.ceil((deadline-now)/(1000*60*60*24)):null;
   const isOverdue=bill.status==='pending'&&daysLeft!==null&&daysLeft<0;
   const isPaid=bill.status==='paid';
+  // Build split countdown: my pay date + deadline
+  const payDate2=payDate;if(payDate2)payDate2.setHours(0,0,0,0);
+  function fmtDaysLabel(d){
+    if(d===null||d===undefined)return null;
+    if(d<0)return{cls:'overdue pulse',txt:`איחור ${Math.abs(d)} ימים`};
+    if(d===0)return{cls:'today pulse',txt:'היום!'};
+    if(d===1)return{cls:'urgent pulse',txt:'מחר'};
+    if(d<=3)return{cls:'urgent pulse',txt:`${d} ימים`};
+    if(d<=7)return{cls:'',txt:`${d} ימים`};
+    return{cls:'',txt:`${d} ימים`};
+  }
+  const payDaysLeft=payDate2?Math.ceil((payDate2-now)/(1000*60*60*24)):null;
+  const payLbl=fmtDaysLabel(payDaysLeft);
+  const dlLbl=fmtDaysLabel(daysLeft);
   let daysLabel='';
-  if(isPaid)daysLabel='<span class="bill-days-badge paid">שולם ✓</span>';
-  else if(daysLeft===null)daysLabel='';
-  else if(daysLeft<0)daysLabel=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(daysLeft)}ד׳</span>`;
-  else if(daysLeft===0)daysLabel='<span class="bill-days-badge big today pulse">היום!</span>';
-  else if(daysLeft<=3)daysLabel=`<span class="bill-days-badge big urgent pulse">${daysLeft}ד׳</span>`;
-  else if(daysLeft<=7)daysLabel=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
-  else daysLabel=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
+  if(!isPaid&&(payLbl||dlLbl)){
+    daysLabel='<div class="bill-countdown-wrap">';
+    if(payLbl)daysLabel+=`<div class="bill-cd-row"><span class="bill-cd-lbl">📅 שלי</span><span class="bill-days-badge big ${payLbl.cls}">${payLbl.txt}</span></div>`;
+    if(dlLbl)daysLabel+=`<div class="bill-cd-row"><span class="bill-cd-lbl">⏰ חברה</span><span class="bill-days-badge big ${dlLbl.cls}">${dlLbl.txt}</span></div>`;
+    daysLabel+='</div>';
+  }else if(isPaid){
+    daysLabel='<span class="bill-days-badge paid">שולם ✓</span>';
+  }
 
   const deadlineStr=deadline?deadline.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
   const payDateStr=payDate?payDate.toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
@@ -5806,6 +5826,37 @@ function createNextRecurringBill(bill){
   saveBills();
   if(nb.payDate||nb.deadline)syncBillToCalendar(nb);
   toast(`🔄 חשבון ${freqLabel} נוצר${isVariable?' — עדכן סכום חדש':''}`);
+}
+
+async function testBillNotifs(){
+  // Send immediate test notification
+  try{
+    if('Notification' in window && Notification.permission==='granted'){
+      const reg=await navigator.serviceWorker.ready;
+      await reg.showNotification('💳 בדיקת התראת חשבון',{
+        body:'זוהי התראת דמה — אם הגיעה, התראות החשבונות עובדות ✅',
+        icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',vibrate:[200,100,200],tag:'vt-bill-test'
+      });
+    }else{
+      toast('⚠️ נדרשת הרשאת התראות — לחץ "התחל פוש"');
+      return;
+    }
+  }catch(e){toast('❌ שגיאה: '+e.message);return;}
+  // Build list of upcoming bill notifs
+  const batch=await buildSmartPushBatch(14*24*3600000);
+  const billNotifs=batch.filter(n=>n.id.startsWith('bill_')).sort((a,b)=>new Date(a.fireAt)-new Date(b.fireAt));
+  let msg='✅ התראת דמה נשלחה!\n\n';
+  if(billNotifs.length){
+    msg+=`📅 ${billNotifs.length} התראות חשבונות מתוזמנות ל-14 הימים הבאים:\n\n`;
+    msg+=billNotifs.slice(0,10).map(n=>{
+      const d=new Date(n.fireAt);
+      const ds=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+      return `• ${ds} — ${n.title}`;
+    }).join('\n');
+  }else{
+    msg+='לא נמצאו התראות חשבונות מתוזמנות.\nוודא:\n• יש לך חשבון עם תאריך תשלום\n• ההתראות מופעלות בהגדרות';
+  }
+  alert(msg);
 }
 
 async function syncBillNow(id){
@@ -6073,11 +6124,18 @@ function renderBillsSection(){
     const isOverdue=daysLeft!==null&&daysLeft<0;
     const cat=BILL_CATS[b.category]||'📄';
     let badge='';
-    if(daysLeft===null)badge='';
-    else if(daysLeft<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(daysLeft)}ד׳</span>`;
-    else if(daysLeft===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
-    else if(daysLeft<=3)badge=`<span class="bill-days-badge big urgent pulse">${daysLeft}ד׳</span>`;
-    else badge=`<span class="bill-days-badge big">${daysLeft}ד׳</span>`;
+    // Use soonest of pay date or deadline
+    const payD2=b.payDate?new Date(b.payDate):null;if(payD2)payD2.setHours(0,0,0,0);
+    const payDL=payD2?Math.ceil((payD2-now)/(86400000)):null;
+    const effective=(payDL!==null&&daysLeft!==null)?Math.min(payDL,daysLeft):(payDL!==null?payDL:daysLeft);
+    const isPayDate=payDL!==null&&(daysLeft===null||payDL<=daysLeft);
+    const prefix=isPayDate?'📅':'⏰';
+    if(effective===null)badge='';
+    else if(effective<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(effective)} ימים</span>`;
+    else if(effective===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
+    else if(effective===1)badge=`<span class="bill-days-badge big urgent pulse">${prefix} מחר</span>`;
+    else if(effective<=3)badge=`<span class="bill-days-badge big urgent pulse">${prefix} ${effective} ימים</span>`;
+    else badge=`<span class="bill-days-badge big">${prefix} ${effective} ימים</span>`;
     html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
       <span class="bill-cat-icon">${cat}</span>
       <span class="bill-mini-name">${esc(b.name)}</span>
