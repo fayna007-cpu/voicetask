@@ -1023,12 +1023,12 @@
       </div>
       <div class="bill-form-row2">
         <div class="bill-form-group" style="flex:1">
-          <label class="bill-form-lbl">תאריך יעד (דדליין)</label>
-          <input class="bill-form-input" id="billDeadline" type="date">
+          <label class="bill-form-lbl">📅 תאריך תשלום שלי</label>
+          <input class="bill-form-input" id="billPayDate" type="date">
         </div>
         <div class="bill-form-group" style="flex:1">
-          <label class="bill-form-lbl">תאריך תשלום מתוכנן</label>
-          <input class="bill-form-input" id="billPayDate" type="date">
+          <label class="bill-form-lbl">⏰ תאריך תשלום של החברה</label>
+          <input class="bill-form-input" id="billDeadline" type="date">
         </div>
       </div>
       <div class="bill-form-group">
@@ -5636,7 +5636,7 @@ function renderBillCard(bill){
     <span class="bill-cat-icon">${cat}</span>
     <div class="bill-card-info">
       <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}</div>
-      <div class="bill-card-meta">${bill.category}${deadlineStr?' · יעד: '+deadlineStr:''}${payDateStr?' · תשלום: '+payDateStr:''}</div>
+      <div class="bill-card-meta">${bill.category}${payDateStr?' · שלי: '+payDateStr:''}${deadlineStr?' · חברה: '+deadlineStr:''}</div>
     </div>
     <div class="bill-card-right">
       <div class="bill-card-amount">${amountStr}</div>
@@ -5744,9 +5744,9 @@ function saveBill(){
     bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null});
   }
   saveBills();
-  // sync to calendar if payDate set
+  // sync to calendar if either date set
   const bill=_billEditId?bills.find(x=>x.id===_billEditId):bills[0];
-  if(bill&&bill.payDate)syncBillToCalendar(bill);
+  if(bill&&(bill.payDate||bill.deadline))syncBillToCalendar(bill);
   toast('✅ חשבון נשמר');
   closeBillForm();
   scheduleSmartPushNotifs();
@@ -5757,7 +5757,10 @@ function deleteBill(){
   if(!_billEditId)return;
   if(!confirm('למחוק את החשבון?'))return;
   const b=bills.find(x=>x.id===_billEditId);
-  if(b&&b.calendarEventId)deleteCalendarEvent(b.calendarEventId);
+  if(b){
+    if(b.calendarEventId)deleteCalendarEvent(b.calendarEventId);
+    if(b.deadlineEventId)deleteCalendarEvent(b.deadlineEventId);
+  }
   bills=bills.filter(x=>x.id!==_billEditId);
   saveBills();
   toast('🗑️ חשבון נמחק');
@@ -5796,28 +5799,51 @@ function createNextRecurringBill(bill){
     payDate:nextPayDate?nextPayDate.toISOString().split('T')[0]:null,
     url:bill.url,notes:nextNotes,recurring:bill.recurring,amountType:bill.amountType||'fixed',
     image:null,status:'pending',
-    createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null};
+    createdAt:new Date().toISOString(),calendarEventId:null,deadlineEventId:null,paidAt:null};
   bills.unshift(nb);
   saveBills();
-  if(nb.payDate)syncBillToCalendar(nb);
+  if(nb.payDate||nb.deadline)syncBillToCalendar(nb);
   toast(`🔄 חשבון ${freqLabel} נוצר${isVariable?' — עדכן סכום חדש':''}`);
 }
 
 async function syncBillToCalendar(bill){
   const token=await getToken();if(!token)return;
-  // delete old event if exists
+  // delete old events if exist
   if(bill.calendarEventId)await deleteCalendarEvent(bill.calendarEventId);
-  const dt=new Date(bill.payDate+'T09:00:00');
-  const end=new Date(dt.getTime()+3600000);
-  try{
-    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
-      method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({summary:'💳 '+bill.name+(bill.amount?' — ₪'+bill.amount:''),
-        description:`קטגוריה: ${bill.category}\nיעד: ${bill.deadline||'—'}\nנוצר מ-VoiceTask 💳\nvt_bill_id:${bill.id}`,
-        start:{dateTime:dt.toISOString()},end:{dateTime:end.toISOString()}})
-    });
-    if(res.ok){const d=await res.json();bill.calendarEventId=d.id||null;saveBills();}
-  }catch(e){}
+  if(bill.deadlineEventId)await deleteCalendarEvent(bill.deadlineEventId);
+  bill.calendarEventId=null;bill.deadlineEventId=null;
+  const amountStr=bill.amount?' — ₪'+bill.amount:'';
+  // 1. My pay date — green/primary event
+  if(bill.payDate){
+    const dt=new Date(bill.payDate+'T09:00:00');
+    const end=new Date(dt.getTime()+3600000);
+    try{
+      const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+        method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({summary:'💳 לשלם: '+bill.name+amountStr,
+          description:`קטגוריה: ${bill.category}\nתאריך תשלום שלי\nדדליין חברה: ${bill.deadline||'—'}\nנוצר מ-VoiceTask 💳\nvt_bill_id:${bill.id}`,
+          start:{dateTime:dt.toISOString()},end:{dateTime:end.toISOString()},
+          colorId:'10'})
+      });
+      if(res.ok){const d=await res.json();bill.calendarEventId=d.id||null;}
+    }catch(e){}
+  }
+  // 2. Company deadline — red/warning event
+  if(bill.deadline){
+    const dt=new Date(bill.deadline+'T09:00:00');
+    const end=new Date(dt.getTime()+3600000);
+    try{
+      const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+        method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({summary:'⏰ דדליין חברה: '+bill.name+amountStr,
+          description:`קטגוריה: ${bill.category}\nתאריך תשלום של החברה (דדליין)\nתאריך תשלום שלי: ${bill.payDate||'—'}\nנוצר מ-VoiceTask 💳\nvt_bill_id:${bill.id}`,
+          start:{dateTime:dt.toISOString()},end:{dateTime:end.toISOString()},
+          colorId:'11'})
+      });
+      if(res.ok){const d=await res.json();bill.deadlineEventId=d.id||null;}
+    }catch(e){}
+  }
+  saveBills();
 }
 
 // Email import — search Gmail for bills/invoices
