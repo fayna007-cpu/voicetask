@@ -406,9 +406,22 @@
         <div class="settings-row-body"><div class="settings-row-title">התראת פיגור חשבון</div><div class="settings-row-sub">חשבון שעבר דדליין ולא שולם</div></div>
         <label class="rtoggle"><input type="checkbox" id="ns-bills-overdueAlert" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">תקציב חודשי לחשבונות</div><div class="settings-row-sub">סכום מקסימלי — התראה על חריגה (0 = כבוי)</div></div>
+        <input type="number" class="settings-select" id="ns-bills-monthlyBudget" min="0" step="100" placeholder="0" onchange="saveNotifSettings()" style="background-image:none;width:100px;text-align:left;direction:ltr">
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">סריקת מייל יומית</div><div class="settings-row-sub">התראה אם הגיעה חשבונית חדשה למייל</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-bills-gmailScan" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
       <div class="settings-row" onclick="testBillNotifs()">
         <div class="settings-row-ico" style="background:oklch(0.45 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">🧪</div>
         <div class="settings-row-body"><div class="settings-row-title">בדוק התראות חשבונות</div><div class="settings-row-sub">שלח התראה + הצג מה מתוזמן</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-row" onclick="scanGmailForNewBills(true)">
+        <div class="settings-row-ico" style="background:oklch(0.45 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">📧</div>
+        <div class="settings-row-body"><div class="settings-row-title">סרוק מייל עכשיו</div><div class="settings-row-sub">חפש חשבוניות חדשות שהגיעו</div></div>
         <div class="settings-row-arrow">›</div>
       </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">📈 פרודוקטיביות</div>
@@ -1070,6 +1083,23 @@
           </select>
         </div>
       </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">🔔 תזכורות (בחר כמה שתרצה)</label>
+        <div class="bill-reminders-grid">
+          <label class="bill-reminder-chip"><input type="checkbox" id="billRem_week" value="week"><span>שבוע לפני</span></label>
+          <label class="bill-reminder-chip"><input type="checkbox" id="billRem_3days" value="3days"><span>3 ימים לפני</span></label>
+          <label class="bill-reminder-chip"><input type="checkbox" id="billRem_1day" value="1day"><span>יום לפני</span></label>
+          <label class="bill-reminder-chip"><input type="checkbox" id="billRem_payday" value="payday"><span>ביום התשלום</span></label>
+          <label class="bill-reminder-chip"><input type="checkbox" id="billRem_deadline" value="deadline"><span>ביום הדדליין</span></label>
+        </div>
+      </div>
+      <div class="bill-form-group" style="flex-direction:row;align-items:center;gap:12px">
+        <label class="rtoggle"><input type="checkbox" id="billAutoDebit"><span class="rtoggle-sl"></span></label>
+        <div style="flex:1">
+          <span class="bill-form-lbl" style="margin:0">💳 חיוב אשראי אוטומטי</span>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">יירד אוטומטית — רק אמת סכום במייל</div>
+        </div>
+      </div>
       <div class="bill-form-actions">
         <button class="bill-form-save" onclick="saveBill()">💾 שמור</button>
         <button class="bill-form-import" onclick="openBillEmailImport()">📧 ייבא מהמייל</button>
@@ -1291,13 +1321,13 @@ function confirmClearData(){
 }
 // ── Smart Push Notification Settings ─────────────────────────────────────────
 let notifSettings=null;
-const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true},productivity:{eveningTime:'21:00',weeklyReview:true}};
+const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true,monthlyBudget:0,gmailScan:false},productivity:{eveningTime:'21:00',weeklyReview:true}};
 function loadNotifSettings(){
   try{const s=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');
     notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},bills:{...NS_DEFAULTS.bills,...(s.bills||{})},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},bills:{...NS_DEFAULTS.bills},productivity:{...NS_DEFAULTS.productivity}};
   }catch(e){notifSettings=JSON.parse(JSON.stringify(NS_DEFAULTS));}
   // Sync values to DOM elements (if settings sheet already rendered)
-  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
+  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-bills-monthlyBudget','bills','monthlyBudget','value'],['ns-bills-gmailScan','bills','gmailScan','checked'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
   pairs.forEach(([id,section,key,prop])=>{const el=document.getElementById(id);if(!el)return;if(prop==='checked')el.checked=!!notifSettings[section][key];else el.value=notifSettings[section][key];});
 }
 function saveNotifSettings(){
@@ -1305,7 +1335,7 @@ function saveNotifSettings(){
   notifSettings={
     tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked},
     routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00'},
-    bills:{payDayTime:g('ns-bills-payDayTime')?.value||'08:00',earlyReminderDays:+(g('ns-bills-earlyReminderDays')?.value||2),overdueAlert:!!g('ns-bills-overdueAlert')?.checked},
+    bills:{payDayTime:g('ns-bills-payDayTime')?.value||'08:00',earlyReminderDays:+(g('ns-bills-earlyReminderDays')?.value||2),overdueAlert:!!g('ns-bills-overdueAlert')?.checked,monthlyBudget:+(g('ns-bills-monthlyBudget')?.value||0),gmailScan:!!g('ns-bills-gmailScan')?.checked},
     productivity:{eveningTime:g('ns-productivity-eveningTime')?.value||'21:00',weeklyReview:!!g('ns-productivity-weeklyReview')?.checked}
   };
   localStorage.setItem('vt_notif_settings',JSON.stringify(notifSettings));
@@ -1389,30 +1419,78 @@ function buildSmartPushBatch(windowMs){
   });
   // Bill reminders
   if(s.bills){
+    const [bh,bm]=(s.bills.payDayTime||'08:00').split(':').map(Number);
     const pendingBills=bills.filter(b=>b.status==='pending');
     pendingBills.forEach(b=>{
-      const [bh,bm]=(s.bills.payDayTime||'08:00').split(':').map(Number);
-      // Pay day reminder
-      if(b.payDate){
-        const payD=new Date(b.payDate);payD.setHours(bh,bm,0,0);
-        queue('bill_pay_'+b.id,'💳 יום תשלום: '+b.name,(b.amount?'₪'+b.amount+' — ':'')+'מגיע היום לתשלום',payD);
+      const perBill=Array.isArray(b.reminders)&&b.reminders.length>0?b.reminders:null;
+      const amountStr=b.amount?' — ₪'+b.amount:'';
+      const autoPrefix=b.autoDebit?'💳 חיוב אוטומטי — אמת: ':'';
+      // Per-bill reminders (override global if defined)
+      if(perBill){
+        perBill.forEach(r=>{
+          if(r==='payday'&&b.payDate){
+            const payD=new Date(b.payDate);payD.setHours(bh,bm,0,0);
+            queue('bill_payday_'+b.id,'💳 יום תשלום: '+b.name,autoPrefix+(b.amount?'₪'+b.amount:'')+' מגיע היום',payD);
+          }
+          if(r==='deadline'&&b.deadline){
+            const dl=new Date(b.deadline);dl.setHours(bh,bm,0,0);
+            queue('bill_deadline_'+b.id,'⏰ דדליין היום: '+b.name,autoPrefix+'היום דדליין תשלום לחברה'+amountStr,dl);
+          }
+          const daysBefore={'week':7,'3days':3,'1day':1};
+          if(daysBefore[r]&&b.deadline){
+            const dl=new Date(b.deadline);dl.setHours(bh,bm,0,0);
+            const fire=new Date(dl-daysBefore[r]*86400000);
+            const label=r==='week'?'שבוע לפני':r==='3days'?'3 ימים לפני':'יום לפני';
+            queue('bill_'+r+'_'+b.id,`🔔 ${label}: ${b.name}`,autoPrefix+`דדליין בעוד ${daysBefore[r]} ימים`+amountStr,fire);
+          }
+        });
+      }else{
+        // Fallback to global settings
+        if(b.payDate){
+          const payD=new Date(b.payDate);payD.setHours(bh,bm,0,0);
+          queue('bill_pay_'+b.id,'💳 יום תשלום: '+b.name,autoPrefix+(b.amount?'₪'+b.amount+' — ':'')+'מגיע היום לתשלום',payD);
+        }
+        if(b.deadline&&s.bills.earlyReminderDays>0){
+          const dl=new Date(b.deadline);dl.setHours(bh,bm,0,0);
+          const early=new Date(dl-s.bills.earlyReminderDays*86400000);
+          const daysLeft=Math.ceil((dl-now)/(86400000));
+          queue('bill_early_'+b.id,'⏰ חשבון מתקרב: '+b.name,`עוד ${daysLeft} ימים לתשלום`+amountStr,early);
+        }
       }
-      // Early reminder (X days before deadline)
-      if(b.deadline&&s.bills.earlyReminderDays>0){
-        const dl=new Date(b.deadline);dl.setHours(bh,bm,0,0);
-        const early=new Date(dl-s.bills.earlyReminderDays*86400000);
-        const daysLeft=Math.ceil((dl-now)/(86400000));
-        queue('bill_early_'+b.id,'⏰ חשבון מתקרב: '+b.name,`עוד ${daysLeft} ימים לתשלום`+(b.amount?' — ₪'+b.amount:''),early);
-      }
-      // Overdue alert
+      // Overdue alert (always on if enabled)
       if(s.bills.overdueAlert&&b.deadline){
         const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
         if(dl<now){
           const overdueDays=Math.ceil((now-dl)/(86400000));
-          queue('bill_overdue_'+b.id,'🚨 חשבון באיחור: '+b.name,`${overdueDays} ימים באיחור`+(b.amount?' — ₪'+b.amount:''),new Date(now+60000));
+          queue('bill_overdue_'+b.id,'🚨 חשבון באיחור: '+b.name,`${overdueDays} ימים באיחור`+amountStr,new Date(now+60000));
+        }
+      }
+      // Variable bill spike alert
+      if(b.amountType==='variable'&&b.amount>0){
+        const prevAmounts=bills.filter(x=>x.name===b.name&&x.status==='paid'&&x.amount>0).slice(0,3).map(x=>x.amount);
+        if(prevAmounts.length>=2){
+          const avg=prevAmounts.reduce((a,c)=>a+c,0)/prevAmounts.length;
+          if(b.amount>avg*1.2){
+            const pct=Math.round((b.amount/avg-1)*100);
+            queue('bill_spike_'+b.id,'⚠️ צריכה גבוהה: '+b.name,`גבוה ב-${pct}% מהממוצע (₪${Math.round(avg)})`,new Date(now+120000));
+          }
         }
       }
     });
+    // Budget alert
+    if(s.bills.monthlyBudget>0){
+      const thisMonth=new Date();thisMonth.setDate(1);thisMonth.setHours(0,0,0,0);
+      const spent=bills.filter(x=>{
+        if(x.status!=='paid'||!x.amount)return false;
+        const d=new Date(x.paidAt||x.createdAt);
+        return d>=thisMonth;
+      }).reduce((sum,x)=>sum+x.amount,0);
+      if(spent>s.bills.monthlyBudget){
+        queue('bill_budget_over','🚨 חריגה מתקציב','שילמת ₪'+Math.round(spent)+' מתוך ₪'+s.bills.monthlyBudget+' ('+Math.round(spent/s.bills.monthlyBudget*100)+'%)',new Date(now+180000));
+      }else if(spent>s.bills.monthlyBudget*0.9){
+        queue('bill_budget_near','⚠️ מתקרב לתקציב','₪'+Math.round(spent)+' מתוך ₪'+s.bills.monthlyBudget+' — 90%+',new Date(now+180000));
+      }
+    }
     // Morning briefing with bills count
     const billCount=pendingBills.length;
     if(billCount>0){
@@ -4030,7 +4108,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -5587,12 +5665,26 @@ function renderBillsSummary(){
   const overdue=pending.filter(b=>b.deadline&&new Date(b.deadline)<now);
   const totalPending=pending.reduce((s,b)=>s+(b.amount||0),0);
   const totalPaid=paid.filter(b=>{const d=new Date(b.paidAt||b.createdAt);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,b)=>s+(b.amount||0),0);
+  // Budget bar
+  const budget=(notifSettings?.bills?.monthlyBudget)||0;
+  let budgetHtml='';
+  if(budget>0){
+    const pct=Math.min(100,Math.round(totalPaid/budget*100));
+    const cls=pct>=100?'over':pct>=90?'near':pct>=70?'mid':'ok';
+    budgetHtml=`<div class="bill-budget-bar ${cls}">
+      <div class="bill-budget-head">
+        <span>🎯 תקציב חודשי</span>
+        <span class="bill-budget-nums">₪${totalPaid.toLocaleString('he-IL')} / ₪${budget.toLocaleString('he-IL')} (${pct}%)</span>
+      </div>
+      <div class="bill-budget-track"><div class="bill-budget-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }
   el.innerHTML=`<div class="bills-sum-row">
     <div class="bills-sum-card"><div class="bills-sum-num">${pending.length}</div><div class="bills-sum-lbl">ממתינים</div></div>
     <div class="bills-sum-card warn"><div class="bills-sum-num">${overdue.length}</div><div class="bills-sum-lbl">באיחור</div></div>
     <div class="bills-sum-card"><div class="bills-sum-num">₪${totalPending.toLocaleString('he-IL')}</div><div class="bills-sum-lbl">לתשלום</div></div>
     <div class="bills-sum-card ok"><div class="bills-sum-num">₪${totalPaid.toLocaleString('he-IL')}</div><div class="bills-sum-lbl">שולם החודש</div></div>
-  </div>`;
+  </div>${budgetHtml}`;
 }
 
 function renderBillsList(){
@@ -5656,7 +5748,7 @@ function renderBillCard(bill){
   <div class="bill-card-top">
     <span class="bill-cat-icon">${cat}</span>
     <div class="bill-card-info">
-      <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}</div>
+      <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}${bill.autoDebit?'<span class="bill-autodebit-tag">💳 אוטומטי</span>':''}</div>
       <div class="bill-card-meta">${bill.category}${payDateStr?' · שלי: '+payDateStr:''}${deadlineStr?' · חברה: '+deadlineStr:''}</div>
     </div>
     <div class="bill-card-right">
@@ -5689,6 +5781,8 @@ function openBillForm(id){
   document.getElementById('billNotes').value='';
   document.getElementById('billRecurring').value='none';
   document.getElementById('billAmountType').value='fixed';
+  document.getElementById('billAutoDebit').checked=false;
+  ['week','3days','1day','payday','deadline'].forEach(k=>{const el=document.getElementById('billRem_'+k);if(el)el.checked=false;});
   document.getElementById('billImgPreview').style.display='none';
   document.getElementById('billImgPreview').src='';
   document.getElementById('billImgRemove').style.display='none';
@@ -5707,6 +5801,9 @@ function openBillForm(id){
     document.getElementById('billNotes').value=b.notes||'';
     document.getElementById('billRecurring').value=b.recurring||'none';
     document.getElementById('billAmountType').value=b.amountType||'fixed';
+    document.getElementById('billAutoDebit').checked=!!b.autoDebit;
+    const rems=b.reminders||[];
+    ['week','3days','1day','payday','deadline'].forEach(k=>{const el=document.getElementById('billRem_'+k);if(el)el.checked=rems.includes(k);});
     if(b.image){
       _billPendingImage=b.image;
       document.getElementById('billImgPreview').src=b.image;
@@ -5754,16 +5851,19 @@ function saveBill(){
   const notes=document.getElementById('billNotes').value.trim()||'';
   const recurring=document.getElementById('billRecurring').value;
   const amountType=document.getElementById('billAmountType').value;
+  const autoDebit=document.getElementById('billAutoDebit').checked;
+  const reminders=['week','3days','1day','payday','deadline'].filter(k=>document.getElementById('billRem_'+k)?.checked);
   const image=_billPendingImage||null;
 
   if(_billEditId){
     const b=bills.find(x=>x.id===_billEditId);
     if(b){
       b.name=name;b.amount=amount;b.category=category;b.deadline=deadline;b.payDate=payDate;
-      b.url=url;b.notes=notes;b.recurring=recurring;b.amountType=amountType;b.image=image;
+      b.url=url;b.notes=notes;b.recurring=recurring;b.amountType=amountType;
+      b.autoDebit=autoDebit;b.reminders=reminders;b.image=image;
     }
   }else{
-    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,paidAt:null});
+    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,autoDebit,reminders,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,deadlineEventId:null,paidAt:null});
   }
   saveBills();
   // sync to calendar if either date set
@@ -5826,6 +5926,48 @@ function createNextRecurringBill(bill){
   saveBills();
   if(nb.payDate||nb.deadline)syncBillToCalendar(nb);
   toast(`🔄 חשבון ${freqLabel} נוצר${isVariable?' — עדכן סכום חדש':''}`);
+}
+
+// Gmail daily scan for new invoices
+async function scanGmailForNewBills(forceNow){
+  if(!forceNow){
+    const last=parseInt(localStorage.getItem('vt_bills_last_gmail_scan')||'0');
+    const today=new Date();today.setHours(0,0,0,0);
+    if(last>=today.getTime())return;// already scanned today
+    if(!notifSettings?.bills?.gmailScan)return;
+  }
+  const token=await getToken();
+  if(!token){if(forceNow)toast('⚠️ יש להתחבר ל-Google');return;}
+  if(forceNow)toast('⏳ סורק מייל...');
+  try{
+    // Search invoices from last 3 days only
+    const q=encodeURIComponent('subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:3d');
+    const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok){if(forceNow)toast('❌ שגיאה בגישה למייל (נדרשת הרשאת Gmail)');return;}
+    const data=await r.json();
+    const msgs=data.messages||[];
+    // Filter out emails already linked to existing bills
+    const existingEmailIds=new Set(bills.map(b=>(b.url||'').split('/').pop()).filter(Boolean));
+    const newMsgs=msgs.filter(m=>!existingEmailIds.has(m.id));
+    localStorage.setItem('vt_bills_last_gmail_scan',Date.now().toString());
+    if(!newMsgs.length){
+      if(forceNow)toast('✅ אין חשבוניות חדשות');
+      return;
+    }
+    // Show notification
+    if('Notification' in window && Notification.permission==='granted'){
+      try{
+        const reg=await navigator.serviceWorker.ready;
+        reg.showNotification('📧 הגיעו '+newMsgs.length+' חשבוניות חדשות',{
+          body:'פתח את האפליקציה לסווג',icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',tag:'vt-bill-scan'
+        });
+      }catch(e){}
+    }
+    if(forceNow){
+      toast('📧 נמצאו '+newMsgs.length+' חשבוניות חדשות — פותח טופס');
+      setTimeout(()=>{openBillsSheet();setTimeout(()=>{openBillForm(null);setTimeout(()=>openBillEmailImport(),300);},400);},600);
+    }
+  }catch(e){if(forceNow)toast('❌ '+e.message);}
 }
 
 async function testBillNotifs(){

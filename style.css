@@ -1223,6 +1223,24 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-cd-row{display:flex;align-items:center;gap:6px}
 .bill-cd-lbl{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap}
 
+.bill-autodebit-tag{font-size:10px;font-weight:700;color:oklch(0.72 0.16 145);background:oklch(0.72 0.16 145 / 0.12);padding:1px 7px;border-radius:8px}
+
+.bill-reminders-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:4px}
+.bill-reminder-chip{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;touch-action:manipulation}
+.bill-reminder-chip input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0}
+.bill-reminder-chip:has(input:checked){background:oklch(0.78 0.16 72 / 0.12);border-color:var(--accent);color:var(--accent)}
+
+.bill-budget-bar{margin:10px 16px 0;padding:12px 14px;background:var(--surface2);border-radius:14px}
+.bill-budget-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px}
+.bill-budget-nums{color:var(--muted);font-size:11px}
+.bill-budget-track{height:8px;background:var(--surface);border-radius:4px;overflow:hidden}
+.bill-budget-fill{height:100%;background:oklch(0.72 0.2 145);transition:width 0.4s ease}
+.bill-budget-bar.mid .bill-budget-fill{background:oklch(0.78 0.18 72)}
+.bill-budget-bar.near .bill-budget-fill{background:oklch(0.72 0.2 50)}
+.bill-budget-bar.over{background:oklch(0.55 0.22 25 / 0.1)}
+.bill-budget-bar.over .bill-budget-fill{background:oklch(0.65 0.22 25)}
+.bill-budget-bar.over .bill-budget-nums{color:oklch(0.75 0.2 25)}
+
 /* Bill form */
 .bill-form-body{padding:0 16px;display:flex;flex-direction:column;gap:14px}
 .bill-form-group{display:flex;flex-direction:column;gap:4px}
