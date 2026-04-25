@@ -1291,6 +1291,15 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .chat-bubble.typing span:nth-child(3){animation-delay:0.4s}
 @keyframes dotPulse{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1.2);opacity:1}}
 .chat-tool-call{align-self:flex-end;font-size:10px;color:var(--muted);background:var(--surface);padding:4px 10px;border-radius:8px;font-family:monospace;direction:ltr;text-align:left;max-width:80%;overflow-x:auto;white-space:nowrap}
+.chat-bubble .chat-time{display:block;font-size:9px;opacity:0.6;margin-top:4px;text-align:left;direction:ltr;letter-spacing:0.3px}
+.chat-bubble.user .chat-time{color:#fff}
+.chat-bubble.greeting{font-style:normal}
+.chat-day-sep{display:flex;align-items:center;justify-content:center;margin:12px 0 4px;position:relative}
+.chat-day-sep span{background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:4px 12px;border-radius:12px;border:1px solid var(--border)}
+.chat-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0 4px;justify-content:flex-end;margin-top:8px}
+.chat-suggestions-hint{width:100%;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;text-align:right}
+.chat-suggestion{background:oklch(0.55 0.16 285 / 0.1);border:1px solid oklch(0.55 0.16 285 / 0.3);color:oklch(0.78 0.18 285);padding:7px 13px;border-radius:14px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.chat-suggestion:active{background:oklch(0.55 0.16 285 / 0.25)}
 
 .chat-confirm{align-self:stretch;background:oklch(0.65 0.2 50 / 0.08);border:1px solid oklch(0.65 0.2 50 / 0.4);border-radius:14px;padding:12px 14px;margin:6px 0}
 .chat-confirm-title{font-size:13px;font-weight:800;color:oklch(0.78 0.18 50);margin-bottom:8px}

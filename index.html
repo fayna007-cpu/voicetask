@@ -1048,6 +1048,7 @@
     <button class="rsheet-action-btn" onclick="saveAgentPersona()" style="font-size:13px;background:none;border:none;color:var(--accent);cursor:pointer;font-weight:800">שמור</button>
   </div>
   <div class="rsheet-scroll">
+    <button class="bill-form-import" onclick="loadRecommendedPersona()" style="margin:12px 16px;width:calc(100% - 32px);background:oklch(0.55 0.16 285 / 0.15);border-color:oklch(0.55 0.16 285 / 0.4);color:oklch(0.78 0.18 285)">✨ טען אפיון מומלץ (אלפרד)</button>
     <div class="bill-form-body">
       <div class="bill-form-group">
         <label class="bill-form-lbl">🧩 שם הסוכן</label>
@@ -5845,6 +5846,31 @@ function closeAgentPersona(){
   document.getElementById('routineOverlay').classList.remove('on');
 }
 
+function loadRecommendedPersona(){
+  const r={
+    name:'אלפרד',
+    role:'custom',
+    roleCustom:'עוזר אישי פרקטי ויעיל בעיקר. גם חבר טוב ומאמן ש"מרים" אותי לעבר המטרות. מכיר אותי הכי טוב מבחינה אישית.',
+    tone:'שילוב רשמי-חברי עם הומור מתון. ישיר וקצר אך חם ואישי. אימוג׳ים במידה.',
+    doNots:'לא להיות yes-man — תגיד את האמת גם אם לא נעימה. לא לתת עצות חיים/מוסר בלי שביקשתי. לא להתפלסף. לא להיות מתנשא. לא להציע פעולות בלי שאשאל. לא להזכיר את עצמך בשם בכל משפט.',
+    specialties:'עוזר אישי פרקטי, יעילות וזמן, ניהול כסף וחשבונות, מוטיבציה ויעדים, ארגון ותעדוף, תקשורת ואסטרטגיה.',
+    greeting:'אדוני — שלום ונעים להכיר. כדי שנתחיל את היום ביעילות, מה הדבר הכי חשוב שאני יכול לעזור לך איתו עכשיו?',
+    userInfo:'אופי: פרקטי מאוד, אוהב הומור, אוהב להתפתח ולגדול לעבר מטרות, חבר טוב שמעריך את החיים. תפקיד: שכיר בכלל ביטוח, תחום עיסוק - דיגיטל ובינה מלאכותית. בת זוג: שירה. אין ילדים, יש משפחה אוהבת. שעות עבודה: 7:00-16:00. אחרי העבודה: אימון, למידה, חברים+שירה, זמן שקט לעצמי. מטרת השנה: להגדיל תזרים והכנסה. אתגרים: חיסכון בזמן ומציאת דרכים להגדיל הכנסה.',
+    shortcuts:'"פוקוס" → 3 משימות הכי חשובות עכשיו\n"סיכום" → סיכום היום עד עכשיו\n"מצב" → מצב כללי (משימות, חשבונות, יומן)\n"כסף" → סיכום פיננסי החודש\n"מה הלאה" → המשימה/אירוע הבא בלוח'
+  };
+  document.getElementById('apName').value=r.name;
+  document.getElementById('apRole').value=r.role;
+  document.getElementById('apRoleCustom').value=r.roleCustom;
+  document.getElementById('apRoleCustom').style.display='block';
+  document.getElementById('apTone').value=r.tone;
+  document.getElementById('apDoNots').value=r.doNots;
+  document.getElementById('apSpecialties').value=r.specialties;
+  document.getElementById('apGreeting').value=r.greeting;
+  document.getElementById('apUserInfo').value=r.userInfo;
+  document.getElementById('apShortcuts').value=r.shortcuts;
+  toast('✨ אפיון אלפרד נטען — לחץ "שמור"');
+}
+
 function buildPersonaBlock(){
   const p=agentPersona;
   if(!p.name&&!p.role&&!p.tone&&!p.doNots&&!p.userInfo)return '';
@@ -6227,7 +6253,7 @@ async function sendChat(){
   const text=inp.value.trim();if(!text)return;
   if(!aiSettings.key){toast('⚠️ הגדר מפתח Gemini בהגדרות');return;}
   inp.value='';inp.style.height='auto';
-  chatHistory.push({role:'user',parts:[{text}]});
+  chatHistory.push({role:'user',parts:[{text}],ts:Date.now()});
   saveChatHistory();
   renderChatMessages();
   await runChatLoop();
@@ -6262,7 +6288,7 @@ async function runChatLoop(){
       });
       if(!r.ok){
         const e=await r.json().catch(()=>({}));
-        chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+(e.error?.message||r.status)}]});
+        chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+(e.error?.message||r.status)}],ts:Date.now()});
         break;
       }
       const data=await r.json();
@@ -6272,14 +6298,14 @@ async function runChatLoop(){
       const calls=parts.filter(p=>p.functionCall);
       const textParts=parts.filter(p=>p.text).map(p=>p.text).join('');
       if(textParts){
-        chatHistory.push({role:'model',parts:[{text:textParts}]});
+        chatHistory.push({role:'model',parts:[{text:textParts}],ts:Date.now()});
       }
       if(!calls.length){
         // No tool calls — done
         break;
       }
       // Add the model's call to history
-      chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall}))});
+      chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall})),ts:Date.now()});
       // Execute each tool call
       const toolResponses=[];
       for(const c of calls){
@@ -6296,12 +6322,12 @@ async function runChatLoop(){
         }
         toolResponses.push({functionResponse:{name:fc.name,response:result}});
       }
-      chatHistory.push({role:'function',parts:toolResponses});
+      chatHistory.push({role:'function',parts:toolResponses,ts:Date.now()});
       // Loop again so model can respond to tool results
     }
     saveChatHistory();
   }catch(e){
-    chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+e.message}]});
+    chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+e.message}],ts:Date.now()});
   }finally{
     typing.remove();
     _chatBusy=false;
@@ -6341,19 +6367,86 @@ function showMemorySaved(content){
   scrollChatBottom();
 }
 
+function dayLabel(ts){
+  if(!ts)return '';
+  const d=new Date(ts);d.setHours(0,0,0,0);
+  const today=new Date();today.setHours(0,0,0,0);
+  const yesterday=new Date(today);yesterday.setDate(today.getDate()-1);
+  if(d.getTime()===today.getTime())return 'היום';
+  if(d.getTime()===yesterday.getTime())return 'אתמול';
+  const diff=Math.floor((today-d)/86400000);
+  if(diff<7)return d.toLocaleDateString('he-IL',{weekday:'long'});
+  return d.toLocaleDateString('he-IL',{day:'numeric',month:'long',year:diff>365?'numeric':undefined});
+}
+function timeLabel(ts){
+  if(!ts)return '';
+  const d=new Date(ts);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function buildContextualSuggestions(){
+  const out=[];
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  const tEnd=new Date(today);tEnd.setHours(23,59,59,999);
+  const todayT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=today&&new Date(t.datetime)<=tEnd).length;
+  const todayB=bills.filter(b=>{if(b.status!=='pending'||!b.payDate)return false;const pd=new Date(b.payDate);pd.setHours(0,0,0,0);return pd.getTime()===today.getTime();}).length;
+  const overdueT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today).length;
+  const dueBills=bills.filter(b=>{if(b.status!=='pending'||!b.deadline)return false;const dl=new Date(b.deadline);dl.setHours(0,0,0,0);return dl<=new Date(today.getTime()+7*86400000);}).length;
+
+  // Time-based default
+  const h=now.getHours();
+  if(h<12)out.push({label:'☀️ סקירת בוקר',q:'תן לי סקירת בוקר קצרה — מה הכי חשוב היום?'});
+  else if(h<17)out.push({label:'⏰ מה הלאה?',q:'מה המשימה הבאה שלי?'});
+  else out.push({label:'🌙 סיכום יום',q:'תן לי סיכום של היום ומה כדאי לתכנן למחר'});
+
+  // Data-aware
+  if(todayT>0||todayB>0)out.push({label:'📌 הפריטים של היום',q:'מה כל הדברים שיש לי היום?'});
+  if(overdueT>0)out.push({label:`⚠️ ${overdueT} משימות באיחור`,q:'יש לי משימות באיחור — מה לעשות איתן?'});
+  if(dueBills>0)out.push({label:`💳 ${dueBills} חשבונות השבוע`,q:'מה החשבונות שצריך לשלם השבוע?'});
+
+  // Always offer
+  out.push({label:'⚡ פוקוס',q:'פוקוס'});
+  out.push({label:'💰 כסף',q:'כסף'});
+
+  return out.slice(0,4);
+}
+
 function renderChatMessages(){
   const body=document.getElementById('assistantBody');if(!body)return;
   if(_asstTab!=='chat')return;
+
   let html='<div class="chat-scroll" id="chatScroll">';
+
+  // Welcome / contextual suggestions if empty or starting new day
+  const lastMsg=chatHistory[chatHistory.length-1];
+  const lastDay=lastMsg?.ts?new Date(lastMsg.ts).toDateString():null;
+  const todayStr=new Date().toDateString();
+  const isNewSession=!chatHistory.length||lastDay!==todayStr;
+
+  // Greeting if empty
   if(!chatHistory.length){
-    html+='<div class="chat-empty">👋 שאל אותי כל דבר על המשימות, השגרות והחשבונות שלך</div>';
+    const greet=agentPersona.greeting||'👋 שאל אותי כל דבר על המשימות, השגרות והחשבונות שלך';
+    html+=`<div class="chat-bubble bot greeting"><strong>${esc(agentPersona.name||'')}${agentPersona.name?': ':''}</strong>${esc(greet)}</div>`;
   }
+
+  // Render messages with day separators
+  let lastDate='';
   chatHistory.forEach(m=>{
     if(m.role==='function')return;
     const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
     const calls=(m.parts||[]).filter(p=>p.functionCall);
+    if(!txt&&!calls.length)return;
+
+    // Day separator
+    const msgDate=m.ts?new Date(m.ts).toDateString():'';
+    if(msgDate&&msgDate!==lastDate){
+      html+=`<div class="chat-day-sep"><span>${dayLabel(m.ts)}</span></div>`;
+      lastDate=msgDate;
+    }
+
     if(txt){
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}</div>`;
+      const time=m.ts?`<span class="chat-time">${timeLabel(m.ts)}</span>`:'';
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}${time}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{
@@ -6361,6 +6454,19 @@ function renderChatMessages(){
       });
     }
   });
+
+  // New session suggestions
+  if(isNewSession){
+    const suggestions=buildContextualSuggestions();
+    if(suggestions.length){
+      html+='<div class="chat-suggestions"><div class="chat-suggestions-hint">💡 שאלות מומלצות:</div>';
+      suggestions.forEach(s=>{
+        html+=`<button class="chat-suggestion" onclick="askQuick('${esc(s.q).replace(/'/g,'&#39;')}')">${esc(s.label)}</button>`;
+      });
+      html+='</div>';
+    }
+  }
+
   html+='</div>';
   body.innerHTML=html;
   scrollChatBottom();
