@@ -457,6 +457,11 @@
           <option value="gemini-1.5-flash">Gemini 1.5 Flash (1500/יום)</option>
         </select>
       </div>
+      <div class="settings-row" onclick="openAgentPersona()">
+        <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.2);color:oklch(0.78 0.18 285)">🎭</div>
+        <div class="settings-row-body"><div class="settings-row-title">אפיון הסוכן</div><div class="settings-row-sub" id="agentPersonaStatus">הגדר אופי, טון ותפקיד</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">זיכרון ארוך טווח</div><div class="settings-row-sub">העוזר זוכר עליך בין שיחות (העדפות, עובדות)</div></div>
         <label class="rtoggle"><input type="checkbox" id="aiMemoryEnabled" checked onchange="saveAiSettings()"><span class="rtoggle-sl"></span></label>
@@ -1020,6 +1025,74 @@
   <div class="postpone-actions">
     <button class="postpone-confirm" onclick="confirmPostpone()">דחה</button>
     <button class="postpone-cancel" onclick="closePostpone()">בטל</button>
+  </div>
+</div>
+
+<!-- Floating assistant bubble (bottom-left) -->
+<button class="asst-fab" id="asstFab" onclick="openAssistantChat()" aria-label="פתח שיחה עם העוזר">
+  <div class="asst-fab-orb">
+    <div class="asst-fab-eyes">
+      <div class="asst-fab-eye"></div>
+      <div class="asst-fab-eye"></div>
+    </div>
+  </div>
+  <span class="asst-fab-pulse"></span>
+</button>
+
+<!-- Agent persona sheet -->
+<div class="rsheet" id="agentPersonaSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeAgentPersona()">✕</button>
+    <h3>🎭 אפיון הסוכן</h3>
+    <button class="rsheet-action-btn" onclick="saveAgentPersona()" style="font-size:13px;background:none;border:none;color:var(--accent);cursor:pointer;font-weight:800">שמור</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="bill-form-body">
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">🧩 שם הסוכן</label>
+        <input class="bill-form-input" id="apName" placeholder="למשל: נובה, מקס, אריאל..." maxlength="30">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">💼 תפקיד / דמות</label>
+        <select class="bill-form-select" id="apRole">
+          <option value="">בחר...</option>
+          <option value="מזכיר אישי יעיל ופרגמטי">💼 מזכיר אישי</option>
+          <option value="מאמן תובעני שדוחף לפעולה ויעדים">🎯 מאמן</option>
+          <option value="חבר טוב, חמים ואמפתי">🤝 חבר טוב</option>
+          <option value="יועץ עסקי אסטרטגי המבוסס נתונים">🧠 יועץ עסקי</option>
+          <option value="מנטור חכם השואל שאלות מנחות">👨‍🏫 מנטור</option>
+          <option value="אסיסטנט מקצועי רשמי וענייני">🤵 אסיסטנט מקצועי</option>
+          <option value="custom">✏️ אחר (כתוב בעצמך)</option>
+        </select>
+        <input class="bill-form-input" id="apRoleCustom" placeholder="תאר את התפקיד שלו" style="display:none;margin-top:6px">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">🗣️ טון דיבור</label>
+        <textarea class="bill-form-input" id="apTone" rows="2" placeholder="ישיר וקצר, חם, ללא הומור, ללא אימוג׳ים..."></textarea>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">🚫 אסור לו לעשות</label>
+        <textarea class="bill-form-input" id="apDoNots" rows="3" placeholder="לא לתת עצות חיים, לא להתפלסף, לא להיות מתנשא, לא להציע פעולות בלי שאשאל..."></textarea>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">⭐ תחומי התמחות (יזום עזרה בנושאים האלה)</label>
+        <textarea class="bill-form-input" id="apSpecialties" rows="2" placeholder="פרודוקטיביות, ניהול כסף, מוטיבציה, ארגון, ניסוח מיילים..."></textarea>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">👋 הצגה ראשונה (כשפותחים את הצ'אט)</label>
+        <input class="bill-form-input" id="apGreeting" placeholder='למשל: "היי גיא, איך אפשר לעזור?"' maxlength="200">
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">👤 דברים שיכיר עליך מההתחלה</label>
+        <textarea class="bill-form-input" id="apUserInfo" rows="4" placeholder="התפקיד שלי, המטרות העיקריות שלי השנה, בני משפחה (שם בן/בת זוג, ילדים), העדפות קבועות..."></textarea>
+      </div>
+      <div class="bill-form-group">
+        <label class="bill-form-lbl">⚡ מילות קוד (אופציונלי)</label>
+        <textarea class="bill-form-input" id="apShortcuts" rows="2" placeholder='"פוקוס" → 3 המשימות הכי חשובות&#10;"סיכום" → סיכום היום'></textarea>
+      </div>
+    </div>
+    <div style="height:80px"></div>
   </div>
 </div>
 
@@ -2920,7 +2993,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet','assistantSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet','assistantSheet','agentPersonaSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -4188,7 +4261,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -5708,6 +5781,104 @@ function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+// ── Agent Persona ─────────────────────────────────────────────────────────────
+let agentPersona={name:'',role:'',roleCustom:'',tone:'',doNots:'',specialties:'',greeting:'',userInfo:'',shortcuts:''};
+
+function loadAgentPersona(){
+  try{const s=JSON.parse(localStorage.getItem('vt_agent_persona')||'null');if(s)agentPersona={...agentPersona,...s};}catch(_){}
+  // Sync to DOM
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  set('apName',agentPersona.name);
+  set('apRole',agentPersona.role==='custom'?'custom':agentPersona.role);
+  set('apRoleCustom',agentPersona.roleCustom);
+  set('apTone',agentPersona.tone);
+  set('apDoNots',agentPersona.doNots);
+  set('apSpecialties',agentPersona.specialties);
+  set('apGreeting',agentPersona.greeting);
+  set('apUserInfo',agentPersona.userInfo);
+  set('apShortcuts',agentPersona.shortcuts);
+  const customRow=document.getElementById('apRoleCustom');
+  if(customRow)customRow.style.display=agentPersona.role==='custom'?'block':'none';
+  // Update settings status text
+  const status=document.getElementById('agentPersonaStatus');
+  if(status){
+    if(agentPersona.name||agentPersona.role){
+      status.textContent=`${agentPersona.name||'הסוכן'}${agentPersona.role&&agentPersona.role!=='custom'?' · '+agentPersona.role.split(' ').slice(0,3).join(' '):''}`;
+    }else status.textContent='הגדר אופי, טון ותפקיד';
+  }
+}
+function saveAgentPersona(){
+  const get=id=>document.getElementById(id)?.value.trim()||'';
+  agentPersona={
+    name:get('apName'),
+    role:get('apRole'),
+    roleCustom:get('apRoleCustom'),
+    tone:get('apTone'),
+    doNots:get('apDoNots'),
+    specialties:get('apSpecialties'),
+    greeting:get('apGreeting'),
+    userInfo:get('apUserInfo'),
+    shortcuts:get('apShortcuts')
+  };
+  localStorage.setItem('vt_agent_persona',JSON.stringify(agentPersona));
+  loadAgentPersona();// refresh status
+  toast('🎭 האפיון נשמר!');
+  closeAgentPersona();
+}
+function openAgentPersona(){
+  closeSettings();
+  setTimeout(()=>{
+    document.getElementById('routineOverlay').classList.add('on');
+    document.getElementById('agentPersonaSheet').classList.add('on');
+    loadAgentPersona();
+  },200);
+  // role select toggle
+  setTimeout(()=>{
+    const sel=document.getElementById('apRole');const cus=document.getElementById('apRoleCustom');
+    if(sel&&cus){
+      sel.onchange=()=>{cus.style.display=sel.value==='custom'?'block':'none';if(sel.value==='custom')cus.focus();};
+    }
+  },300);
+}
+function closeAgentPersona(){
+  document.getElementById('agentPersonaSheet').classList.remove('on');
+  document.getElementById('routineOverlay').classList.remove('on');
+}
+
+function buildPersonaBlock(){
+  const p=agentPersona;
+  if(!p.name&&!p.role&&!p.tone&&!p.doNots&&!p.userInfo)return '';
+  const role=p.role==='custom'?p.roleCustom:p.role;
+  let block='\n\n🎭 אופי קבוע (חובה לפעול לפיו תמיד):';
+  if(p.name)block+=`\nשם: ${p.name} (אם המשתמש מתייחס אליך — ענה כ-${p.name})`;
+  if(role)block+=`\nתפקיד: ${role}`;
+  if(p.tone)block+=`\nטון דיבור: ${p.tone}`;
+  if(p.specialties)block+=`\nתחומי מומחיות (יזום עזרה בהם): ${p.specialties}`;
+  if(p.doNots)block+=`\n🚫 אסור לך: ${p.doNots}`;
+  if(p.userInfo)block+=`\nמה אתה יודע על המשתמש: ${p.userInfo}`;
+  if(p.shortcuts)block+=`\nמילות קוד מהמשתמש: ${p.shortcuts}`;
+  if(p.greeting)block+=`\nכשהמשתמש פותח שיחה ריקה — אמור: "${p.greeting}"`;
+  return block;
+}
+
+// FAB control
+function openAssistantChat(){
+  _asstTab='chat';
+  document.querySelectorAll('.asst-tab').forEach(b=>b.classList.toggle('on',b.dataset.cat==='chat'));
+  openAssistantSheet();
+  setTimeout(()=>{
+    const inp=document.getElementById('asstInput');if(inp)inp.focus();
+  },400);
+}
+
+// Hide FAB when assistant is open
+function updateFabVisibility(){
+  const fab=document.getElementById('asstFab');if(!fab)return;
+  const sheetOpen=document.getElementById('assistantSheet')?.classList.contains('on');
+  const settingsOpen=document.getElementById('settingsSheet')?.classList.contains('on');
+  fab.style.display=(sheetOpen||settingsOpen)?'none':'flex';
+}
+
 // ── AI Settings & Gemini Client ──────────────────────────────────────────────
 let aiSettings={key:'',model:'gemini-2.5-flash',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
 let assistantMemory=[];
@@ -6022,7 +6193,7 @@ function buildAssistantContext(){
     ?'\n\n💭 דברים שהמשתמש סיפר לך (זיכרון ארוך טווח):\n'+assistantMemory.map(m=>`- [id:${m.id}] ${m.content}`).join('\n')
     :'';
 
-  return `אתה עוזר אישי באפליקציית VoiceTask של ${gAuth?.name||'המשתמש'}.
+  return `אתה עוזר אישי באפליקציית VoiceTask של ${gAuth?.name||'המשתמש'}.${buildPersonaBlock()}
 דבר עברית, תשובות קצרות וישירות, מבוססות נתונים בלבד. אסור להמציא — אם אין מידע, אמור.
 כשהמשתמש מבקש פעולה — השתמש בכלי המתאים. ${aiSettings.readOnly?'⚠️ מצב קריאה בלבד — אין לבצע פעולות שינוי.':''}
 כשהמשתמש משתף עובדה אישית/העדפה (צבע אהוב, שם של בן משפחה, מקום עבודה, הרגלים) — קרא ל-save_memory לזכור אותה לעתיד. אל תבקש אישור — פשוט שמור. ציין בקצרה "💭 זכרתי".
@@ -6228,10 +6399,12 @@ function openAssistantSheet(){
   const bar=document.getElementById('asstChatBar');
   if(bar)bar.style.display=_asstTab==='chat'?'block':'none';
   renderAssistant();
+  updateFabVisibility();
 }
 function closeAssistantSheet(){
   document.getElementById('assistantOverlay').classList.remove('on');
   document.getElementById('assistantSheet').classList.remove('on');
+  updateFabVisibility();
 }
 function setAsstTab(cat){
   _asstTab=cat;
