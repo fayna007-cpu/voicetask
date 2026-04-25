@@ -439,6 +439,41 @@
         <label class="rtoggle"><input type="checkbox" id="ns-productivity-weeklyReview" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
     </div>
+    <div class="settings-section">🤖 חיבור AI (Gemini)</div>
+    <div class="settings-cards">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px">
+        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">מפתח API של Gemini</div><div class="settings-row-sub">קבל חינמי ב-aistudio.google.com → Get API Key</div></div>
+        <input type="password" class="bill-form-input" id="aiGeminiKey" placeholder="AIzaSy..." dir="ltr" onchange="saveAiSettings()" style="width:100%">
+        <div style="display:flex;gap:8px">
+          <button class="bill-form-import" onclick="testGeminiConnection()" style="flex:1">בדוק חיבור</button>
+          <a class="bill-form-import" href="https://aistudio.google.com/app/apikey" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל מפתח →</a>
+        </div>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">מודל</div><div class="settings-row-sub">Flash 2.5 = איכות · Flash 1.5 = מכסה גדולה</div></div>
+        <select class="settings-select" id="aiModel" onchange="saveAiSettings()">
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+          <option value="gemini-1.5-flash">Gemini 1.5 Flash (1500/יום)</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">זיכרון ארוך טווח</div><div class="settings-row-sub">העוזר זוכר עליך בין שיחות (העדפות, עובדות)</div></div>
+        <label class="rtoggle"><input type="checkbox" id="aiMemoryEnabled" checked onchange="saveAiSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">מצב קריאה בלבד</div><div class="settings-row-sub">חוסם פעולות שליחה/יצירה (מייל, אירועים, משימות)</div></div>
+        <label class="rtoggle"><input type="checkbox" id="aiReadOnly" onchange="saveAiSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">שימוש היום</div><div class="settings-row-sub" id="aiUsageInfo">0 בקשות נשלחו</div></div>
+        <button class="bill-form-import" onclick="clearChatHistory()" style="font-size:11px">נקה שיחה</button>
+      </div>
+      <div class="settings-row" style="cursor:default;align-items:flex-start">
+        <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.15);color:oklch(0.78 0.18 285)">🛡️</div>
+        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px">פרטיות</div><div class="settings-row-sub" style="font-size:11px">המפתח נשמר אצלך בלבד. הנתונים שלך נשלחים ישירות ל-Google בכל שיחה לצורך ההקשר.</div></div>
+      </div>
+    </div>
     <div class="settings-section">אזור מסוכן</div>
     <div class="settings-cards">
       <div class="settings-row" onclick="confirmClearData()">
@@ -1000,13 +1035,28 @@
   <div class="rsheet-scroll">
     <div class="assistant-greeting" id="assistantGreeting"></div>
     <div class="assistant-tabs" id="assistantTabs">
-      <button class="asst-tab on" data-cat="today" onclick="setAsstTab('today')">📌 היום</button>
+      <button class="asst-tab on" data-cat="chat" onclick="setAsstTab('chat')">💬 שיחה</button>
+      <button class="asst-tab" data-cat="today" onclick="setAsstTab('today')">📌 היום</button>
       <button class="asst-tab" data-cat="risks" onclick="setAsstTab('risks')">⚠️ דחוף</button>
       <button class="asst-tab" data-cat="money" onclick="setAsstTab('money')">💰 כסף</button>
       <button class="asst-tab" data-cat="patterns" onclick="setAsstTab('patterns')">📊 דפוסים</button>
+      <button class="asst-tab" data-cat="memory" onclick="setAsstTab('memory')">💭 זיכרונות</button>
     </div>
     <div id="assistantBody"></div>
     <div style="height:80px"></div>
+  </div>
+  <!-- Chat input bar — shown only in chat tab -->
+  <div class="asst-chat-input-bar" id="asstChatBar" style="display:none">
+    <div class="asst-quick-chips">
+      <button class="asst-quick-chip" onclick="askQuick('מה יש לי היום?')">מה היום?</button>
+      <button class="asst-quick-chip" onclick="askQuick('מה הכי דחוף לי השבוע?')">מה דחוף?</button>
+      <button class="asst-quick-chip" onclick="askQuick('סיכום הוצאות החודש')">סיכום חודשי</button>
+      <button class="asst-quick-chip" onclick="askQuick('תן לי טיפ פרודוקטיביות לפי הנתונים שלי')">טיפ</button>
+    </div>
+    <div class="asst-input-row">
+      <textarea class="asst-input" id="asstInput" placeholder="שאל את העוזר..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <button class="asst-send-btn" onclick="sendChat()" id="asstSendBtn">↑</button>
+    </div>
   </div>
 </div>
 
@@ -4138,7 +4188,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -5658,11 +5708,525 @@ function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+// ── AI Settings & Gemini Client ──────────────────────────────────────────────
+let aiSettings={key:'',model:'gemini-2.5-flash',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
+let assistantMemory=[];
+let chatHistory=[];
+
+function loadAiSettings(){
+  try{const s=JSON.parse(localStorage.getItem('vt_ai_settings')||'null');if(s)aiSettings={...aiSettings,...s};}catch(_){}
+  try{assistantMemory=JSON.parse(localStorage.getItem('vt_assistant_memory')||'[]');}catch(_){}
+  try{chatHistory=JSON.parse(localStorage.getItem('vt_chat_history')||'[]');}catch(_){}
+  // Reset daily counter if new day
+  const today=new Date().toDateString();
+  if(aiSettings.dailyDate!==today){aiSettings.dailyCount=0;aiSettings.dailyDate=today;}
+  // Sync to DOM
+  const k=document.getElementById('aiGeminiKey');if(k)k.value=aiSettings.key||'';
+  const m=document.getElementById('aiModel');if(m)m.value=aiSettings.model;
+  const me=document.getElementById('aiMemoryEnabled');if(me)me.checked=!!aiSettings.memoryEnabled;
+  const ro=document.getElementById('aiReadOnly');if(ro)ro.checked=!!aiSettings.readOnly;
+  updateAiUsageInfo();
+}
+function saveAiSettings(){
+  aiSettings.key=document.getElementById('aiGeminiKey')?.value.trim()||aiSettings.key;
+  aiSettings.model=document.getElementById('aiModel')?.value||aiSettings.model;
+  aiSettings.memoryEnabled=!!document.getElementById('aiMemoryEnabled')?.checked;
+  aiSettings.readOnly=!!document.getElementById('aiReadOnly')?.checked;
+  localStorage.setItem('vt_ai_settings',JSON.stringify(aiSettings));
+}
+function updateAiUsageInfo(){
+  const el=document.getElementById('aiUsageInfo');if(!el)return;
+  el.textContent=`${aiSettings.dailyCount} בקשות נשלחו · ${assistantMemory.length} זיכרונות שמורים`;
+}
+function saveAssistantMemory(){localStorage.setItem('vt_assistant_memory',JSON.stringify(assistantMemory));}
+function saveChatHistory(){
+  // Keep last 30 messages
+  if(chatHistory.length>30)chatHistory=chatHistory.slice(-30);
+  localStorage.setItem('vt_chat_history',JSON.stringify(chatHistory));
+}
+function clearChatHistory(){
+  if(!confirm('למחוק את כל היסטוריית השיחה?'))return;
+  chatHistory=[];saveChatHistory();
+  if(_asstTab==='chat')renderAssistant();
+  toast('🗑️ היסטוריה נמחקה');
+}
+
+async function testGeminiConnection(){
+  saveAiSettings();
+  if(!aiSettings.key){toast('⚠️ הזן מפתח API קודם');return;}
+  toast('⏳ בודק חיבור...');
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:'אמור "שלום" בעברית'}]}],generationConfig:{maxOutputTokens:20,temperature:0.1}})
+    });
+    if(r.ok){
+      const d=await r.json();
+      const txt=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      toast('✅ חיבור תקין: '+txt.slice(0,30));
+    }else{
+      const e=await r.json().catch(()=>({}));
+      toast('❌ '+(e.error?.message||'מפתח לא תקין'));
+    }
+  }catch(e){toast('❌ '+e.message);}
+}
+
+// ── Memory tools ─────────────────────────────────────────────────────────────
+function memorySave(content,type){
+  const id=Date.now()+Math.random();
+  assistantMemory.push({id,content,type:type||'fact',createdAt:new Date().toISOString()});
+  saveAssistantMemory();
+  return id;
+}
+function memoryDelete(id){
+  assistantMemory=assistantMemory.filter(m=>m.id!=id);
+  saveAssistantMemory();
+}
+function memoryAddManual(){
+  const content=prompt('מה לזכור?');if(!content)return;
+  memorySave(content.trim(),'manual');
+  toast('💭 נשמר לזיכרון');
+  if(_asstTab==='memory')renderAssistant();
+}
+
+// ── Gemini Tools (Function Declarations) ─────────────────────────────────────
+const GEMINI_TOOLS=[{functionDeclarations:[
+  {name:'add_task',description:'הוסף משימה חדשה. פורמט תאריך: ISO 8601',parameters:{type:'object',properties:{
+    text:{type:'string',description:'תיאור המשימה'},
+    datetime:{type:'string',description:'תאריך ושעה ISO 8601'},
+    category:{type:'string',enum:['אישי','מקצועי','כללי'],description:'קטגוריה'}
+  },required:['text','datetime']}},
+  {name:'complete_task',description:'סמן משימה כבוצעה',parameters:{type:'object',properties:{
+    id:{type:'number',description:'מזהה המשימה'}
+  },required:['id']}},
+  {name:'defer_task',description:'דחה משימה לתאריך אחר',parameters:{type:'object',properties:{
+    id:{type:'number'},newDatetime:{type:'string',description:'תאריך חדש ISO'}
+  },required:['id','newDatetime']}},
+  {name:'delete_task',description:'מחק משימה',parameters:{type:'object',properties:{id:{type:'number'}},required:['id']}},
+  {name:'add_bill',description:'הוסף חשבון חדש',parameters:{type:'object',properties:{
+    name:{type:'string'},amount:{type:'number'},category:{type:'string'},
+    deadline:{type:'string',description:'תאריך דדליין YYYY-MM-DD'},
+    payDate:{type:'string',description:'תאריך תשלום שלי YYYY-MM-DD'}
+  },required:['name']}},
+  {name:'mark_bill_paid',description:'סמן חשבון כשולם',parameters:{type:'object',properties:{id:{type:'number'}},required:['id']}},
+  {name:'save_memory',description:'שמור עובדה לזיכרון ארוך טווח. השתמש כשהמשתמש משתף משהו אישי שראוי לזכור (העדפות, עובדות, יחסים).',parameters:{type:'object',properties:{
+    content:{type:'string',description:'תוכן הזיכרון בעברית, קצר וברור'},
+    type:{type:'string',enum:['preference','fact','context'],description:'סוג'}
+  },required:['content']}},
+  {name:'delete_memory',description:'מחק זיכרון לפי id',parameters:{type:'object',properties:{id:{type:'number'}},required:['id']}},
+  {name:'gcal_list_events',description:'רשימת אירועי יומן בטווח',parameters:{type:'object',properties:{
+    timeMin:{type:'string',description:'התחלה ISO'},timeMax:{type:'string',description:'סוף ISO'}
+  },required:['timeMin','timeMax']}},
+  {name:'gcal_create_event',description:'יצירת אירוע ביומן (דורש אישור משתמש)',parameters:{type:'object',properties:{
+    summary:{type:'string'},start:{type:'string',description:'ISO'},end:{type:'string',description:'ISO'},
+    description:{type:'string'}
+  },required:['summary','start','end']}},
+  {name:'gcal_find_free_slots',description:'מצא חלונות זמן פנויים ביום',parameters:{type:'object',properties:{
+    date:{type:'string',description:'YYYY-MM-DD'},durationMinutes:{type:'number'}
+  },required:['date','durationMinutes']}},
+  {name:'gmail_search',description:'חיפוש מיילים',parameters:{type:'object',properties:{
+    query:{type:'string',description:'שאילתת חיפוש Gmail'},maxResults:{type:'number'}
+  },required:['query']}},
+  {name:'gmail_read',description:'קריאת תוכן מייל',parameters:{type:'object',properties:{id:{type:'string'}},required:['id']}},
+  {name:'gmail_send',description:'שליחת מייל (דורש אישור משתמש)',parameters:{type:'object',properties:{
+    to:{type:'string'},subject:{type:'string'},body:{type:'string'}
+  },required:['to','subject','body']}}
+]}];
+
+const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
+const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill']);
+
+// ── Tool executor ────────────────────────────────────────────────────────────
+async function executeTool(name,args){
+  if(aiSettings.readOnly&&WRITE_TOOLS.has(name))return{error:'מצב קריאה בלבד מופעל — לא ניתן לבצע פעולות שינוי'};
+  try{
+    switch(name){
+      case 'add_task':{
+        const dt=new Date(args.datetime);
+        const t={id:Date.now(),text:args.text,category:args.category||'כללי',datetime:dt.toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins:30,morningAlert:true,url:null,image:null};
+        tasks.unshift(t);save();render();syncTask(t);
+        return{success:true,id:t.id,text:t.text,datetime:t.datetime};
+      }
+      case 'complete_task':{
+        const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'משימה לא נמצאה'};
+        t.completed=true;save();render();return{success:true,text:t.text};
+      }
+      case 'defer_task':{
+        const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'לא נמצאה'};
+        if(t.calendarEventId)await deleteFromCalendar(t);
+        t.datetime=new Date(args.newDatetime).toISOString();t.calendarEventId=null;t.completed=false;
+        save();render();syncTask(t);return{success:true,newDate:t.datetime};
+      }
+      case 'delete_task':{
+        const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'לא נמצאה'};
+        if(t.calendarEventId)await deleteFromCalendar(t);
+        tasks=tasks.filter(x=>x.id!=args.id);save();render();return{success:true};
+      }
+      case 'add_bill':{
+        const b={id:Date.now(),name:args.name,amount:args.amount||0,category:args.category||'כללי',
+          deadline:args.deadline||null,payDate:args.payDate||null,url:null,notes:'',
+          recurring:'none',amountType:'fixed',autoDebit:false,reminders:[],image:null,
+          status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,deadlineEventId:null,paidAt:null};
+        bills.unshift(b);saveBills();render();
+        if(b.payDate||b.deadline)syncBillToCalendar(b);
+        return{success:true,id:b.id,name:b.name};
+      }
+      case 'mark_bill_paid':{
+        const b=bills.find(x=>x.id==args.id);if(!b)return{error:'חשבון לא נמצא'};
+        b.status='paid';b.paidAt=new Date().toISOString();saveBills();render();
+        if(b.recurring&&b.recurring!=='none')createNextRecurringBill(b);
+        return{success:true,name:b.name,amount:b.amount};
+      }
+      case 'save_memory':{
+        const id=memorySave(args.content,args.type);
+        return{success:true,id,content:args.content};
+      }
+      case 'delete_memory':{
+        memoryDelete(args.id);
+        return{success:true};
+      }
+      case 'gcal_list_events':{
+        const token=await getToken();if(!token)return{error:'לא מחובר ל-Google'};
+        const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(args.timeMin)}&timeMax=${encodeURIComponent(args.timeMax)}&singleEvents=true&orderBy=startTime&maxResults=50`,{headers:{Authorization:'Bearer '+token}});
+        if(!r.ok)return{error:'שגיאה בקריאת יומן'};
+        const d=await r.json();
+        return{events:(d.items||[]).map(e=>({id:e.id,summary:e.summary,start:e.start?.dateTime||e.start?.date,end:e.end?.dateTime||e.end?.date,location:e.location}))};
+      }
+      case 'gcal_create_event':{
+        const token=await getToken();if(!token)return{error:'לא מחובר'};
+        const r=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+          method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+          body:JSON.stringify({summary:args.summary,description:args.description||'',start:{dateTime:args.start},end:{dateTime:args.end}})
+        });
+        if(!r.ok)return{error:'יצירת אירוע נכשלה'};
+        const d=await r.json();return{success:true,id:d.id,summary:d.summary};
+      }
+      case 'gcal_find_free_slots':{
+        const token=await getToken();if(!token)return{error:'לא מחובר'};
+        const dayStart=new Date(args.date+'T08:00:00');
+        const dayEnd=new Date(args.date+'T22:00:00');
+        const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${dayStart.toISOString()}&timeMax=${dayEnd.toISOString()}&singleEvents=true&orderBy=startTime`,{headers:{Authorization:'Bearer '+token}});
+        if(!r.ok)return{error:'שגיאה'};
+        const d=await r.json();
+        const events=(d.items||[]).map(e=>({s:new Date(e.start?.dateTime||e.start?.date),e:new Date(e.end?.dateTime||e.end?.date)})).sort((a,b)=>a.s-b.s);
+        const slots=[];let cursor=dayStart;const dur=args.durationMinutes*60000;
+        events.forEach(ev=>{if(ev.s-cursor>=dur)slots.push({start:cursor.toISOString(),end:ev.s.toISOString()});if(ev.e>cursor)cursor=ev.e;});
+        if(dayEnd-cursor>=dur)slots.push({start:cursor.toISOString(),end:dayEnd.toISOString()});
+        return{slots:slots.slice(0,5)};
+      }
+      case 'gmail_search':{
+        const ok=await ensureGmailReadScope();if(!ok)return{error:'נדרשת הרשאת Gmail'};
+        const q=encodeURIComponent(args.query);
+        const max=args.maxResults||10;
+        const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=${max}`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+        if(!r.ok)return{error:'חיפוש נכשל'};
+        const d=await r.json();const msgs=d.messages||[];
+        const details=await Promise.all(msgs.slice(0,max).map(async m=>{
+          const mr=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+          if(!mr.ok)return null;const md=await mr.json();const h=md.payload?.headers||[];
+          return{id:m.id,subject:h.find(x=>x.name==='Subject')?.value||'',from:h.find(x=>x.name==='From')?.value||'',date:h.find(x=>x.name==='Date')?.value||'',snippet:md.snippet||''};
+        }));
+        return{emails:details.filter(Boolean)};
+      }
+      case 'gmail_read':{
+        const ok=await ensureGmailReadScope();if(!ok)return{error:'נדרשת הרשאה'};
+        const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${args.id}?format=full`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+        if(!r.ok)return{error:'קריאה נכשלה'};
+        const d=await r.json();
+        let body='';
+        function extract(p){
+          if(p.mimeType==='text/plain'&&p.body?.data)body+=atob(p.body.data.replace(/-/g,'+').replace(/_/g,'/'));
+          if(p.mimeType==='text/html'&&p.body?.data&&!body){const h=atob(p.body.data.replace(/-/g,'+').replace(/_/g,'/'));body+=h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');}
+          if(p.parts)p.parts.forEach(extract);
+        }
+        if(d.payload)extract(d.payload);
+        const h=d.payload?.headers||[];
+        return{subject:h.find(x=>x.name==='Subject')?.value||'',from:h.find(x=>x.name==='From')?.value||'',body:body.slice(0,3000)};
+      }
+      case 'gmail_send':{
+        const ok=await ensureGmailSendScope();if(!ok)return{error:'נדרשת הרשאת שליחת מייל'};
+        const raw=`To: ${args.to}\r\nSubject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(args.subject)))}?=\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${args.body}`;
+        const encoded=btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+        const r=await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send',{
+          method:'POST',headers:{'Authorization':'Bearer '+gAuth.access_token,'Content-Type':'application/json'},
+          body:JSON.stringify({raw:encoded})
+        });
+        if(!r.ok){const e=await r.json().catch(()=>({}));return{error:e.error?.message||'שליחה נכשלה'};}
+        return{success:true,to:args.to,subject:args.subject};
+      }
+    }
+  }catch(e){return{error:e.message};}
+  return{error:'כלי לא ידוע: '+name};
+}
+
+async function ensureGmailReadScope(){
+  if(!gAuth?.access_token)return false;
+  // Try a small request to check; if fails we re-request
+  try{
+    const r=await fetch('https://www.googleapis.com/gmail/v1/users/me/profile',{headers:{Authorization:'Bearer '+gAuth.access_token}});
+    if(r.ok)return true;
+  }catch(_){}
+  return await requestExtraScope('https://www.googleapis.com/auth/gmail.readonly');
+}
+async function ensureGmailSendScope(){
+  if(!gAuth?.access_token)return false;
+  return await requestExtraScope('https://www.googleapis.com/auth/gmail.send');
+}
+function requestExtraScope(scope){
+  return new Promise(resolve=>{
+    try{
+      const tc=google.accounts.oauth2.initTokenClient({
+        client_id:GOOGLE_CLIENT_ID,
+        scope:SCOPES+' '+scope+' https://www.googleapis.com/auth/gmail.readonly',
+        callback:resp=>{
+          if(resp.error){resolve(false);return;}
+          gAuth.access_token=resp.access_token;
+          gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+          localStorage.setItem('vt_auth',JSON.stringify(gAuth));resolve(true);
+        }
+      });
+      tc.requestAccessToken();
+    }catch(e){resolve(false);}
+  });
+}
+
+// ── Context Builder ──────────────────────────────────────────────────────────
+function buildAssistantContext(){
+  const now=new Date();
+  const today=new Date();today.setHours(0,0,0,0);
+  const tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);
+  const weekEnd=new Date(today);weekEnd.setDate(today.getDate()+7);
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+
+  const upcomingTasks=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<=weekEnd)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,15)
+    .map(t=>({id:t.id,text:t.text,datetime:t.datetime,category:t.category}));
+  const overdueTasks=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today).slice(0,5)
+    .map(t=>({id:t.id,text:t.text,datetime:t.datetime}));
+  const recentDone=tasks.filter(t=>t.completed&&t.datetime&&new Date(t.datetime)>=monthStart)
+    .sort((a,b)=>new Date(b.datetime)-new Date(a.datetime)).slice(0,5)
+    .map(t=>({text:t.text,datetime:t.datetime}));
+  const activeRoutines=routines.filter(r=>r.enabled).map(r=>{
+    const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay());
+    const completed=(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
+    return{id:r.id,name:r.name||r.text,target:r.timesPerWeek,completedThisWeek:completed};
+  });
+  const pendingBills=bills.filter(b=>b.status==='pending').slice(0,15)
+    .map(b=>({id:b.id,name:b.name,amount:b.amount,deadline:b.deadline,payDate:b.payDate,category:b.category,recurring:b.recurring}));
+  const monthSpent=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart)
+    .reduce((s,b)=>s+(b.amount||0),0);
+  const recentBillsPaid=bills.filter(b=>b.status==='paid').sort((a,b)=>new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt)).slice(0,8)
+    .map(b=>({name:b.name,amount:b.amount,paidAt:b.paidAt,category:b.category}));
+
+  const memoryBlock=aiSettings.memoryEnabled&&assistantMemory.length
+    ?'\n\n💭 דברים שהמשתמש סיפר לך (זיכרון ארוך טווח):\n'+assistantMemory.map(m=>`- [id:${m.id}] ${m.content}`).join('\n')
+    :'';
+
+  return `אתה עוזר אישי באפליקציית VoiceTask של ${gAuth?.name||'המשתמש'}.
+דבר עברית, תשובות קצרות וישירות, מבוססות נתונים בלבד. אסור להמציא — אם אין מידע, אמור.
+כשהמשתמש מבקש פעולה — השתמש בכלי המתאים. ${aiSettings.readOnly?'⚠️ מצב קריאה בלבד — אין לבצע פעולות שינוי.':''}
+כשהמשתמש משתף עובדה אישית/העדפה (צבע אהוב, שם של בן משפחה, מקום עבודה, הרגלים) — קרא ל-save_memory לזכור אותה לעתיד. אל תבקש אישור — פשוט שמור. ציין בקצרה "💭 זכרתי".
+תאריך עכשיו: ${now.toISOString()} (${now.toLocaleString('he-IL')})
+
+📌 משימות קרובות (${upcomingTasks.length}):
+${upcomingTasks.map(t=>`- [id:${t.id}] ${t.text} (${t.datetime}, ${t.category})`).join('\n')||'אין'}
+
+⏰ באיחור (${overdueTasks.length}):
+${overdueTasks.map(t=>`- [id:${t.id}] ${t.text} (${t.datetime})`).join('\n')||'אין'}
+
+✅ הושלמו לאחרונה:
+${recentDone.map(t=>`- ${t.text}`).join('\n')||'אין'}
+
+🔄 שגרות פעילות:
+${activeRoutines.map(r=>`- ${r.name}: ${r.completedThisWeek}/${r.target} השבוע`).join('\n')||'אין'}
+
+💳 חשבונות ממתינים (${pendingBills.length}):
+${pendingBills.map(b=>`- [id:${b.id}] ${b.name} ₪${b.amount||0} · דדליין ${b.deadline||'—'} · תשלום שלי ${b.payDate||'—'} · ${b.recurring||'none'}`).join('\n')||'אין'}
+
+💰 הוצאות החודש: ₪${Math.round(monthSpent).toLocaleString('he-IL')}
+חשבונות ששולמו לאחרונה:
+${recentBillsPaid.map(b=>`- ${b.name} ₪${b.amount} (${b.paidAt?new Date(b.paidAt).toLocaleDateString('he-IL'):''})`).join('\n')||'אין'}${memoryBlock}`;
+}
+
+// ── Chat Engine ──────────────────────────────────────────────────────────────
+let _chatBusy=false;
+async function sendChat(){
+  if(_chatBusy)return;
+  const inp=document.getElementById('asstInput');
+  const text=inp.value.trim();if(!text)return;
+  if(!aiSettings.key){toast('⚠️ הגדר מפתח Gemini בהגדרות');return;}
+  inp.value='';inp.style.height='auto';
+  chatHistory.push({role:'user',parts:[{text}]});
+  saveChatHistory();
+  renderChatMessages();
+  await runChatLoop();
+}
+function askQuick(q){
+  document.getElementById('asstInput').value=q;
+  sendChat();
+}
+
+async function runChatLoop(){
+  _chatBusy=true;
+  document.getElementById('asstSendBtn').textContent='…';
+  // Show typing indicator
+  const typing=document.createElement('div');
+  typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
+  document.getElementById('chatScroll')?.appendChild(typing);
+  scrollChatBottom();
+  try{
+    let iterations=0;
+    while(iterations<5){
+      iterations++;
+      const sys=buildAssistantContext();
+      const body={
+        systemInstruction:{parts:[{text:sys}]},
+        contents:chatHistory,
+        tools:GEMINI_TOOLS,
+        generationConfig:{temperature:0.4,maxOutputTokens:1500}
+      };
+      aiSettings.dailyCount++;saveAiSettings();updateAiUsageInfo();
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+      });
+      if(!r.ok){
+        const e=await r.json().catch(()=>({}));
+        chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+(e.error?.message||r.status)}]});
+        break;
+      }
+      const data=await r.json();
+      const cand=data.candidates?.[0];if(!cand){break;}
+      const parts=cand.content?.parts||[];
+      // Detect function calls
+      const calls=parts.filter(p=>p.functionCall);
+      const textParts=parts.filter(p=>p.text).map(p=>p.text).join('');
+      if(textParts){
+        chatHistory.push({role:'model',parts:[{text:textParts}]});
+      }
+      if(!calls.length){
+        // No tool calls — done
+        break;
+      }
+      // Add the model's call to history
+      chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall}))});
+      // Execute each tool call
+      const toolResponses=[];
+      for(const c of calls){
+        const fc=c.functionCall;
+        let result;
+        if(CONFIRM_TOOLS.has(fc.name)&&!aiSettings.readOnly){
+          result=await confirmToolCall(fc);
+        }else{
+          result=await executeTool(fc.name,fc.args||{});
+        }
+        // Special UI signal for memory save
+        if(fc.name==='save_memory'&&result.success){
+          showMemorySaved(result.content);
+        }
+        toolResponses.push({functionResponse:{name:fc.name,response:result}});
+      }
+      chatHistory.push({role:'function',parts:toolResponses});
+      // Loop again so model can respond to tool results
+    }
+    saveChatHistory();
+  }catch(e){
+    chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+e.message}]});
+  }finally{
+    typing.remove();
+    _chatBusy=false;
+    document.getElementById('asstSendBtn').textContent='↑';
+    renderChatMessages();
+  }
+}
+
+function confirmToolCall(fc){
+  return new Promise(resolve=>{
+    const args=fc.args||{};
+    let summary='';
+    if(fc.name==='gmail_send')summary=`📧 שליחת מייל\nאל: ${args.to}\nנושא: ${args.subject}\n\n${args.body}`;
+    else if(fc.name==='gcal_create_event')summary=`📅 אירוע ביומן\n${args.summary}\nמ: ${new Date(args.start).toLocaleString('he-IL')}\nעד: ${new Date(args.end).toLocaleString('he-IL')}`;
+    else if(fc.name==='delete_task')summary=`🗑️ מחיקת משימה (id: ${args.id})`;
+    else if(fc.name==='add_bill')summary=`💳 הוספת חשבון: ${args.name}${args.amount?' ₪'+args.amount:''}${args.deadline?' · דדליין '+args.deadline:''}`;
+    const wrap=document.createElement('div');
+    wrap.className='chat-confirm';
+    wrap.innerHTML=`<div class="chat-confirm-title">⚠️ אישור פעולה</div>
+      <pre class="chat-confirm-body">${esc(summary)}</pre>
+      <div class="chat-confirm-actions">
+        <button class="chat-confirm-yes">✓ בצע</button>
+        <button class="chat-confirm-no">✕ בטל</button>
+      </div>`;
+    document.getElementById('chatScroll')?.appendChild(wrap);
+    scrollChatBottom();
+    wrap.querySelector('.chat-confirm-yes').onclick=async()=>{wrap.remove();resolve(await executeTool(fc.name,args));};
+    wrap.querySelector('.chat-confirm-no').onclick=()=>{wrap.remove();resolve({cancelled:true,message:'המשתמש ביטל את הפעולה'});};
+  });
+}
+
+function showMemorySaved(content){
+  const wrap=document.createElement('div');
+  wrap.className='chat-memory-saved';
+  wrap.innerHTML=`💭 שמרתי לזיכרון: <strong>${esc(content)}</strong>`;
+  document.getElementById('chatScroll')?.appendChild(wrap);
+  scrollChatBottom();
+}
+
+function renderChatMessages(){
+  const body=document.getElementById('assistantBody');if(!body)return;
+  if(_asstTab!=='chat')return;
+  let html='<div class="chat-scroll" id="chatScroll">';
+  if(!chatHistory.length){
+    html+='<div class="chat-empty">👋 שאל אותי כל דבר על המשימות, השגרות והחשבונות שלך</div>';
+  }
+  chatHistory.forEach(m=>{
+    if(m.role==='function')return;
+    const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
+    const calls=(m.parts||[]).filter(p=>p.functionCall);
+    if(txt){
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}</div>`;
+    }
+    if(calls.length&&m.role==='model'){
+      calls.forEach(c=>{
+        html+=`<div class="chat-tool-call">🔧 ${esc(c.functionCall.name)}(${esc(JSON.stringify(c.functionCall.args||{}).slice(0,100))})</div>`;
+      });
+    }
+  });
+  html+='</div>';
+  body.innerHTML=html;
+  scrollChatBottom();
+}
+function scrollChatBottom(){
+  const s=document.getElementById('chatScroll');if(s)s.scrollTop=s.scrollHeight;
+}
+
+// ── Memory tab UI ────────────────────────────────────────────────────────────
+function renderMemoryTab(){
+  const body=document.getElementById('assistantBody');if(!body)return;
+  let html='<div class="memory-list">';
+  html+='<button class="bill-form-import" onclick="memoryAddManual()" style="margin:0 16px 12px;width:calc(100% - 32px)">＋ הוסף זיכרון ידני</button>';
+  if(!assistantMemory.length){
+    html+='<div class="asst-empty">העוזר עדיין לא מכיר אותך 👋<br><span style="font-size:11px;color:var(--muted)">שתף עובדות בשיחה — הוא יזכור אוטומטית</span></div>';
+  }else{
+    assistantMemory.slice().reverse().forEach(m=>{
+      const ds=new Date(m.createdAt).toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+      html+=`<div class="memory-item">
+        <div class="memory-content">${esc(m.content)}</div>
+        <div class="memory-meta">${m.type||'fact'} · ${ds}</div>
+        <button class="memory-del" onclick="if(confirm('למחוק זיכרון?')){memoryDelete(${m.id});renderAssistant()}">🗑️</button>
+      </div>`;
+    });
+  }
+  html+='</div>';
+  body.innerHTML=html;
+}
+
 // ── Assistant (Layer 1: local proactive insights) ────────────────────────────
-let _asstTab='today';
+let _asstTab='chat';
 function openAssistantSheet(){
   document.getElementById('assistantOverlay').classList.add('on');
   document.getElementById('assistantSheet').classList.add('on');
+  // Show chat bar by default
+  const bar=document.getElementById('asstChatBar');
+  if(bar)bar.style.display=_asstTab==='chat'?'block':'none';
   renderAssistant();
 }
 function closeAssistantSheet(){
@@ -5672,6 +6236,9 @@ function closeAssistantSheet(){
 function setAsstTab(cat){
   _asstTab=cat;
   document.querySelectorAll('.asst-tab').forEach(b=>b.classList.toggle('on',b.dataset.cat===cat));
+  // Show chat input bar only on chat tab
+  const bar=document.getElementById('asstChatBar');
+  if(bar)bar.style.display=cat==='chat'?'block':'none';
   renderAssistant();
 }
 
@@ -5684,7 +6251,7 @@ function renderAssistant(){
   const greetTxt=h<5?'לילה טוב':h<12?'בוקר טוב':h<17?'צהריים טובים':h<21?'ערב טוב':'לילה טוב';
   const name=gAuth?.name?.split(' ')[0]||'';
   const insights={today:asstToday(),risks:asstRisks(),money:asstMoney(),patterns:asstPatterns()};
-  const counts={today:insights.today.length,risks:insights.risks.length,money:insights.money.length,patterns:insights.patterns.length};
+  const counts={today:insights.today.length,risks:insights.risks.length,money:insights.money.length,patterns:insights.patterns.length,chat:0,memory:assistantMemory.length};
   // Update tab badges
   document.querySelectorAll('.asst-tab').forEach(b=>{
     const c=counts[b.dataset.cat]||0;
@@ -5692,15 +6259,16 @@ function renderAssistant(){
     b.textContent=c?`${lbl} (${c})`:lbl;
     if(b.dataset.cat==='risks')b.classList.toggle('hot',c>0);
   });
-  greet.innerHTML=`<div class="asst-greet-name">${greetTxt}${name?' '+name:''} 👋</div><div class="asst-greet-sub">סיכום המצב שלך עכשיו</div>`;
-  // Render selected tab
+  greet.innerHTML=`<div class="asst-greet-name">${greetTxt}${name?' '+name:''} 👋</div><div class="asst-greet-sub">${_asstTab==='chat'?'שיחה אישית עם Gemini':_asstTab==='memory'?'מה העוזר זוכר עליך':'סיכום המצב שלך עכשיו'}</div>`;
+  // Dispatch by tab
+  if(_asstTab==='chat'){renderChatMessages();updateAssistantBadge();return;}
+  if(_asstTab==='memory'){renderMemoryTab();updateAssistantBadge();return;}
   const list=insights[_asstTab];
   if(!list.length){
     body.innerHTML=`<div class="asst-empty">אין תובנות בקטגוריה זו 👌<br><span style="font-size:11px;color:var(--muted)">המשך כך — הכל תחת שליטה</span></div>`;
-    return;
+    updateAssistantBadge();return;
   }
   body.innerHTML=list.map(renderAsstCard).join('');
-  // Update side badge
   updateAssistantBadge();
 }
 
