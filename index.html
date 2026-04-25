@@ -6278,7 +6278,7 @@ async function runChatLoop(){
       const sys=buildAssistantContext();
       const body={
         systemInstruction:{parts:[{text:sys}]},
-        contents:chatHistory,
+        contents:chatHistory.map(m=>({role:m.role,parts:m.parts})),
         tools:GEMINI_TOOLS,
         generationConfig:{temperature:0.4,maxOutputTokens:1500}
       };
