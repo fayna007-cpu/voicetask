@@ -1241,6 +1241,32 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-budget-bar.over .bill-budget-fill{background:oklch(0.65 0.22 25)}
 .bill-budget-bar.over .bill-budget-nums{color:oklch(0.75 0.2 25)}
 
+/* ── Assistant ── */
+.assistant-side-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;background:oklch(0.55 0.22 25);color:#fff;border-radius:10px;font-size:11px;font-weight:800;margin-inline-start:auto}
+.assistant-greeting{padding:8px 16px 12px}
+.asst-greet-name{font-size:18px;font-weight:800;color:var(--text)}
+.asst-greet-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.assistant-tabs{display:flex;gap:6px;padding:0 16px 12px;overflow-x:auto;scrollbar-width:none}
+.assistant-tabs::-webkit-scrollbar{display:none}
+.asst-tab{flex-shrink:0;padding:7px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;color:var(--muted);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;white-space:nowrap}
+.asst-tab.on{background:oklch(0.55 0.16 285 / 0.15);border-color:oklch(0.55 0.16 285 / 0.5);color:oklch(0.78 0.18 285)}
+.asst-tab.hot{animation:asstHotPulse 1.8s ease-in-out infinite}
+@keyframes asstHotPulse{0%,100%{box-shadow:0 0 0 0 oklch(0.55 0.22 25 / 0.6)}50%{box-shadow:0 0 0 6px oklch(0.55 0.22 25 / 0)}}
+
+.asst-card{background:var(--surface2);border-radius:14px;padding:12px 14px;margin:0 16px 8px;border:1px solid var(--border2)}
+.asst-card.sev-info{border-color:oklch(0.55 0.16 285 / 0.3);background:oklch(0.55 0.16 285 / 0.06)}
+.asst-card.sev-good{border-color:oklch(0.55 0.18 145 / 0.3);background:oklch(0.55 0.18 145 / 0.06)}
+.asst-card.sev-warn{border-color:oklch(0.65 0.2 50 / 0.4);background:oklch(0.65 0.2 50 / 0.06)}
+.asst-card.sev-high{border-color:oklch(0.65 0.22 25 / 0.5);background:oklch(0.65 0.22 25 / 0.08)}
+.asst-card-top{display:flex;align-items:flex-start;gap:10px}
+.asst-card-ico{font-size:20px;flex-shrink:0;line-height:1.2}
+.asst-card-body{flex:1;min-width:0}
+.asst-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35}
+.asst-card-detail{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45}
+.asst-action{display:block;margin-top:9px;padding:7px 14px;background:var(--accent);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;width:fit-content}
+.asst-action:active{filter:brightness(0.85)}
+.asst-empty{padding:50px 20px;text-align:center;color:var(--text);font-size:14px;font-weight:600}
+
 /* Bill form */
 .bill-form-body{padding:0 16px;display:flex;flex-direction:column;gap:14px}
 .bill-form-group{display:flex;flex-direction:column;gap:4px}

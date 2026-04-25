@@ -221,6 +221,11 @@
       <div class="side-item-ico" style="background:oklch(0.45 0.18 145 / 0.2);color:oklch(0.72 0.20 145)">🚀</div>
       מנוע הצמיחה
     </button>
+    <button class="side-item" onclick="closeSideMenu();openAssistantSheet()">
+      <div class="side-item-ico" style="background:oklch(0.55 0.16 285 / 0.2);color:oklch(0.78 0.18 285)">🤖</div>
+      העוזר שלי
+      <span class="assistant-side-badge" id="assistantSideBadge" style="display:none"></span>
+    </button>
     <button class="side-item" onclick="closeSideMenu();openBillsSheet()">
       <div class="side-item-ico" style="background:oklch(0.45 0.18 30 / 0.2);color:oklch(0.72 0.18 30)">💳</div>
       חשבונות
@@ -980,6 +985,28 @@
   <div class="postpone-actions">
     <button class="postpone-confirm" onclick="confirmPostpone()">דחה</button>
     <button class="postpone-cancel" onclick="closePostpone()">בטל</button>
+  </div>
+</div>
+
+<!-- Assistant overlay & sheet -->
+<div class="routine-overlay" id="assistantOverlay" onclick="closeAssistantSheet()"></div>
+<div class="rsheet assistant-sheet" id="assistantSheet">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="closeAssistantSheet()">✕</button>
+    <h3>🤖 העוזר שלי</h3>
+    <button class="rsheet-action-btn" onclick="renderAssistant()" style="font-size:14px;background:none;border:none;color:var(--accent);cursor:pointer">↻ רענן</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="assistant-greeting" id="assistantGreeting"></div>
+    <div class="assistant-tabs" id="assistantTabs">
+      <button class="asst-tab on" data-cat="today" onclick="setAsstTab('today')">📌 היום</button>
+      <button class="asst-tab" data-cat="risks" onclick="setAsstTab('risks')">⚠️ דחוף</button>
+      <button class="asst-tab" data-cat="money" onclick="setAsstTab('money')">💰 כסף</button>
+      <button class="asst-tab" data-cat="patterns" onclick="setAsstTab('patterns')">📊 דפוסים</button>
+    </div>
+    <div id="assistantBody"></div>
+    <div style="height:80px"></div>
   </div>
 </div>
 
@@ -2529,6 +2556,7 @@ function render(){
   updateGreeting();
   renderCalView();
   updateBillsSideBadge();
+  try{updateAssistantBadge();}catch(_){}
 }
 
 function updateGreeting(){
@@ -2842,7 +2870,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet','assistantSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -3910,6 +3938,8 @@ function initSwipeGestures(){
   const billsOv=document.getElementById('billsOverlay');
   initSheetSwipe(document.getElementById('billsListSheet'),billsOv);
   initSheetSwipe(document.getElementById('billFormSheet'),billsOv);
+  // Assistant sheet
+  initAssistantSwipe();
 }
 
 // ── Calendar Panel ────────────────────────────────────────────────────────────
@@ -5628,6 +5658,281 @@ function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+// ── Assistant (Layer 1: local proactive insights) ────────────────────────────
+let _asstTab='today';
+function openAssistantSheet(){
+  document.getElementById('assistantOverlay').classList.add('on');
+  document.getElementById('assistantSheet').classList.add('on');
+  renderAssistant();
+}
+function closeAssistantSheet(){
+  document.getElementById('assistantOverlay').classList.remove('on');
+  document.getElementById('assistantSheet').classList.remove('on');
+}
+function setAsstTab(cat){
+  _asstTab=cat;
+  document.querySelectorAll('.asst-tab').forEach(b=>b.classList.toggle('on',b.dataset.cat===cat));
+  renderAssistant();
+}
+
+function renderAssistant(){
+  const greet=document.getElementById('assistantGreeting');
+  const body=document.getElementById('assistantBody');
+  if(!body)return;
+  // Greeting line
+  const h=new Date().getHours();
+  const greetTxt=h<5?'לילה טוב':h<12?'בוקר טוב':h<17?'צהריים טובים':h<21?'ערב טוב':'לילה טוב';
+  const name=gAuth?.name?.split(' ')[0]||'';
+  const insights={today:asstToday(),risks:asstRisks(),money:asstMoney(),patterns:asstPatterns()};
+  const counts={today:insights.today.length,risks:insights.risks.length,money:insights.money.length,patterns:insights.patterns.length};
+  // Update tab badges
+  document.querySelectorAll('.asst-tab').forEach(b=>{
+    const c=counts[b.dataset.cat]||0;
+    const lbl=b.textContent.replace(/\s\(\d+\)$/,'');
+    b.textContent=c?`${lbl} (${c})`:lbl;
+    if(b.dataset.cat==='risks')b.classList.toggle('hot',c>0);
+  });
+  greet.innerHTML=`<div class="asst-greet-name">${greetTxt}${name?' '+name:''} 👋</div><div class="asst-greet-sub">סיכום המצב שלך עכשיו</div>`;
+  // Render selected tab
+  const list=insights[_asstTab];
+  if(!list.length){
+    body.innerHTML=`<div class="asst-empty">אין תובנות בקטגוריה זו 👌<br><span style="font-size:11px;color:var(--muted)">המשך כך — הכל תחת שליטה</span></div>`;
+    return;
+  }
+  body.innerHTML=list.map(renderAsstCard).join('');
+  // Update side badge
+  updateAssistantBadge();
+}
+
+function renderAsstCard(ins){
+  const actHtml=ins.action?`<button class="asst-action" onclick="${ins.action.fn.replace(/"/g,'&quot;')}">${ins.action.label}</button>`:'';
+  const sevCls=ins.severity?'sev-'+ins.severity:'';
+  return `<div class="asst-card ${sevCls}">
+    <div class="asst-card-top">
+      <span class="asst-card-ico">${ins.icon}</span>
+      <div class="asst-card-body">
+        <div class="asst-card-title">${ins.title}</div>
+        ${ins.detail?`<div class="asst-card-detail">${ins.detail}</div>`:''}
+      </div>
+    </div>
+    ${actHtml}
+  </div>`;
+}
+
+// ── Insight builders ─────────────────────────────────────────────────────────
+function _ymdLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function asstToday(){
+  const out=[];
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  const tEnd=new Date(today);tEnd.setHours(23,59,59,999);
+  // Today's tasks
+  const todayT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=today&&new Date(t.datetime)<=tEnd);
+  // Today's routines
+  const routInst=getRoutineInstances().filter(r=>!r.completed&&new Date(r.datetime)>=today&&new Date(r.datetime)<=tEnd);
+  // Today's bills (pay date today)
+  const todayB=bills.filter(b=>{
+    if(b.status==='paid')return false;
+    if(!b.payDate)return false;
+    const pd=new Date(b.payDate);pd.setHours(0,0,0,0);
+    return pd.getTime()===today.getTime();
+  });
+  // Plan summary
+  const total=todayT.length+routInst.length+todayB.length;
+  if(total>0){
+    out.push({icon:'🎯',severity:'info',title:`היום יש לך ${total} פריטים`,detail:`${todayT.length} משימות · ${routInst.length} שגרות · ${todayB.length} חשבונות`});
+  }else{
+    out.push({icon:'☀️',title:'היום פנוי',detail:'אין פריטים מתוכננים — אולי לתכנן?',action:{label:'פתח תכנון',fn:'closeAssistantSheet();showDailyPopup()'}});
+  }
+  // Specific bills today
+  todayB.forEach(b=>{
+    out.push({icon:'💳',severity:'warn',title:`חשבון לתשלום היום: ${b.name}`,detail:b.amount?`₪${b.amount}`:'',action:{label:'פתח',fn:`closeAssistantSheet();openBillsSheet();setTimeout(()=>openBillForm(${b.id}),300)`}});
+  });
+  // Next 3 incomplete tasks
+  todayT.slice(0,3).forEach(t=>{
+    const dt=new Date(t.datetime);const ts=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+    out.push({icon:'📌',title:t.text.slice(0,60),detail:'⏰ '+ts,action:{label:'סיים',fn:`toggleDone(${t.id});renderAssistant()`}});
+  });
+  // Overdue from yesterday
+  const overdueT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today);
+  if(overdueT.length){
+    out.push({icon:'⏰',severity:'warn',title:`${overdueT.length} משימות באיחור`,detail:'משימות שלא הושלמו מימים קודמים',action:{label:'הצג',fn:`closeAssistantSheet();setFilter('all')`}});
+  }
+  return out;
+}
+
+function asstRisks(){
+  const out=[];
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  // Bills approaching deadline (≤3 days)
+  bills.filter(b=>b.status==='pending'&&b.deadline).forEach(b=>{
+    const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
+    const days=Math.ceil((dl-today)/(86400000));
+    if(days<0){
+      out.push({icon:'🚨',severity:'high',title:`חשבון ${b.name} באיחור`,detail:`עברו ${Math.abs(days)} ימים מהדדליין${b.amount?' · ₪'+b.amount:''}`,action:{label:'פתח',fn:`closeAssistantSheet();openBillsSheet();setTimeout(()=>openBillForm(${b.id}),300)`}});
+    }else if(days<=3){
+      out.push({icon:'⏰',severity:'warn',title:`${b.name} — עוד ${days===0?'היום':days+' ימים'}`,detail:`דדליין חברה${b.amount?' · ₪'+b.amount:''}`,action:{label:'פתח',fn:`closeAssistantSheet();openBillsSheet();setTimeout(()=>openBillForm(${b.id}),300)`}});
+    }
+  });
+  // Routines not done this week
+  const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay());
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const target=r.timesPerWeek||0;if(!target)return;
+    const completed=(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
+    if(completed===0&&target>0){
+      out.push({icon:'🎯',severity:'warn',title:`${r.name||r.text} — לא בוצעה השבוע`,detail:`יעד: ${target} פעמים בשבוע`,action:{label:'קבע',fn:`closeAssistantSheet();openRoutineSheet()`}});
+    }else if(completed<target/2){
+      out.push({icon:'📉',title:`${r.name||r.text} — ${completed}/${target}`,detail:'מתחת לחצי מהיעד השבועי'});
+    }
+  });
+  // Unsynced bills with dates
+  const unsyncedBills=bills.filter(b=>b.status==='pending'&&(b.payDate||b.deadline)&&!b.calendarEventId&&!b.deadlineEventId);
+  if(unsyncedBills.length>0){
+    out.push({icon:'📅',title:`${unsyncedBills.length} חשבונות לא מסונכרנים ליומן`,detail:'תאריכים שלא יופיעו ביומן גוגל',action:{label:'סנכרן הכל',fn:`syncAllBills()`}});
+  }
+  return out;
+}
+
+function asstMoney(){
+  const out=[];
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const lastMonthEnd=new Date(now.getFullYear(),now.getMonth(),0,23,59,59);
+  // Spent this month
+  const paidThisMonth=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart);
+  const spentThis=paidThisMonth.reduce((s,b)=>s+(b.amount||0),0);
+  // Spent last month
+  const paidLast=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=lastMonthStart&&new Date(b.paidAt)<=lastMonthEnd);
+  const spentLast=paidLast.reduce((s,b)=>s+(b.amount||0),0);
+  // Pending
+  const pendingTotal=bills.filter(b=>b.status==='pending').reduce((s,b)=>s+(b.amount||0),0);
+  // Header summary
+  out.push({icon:'💰',severity:'info',title:`החודש שילמת ₪${Math.round(spentThis).toLocaleString('he-IL')}`,detail:`חודש קודם: ₪${Math.round(spentLast).toLocaleString('he-IL')} · ממתין: ₪${Math.round(pendingTotal).toLocaleString('he-IL')}`});
+  // Trend vs last month
+  if(spentLast>0){
+    const diff=spentThis-spentLast;
+    const pct=Math.round(diff/spentLast*100);
+    if(Math.abs(pct)>=15){
+      out.push({icon:diff>0?'📈':'📉',severity:diff>0?'warn':'good',title:`${diff>0?'עלייה':'ירידה'} של ${Math.abs(pct)}% מחודש קודם`,detail:`הפרש: ₪${Math.abs(Math.round(diff)).toLocaleString('he-IL')}`});
+    }
+  }
+  // Variable bills spike
+  const billsByName={};
+  bills.filter(b=>b.status==='paid'&&b.amount>0).forEach(b=>{
+    if(!billsByName[b.name])billsByName[b.name]=[];
+    billsByName[b.name].push(b);
+  });
+  Object.keys(billsByName).forEach(name=>{
+    const arr=billsByName[name].sort((a,b)=>new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt));
+    if(arr.length<3)return;
+    const recent=arr[0].amount;
+    const prev=(arr[1].amount+arr[2].amount)/2;
+    if(recent>prev*1.2){
+      const pct=Math.round((recent/prev-1)*100);
+      out.push({icon:'⚠️',severity:'warn',title:`${name} עלה ב-${pct}%`,detail:`אחרון: ₪${recent} · ממוצע: ₪${Math.round(prev)}`,action:{label:'בדוק',fn:`closeAssistantSheet();openBillsSheet();setTimeout(()=>openBillForm(${arr[0].id}),300)`}});
+    }
+  });
+  // Category breakdown (top 3)
+  const byCat={};
+  paidThisMonth.forEach(b=>{byCat[b.category]=(byCat[b.category]||0)+(b.amount||0);});
+  const catArr=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  if(catArr.length){
+    out.push({icon:'📊',title:'קטגוריות מובילות החודש',detail:catArr.map(([c,v])=>`${BILL_CATS[c]||'📄'} ${c}: ₪${Math.round(v).toLocaleString('he-IL')}`).join(' · ')});
+  }
+  // Budget status
+  const budget=notifSettings?.bills?.monthlyBudget||0;
+  if(budget>0){
+    const pct=Math.round(spentThis/budget*100);
+    if(pct>=100){
+      out.push({icon:'🚨',severity:'high',title:`חרגת מהתקציב — ${pct}%`,detail:`₪${Math.round(spentThis).toLocaleString('he-IL')} מתוך ₪${budget.toLocaleString('he-IL')}`});
+    }else if(pct>=80){
+      out.push({icon:'⚠️',severity:'warn',title:`קרוב לתקציב — ${pct}%`,detail:`₪${Math.round(spentThis).toLocaleString('he-IL')} מתוך ₪${budget.toLocaleString('he-IL')}`});
+    }
+  }else{
+    out.push({icon:'💡',title:'תרצה תקציב חודשי?',detail:'הגדר סכום ותקבל התראות חריגה',action:{label:'הגדר',fn:`closeAssistantSheet();openSettings()`}});
+  }
+  return out;
+}
+
+function asstPatterns(){
+  const out=[];
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  const weekAgo=new Date(today);weekAgo.setDate(today.getDate()-7);
+  // Task completion rate this week
+  const tasksThisWeek=tasks.filter(t=>t.datetime&&new Date(t.datetime)>=weekAgo&&new Date(t.datetime)<=today);
+  const completedThisWeek=tasksThisWeek.filter(t=>t.completed).length;
+  if(tasksThisWeek.length>=3){
+    const rate=Math.round(completedThisWeek/tasksThisWeek.length*100);
+    out.push({icon:rate>=70?'🔥':rate>=40?'👍':'📉',severity:rate>=70?'good':rate>=40?'info':'warn',title:`השלמת משימות השבוע: ${rate}%`,detail:`${completedThisWeek} מתוך ${tasksThisWeek.length} משימות`});
+  }
+  // Most productive hour
+  const completedTasks=tasks.filter(t=>t.completed&&t.datetime);
+  if(completedTasks.length>=5){
+    const hourCounts={};
+    completedTasks.forEach(t=>{const h=new Date(t.datetime).getHours();hourCounts[h]=(hourCounts[h]||0)+1;});
+    const best=Object.entries(hourCounts).sort((a,b)=>b[1]-a[1])[0];
+    if(best){
+      const h=parseInt(best[0]);const lbl=h<12?'בוקר':h<17?'צהריים':h<21?'ערב':'לילה';
+      out.push({icon:'⏰',title:`השעה הכי פרודוקטיבית שלך: ${h}:00`,detail:`${lbl} — שווה לקבוע משימות חשובות בשעה זו`});
+    }
+  }
+  // Routines adherence
+  const adherence=[];
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const target=r.timesPerWeek||0;if(!target)return;
+    const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay());
+    const completed=(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
+    adherence.push({name:r.name||r.text,completed,target,pct:Math.round(completed/target*100)});
+  });
+  if(adherence.length){
+    const avgPct=Math.round(adherence.reduce((s,a)=>s+Math.min(100,a.pct),0)/adherence.length);
+    out.push({icon:'🎯',severity:avgPct>=70?'good':'info',title:`עמידה בשגרות: ${avgPct}%`,detail:adherence.slice(0,3).map(a=>`${a.name} ${a.completed}/${a.target}`).join(' · ')});
+  }
+  // Recurring bills count
+  const recurring=bills.filter(b=>b.recurring&&b.recurring!=='none');
+  if(recurring.length){
+    const monthlyEst=recurring.filter(b=>b.recurring==='monthly').reduce((s,b)=>s+(b.amount||0),0);
+    const bimonthlyEst=recurring.filter(b=>b.recurring==='bimonthly').reduce((s,b)=>s+(b.amount||0),0)/2;
+    const total=monthlyEst+bimonthlyEst;
+    if(total>0)out.push({icon:'🔄',title:`חשבונות קבועים חודשיים: ₪${Math.round(total).toLocaleString('he-IL')}`,detail:`${recurring.length} חשבונות חוזרים`});
+  }
+  // Bills count overall
+  if(bills.length>=3){
+    const paidCount=bills.filter(b=>b.status==='paid').length;
+    out.push({icon:'📋',title:`עד היום ${paidCount} חשבונות שולמו`,detail:`סה"כ במערכת: ${bills.length}`});
+  }
+  return out;
+}
+
+// Sync all unsynced bills (helper for risks)
+async function syncAllBills(){
+  const unsynced=bills.filter(b=>b.status==='pending'&&(b.payDate||b.deadline)&&!b.calendarEventId&&!b.deadlineEventId);
+  if(!unsynced.length){toast('אין מה לסנכרן');return;}
+  toast('⏳ מסנכרן '+unsynced.length+' חשבונות...');
+  let ok=0;
+  for(const b of unsynced){
+    await syncBillToCalendar(b);
+    if(b.calendarEventId||b.deadlineEventId)ok++;
+  }
+  toast('✅ סונכרנו '+ok+'/'+unsynced.length);
+  renderAssistant();
+}
+
+// Side menu badge: count high-severity insights
+function updateAssistantBadge(){
+  const badge=document.getElementById('assistantSideBadge');if(!badge)return;
+  const count=asstRisks().filter(i=>i.severity==='high'||i.severity==='warn').length;
+  if(count>0){badge.textContent=count;badge.style.display='inline-flex';}
+  else badge.style.display='none';
+}
+
+// Init swipe for assistant sheet
+function initAssistantSwipe(){
+  const ov=document.getElementById('assistantOverlay');
+  initSheetSwipe(document.getElementById('assistantSheet'),ov);
+}
+
 // ── Bills ─────────────────────────────────────────────────────────────────────
 let bills=JSON.parse(localStorage.getItem('vt_bills')||'[]');
 let _billEditId=null;
