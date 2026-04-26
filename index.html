@@ -512,9 +512,12 @@
         <div class="settings-row-body"><div class="settings-row-title">מצב קריאה בלבד</div><div class="settings-row-sub">חוסם פעולות שליחה/יצירה (מייל, אירועים, משימות)</div></div>
         <label class="rtoggle"><input type="checkbox" id="aiReadOnly" onchange="saveAiSettings()"><span class="rtoggle-sl"></span></label>
       </div>
-      <div class="settings-row" style="cursor:default">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:6px">
         <div class="settings-row-body"><div class="settings-row-title">שימוש היום</div><div class="settings-row-sub" id="aiUsageInfo">0 בקשות נשלחו</div></div>
-        <button class="bill-form-import" onclick="clearChatHistory()" style="font-size:11px">נקה שיחה</button>
+        <div style="display:flex;gap:6px">
+          <button class="bill-form-import" onclick="clearChatErrors()" style="flex:1;font-size:11px">🧹 נקה שגיאות</button>
+          <button class="bill-form-import" onclick="clearChatHistory()" style="flex:1;font-size:11px">🗑️ נקה שיחה</button>
+        </div>
       </div>
       <div class="settings-row" style="cursor:default;align-items:flex-start">
         <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.15);color:oklch(0.78 0.18 285)">🛡️</div>
@@ -6006,6 +6009,13 @@ function clearChatHistory(){
   if(_asstTab==='chat')renderAssistant();
   toast('🗑️ היסטוריה נמחקה');
 }
+function clearChatErrors(){
+  const before=chatHistory.length;
+  chatHistory=chatHistory.filter(m=>!isErrorMessage(m));
+  saveChatHistory();
+  if(_asstTab==='chat')renderAssistant();
+  toast('🧹 הוסרו '+(before-chatHistory.length)+' הודעות שגיאה');
+}
 
 async function testGeminiConnection(){
   saveAiSettings();
@@ -6102,9 +6112,14 @@ async function testAllProviders(){
 function geminiToolsToOpenai(){
   return GEMINI_TOOLS[0].functionDeclarations.map(fn=>({type:'function',function:{name:fn.name,description:fn.description,parameters:fn.parameters}}));
 }
+function isErrorMessage(m){
+  if(m.role!=='model')return false;
+  const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
+  return txt.startsWith('❌');
+}
 function chatHistoryToOpenai(systemPrompt){
   const msgs=[{role:'system',content:systemPrompt}];
-  chatHistory.forEach(m=>{
+  chatHistory.filter(m=>!isErrorMessage(m)).forEach(m=>{
     if(m.role==='user'){
       const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('');
       if(txt)msgs.push({role:'user',content:txt});
@@ -6158,7 +6173,7 @@ async function callProvider(provider,systemPrompt){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         systemInstruction:{parts:[{text:systemPrompt}]},
-        contents:chatHistory.map(m=>({role:m.role==='function'?'function':m.role,parts:m.parts})).filter(m=>m.role!=='function'||m.parts.length),
+        contents:chatHistory.filter(m=>!isErrorMessage(m)).map(m=>({role:m.role==='function'?'function':m.role,parts:m.parts})).filter(m=>m.role!=='function'||m.parts.length),
         tools:GEMINI_TOOLS,
         generationConfig:{temperature:0.4,maxOutputTokens:1500}
       })
@@ -6750,6 +6765,10 @@ let _asstTab='chat';
 function openAssistantSheet(){
   document.getElementById('assistantOverlay').classList.add('on');
   document.getElementById('assistantSheet').classList.add('on');
+  // Auto-cleanup: remove old error messages so they don't pollute new sessions
+  const before=chatHistory.length;
+  chatHistory=chatHistory.filter(m=>!isErrorMessage(m));
+  if(chatHistory.length<before)saveChatHistory();
   // Show chat bar by default
   const bar=document.getElementById('asstChatBar');
   if(bar)bar.style.display=_asstTab==='chat'?'block':'none';
