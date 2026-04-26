@@ -487,6 +487,8 @@
       <div class="settings-row" style="cursor:default;border-top:1px solid var(--border);padding-top:14px">
         <div class="settings-row-body"><div class="settings-row-title">סדר ספקים</div><div class="settings-row-sub">בחר ראשי + גיבוי. ברירת מחדל: Gemini→Groq→CF</div></div>
         <select class="settings-select" id="aiProviderOrder" onchange="saveAiSettings()">
+          <option value="gemini,groq">Gemini → Groq (מומלץ)</option>
+          <option value="groq,gemini">Groq → Gemini</option>
           <option value="gemini,groq,cloudflare">Gemini → Groq → CF</option>
           <option value="groq,gemini,cloudflare">Groq → Gemini → CF</option>
           <option value="gemini">Gemini בלבד</option>
@@ -5951,7 +5953,7 @@ function updateFabVisibility(){
 }
 
 // ── AI Settings & Gemini Client ──────────────────────────────────────────────
-let aiSettings={key:'',model:'gemini-2.5-flash',groqKey:'',groqModel:'llama-3.3-70b-versatile',cfToken:'',cfAccount:'',providerOrder:'gemini,groq,cloudflare',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
+let aiSettings={key:'',model:'gemini-2.5-flash',groqKey:'',groqModel:'llama-3.3-70b-versatile',cfToken:'',cfAccount:'',providerOrder:'gemini,groq',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
 // Per-provider cooldown (skip if failed within last 5 minutes)
 let providerCooldowns={};
 let assistantMemory=[];
