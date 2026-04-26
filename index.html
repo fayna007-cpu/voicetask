@@ -6144,28 +6144,82 @@ function chatHistoryToOpenai(systemPrompt){
   return msgs;
 }
 
-// Generic LLM call with provider waterfall
+// Generic LLM call with provider waterfall + smart per-provider resilience
 async function callLLM(systemPrompt){
-  const order=(aiSettings.providerOrder||'gemini,groq,cloudflare').split(',');
+  const order=(aiSettings.providerOrder||'gemini,groq').split(',');
   const errors=[];
   for(const provider of order){
-    // Skip cooldown
-    if(providerCooldowns[provider]&&Date.now()-providerCooldowns[provider]<5*60000){
-      errors.push(`${provider}: בקירור`);continue;
+    const cd=providerCooldowns[provider];
+    if(cd&&Date.now()<cd){
+      const left=Math.ceil((cd-Date.now())/1000);
+      errors.push(`${provider}: בקירור עוד ${left}ש'`);
+      continue;
     }
-    try{
-      const result=await callProvider(provider,systemPrompt);
-      if(result){result.provider=provider;return result;}
-    }catch(e){
-      const msg=e.message||'';
-      errors.push(`${provider}: ${msg.slice(0,60)}`);
-      // Mark cooldown if quota/rate error
-      if(/quota|429|rate|limit/i.test(msg)||(e.status&&[429,402,403].includes(e.status))){
-        providerCooldowns[provider]=Date.now();
-      }
-    }
+    // Try provider with internal resilience (retry once + model fallback)
+    const result=await tryProviderWithResilience(provider,systemPrompt,errors);
+    if(result){result.provider=provider;return result;}
   }
   throw new Error('כל הספקים נכשלו:\n'+errors.join('\n'));
+}
+
+async function tryProviderWithResilience(provider,systemPrompt,errors){
+  let attempts=0;
+  while(attempts<2){
+    attempts++;
+    try{
+      return await callProvider(provider,systemPrompt);
+    }catch(e){
+      const msg=(e.message||'').toLowerCase();
+      const status=e.status||0;
+      const isQuota=/quota|insufficient|exceeded.*tier|free_tier/i.test(e.message||'');
+      const isRate=/rate.?limit|too many|retry/i.test(e.message||'')||status===429;
+      const isAuth=status===401||status===403||/api key|invalid|unauthorized/i.test(e.message||'');
+
+      // Hard quota → cooldown 5 minutes, no more attempts on this provider
+      if(isQuota){
+        providerCooldowns[provider]=Date.now()+5*60*1000;
+        errors.push(`${provider}: מכסה הסתיימה (קירור 5 דק׳)`);
+        return null;
+      }
+      // Auth error → cooldown until restart, no point retrying
+      if(isAuth){
+        providerCooldowns[provider]=Date.now()+10*60*1000;
+        errors.push(`${provider}: בעיית הרשאה (בדוק מפתח)`);
+        return null;
+      }
+      // Rate limit → for Groq try lighter model first, otherwise short retry
+      if(isRate){
+        // Extract retry-after seconds from message (e.g. "try again in 12s")
+        const m=msg.match(/(\d+(?:\.\d+)?)\s*s\b/);
+        let waitMs=m?Math.min(parseFloat(m[1])*1000,8000):2500;
+        // For Groq specifically, fall back to 8b instant which has higher rate
+        if(provider==='groq'&&attempts===1&&aiSettings.groqModel!=='llama-3.1-8b-instant'){
+          const original=aiSettings.groqModel;
+          aiSettings.groqModel='llama-3.1-8b-instant';
+          try{
+            const r=await callProvider(provider,systemPrompt);
+            // Note: keep model on 8b until manual change — user gets working chat
+            return r;
+          }catch(e2){
+            aiSettings.groqModel=original;// restore on failure
+            // fall through to wait+retry below
+          }
+        }
+        if(attempts<2&&waitMs>0&&waitMs<=8000){
+          await new Promise(r=>setTimeout(r,waitMs));
+          continue;// retry once
+        }
+        providerCooldowns[provider]=Date.now()+60*1000;
+        errors.push(`${provider}: rate limit (קירור דקה)`);
+        return null;
+      }
+      // Other transient errors → short retry
+      if(attempts<2){await new Promise(r=>setTimeout(r,1500));continue;}
+      errors.push(`${provider}: ${(e.message||'').slice(0,70)}`);
+      return null;
+    }
+  }
+  return null;
 }
 
 async function callProvider(provider,systemPrompt){
