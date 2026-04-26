@@ -1328,6 +1328,31 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 @keyframes fabBlink{0%,40%,42%,100%{transform:scaleY(1)}41%{transform:scaleY(0.1)}}
 .asst-fab-pulse{position:absolute;inset:-6px;border-radius:50%;border:2px solid oklch(0.55 0.16 285 / 0.5);animation:fabPulse 2.4s ease-out infinite;pointer-events:none}
 @keyframes fabPulse{0%{transform:scale(1);opacity:0.7}100%{transform:scale(1.4);opacity:0}}
+.asst-fab-badge{position:absolute;top:-2px;right:-2px;background:oklch(0.65 0.22 25);color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;padding:0 6px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);z-index:2}
+
+/* ── Alfred top card on main screen ── */
+.alfred-top-card{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,oklch(0.55 0.16 285 / 0.12) 0%,oklch(0.65 0.18 320 / 0.08) 100%);border:1px solid oklch(0.55 0.16 285 / 0.3);border-radius:14px;padding:12px 14px;margin:0 16px 12px;cursor:pointer;touch-action:manipulation}
+.alfred-top-card:active{filter:brightness(0.92)}
+.alfred-top-card.sev-warn{background:linear-gradient(135deg,oklch(0.65 0.2 50 / 0.1) 0%,oklch(0.55 0.22 25 / 0.06) 100%);border-color:oklch(0.65 0.2 50 / 0.4)}
+.alfred-top-card.sev-high{background:oklch(0.65 0.22 25 / 0.1);border-color:oklch(0.65 0.22 25 / 0.5)}
+.alfred-top-card.sev-good{background:oklch(0.55 0.18 145 / 0.08);border-color:oklch(0.55 0.18 145 / 0.4)}
+.alfred-top-ico{font-size:24px;flex-shrink:0;line-height:1}
+.alfred-top-body{flex:1;min-width:0}
+.alfred-top-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
+.alfred-top-detail{font-size:11px;color:var(--muted);margin-top:2px}
+.alfred-top-more{flex-shrink:0;background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;border-radius:10px}
+
+/* ── Insights section in assistant ── */
+.asst-insights-wrap{padding-bottom:8px;margin-bottom:8px;border-bottom:1px dashed var(--border)}
+.asst-insights-title{font-size:12px;font-weight:800;color:var(--text);margin:0 16px 8px;display:flex;align-items:center;gap:6px}
+.asst-action-secondary{padding:7px 13px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;color:var(--muted);font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.asst-action-secondary:active{background:var(--surface2)}
+
+/* ── Voice button in chat ── */
+.asst-voice-btn{width:38px;height:38px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:inherit;touch-action:manipulation}
+.asst-voice-btn:active{background:var(--surface)}
+.asst-voice-btn.recording{background:oklch(0.65 0.22 25);color:#fff;border-color:oklch(0.65 0.22 25);animation:micPulse 1.2s ease-in-out infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 oklch(0.65 0.22 25 / 0.7)}50%{box-shadow:0 0 0 8px oklch(0.65 0.22 25 / 0)}}
 
 /* Bill form */
 .bill-form-body{padding:0 16px;display:flex;flex-direction:column;gap:14px}

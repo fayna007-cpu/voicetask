@@ -429,6 +429,15 @@
         <div class="settings-row-body"><div class="settings-row-title">סרוק מייל עכשיו</div><div class="settings-row-sub">חפש חשבוניות חדשות שהגיעו</div></div>
         <div class="settings-row-arrow">›</div>
       </div>
+      <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">🤖 אלפרד</div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">סיכום בוקר אישי</div><div class="settings-row-sub">פוש יומי מאלפרד עם סיכום היום</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-alfred-morningBrief" checked onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">שעת סיכום בוקר</div><div class="settings-row-sub">מתי אלפרד יתחיל את היום שלך</div></div>
+        <input type="time" class="settings-select" id="ns-alfred-morningBriefTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">📈 פרודוקטיביות</div>
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">תכנון ערב</div><div class="settings-row-sub">תזכורת יומית לתכנן את מחר</div></div>
@@ -1175,6 +1184,7 @@
       <button class="asst-quick-chip" onclick="askQuick('תן לי טיפ פרודוקטיביות לפי הנתונים שלי')">טיפ</button>
     </div>
     <div class="asst-input-row">
+      <button class="asst-voice-btn" id="asstVoiceBtn" onclick="toggleChatVoice()" title="דיבור">🎤</button>
       <textarea class="asst-input" id="asstInput" placeholder="שאל את העוזר..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
       <button class="asst-send-btn" onclick="sendChat()" id="asstSendBtn">↑</button>
     </div>
@@ -1519,13 +1529,13 @@ function confirmClearData(){
 }
 // ── Smart Push Notification Settings ─────────────────────────────────────────
 let notifSettings=null;
-const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true,monthlyBudget:0,gmailScan:false},productivity:{eveningTime:'21:00',weeklyReview:true}};
+const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true,monthlyBudget:0,gmailScan:false},alfred:{morningBrief:true,morningBriefTime:'07:30'},productivity:{eveningTime:'21:00',weeklyReview:true}};
 function loadNotifSettings(){
   try{const s=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');
-    notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},bills:{...NS_DEFAULTS.bills,...(s.bills||{})},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},bills:{...NS_DEFAULTS.bills},productivity:{...NS_DEFAULTS.productivity}};
+    notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},bills:{...NS_DEFAULTS.bills,...(s.bills||{})},alfred:{...NS_DEFAULTS.alfred,...(s.alfred||{})},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},bills:{...NS_DEFAULTS.bills},alfred:{...NS_DEFAULTS.alfred},productivity:{...NS_DEFAULTS.productivity}};
   }catch(e){notifSettings=JSON.parse(JSON.stringify(NS_DEFAULTS));}
   // Sync values to DOM elements (if settings sheet already rendered)
-  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-bills-monthlyBudget','bills','monthlyBudget','value'],['ns-bills-gmailScan','bills','gmailScan','checked'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
+  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-bills-monthlyBudget','bills','monthlyBudget','value'],['ns-bills-gmailScan','bills','gmailScan','checked'],['ns-alfred-morningBrief','alfred','morningBrief','checked'],['ns-alfred-morningBriefTime','alfred','morningBriefTime','value'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
   pairs.forEach(([id,section,key,prop])=>{const el=document.getElementById(id);if(!el)return;if(prop==='checked')el.checked=!!notifSettings[section][key];else el.value=notifSettings[section][key];});
 }
 function saveNotifSettings(){
@@ -1534,10 +1544,12 @@ function saveNotifSettings(){
     tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked},
     routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00'},
     bills:{payDayTime:g('ns-bills-payDayTime')?.value||'08:00',earlyReminderDays:+(g('ns-bills-earlyReminderDays')?.value||2),overdueAlert:!!g('ns-bills-overdueAlert')?.checked,monthlyBudget:+(g('ns-bills-monthlyBudget')?.value||0),gmailScan:!!g('ns-bills-gmailScan')?.checked},
+    alfred:{morningBrief:!!g('ns-alfred-morningBrief')?.checked,morningBriefTime:g('ns-alfred-morningBriefTime')?.value||'07:30'},
     productivity:{eveningTime:g('ns-productivity-eveningTime')?.value||'21:00',weeklyReview:!!g('ns-productivity-weeklyReview')?.checked}
   };
   localStorage.setItem('vt_notif_settings',JSON.stringify(notifSettings));
   scheduleSmartPushNotifs();
+  if(typeof scheduleMorningBrief==='function')scheduleMorningBrief();
   toast('✅ הגדרות נשמרו');
 }
 function notifCtx(name){
@@ -2689,6 +2701,8 @@ function render(){
     return;
   }
   let html='';
+  // Section -1: Alfred top insight card
+  html+=renderAlfredTopCard();
   // Section 0: Open bills (above tasks)
   html+=renderBillsSection();
   // Section 1: Regular tasks
@@ -4309,7 +4323,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();setTimeout(()=>scanGmailForNewBills(false).catch(()=>{}),5000);});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();loadAlfredInsights();setTimeout(()=>{try{runProactiveScan();refreshAlfredUI();}catch(_){}scanGmailForNewBills(false).catch(()=>{});scheduleMorningBrief();},5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -5829,6 +5843,309 @@ function closeDailyPopup(){
   document.getElementById('dpOverlay').classList.remove('on');
   document.getElementById('dpModal').classList.remove('on');
 }
+// ── Proactive Insights (Alfred Layer 3) ──────────────────────────────────────
+let alfredInsights=[];
+let dismissedInsights={};
+let _alfredLastScan=0;
+
+function loadAlfredInsights(){
+  try{dismissedInsights=JSON.parse(localStorage.getItem('vt_alfred_dismissed')||'{}');}catch(_){dismissedInsights={};}
+  // Clean up expired dismissals
+  const now=Date.now();
+  Object.keys(dismissedInsights).forEach(k=>{if(dismissedInsights[k]<now)delete dismissedInsights[k];});
+  saveDismissedInsights();
+}
+function saveDismissedInsights(){localStorage.setItem('vt_alfred_dismissed',JSON.stringify(dismissedInsights));}
+function dismissInsight(id,days){
+  const ms=(days||7)*86400000;
+  dismissedInsights[id]=Date.now()+ms;
+  saveDismissedInsights();
+  alfredInsights=alfredInsights.filter(i=>i.id!==id);
+  refreshAlfredUI();
+}
+function actOnInsight(id){
+  const ins=alfredInsights.find(i=>i.id===id);
+  if(!ins)return;
+  if(ins.action&&ins.action.fn){
+    try{(new Function(ins.action.fn))();}catch(e){console.warn(e);}
+  }
+  dismissInsight(id,7);
+}
+
+function runProactiveScan(force){
+  const now=Date.now();
+  if(!force&&now-_alfredLastScan<4*3600000)return;// max once per 4 hours
+  _alfredLastScan=now;
+  const out=[];
+  const today=new Date();today.setHours(0,0,0,0);
+  const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay());
+  const weekAgo=new Date(today);weekAgo.setDate(today.getDate()-7);
+
+  // Rule 1: Routine slacking (hasn't done a routine in days when target says they should)
+  routines.filter(r=>r.enabled).forEach(r=>{
+    const target=r.timesPerWeek||0;if(!target)return;
+    const completedThisWeek=(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
+    const dayOfWeek=today.getDay();// 0-6
+    const expectedByNow=Math.ceil(target*((dayOfWeek+1)/7));
+    if(completedThisWeek<expectedByNow-1&&completedThisWeek<target){
+      const lastDone=(r.completedDates||[]).map(d=>new Date(d)).sort((a,b)=>b-a)[0];
+      const daysSince=lastDone?Math.floor((today-lastDone)/86400000):999;
+      if(daysSince>=2){
+        const id=`routine_slack_${r.id}_${today.toISOString().slice(0,10)}`;
+        out.push({id,type:'routine',severity:'warn',icon:'🎯',
+          message:`לא ביצעת "${r.name||r.text}" ${daysSince>=7?'יותר משבוע':daysSince+' ימים'}`,
+          detail:`${completedThisWeek}/${target} השבוע · יעד מצופה: ${expectedByNow}`,
+          action:{label:'קבע עכשיו',fn:`closeAssistantSheet();openRoutineSheet()`}});
+      }
+    }
+  });
+
+  // Rule 2: Bill probably late (recurring monthly bill that should have arrived)
+  const billsByName={};
+  bills.filter(b=>b.recurring==='monthly'||b.recurring==='bimonthly').forEach(b=>{
+    if(!billsByName[b.name])billsByName[b.name]=[];
+    billsByName[b.name].push(b);
+  });
+  Object.keys(billsByName).forEach(name=>{
+    const arr=billsByName[name].sort((a,b)=>new Date(b.createdAt||b.paidAt)-new Date(a.createdAt||a.paidAt));
+    const newest=arr[0];if(!newest)return;
+    const newestDate=new Date(newest.createdAt||newest.paidAt);
+    const expectedNext=new Date(newestDate);
+    expectedNext.setMonth(expectedNext.getMonth()+(newest.recurring==='bimonthly'?2:1));
+    const daysLate=Math.floor((today-expectedNext)/86400000);
+    if(daysLate>=2&&daysLate<=14&&newest.status==='paid'){
+      const id=`bill_late_${name}_${expectedNext.toISOString().slice(0,7)}`;
+      out.push({id,type:'bill',severity:'info',icon:'📨',
+        message:`${name} — בדרך כלל מגיע ב-${expectedNext.getDate()} לחודש`,
+        detail:`עברו ${daysLate} ימים ולא נוסף — בדוק מייל`,
+        action:{label:'סרוק מייל',fn:`closeAssistantSheet();scanGmailForNewBills(true)`}});
+    }
+  });
+
+  // Rule 3: Weekly achievement (high task completion)
+  const weekTasks=tasks.filter(t=>t.datetime&&new Date(t.datetime)>=weekStart&&new Date(t.datetime)<=today);
+  if(weekTasks.length>=5){
+    const done=weekTasks.filter(t=>t.completed).length;
+    const pct=Math.round(done/weekTasks.length*100);
+    if(pct>=80){
+      const id=`achievement_${weekStart.toISOString().slice(0,10)}_${pct}`;
+      out.push({id,type:'achievement',severity:'good',icon:'🔥',
+        message:`${pct}% השלמת משימות השבוע!`,
+        detail:`${done} מתוך ${weekTasks.length} משימות. כל הכבוד!`,
+        action:null});
+    }
+  }
+
+  // Rule 4: Free time block tomorrow
+  const tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);
+  const tEnd=new Date(tomorrow);tEnd.setHours(23,59,59,999);
+  const tomorrowItems=[
+    ...tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=tomorrow&&new Date(t.datetime)<=tEnd),
+    ...getRoutineInstances().filter(r=>!r.completed&&new Date(r.datetime)>=tomorrow&&new Date(r.datetime)<=tEnd)
+  ].sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  if(tomorrowItems.length<=2){
+    const id=`free_time_${tomorrow.toISOString().slice(0,10)}`;
+    out.push({id,type:'calendar',severity:'info',icon:'📅',
+      message:`מחר יחסית פנוי לך — רק ${tomorrowItems.length} פריטים`,
+      detail:'הזדמנות לקבוע משהו חשוב שדחית',
+      action:{label:'קבע משימה',fn:`closeAssistantSheet();startSiri()`}});
+  }
+
+  // Rule 5: Budget warning
+  const budget=notifSettings?.bills?.monthlyBudget||0;
+  if(budget>0){
+    const monthStart=new Date(today.getFullYear(),today.getMonth(),1);
+    const spent=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart).reduce((s,b)=>s+(b.amount||0),0);
+    const pct=Math.round(spent/budget*100);
+    if(pct>=70&&pct<100){
+      const id=`budget_${monthStart.toISOString().slice(0,7)}_${Math.floor(pct/10)*10}`;
+      out.push({id,type:'budget',severity:'warn',icon:'💸',
+        message:`${pct}% מהתקציב החודשי הוצא`,
+        detail:`₪${Math.round(spent).toLocaleString('he-IL')} / ₪${budget.toLocaleString('he-IL')}`,
+        action:{label:'הצג חשבונות',fn:`closeAssistantSheet();openBillsSheet()`}});
+    }
+  }
+
+  // Rule 6: Uncategorized tasks (no datetime)
+  const noDateTasks=tasks.filter(t=>!t.completed&&(!t.datetime||t.datetime==='null'));
+  if(noDateTasks.length>=3){
+    const id=`uncategorized_${today.toISOString().slice(0,10)}`;
+    out.push({id,type:'tasks',severity:'info',icon:'📋',
+      message:`${noDateTasks.length} משימות בלי תאריך`,
+      detail:'תרצה לעבור עליהן ולתזמן?',
+      action:{label:'הצג',fn:`closeAssistantSheet();setFilter&&setFilter('all')`}});
+  }
+
+  // Rule 7: Bills due this week total
+  const weekEnd=new Date(today);weekEnd.setDate(today.getDate()+7);
+  const dueBills=bills.filter(b=>b.status==='pending'&&b.deadline&&new Date(b.deadline)<=weekEnd);
+  if(dueBills.length>=2){
+    const total=dueBills.reduce((s,b)=>s+(b.amount||0),0);
+    const id=`week_bills_${today.toISOString().slice(0,10)}`;
+    out.push({id,type:'bill',severity:'warn',icon:'💳',
+      message:`${dueBills.length} חשבונות עד סוף השבוע`,
+      detail:`סה"כ ₪${Math.round(total).toLocaleString('he-IL')} לתשלום`,
+      action:{label:'הצג חשבונות',fn:`closeAssistantSheet();openBillsSheet()`}});
+  }
+
+  // Rule 8: Month-end goal nudge
+  const lastDayOfMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  const dayOfMonth=today.getDate();
+  if(dayOfMonth>=lastDayOfMonth-3){
+    const id=`month_end_${today.toISOString().slice(0,7)}`;
+    out.push({id,type:'goal',severity:'info',icon:'🎯',
+      message:`נשארו ${lastDayOfMonth-dayOfMonth} ימים בחודש`,
+      detail:'זמן לסקור מה הספקת והאם אתה במסלול ליעדים',
+      action:{label:'דבר עם אלפרד',fn:`closeAssistantSheet();openAssistantChat();setTimeout(()=>{const i=document.getElementById('asstInput');if(i){i.value='איך אני נראה החודש לעומת היעדים שלי?';sendChat();}},500)`}});
+  }
+
+  // Filter out dismissed
+  alfredInsights=out.filter(i=>!dismissedInsights[i.id]||dismissedInsights[i.id]<Date.now())
+    .sort((a,b)=>{
+      const order={high:0,warn:1,good:2,info:3};
+      return (order[a.severity]||9)-(order[b.severity]||9);
+    });
+}
+
+function refreshAlfredUI(){
+  // FAB badge
+  const fab=document.getElementById('asstFab');
+  if(fab){
+    let badge=fab.querySelector('.asst-fab-badge');
+    if(alfredInsights.length){
+      if(!badge){badge=document.createElement('span');badge.className='asst-fab-badge';fab.appendChild(badge);}
+      badge.textContent=alfredInsights.length;
+    }else if(badge)badge.remove();
+  }
+  // Re-render list and main screen if visible
+  if(_asstTab==='today'||_asstTab==='risks'){try{renderAssistant();}catch(_){}}
+  // Re-render main if currently shown
+  const list=document.getElementById('list');if(list)try{
+    const cardEl=document.querySelector('.alfred-top-card');
+    if(cardEl){
+      const newHtml=renderAlfredTopCard();
+      const tmp=document.createElement('div');tmp.innerHTML=newHtml;
+      cardEl.replaceWith(...tmp.children);
+    }
+  }catch(_){}
+}
+
+function renderAlfredTopCard(){
+  if(!alfredInsights.length)return '';
+  const top=alfredInsights[0];
+  const sev=top.severity||'info';
+  return `<div class="alfred-top-card sev-${sev}" onclick="openAssistantChat()">
+    <div class="alfred-top-ico">${top.icon}</div>
+    <div class="alfred-top-body">
+      <div class="alfred-top-title">${esc(top.message)}</div>
+      ${top.detail?`<div class="alfred-top-detail">${esc(top.detail)}</div>`:''}
+    </div>
+    ${alfredInsights.length>1?`<div class="alfred-top-more">+${alfredInsights.length-1}</div>`:''}
+  </div>`;
+}
+
+function renderInsightsSection(){
+  if(!alfredInsights.length)return '';
+  let html='<div class="asst-insights-wrap"><div class="asst-insights-title">🔔 שמתי לב...</div>';
+  alfredInsights.forEach(ins=>{
+    const sev=ins.severity?'sev-'+ins.severity:'';
+    html+=`<div class="asst-card ${sev}">
+      <div class="asst-card-top">
+        <span class="asst-card-ico">${ins.icon}</span>
+        <div class="asst-card-body">
+          <div class="asst-card-title">${esc(ins.message)}</div>
+          ${ins.detail?`<div class="asst-card-detail">${esc(ins.detail)}</div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:9px">
+        ${ins.action?`<button class="asst-action" onclick="actOnInsight('${ins.id}')">${esc(ins.action.label)}</button>`:''}
+        <button class="asst-action-secondary" onclick="dismissInsight('${ins.id}',1)">תזכיר מחר</button>
+        <button class="asst-action-secondary" onclick="dismissInsight('${ins.id}',7)">דחה</button>
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+// ── Voice input in chat ──────────────────────────────────────────────────────
+let _chatVoiceRec=null;
+function toggleChatVoice(){
+  if(_chatVoiceRec){
+    try{_chatVoiceRec.stop();}catch(_){}
+    _chatVoiceRec=null;
+    document.getElementById('asstVoiceBtn')?.classList.remove('recording');
+    return;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('הדפדפן לא תומך בזיהוי דיבור');return;}
+  _chatVoiceRec=new SR();
+  _chatVoiceRec.lang='he-IL';
+  _chatVoiceRec.continuous=false;
+  _chatVoiceRec.interimResults=true;
+  document.getElementById('asstVoiceBtn')?.classList.add('recording');
+  const inp=document.getElementById('asstInput');
+  let finalText='';
+  _chatVoiceRec.onresult=ev=>{
+    let interim='';
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      if(ev.results[i].isFinal)finalText+=ev.results[i][0].transcript;
+      else interim+=ev.results[i][0].transcript;
+    }
+    if(inp)inp.value=finalText+interim;
+  };
+  _chatVoiceRec.onend=()=>{
+    document.getElementById('asstVoiceBtn')?.classList.remove('recording');
+    _chatVoiceRec=null;
+    if(inp&&inp.value.trim())inp.focus();
+  };
+  _chatVoiceRec.onerror=e=>{
+    document.getElementById('asstVoiceBtn')?.classList.remove('recording');
+    _chatVoiceRec=null;
+    if(e.error!=='aborted'&&e.error!=='no-speech')toast('שגיאה: '+e.error);
+  };
+  try{_chatVoiceRec.start();}catch(e){toast('לא הצליח להתחיל');_chatVoiceRec=null;}
+}
+
+// ── Morning brief auto-push ──────────────────────────────────────────────────
+let _morningBriefTimer=null;
+function scheduleMorningBrief(){
+  if(_morningBriefTimer)clearTimeout(_morningBriefTimer);
+  if(!notifSettings?.alfred?.morningBrief)return;
+  const time=notifSettings?.alfred?.morningBriefTime||'07:00';
+  const[h,m]=time.split(':').map(Number);
+  const next=new Date();next.setHours(h,m,0,0);
+  if(next<=new Date())next.setDate(next.getDate()+1);
+  const ms=next-new Date();
+  _morningBriefTimer=setTimeout(()=>{
+    sendMorningBrief();
+    scheduleMorningBrief();// reschedule next day
+  },ms);
+}
+async function sendMorningBrief(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const tEnd=new Date(today);tEnd.setHours(23,59,59,999);
+  const todayT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=today&&new Date(t.datetime)<=tEnd).length;
+  const todayR=getRoutineInstances().filter(r=>!r.completed&&new Date(r.datetime)>=today&&new Date(r.datetime)<=tEnd).length;
+  const todayB=bills.filter(b=>{if(b.status!=='pending'||!b.payDate)return false;const pd=new Date(b.payDate);pd.setHours(0,0,0,0);return pd.getTime()===today.getTime();}).length;
+  if(todayT===0&&todayR===0&&todayB===0)return;// nothing to brief about
+  const parts=[];
+  if(todayT)parts.push(todayT+' משימות');
+  if(todayR)parts.push(todayR+' שגרות');
+  if(todayB)parts.push(todayB+' חשבונות');
+  const name=agentPersona.name||'אלפרד';
+  const greet=agentPersona.greeting?'בוקר טוב!':'בוקר טוב אדוני!';
+  try{
+    if('Notification' in window&&Notification.permission==='granted'){
+      const reg=await navigator.serviceWorker.ready;
+      reg.showNotification(`☀️ ${name}: ${greet}`,{
+        body:`היום: ${parts.join(' · ')}. הקש כאן לפתיחת השיחה`,
+        icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',tag:'vt-alfred-morning'
+      });
+    }
+  }catch(_){}
+}
+
 // ── Agent Persona ─────────────────────────────────────────────────────────────
 let agentPersona={name:'',role:'',roleCustom:'',tone:'',doNots:'',specialties:'',greeting:'',userInfo:'',shortcuts:''};
 
@@ -6825,11 +7142,14 @@ function openAssistantSheet(){
   const before=chatHistory.length;
   chatHistory=chatHistory.filter(m=>!isErrorMessage(m));
   if(chatHistory.length<before)saveChatHistory();
+  // Run proactive scan
+  try{runProactiveScan();}catch(e){console.warn(e);}
   // Show chat bar by default
   const bar=document.getElementById('asstChatBar');
   if(bar)bar.style.display=_asstTab==='chat'?'block':'none';
   renderAssistant();
   updateFabVisibility();
+  refreshAlfredUI();
 }
 function closeAssistantSheet(){
   document.getElementById('assistantOverlay').classList.remove('on');
@@ -6867,11 +7187,16 @@ function renderAssistant(){
   if(_asstTab==='chat'){renderChatMessages();updateAssistantBadge();return;}
   if(_asstTab==='memory'){renderMemoryTab();updateAssistantBadge();return;}
   const list=insights[_asstTab];
-  if(!list.length){
+  // Show proactive insights at top of today and risks tabs
+  let prefix='';
+  if(_asstTab==='today'||_asstTab==='risks'){
+    prefix=renderInsightsSection();
+  }
+  if(!list.length&&!prefix){
     body.innerHTML=`<div class="asst-empty">אין תובנות בקטגוריה זו 👌<br><span style="font-size:11px;color:var(--muted)">המשך כך — הכל תחת שליטה</span></div>`;
     updateAssistantBadge();return;
   }
-  body.innerHTML=list.map(renderAsstCard).join('');
+  body.innerHTML=prefix+list.map(renderAsstCard).join('');
   updateAssistantBadge();
 }
 
