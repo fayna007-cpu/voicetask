@@ -1,4 +1,4 @@
-const V = 'vt-v31';
+const V = 'vt-v32';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -43,6 +43,11 @@ self.addEventListener('message', event => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Bypass SW for cross-origin requests (Gemini, Google APIs, etc)
+  if (url.origin !== self.location.origin) return;
+  // Bypass non-GET requests (POST/PUT/DELETE go straight to network)
+  if (e.request.method !== 'GET') return;
 
   // Share target
   if (url.searchParams.has('share_text')) {

@@ -1292,6 +1292,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 @keyframes dotPulse{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1.2);opacity:1}}
 .chat-tool-call{align-self:flex-end;font-size:10px;color:var(--muted);background:var(--surface);padding:4px 10px;border-radius:8px;font-family:monospace;direction:ltr;text-align:left;max-width:80%;overflow-x:auto;white-space:nowrap}
 .chat-bubble .chat-time{display:block;font-size:9px;opacity:0.6;margin-top:4px;text-align:left;direction:ltr;letter-spacing:0.3px}
+.chat-bubble .chat-provider{display:inline-block;font-size:9px;opacity:0.5;margin-top:2px;direction:ltr;font-style:italic}
 .chat-bubble.user .chat-time{color:#fff}
 .chat-bubble.greeting{font-style:normal}
 .chat-day-sep{display:flex;align-items:center;justify-content:center;margin:12px 0 4px;position:relative}

@@ -450,12 +450,53 @@
         </div>
       </div>
       <div class="settings-row" style="cursor:default">
-        <div class="settings-row-body"><div class="settings-row-title">מודל</div><div class="settings-row-sub">Flash 2.5 = איכות · Flash 1.5 = מכסה גדולה</div></div>
+        <div class="settings-row-body"><div class="settings-row-title">מודל Gemini</div><div class="settings-row-sub">1.5 Flash = יציב · 2.5 = איכות גבוהה</div></div>
         <select class="settings-select" id="aiModel" onchange="saveAiSettings()">
+          <option value="gemini-1.5-flash">Gemini 1.5 Flash (1500/יום)</option>
+          <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
           <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
           <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash (1500/יום)</option>
         </select>
+      </div>
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid var(--border);padding-top:14px">
+        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">🚀 מפתח Groq (גיבוי 1)</div><div class="settings-row-sub">14,400 בקשות/יום חינם — קבל ב-console.groq.com</div></div>
+        <input type="password" class="bill-form-input" id="aiGroqKey" placeholder="gsk_..." dir="ltr" onchange="saveAiSettings()" style="width:100%">
+        <div style="display:flex;gap:8px">
+          <button class="bill-form-import" onclick="testGroqConnection()" style="flex:1">בדוק Groq</button>
+          <a class="bill-form-import" href="https://console.groq.com/keys" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל מפתח →</a>
+        </div>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">מודל Groq</div><div class="settings-row-sub">70B = איכות · 8B = מהיר ויציב</div></div>
+        <select class="settings-select" id="aiGroqModel" onchange="saveAiSettings()">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+          <option value="llama-3.1-70b-versatile">Llama 3.1 70B</option>
+          <option value="llama-3.1-8b-instant">Llama 3.1 8B (מהיר)</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid var(--border);padding-top:14px">
+        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">☁️ Cloudflare Workers AI (גיבוי 2 — אופציונלי)</div><div class="settings-row-sub">10,000 בקשות/יום חינם — דורש Account ID + Token</div></div>
+        <input type="password" class="bill-form-input" id="aiCfToken" placeholder="API Token" dir="ltr" onchange="saveAiSettings()" style="width:100%">
+        <input type="text" class="bill-form-input" id="aiCfAccount" placeholder="Account ID" dir="ltr" onchange="saveAiSettings()" style="width:100%">
+        <div style="display:flex;gap:8px">
+          <button class="bill-form-import" onclick="testCfConnection()" style="flex:1">בדוק CF</button>
+          <a class="bill-form-import" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל Token →</a>
+        </div>
+      </div>
+      <div class="settings-row" style="cursor:default;border-top:1px solid var(--border);padding-top:14px">
+        <div class="settings-row-body"><div class="settings-row-title">סדר ספקים</div><div class="settings-row-sub">בחר ראשי + גיבוי. ברירת מחדל: Gemini→Groq→CF</div></div>
+        <select class="settings-select" id="aiProviderOrder" onchange="saveAiSettings()">
+          <option value="gemini,groq,cloudflare">Gemini → Groq → CF</option>
+          <option value="groq,gemini,cloudflare">Groq → Gemini → CF</option>
+          <option value="gemini">Gemini בלבד</option>
+          <option value="groq">Groq בלבד</option>
+          <option value="cloudflare">Cloudflare בלבד</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default;align-items:flex-start;background:var(--surface);border-radius:10px">
+        <div class="settings-row-ico" style="background:oklch(0.55 0.18 145 / 0.15);color:oklch(0.72 0.2 145)">🛡️</div>
+        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px;color:oklch(0.72 0.2 145)">סטטוס ספקים</div><div class="settings-row-sub" style="font-size:11px" id="aiProviderStatus">לא נבדק</div></div>
+        <button class="bill-form-import" onclick="testAllProviders()" style="font-size:11px">בדוק הכל</button>
       </div>
       <div class="settings-row" onclick="openAgentPersona()">
         <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.2);color:oklch(0.78 0.18 285)">🎭</div>
@@ -5906,7 +5947,9 @@ function updateFabVisibility(){
 }
 
 // ── AI Settings & Gemini Client ──────────────────────────────────────────────
-let aiSettings={key:'',model:'gemini-2.5-flash',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
+let aiSettings={key:'',model:'gemini-1.5-flash',groqKey:'',groqModel:'llama-3.3-70b-versatile',cfToken:'',cfAccount:'',providerOrder:'gemini,groq,cloudflare',memoryEnabled:true,readOnly:false,dailyCount:0,dailyDate:''};
+// Per-provider cooldown (skip if failed within last 5 minutes)
+let providerCooldowns={};
 let assistantMemory=[];
 let chatHistory=[];
 
@@ -5918,15 +5961,27 @@ function loadAiSettings(){
   const today=new Date().toDateString();
   if(aiSettings.dailyDate!==today){aiSettings.dailyCount=0;aiSettings.dailyDate=today;}
   // Sync to DOM
-  const k=document.getElementById('aiGeminiKey');if(k)k.value=aiSettings.key||'';
-  const m=document.getElementById('aiModel');if(m)m.value=aiSettings.model;
+  const set=(id,prop)=>{const el=document.getElementById(id);if(el)el.value=aiSettings[prop]||'';};
+  set('aiGeminiKey','key');
+  set('aiModel','model');
+  set('aiGroqKey','groqKey');
+  set('aiGroqModel','groqModel');
+  set('aiCfToken','cfToken');
+  set('aiCfAccount','cfAccount');
+  set('aiProviderOrder','providerOrder');
   const me=document.getElementById('aiMemoryEnabled');if(me)me.checked=!!aiSettings.memoryEnabled;
   const ro=document.getElementById('aiReadOnly');if(ro)ro.checked=!!aiSettings.readOnly;
   updateAiUsageInfo();
 }
 function saveAiSettings(){
-  aiSettings.key=document.getElementById('aiGeminiKey')?.value.trim()||aiSettings.key;
-  aiSettings.model=document.getElementById('aiModel')?.value||aiSettings.model;
+  const get=id=>document.getElementById(id)?.value.trim();
+  aiSettings.key=get('aiGeminiKey')??aiSettings.key;
+  aiSettings.model=get('aiModel')||aiSettings.model;
+  aiSettings.groqKey=get('aiGroqKey')??aiSettings.groqKey;
+  aiSettings.groqModel=get('aiGroqModel')||aiSettings.groqModel;
+  aiSettings.cfToken=get('aiCfToken')??aiSettings.cfToken;
+  aiSettings.cfAccount=get('aiCfAccount')??aiSettings.cfAccount;
+  aiSettings.providerOrder=get('aiProviderOrder')||aiSettings.providerOrder;
   aiSettings.memoryEnabled=!!document.getElementById('aiMemoryEnabled')?.checked;
   aiSettings.readOnly=!!document.getElementById('aiReadOnly')?.checked;
   localStorage.setItem('vt_ai_settings',JSON.stringify(aiSettings));
@@ -5951,7 +6006,7 @@ function clearChatHistory(){
 async function testGeminiConnection(){
   saveAiSettings();
   if(!aiSettings.key){toast('⚠️ הזן מפתח API קודם');return;}
-  toast('⏳ בודק חיבור...');
+  toast('⏳ בודק Gemini...');
   try{
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -5960,12 +6015,194 @@ async function testGeminiConnection(){
     if(r.ok){
       const d=await r.json();
       const txt=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      toast('✅ חיבור תקין: '+txt.slice(0,30));
+      toast('✅ Gemini תקין: '+txt.slice(0,30));
+      delete providerCooldowns.gemini;
     }else{
       const e=await r.json().catch(()=>({}));
-      toast('❌ '+(e.error?.message||'מפתח לא תקין'));
+      toast('❌ Gemini: '+(e.error?.message||'מפתח לא תקין').slice(0,80));
     }
   }catch(e){toast('❌ '+e.message);}
+}
+async function testGroqConnection(){
+  saveAiSettings();
+  if(!aiSettings.groqKey){toast('⚠️ הזן מפתח Groq קודם');return;}
+  toast('⏳ בודק Groq...');
+  try{
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.groqKey},
+      body:JSON.stringify({model:aiSettings.groqModel,messages:[{role:'user',content:'אמור "שלום" בעברית'}],max_tokens:20,temperature:0.1})
+    });
+    if(r.ok){
+      const d=await r.json();
+      toast('✅ Groq תקין: '+(d.choices?.[0]?.message?.content||'').slice(0,30));
+      delete providerCooldowns.groq;
+    }else{
+      const e=await r.json().catch(()=>({}));
+      toast('❌ Groq: '+(e.error?.message||'מפתח לא תקין').slice(0,80));
+    }
+  }catch(e){toast('❌ '+e.message);}
+}
+async function testCfConnection(){
+  saveAiSettings();
+  if(!aiSettings.cfToken||!aiSettings.cfAccount){toast('⚠️ הזן Token + Account ID');return;}
+  toast('⏳ בודק Cloudflare...');
+  try{
+    const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${aiSettings.cfAccount}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.cfToken},
+      body:JSON.stringify({messages:[{role:'user',content:'אמור "שלום" בעברית'}],max_tokens:20})
+    });
+    if(r.ok){
+      const d=await r.json();
+      toast('✅ Cloudflare תקין: '+(d.result?.response||'').slice(0,30));
+      delete providerCooldowns.cloudflare;
+    }else{
+      const e=await r.json().catch(()=>({}));
+      toast('❌ CF: '+(e.errors?.[0]?.message||'שגיאה').slice(0,80));
+    }
+  }catch(e){toast('❌ '+e.message);}
+}
+async function testAllProviders(){
+  const status=document.getElementById('aiProviderStatus');if(status)status.textContent='⏳ בודק...';
+  const out=[];
+  if(aiSettings.key){
+    try{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{role:'user',parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})
+      });
+      out.push('Gemini: '+(r.ok?'✅':'❌'));
+    }catch(_){out.push('Gemini: ❌');}
+  }else out.push('Gemini: —');
+  if(aiSettings.groqKey){
+    try{
+      const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.groqKey},
+        body:JSON.stringify({model:aiSettings.groqModel,messages:[{role:'user',content:'hi'}],max_tokens:5})
+      });
+      out.push('Groq: '+(r.ok?'✅':'❌'));
+    }catch(_){out.push('Groq: ❌');}
+  }else out.push('Groq: —');
+  if(aiSettings.cfToken&&aiSettings.cfAccount){
+    try{
+      const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${aiSettings.cfAccount}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,{
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.cfToken},
+        body:JSON.stringify({messages:[{role:'user',content:'hi'}],max_tokens:5})
+      });
+      out.push('CF: '+(r.ok?'✅':'❌'));
+    }catch(_){out.push('CF: ❌');}
+  }else out.push('CF: —');
+  if(status)status.textContent=out.join(' · ');
+}
+
+// ── Format adapters: Gemini ↔ OpenAI (Groq/CF) ──────────────────────────────
+function geminiToolsToOpenai(){
+  return GEMINI_TOOLS[0].functionDeclarations.map(fn=>({type:'function',function:{name:fn.name,description:fn.description,parameters:fn.parameters}}));
+}
+function chatHistoryToOpenai(systemPrompt){
+  const msgs=[{role:'system',content:systemPrompt}];
+  chatHistory.forEach(m=>{
+    if(m.role==='user'){
+      const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('');
+      if(txt)msgs.push({role:'user',content:txt});
+    }else if(m.role==='model'){
+      const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('');
+      const calls=(m.parts||[]).filter(p=>p.functionCall).map(p=>({id:'call_'+(p.functionCall.name)+'_'+Math.random().toString(36).slice(2,8),type:'function',function:{name:p.functionCall.name,arguments:JSON.stringify(p.functionCall.args||{})}}));
+      const msg={role:'assistant',content:txt||null};
+      if(calls.length)msg.tool_calls=calls;
+      msgs.push(msg);
+    }else if(m.role==='function'){
+      // Gemini function response → OpenAI tool result
+      (m.parts||[]).filter(p=>p.functionResponse).forEach(p=>{
+        // Pick the matching tool_call id from the previous assistant message
+        const lastAsst=[...msgs].reverse().find(x=>x.role==='assistant'&&x.tool_calls);
+        const matchId=lastAsst?.tool_calls?.find(tc=>tc.function.name===p.functionResponse.name)?.id||'call_'+p.functionResponse.name;
+        msgs.push({role:'tool',tool_call_id:matchId,content:JSON.stringify(p.functionResponse.response||{})});
+      });
+    }
+  });
+  return msgs;
+}
+
+// Generic LLM call with provider waterfall
+async function callLLM(systemPrompt){
+  const order=(aiSettings.providerOrder||'gemini,groq,cloudflare').split(',');
+  const errors=[];
+  for(const provider of order){
+    // Skip cooldown
+    if(providerCooldowns[provider]&&Date.now()-providerCooldowns[provider]<5*60000){
+      errors.push(`${provider}: בקירור`);continue;
+    }
+    try{
+      const result=await callProvider(provider,systemPrompt);
+      if(result){result.provider=provider;return result;}
+    }catch(e){
+      const msg=e.message||'';
+      errors.push(`${provider}: ${msg.slice(0,60)}`);
+      // Mark cooldown if quota/rate error
+      if(/quota|429|rate|limit/i.test(msg)||(e.status&&[429,402,403].includes(e.status))){
+        providerCooldowns[provider]=Date.now();
+      }
+    }
+  }
+  throw new Error('כל הספקים נכשלו:\n'+errors.join('\n'));
+}
+
+async function callProvider(provider,systemPrompt){
+  if(provider==='gemini'){
+    if(!aiSettings.key)throw Object.assign(new Error('אין מפתח Gemini'),{status:0});
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        systemInstruction:{parts:[{text:systemPrompt}]},
+        contents:chatHistory.map(m=>({role:m.role==='function'?'function':m.role,parts:m.parts})).filter(m=>m.role!=='function'||m.parts.length),
+        tools:GEMINI_TOOLS,
+        generationConfig:{temperature:0.4,maxOutputTokens:1500}
+      })
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw Object.assign(new Error(e.error?.message||'Gemini '+r.status),{status:r.status});}
+    const d=await r.json();const cand=d.candidates?.[0];if(!cand)return null;
+    const parts=cand.content?.parts||[];
+    return{parts};
+  }
+  if(provider==='groq'){
+    if(!aiSettings.groqKey)throw Object.assign(new Error('אין מפתח Groq'),{status:0});
+    const messages=chatHistoryToOpenai(systemPrompt);
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.groqKey},
+      body:JSON.stringify({model:aiSettings.groqModel,messages,tools:geminiToolsToOpenai(),tool_choice:'auto',temperature:0.4,max_tokens:1500})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw Object.assign(new Error(e.error?.message||'Groq '+r.status),{status:r.status});}
+    const d=await r.json();const choice=d.choices?.[0];if(!choice)return null;
+    const parts=[];
+    if(choice.message?.content)parts.push({text:choice.message.content});
+    (choice.message?.tool_calls||[]).forEach(tc=>{
+      let args={};try{args=JSON.parse(tc.function.arguments||'{}');}catch(_){}
+      parts.push({functionCall:{name:tc.function.name,args}});
+    });
+    return{parts};
+  }
+  if(provider==='cloudflare'){
+    if(!aiSettings.cfToken||!aiSettings.cfAccount)throw Object.assign(new Error('Cloudflare לא מוגדר'),{status:0});
+    const messages=chatHistoryToOpenai(systemPrompt);
+    const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${aiSettings.cfAccount}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+aiSettings.cfToken},
+      body:JSON.stringify({messages,tools:geminiToolsToOpenai(),max_tokens:1500,temperature:0.4})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw Object.assign(new Error(e.errors?.[0]?.message||'CF '+r.status),{status:r.status});}
+    const d=await r.json();
+    const text=d.result?.response||'';
+    const calls=d.result?.tool_calls||[];
+    const parts=[];
+    if(text)parts.push({text});
+    calls.forEach(tc=>{
+      let args={};
+      const argSrc=tc.arguments||tc.function?.arguments;
+      if(typeof argSrc==='string'){try{args=JSON.parse(argSrc);}catch(_){}}else if(argSrc)args=argSrc;
+      parts.push({functionCall:{name:tc.name||tc.function?.name,args}});
+    });
+    return{parts};
+  }
+  throw new Error('ספק לא ידוע: '+provider);
 }
 
 // ── Memory tools ─────────────────────────────────────────────────────────────
@@ -6293,64 +6530,44 @@ function askQuick(q){
 async function runChatLoop(){
   _chatBusy=true;
   document.getElementById('asstSendBtn').textContent='…';
-  // Show typing indicator
   const typing=document.createElement('div');
   typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
   document.getElementById('chatScroll')?.appendChild(typing);
   scrollChatBottom();
+  let lastProvider='';
   try{
     let iterations=0;
     while(iterations<5){
       iterations++;
       const sys=buildAssistantContext();
-      const body={
-        systemInstruction:{parts:[{text:sys}]},
-        contents:chatHistory.map(m=>({role:m.role,parts:m.parts})),
-        tools:GEMINI_TOOLS,
-        generationConfig:{temperature:0.4,maxOutputTokens:1500}
-      };
       aiSettings.dailyCount++;saveAiSettings();updateAiUsageInfo();
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiSettings.model}:generateContent?key=${aiSettings.key}`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-      });
-      if(!r.ok){
-        const e=await r.json().catch(()=>({}));
-        chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+(e.error?.message||r.status)}],ts:Date.now()});
-        break;
+      let result;
+      try{result=await callLLM(sys);}catch(e){
+        chatHistory.push({role:'model',parts:[{text:'❌ '+e.message}],ts:Date.now()});break;
       }
-      const data=await r.json();
-      const cand=data.candidates?.[0];if(!cand){break;}
-      const parts=cand.content?.parts||[];
-      // Detect function calls
+      if(!result||!result.parts){break;}
+      lastProvider=result.provider||'';
+      const parts=result.parts;
       const calls=parts.filter(p=>p.functionCall);
       const textParts=parts.filter(p=>p.text).map(p=>p.text).join('');
       if(textParts){
-        chatHistory.push({role:'model',parts:[{text:textParts}],ts:Date.now()});
+        chatHistory.push({role:'model',parts:[{text:textParts}],ts:Date.now(),provider:lastProvider});
       }
-      if(!calls.length){
-        // No tool calls — done
-        break;
-      }
-      // Add the model's call to history
-      chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall})),ts:Date.now()});
-      // Execute each tool call
+      if(!calls.length)break;
+      chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall})),ts:Date.now(),provider:lastProvider});
       const toolResponses=[];
       for(const c of calls){
         const fc=c.functionCall;
-        let result;
+        let toolResult;
         if(CONFIRM_TOOLS.has(fc.name)&&!aiSettings.readOnly){
-          result=await confirmToolCall(fc);
+          toolResult=await confirmToolCall(fc);
         }else{
-          result=await executeTool(fc.name,fc.args||{});
+          toolResult=await executeTool(fc.name,fc.args||{});
         }
-        // Special UI signal for memory save
-        if(fc.name==='save_memory'&&result.success){
-          showMemorySaved(result.content);
-        }
-        toolResponses.push({functionResponse:{name:fc.name,response:result}});
+        if(fc.name==='save_memory'&&toolResult.success)showMemorySaved(toolResult.content);
+        toolResponses.push({functionResponse:{name:fc.name,response:toolResult}});
       }
       chatHistory.push({role:'function',parts:toolResponses,ts:Date.now()});
-      // Loop again so model can respond to tool results
     }
     saveChatHistory();
   }catch(e){
@@ -6473,7 +6690,8 @@ function renderChatMessages(){
 
     if(txt){
       const time=m.ts?`<span class="chat-time">${timeLabel(m.ts)}</span>`:'';
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}${time}</div>`;
+      const prov=m.role==='model'&&m.provider?`<span class="chat-provider">via ${esc(m.provider)}</span>`:'';
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}${time}${prov}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{
