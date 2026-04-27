@@ -6425,6 +6425,21 @@ function clearChatHistory(){
   if(_asstTab==='chat')renderAssistant();
   toast('🗑️ היסטוריה נמחקה');
 }
+async function retryLastChat(){
+  // Reset all cooldowns
+  providerCooldowns={};
+  // Strip error messages
+  chatHistory=chatHistory.filter(m=>!isErrorMessage(m));
+  saveChatHistory();
+  renderChatMessages();
+  // If last message is from user, retry the loop
+  const last=chatHistory[chatHistory.length-1];
+  if(last&&last.role==='user'){
+    await runChatLoop();
+  }else{
+    toast('אין הודעה לשלוח שוב — כתוב מחדש');
+  }
+}
 function clearChatErrors(){
   const before=chatHistory.length;
   chatHistory=chatHistory.filter(m=>!isErrorMessage(m));
@@ -6562,6 +6577,7 @@ function chatHistoryToOpenai(systemPrompt){
 async function callLLM(systemPrompt){
   const order=(aiSettings.providerOrder||'gemini,groq').split(',');
   const errors=[];
+  // First pass — respect cooldowns
   for(const provider of order){
     const cd=providerCooldowns[provider];
     if(cd&&Date.now()<cd){
@@ -6569,9 +6585,17 @@ async function callLLM(systemPrompt){
       errors.push(`${provider}: בקירור עוד ${left}ש'`);
       continue;
     }
-    // Try provider with internal resilience (retry once + model fallback)
     const result=await tryProviderWithResilience(provider,systemPrompt,errors);
     if(result){result.provider=provider;return result;}
+  }
+  // All providers either cooled or failed — second pass: ignore cooldowns, try anyway
+  if(order.length){
+    errors.push('--- ניסיון נוסף תוך התעלמות מקירורים ---');
+    for(const provider of order){
+      delete providerCooldowns[provider];// reset
+      const result=await tryProviderWithResilience(provider,systemPrompt,errors);
+      if(result){result.provider=provider;return result;}
+    }
   }
   throw new Error('כל הספקים נכשלו:\n'+errors.join('\n'));
 }
@@ -7232,7 +7256,9 @@ function renderChatMessages(){
     if(txt){
       const time=m.ts?`<span class="chat-time">${timeLabel(m.ts)}</span>`:'';
       const prov=m.role==='model'&&m.provider?`<span class="chat-provider">via ${esc(m.provider)}</span>`:'';
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}">${esc(txt).replace(/\n/g,'<br>')}${time}${prov}</div>`;
+      const isErr=m.role==='model'&&txt.startsWith('❌');
+      const retry=isErr?'<button class="chat-retry-btn" onclick="retryLastChat()">↻ נסה שוב</button>':'';
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${esc(txt).replace(/\n/g,'<br>')}${time}${prov}${retry}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{

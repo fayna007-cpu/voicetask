@@ -1293,6 +1293,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .chat-tool-call{align-self:flex-end;font-size:10px;color:var(--muted);background:var(--surface);padding:4px 10px;border-radius:8px;font-family:monospace;direction:ltr;text-align:left;max-width:80%;overflow-x:auto;white-space:nowrap}
 .chat-bubble .chat-time{display:block;font-size:9px;opacity:0.6;margin-top:4px;text-align:left;direction:ltr;letter-spacing:0.3px}
 .chat-bubble .chat-provider{display:inline-block;font-size:9px;opacity:0.5;margin-top:2px;direction:ltr;font-style:italic}
+.chat-bubble.error{background:oklch(0.65 0.22 25 / 0.12);border:1px solid oklch(0.65 0.22 25 / 0.4);color:var(--text)}
+.chat-retry-btn{display:inline-block;margin-top:8px;padding:6px 12px;background:oklch(0.55 0.16 285);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.chat-retry-btn:active{filter:brightness(0.85)}
 .chat-bubble.user .chat-time{color:#fff}
 .chat-bubble.greeting{font-style:normal}
 .chat-day-sep{display:flex;align-items:center;justify-content:center;margin:12px 0 4px;position:relative}
