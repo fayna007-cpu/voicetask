@@ -2470,21 +2470,39 @@ async function confirmPostpone(){
     t.calendarEventId=null;t.completed=false;
     save();render();closePostpone();await syncTask(t);toast('📅 נדחתה בהצלחה');
   } else if(type==='routine'){
-    // Reuse existing saveRoutineInstanceTime logic directly
     const r=routines.find(x=>x.id==routineId);if(!r)return;
     const newDt=new Date(inp.value).toISOString();
-    let replaced=false;
+    const newWk=getWeekKey(new Date(newDt));
+    let oldEventId=null;let oldWk=null;let oldIndex=-1;
     Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
       (r.scheduledWeeks[wk]||[]).forEach((item,i)=>{
         const dt=typeof item==='string'?item:item?.dt;
-        if(dt===dateStr){r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};replaced=true;}
+        if(dt===dateStr){
+          oldEventId=typeof item==='object'?item.eventId:null;
+          oldWk=wk;oldIndex=i;
+        }
       });
     });
-    if(!replaced){toast('לא נמצא האירוע');return;}
+    if(oldIndex===-1){toast('לא נמצא האירוע');return;}
+    closePostpone();toast('⏳ דוחה ומסנכרן...');
+    // Delete old calendar event
+    if(oldEventId&&!String(oldEventId).startsWith('local_')){
+      try{const tk=await getToken();if(tk)await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${oldEventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(_){}
+    }
+    // Remove from old week
+    r.scheduledWeeks[oldWk].splice(oldIndex,1);
+    // Create new calendar event
+    let newEventId=null;
+    try{const ev=await createCalendarEvent(r,newDt);newEventId=ev?.id||null;}catch(_){}
+    // Add to new week
+    if(!r.scheduledWeeks[newWk])r.scheduledWeeks[newWk]=[];
+    r.scheduledWeeks[newWk].push({dt:newDt,eventId:newEventId});
+    // Update completed/skipped trackers
     [r.completedDates,r.skippedDates].forEach(arr=>{
       if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
     });
-    saveRoutines();render();closePostpone();toast('📅 שגרה נדחתה');
+    saveRoutines();render();
+    toast(newEventId?'📅 שגרה נדחתה וסונכרנה ליומן':'📅 שגרה נדחתה (ללא יומן)');
   } else if(type==='bill'){
     const b=bills.find(x=>x.id===taskId);if(!b)return;
     b.payDate=inp.value;
@@ -6706,6 +6724,11 @@ const GEMINI_TOOLS=[{functionDeclarations:[
     id:{type:'number'},newDatetime:{type:'string',description:'תאריך חדש ISO'}
   },required:['id','newDatetime']}},
   {name:'delete_task',description:'מחק משימה',parameters:{type:'object',properties:{id:{type:'number'}},required:['id']}},
+  {name:'defer_routine',description:'דחה מופע של שגרה לתאריך/שעה אחר. חובה: שם השגרה (או id) + התאריך הנוכחי של המופע + התאריך החדש. דוגמה: לדחות אימון FB מיום ראשון ליום שני.',parameters:{type:'object',properties:{
+    routineName:{type:'string',description:'שם השגרה (כמו שמופיע בקונטקסט)'},
+    currentDate:{type:'string',description:'תאריך/שעה ISO של המופע הנוכחי (כמו שמופיע בקונטקסט)'},
+    newDate:{type:'string',description:'תאריך/שעה ISO של המועד החדש'}
+  },required:['routineName','currentDate','newDate']}},
   {name:'add_bill',description:'הוסף חשבון חדש',parameters:{type:'object',properties:{
     name:{type:'string'},amount:{type:'number'},category:{type:'string'},
     deadline:{type:'string',description:'תאריך דדליין YYYY-MM-DD'},
@@ -6736,7 +6759,7 @@ const GEMINI_TOOLS=[{functionDeclarations:[
   },required:['to','subject','body']}}
 ]}];
 
-const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
+const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
 const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill']);
 
 // ── Tool executor ────────────────────────────────────────────────────────────
@@ -6764,6 +6787,46 @@ async function executeTool(name,args){
         const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'לא נמצאה'};
         if(t.calendarEventId)await deleteFromCalendar(t);
         tasks=tasks.filter(x=>x.id!=args.id);save();render();return{success:true};
+      }
+      case 'defer_routine':{
+        const name=(args.routineName||'').trim();
+        const currentDt=new Date(args.currentDate);
+        const newDt=new Date(args.newDate);
+        if(!name||isNaN(currentDt)||isNaN(newDt))return{error:'פרטים חסרים'};
+        // Find routine by name (fuzzy)
+        const r=routines.find(x=>(x.name||x.text||'').includes(name)||name.includes(x.name||x.text||''));
+        if(!r)return{error:'לא נמצאה שגרה בשם '+name};
+        // Find the instance in scheduledWeeks
+        const currentIso=currentDt.toISOString();
+        let oldEventId=null,oldWk=null,oldIndex=-1,foundDt=null;
+        Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+          (r.scheduledWeeks[wk]||[]).forEach((item,i)=>{
+            const dt=typeof item==='string'?item:item?.dt;
+            // Match same calendar day (loose)
+            if(new Date(dt).toDateString()===currentDt.toDateString()){
+              oldEventId=typeof item==='object'?item.eventId:null;
+              oldWk=wk;oldIndex=i;foundDt=dt;
+            }
+          });
+        });
+        if(oldIndex===-1)return{error:'לא נמצא מופע השגרה בתאריך '+currentDt.toLocaleDateString('he-IL')};
+        // Delete old calendar event
+        if(oldEventId&&!String(oldEventId).startsWith('local_')){
+          try{const tk=await getToken();if(tk)await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${oldEventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(_){}
+        }
+        r.scheduledWeeks[oldWk].splice(oldIndex,1);
+        // Create new event
+        let newEventId=null;
+        try{const ev=await createCalendarEvent(r,newDt.toISOString());newEventId=ev?.id||null;}catch(_){}
+        const newWk=getWeekKey(newDt);
+        if(!r.scheduledWeeks[newWk])r.scheduledWeeks[newWk]=[];
+        r.scheduledWeeks[newWk].push({dt:newDt.toISOString(),eventId:newEventId});
+        // Update completed/skipped trackers
+        [r.completedDates,r.skippedDates].forEach(arr=>{
+          if(!arr)return;const idx=arr.indexOf(foundDt);if(idx!==-1)arr[idx]=newDt.toISOString();
+        });
+        saveRoutines();render();
+        return{success:true,routine:r.name||r.text,from:currentDt.toLocaleDateString('he-IL'),to:newDt.toLocaleString('he-IL'),syncedToCalendar:!!newEventId};
       }
       case 'add_bill':{
         const b={id:Date.now(),name:args.name,amount:args.amount||0,category:args.category||'כללי',
@@ -6934,6 +6997,13 @@ function buildAssistantContext(){
 דבר עברית, תשובות קצרות וישירות, מבוססות נתונים בלבד. אסור להמציא — אם אין מידע, אמור.
 כשהמשתמש מבקש פעולה — השתמש בכלי המתאים. ${aiSettings.readOnly?'⚠️ מצב קריאה בלבד — אין לבצע פעולות שינוי.':''}
 כשהמשתמש משתף עובדה אישית/העדפה (צבע אהוב, שם של בן משפחה, מקום עבודה, הרגלים) — קרא ל-save_memory לזכור אותה לעתיד. אל תבקש אישור — פשוט שמור. ציין בקצרה "💭 זכרתי".
+
+⚠️ הוראת תאריך/יום (חובה לדייק):
+היום בעברית הוא: ${['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][now.getDay()]}
+תאריך מלא: ${now.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+שעה: ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}
+מחר הוא יום: ${['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][(now.getDay()+1)%7]}
+**אסור לטעות בזיהוי יום השבוע. אם המשתמש שואל "איזה יום היום" — ענה לפי הנתון לעיל בלבד.**
 
 🛠️ היכולות שלך (השתמש בלי לבקש אישור — חוץ מאלה שדורשות):
 - 📅 גוגל יומן: לקרוא אירועים (gcal_list_events), ליצור (gcal_create_event — צריך אישור), למצוא חלונות פנויים (gcal_find_free_slots)
