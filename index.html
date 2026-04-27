@@ -1095,6 +1095,14 @@
   <span class="asst-fab-pulse"></span>
 </button>
 
+<!-- Prominent Alfred input bar above bottom nav -->
+<div class="alfred-bar" id="alfredBar">
+  <div class="alfred-bar-avatar">🤖</div>
+  <input class="alfred-bar-input" id="alfredBarInput" placeholder="שאל את אלפרד..." onkeydown="if(event.key==='Enter'){alfredBarSend();}">
+  <button class="alfred-bar-mic" id="alfredBarMicBtn" onclick="alfredBarMic()" title="דיבור">🎤</button>
+  <button class="alfred-bar-send" onclick="alfredBarSend()" title="שלח">↑</button>
+</div>
+
 <!-- Agent persona sheet -->
 <div class="rsheet" id="agentPersonaSheet">
   <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
@@ -2701,8 +2709,6 @@ function render(){
     return;
   }
   let html='';
-  // Section -2: Alfred quick input
-  html+=renderAlfredQuickInput();
   // Section -1: Alfred top insight card
   html+=renderAlfredTopCard();
   // Section 0: Open bills (above tasks)
@@ -4325,7 +4331,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();loadAlfredInsights();setTimeout(()=>{try{runProactiveScan();refreshAlfredUI();}catch(_){}scanGmailForNewBills(false).catch(()=>{});scheduleMorningBrief();},5000);});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();loadAlfredInsights();updateAlfredBarPlaceholder();updateAlfredBarVisibility();setTimeout(()=>{try{runProactiveScan();refreshAlfredUI();}catch(_){}scanGmailForNewBills(false).catch(()=>{});scheduleMorningBrief();},5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -6032,22 +6038,20 @@ function refreshAlfredUI(){
   }catch(_){}
 }
 
-function renderAlfredQuickInput(){
-  const name=agentPersona.name||'אלפרד';
-  return `<div class="alfred-quick-bar">
-    <div class="alfred-quick-avatar">🤖</div>
-    <input class="alfred-quick-input" id="alfredQuickInput" placeholder="שאל את ${esc(name)}..." onkeydown="if(event.key==='Enter'){alfredQuickSend();}">
-    <button class="alfred-quick-mic" onclick="alfredQuickMic()" title="דיבור">🎤</button>
-    <button class="alfred-quick-send" onclick="alfredQuickSend()" title="שלח">↑</button>
-  </div>`;
+function updateAlfredBarPlaceholder(){
+  const inp=document.getElementById('alfredBarInput');
+  if(inp){
+    const name=agentPersona.name||'אלפרד';
+    inp.placeholder=`שאל את ${name}...`;
+  }
 }
 
-function alfredQuickSend(){
-  const inp=document.getElementById('alfredQuickInput');
+function alfredBarSend(){
+  const inp=document.getElementById('alfredBarInput');
   const text=(inp?.value||'').trim();
   if(!text){openAssistantChat();return;}
   inp.value='';
-  // Open assistant chat and send the message
+  inp.blur();
   _asstTab='chat';
   document.querySelectorAll('.asst-tab').forEach(b=>b.classList.toggle('on',b.dataset.cat==='chat'));
   openAssistantSheet();
@@ -6057,20 +6061,20 @@ function alfredQuickSend(){
   },350);
 }
 
-let _alfredQuickRec=null;
-function alfredQuickMic(){
-  if(_alfredQuickRec){try{_alfredQuickRec.stop();}catch(_){}return;}
+let _alfredBarRec=null;
+function alfredBarMic(){
+  if(_alfredBarRec){try{_alfredBarRec.stop();}catch(_){}return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('הדפדפן לא תומך בזיהוי דיבור');return;}
-  _alfredQuickRec=new SR();
-  _alfredQuickRec.lang='he-IL';
-  _alfredQuickRec.continuous=false;
-  _alfredQuickRec.interimResults=true;
-  const btn=document.querySelector('.alfred-quick-mic');
+  _alfredBarRec=new SR();
+  _alfredBarRec.lang='he-IL';
+  _alfredBarRec.continuous=false;
+  _alfredBarRec.interimResults=true;
+  const btn=document.getElementById('alfredBarMicBtn');
   if(btn)btn.classList.add('recording');
-  const inp=document.getElementById('alfredQuickInput');
+  const inp=document.getElementById('alfredBarInput');
   let finalText='';
-  _alfredQuickRec.onresult=ev=>{
+  _alfredBarRec.onresult=ev=>{
     let interim='';
     for(let i=ev.resultIndex;i<ev.results.length;i++){
       if(ev.results[i].isFinal)finalText+=ev.results[i][0].transcript;
@@ -6078,17 +6082,28 @@ function alfredQuickMic(){
     }
     if(inp)inp.value=finalText+interim;
   };
-  _alfredQuickRec.onend=()=>{
+  _alfredBarRec.onend=()=>{
     if(btn)btn.classList.remove('recording');
-    _alfredQuickRec=null;
-    if(inp&&inp.value.trim())alfredQuickSend();
+    _alfredBarRec=null;
+    if(inp&&inp.value.trim())alfredBarSend();
   };
-  _alfredQuickRec.onerror=e=>{
+  _alfredBarRec.onerror=e=>{
     if(btn)btn.classList.remove('recording');
-    _alfredQuickRec=null;
+    _alfredBarRec=null;
     if(e.error!=='aborted'&&e.error!=='no-speech')toast('שגיאה: '+e.error);
   };
-  try{_alfredQuickRec.start();}catch(e){toast('לא הצליח להתחיל');_alfredQuickRec=null;}
+  try{_alfredBarRec.start();}catch(e){toast('לא הצליח להתחיל');_alfredBarRec=null;}
+}
+
+function updateAlfredBarVisibility(){
+  const bar=document.getElementById('alfredBar');if(!bar)return;
+  const sheetOpen=document.getElementById('assistantSheet')?.classList.contains('on');
+  const settingsOpen=document.getElementById('settingsSheet')?.classList.contains('on');
+  const billsOpen=document.getElementById('billsListSheet')?.classList.contains('on');
+  const billFormOpen=document.getElementById('billFormSheet')?.classList.contains('on');
+  const personaOpen=document.getElementById('agentPersonaSheet')?.classList.contains('on');
+  const loginShown=document.getElementById('loginScreen')?.style.display!=='none';
+  bar.style.display=(sheetOpen||settingsOpen||billsOpen||billFormOpen||personaOpen||loginShown)?'none':'flex';
 }
 
 function renderAlfredTopCard(){
@@ -6324,10 +6339,11 @@ function openAssistantChat(){
 
 // Hide FAB when assistant is open
 function updateFabVisibility(){
-  const fab=document.getElementById('asstFab');if(!fab)return;
+  const fab=document.getElementById('asstFab');
   const sheetOpen=document.getElementById('assistantSheet')?.classList.contains('on');
   const settingsOpen=document.getElementById('settingsSheet')?.classList.contains('on');
-  fab.style.display=(sheetOpen||settingsOpen)?'none':'flex';
+  if(fab)fab.style.display=(sheetOpen||settingsOpen)?'none':'flex';
+  if(typeof updateAlfredBarVisibility==='function')updateAlfredBarVisibility();
 }
 
 // ── AI Settings & Gemini Client ──────────────────────────────────────────────
