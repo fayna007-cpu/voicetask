@@ -1402,7 +1402,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);if(typeof updateAlfredBarVisibility==='function')updateAlfredBarVisibility();if(typeof updateAlfredBarPlaceholder==='function')updateAlfredBarPlaceholder();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -6120,8 +6120,10 @@ function updateAlfredBarVisibility(){
   const billsOpen=document.getElementById('billsListSheet')?.classList.contains('on');
   const billFormOpen=document.getElementById('billFormSheet')?.classList.contains('on');
   const personaOpen=document.getElementById('agentPersonaSheet')?.classList.contains('on');
-  const loginShown=document.getElementById('loginScreen')?.style.display!=='none';
-  bar.style.display=(sheetOpen||settingsOpen||billsOpen||billFormOpen||personaOpen||loginShown)?'none':'flex';
+  // Only hide if user is NOT yet logged in (app element hidden)
+  const app=document.getElementById('app');
+  const appHidden=app&&app.style.display==='none';
+  bar.style.display=(sheetOpen||settingsOpen||billsOpen||billFormOpen||personaOpen||appHidden)?'none':'flex';
 }
 
 function renderAlfredTopCard(){
