@@ -6960,6 +6960,11 @@ const GEMINI_TOOLS=[{functionDeclarations:[
     id:{type:'number'},newDatetime:{type:'string',description:'תאריך חדש ISO'}
   },required:['id','newDatetime']}},
   {name:'delete_task',description:'מחק משימה',parameters:{type:'object',properties:{id:{type:'number'}},required:['id']}},
+  {name:'create_routine',description:'יצירת שגרה חוזרת חדשה (אימון, הרגל, פגישה חוזרת). מקבל תיאור מילולי של התזמון בעברית — האפליקציה מנתחת אותו אוטומטית. דוגמאות תזמון: "פעמיים בשבוע באמצע שבוע עם הפרדה ויום שישי בצהריים", "ראשון שלישי חמישי בבוקר 17:00", "כל יום בבוקר", "כל יום ראשון בשעה 9 בערב".',parameters:{type:'object',properties:{
+    name:{type:'string',description:'שם השגרה. דוגמה: "אימון FB", "ריצת בוקר", "מדיטציה"'},
+    schedule:{type:'string',description:'תיאור מילולי של התזמון בעברית — בדיוק כמו שהמשתמש אמר'},
+    duration:{type:'number',description:'משך בדקות (אופציונלי, ברירת מחדל 60)'}
+  },required:['name','schedule']}},
   {name:'defer_routine',description:'דחה מופע של שגרה לתאריך/שעה אחר. חובה: שם השגרה (או id) + התאריך הנוכחי של המופע + התאריך החדש. דוגמה: לדחות אימון FB מיום ראשון ליום שני.',parameters:{type:'object',properties:{
     routineName:{type:'string',description:'שם השגרה (כמו שמופיע בקונטקסט)'},
     currentDate:{type:'string',description:'תאריך/שעה ISO של המופע הנוכחי (כמו שמופיע בקונטקסט)'},
@@ -6995,12 +7000,12 @@ const GEMINI_TOOLS=[{functionDeclarations:[
   },required:['to','subject','body']}}
 ]}];
 
-const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
+const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
 const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill']);
 // Tools that need LLM follow-up to summarize/interpret results
 const QUERY_TOOLS=new Set(['gcal_list_events','gcal_find_free_slots','gmail_search','gmail_read']);
 // Tools that just need a local confirmation — skip extra LLM call after these
-const ACTION_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','save_memory','delete_memory']);
+const ACTION_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','save_memory','delete_memory']);
 
 // ── Tool executor ────────────────────────────────────────────────────────────
 async function executeTool(name,args){
@@ -7027,6 +7032,55 @@ async function executeTool(name,args){
         const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'לא נמצאה'};
         if(t.calendarEventId)await deleteFromCalendar(t);
         tasks=tasks.filter(x=>x.id!=args.id);save();render();return{success:true};
+      }
+      case 'create_routine':{
+        const name=(args.name||'').trim();
+        const schedule=(args.schedule||'').trim();
+        if(!name)return{error:'חסר שם השגרה'};
+        if(!schedule)return{error:'חסר תיאור התזמון'};
+        const verbParsed=parseVerbSchedule(schedule);
+        if(!verbParsed||(verbParsed.daySlots.length===0&&!/(\d|פעם|כל)/.test(schedule))){
+          return{error:'לא הצלחתי להבין את התזמון: '+schedule};
+        }
+        const r={
+          id:Date.now(),
+          name,
+          text:name,
+          enabled:true,
+          timesPerWeek:Math.max(1,verbParsed.timesPerWeek||verbParsed.daySlots.length||3),
+          duration:args.duration||verbParsed.duration||60,
+          timeWindow:verbParsed.timeWindow||'morning',
+          specificTime:'09:00',
+          preferredDays:verbParsed.daySlots.length?verbParsed.daySlots.map(s=>s.day):[],
+          weeklyReminderDay:-1,
+          weeklyReminderTime:'08:00',
+          scheduledWeeks:{},
+          completedDates:[],
+          skippedDates:[],
+          scheduleMode:'verbal',
+          verbCondition:schedule,
+          verbParsed,
+          morningReminder:true,
+          reminder:30
+        };
+        routines.push(r);
+        saveRoutines();
+        // Generate this week's slots and create calendar events
+        const slots=generateWeekSlots(r,0);
+        const wk=getWeekKey();
+        if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
+        for(const dt of slots){
+          let evId=null;
+          try{const ev=await createCalendarEvent(r,dt);evId=ev?.id||null;}catch(_){}
+          r.scheduledWeeks[wk].push({dt,eventId:evId});
+        }
+        saveRoutines();render();if(typeof renderRoutineList==='function')renderRoutineList();
+        const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        const summary=slots.slice(0,7).map(s=>{
+          const d=new Date(s);
+          return dayNames[d.getDay()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+        }).join(' · ');
+        return{success:true,name:r.name,timesPerWeek:r.timesPerWeek,scheduledThisWeek:slots.length,schedule:summary};
       }
       case 'defer_routine':{
         const name=(args.routineName||'').trim();
@@ -7313,6 +7367,7 @@ function summarizeToolsExecuted(list){
     if(t.name==='complete_task')return '✓ משימה "'+(t.result?.text||'').slice(0,50)+'" סומנה כבוצעה';
     if(t.name==='defer_task')return '✓ משימה נדחתה';
     if(t.name==='delete_task')return '✓ משימה נמחקה';
+    if(t.name==='create_routine')return '✓ שגרה "'+(t.result?.name||'').slice(0,40)+'" נוצרה — '+(t.result?.scheduledThisWeek||0)+' מופעים השבוע: '+(t.result?.schedule||'');
     if(t.name==='defer_routine')return '✓ שגרה "'+(t.result?.routine||'').slice(0,40)+'" נדחתה';
     if(t.name==='add_bill')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" נוסף';
     if(t.name==='mark_bill_paid')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" סומן כשולם';
