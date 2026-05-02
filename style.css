@@ -823,6 +823,36 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .ot-task-row:active{opacity:.7}
 .ot-task-ico{font-size:16px;flex-shrink:0}
 .ot-task-txt{font-size:14px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ot-task-add{font-size:18px;color:var(--accent);font-weight:800;flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:oklch(0.78 0.16 72 / 0.12);border-radius:50%}
+
+/* Builder list */
+.ot-builder{margin:8px 0;display:flex;flex-direction:column;gap:6px;direction:rtl}
+.ot-builder-empty{padding:14px;background:var(--surface);border:1px dashed var(--border2);border-radius:12px;font-size:12px;color:var(--muted);text-align:center}
+.ot-builder-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:oklch(0.78 0.16 72 / 0.1);border:1px solid oklch(0.78 0.16 72 / 0.3);border-radius:12px}
+.ot-builder-row.done{opacity:0.6;text-decoration:line-through}
+.ot-builder-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.ot-builder-text{flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+.ot-builder-del{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:4px 6px;font-family:inherit}
+.ot-builder-del:active{color:oklch(0.65 0.22 25)}
+
+.ot-add-row{display:flex;gap:6px;margin:8px 0}
+.ot-custom-input{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--text);font-family:inherit;outline:none}
+.ot-custom-input:focus{border-color:var(--accent)}
+.ot-add-btn{width:42px;height:42px;background:var(--accent);border:none;border-radius:12px;color:#000;font-size:22px;font-weight:900;cursor:pointer;font-family:inherit;flex-shrink:0;touch-action:manipulation}
+.ot-add-btn:active{filter:brightness(0.85)}
+
+.ot-tabs{display:flex;gap:6px;margin:14px 0 8px;direction:rtl}
+.ot-tab{flex:1;padding:8px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;color:var(--muted);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.ot-tab.on{background:oklch(0.78 0.16 72 / 0.15);border-color:oklch(0.78 0.16 72 / 0.5);color:var(--accent)}
+
+/* Multi-item display on main */
+.ot-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.ot-list-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:oklch(0.78 0.16 72 / 0.08);border-radius:10px}
+.ot-list-row.done{opacity:0.55}
+.ot-list-row.done .ot-list-text{text-decoration:line-through}
+.ot-list-check{width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--accent);color:var(--accent);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1}
+.ot-list-row.done .ot-list-check{background:var(--accent);color:#000}
+.ot-list-text{flex:1;font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
 /* Focus button on task card */
 .act.focus-task-btn{font-size:14px;background:var(--surface2)}
 

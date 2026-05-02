@@ -1000,10 +1000,17 @@
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll" style="padding:16px 16px calc(32px + var(--sab,0px))">
-    <p class="ot-picker-desc">בחר משימה אחת שאם תעשה אותה היום — היום היה שווה.</p>
-    <textarea class="ot-custom-input" id="otCustomText" rows="2" placeholder="כתוב משימה חופשית..."></textarea>
-    <button class="ot-custom-btn" onclick="setOneThingCustom()">✓ בחר זה</button>
-    <div class="ot-divider"><span>או בחר ממשימות היום</span></div>
+    <p class="ot-picker-desc">משימה אחת שאם תעשה אותה היום — היום היה שווה. אפשר גם רשימה של עד 5 פריטים.</p>
+    <div class="ot-builder" id="otBuilder"></div>
+    <div class="ot-add-row">
+      <input class="ot-custom-input" id="otCustomText" placeholder="הוסף משימה חופשית..." onkeydown="if(event.key==='Enter'){addOtItem()}">
+      <button class="ot-add-btn" onclick="addOtItem()">＋</button>
+    </div>
+    <button class="ot-custom-btn" onclick="saveOtList()">✓ שמור</button>
+    <div class="ot-tabs">
+      <button class="ot-tab on" data-otmode="today" onclick="switchOtMode('today')">היום</button>
+      <button class="ot-tab" data-otmode="all" onclick="switchOtMode('all')">כל המשימות</button>
+    </div>
     <div id="otTaskList"></div>
   </div>
 </div>
@@ -5648,10 +5655,22 @@ function getOneThing(){
   return d;
 }
 function saveOneThing(d){localStorage.setItem(OT_KEY,JSON.stringify(d));}
+// Migrate old single-item shape to list shape
+function getOneThingList(){
+  const d=JSON.parse(localStorage.getItem(OT_KEY)||'null');
+  if(!d||d.date!==_ymd(new Date()))return null;
+  if(d.items)return d;// new shape
+  // Old shape — wrap as list
+  return{date:d.date,items:[{text:d.text,taskId:d.taskId||null,completed:!!d.completed}]};
+}
+function saveOneThingList(items){
+  localStorage.setItem(OT_KEY,JSON.stringify({date:_ymd(new Date()),items}));
+}
+
 function renderOneThing(){
   const el=document.getElementById('oneThing');if(!el)return;
-  const d=getOneThing();
-  if(!d){
+  const d=getOneThingList();
+  if(!d||!d.items||!d.items.length){
     el.innerHTML=`<div class="ot-empty" onclick="openOtSheet()">
       <span class="ot-empty-icon">🎯</span>
       <span class="ot-empty-text">מה המשימה האחת שלך היום?</span>
@@ -5659,44 +5678,63 @@ function renderOneThing(){
     </div>`;
     return;
   }
-  if(d.completed){
+  const items=d.items;
+  const allDone=items.every(i=>i.completed);
+  if(allDone&&items.length===1){
     el.innerHTML=`<div class="ot-done">
       <span class="ot-done-icon">🏆</span>
-      <div class="ot-done-text">${esc(d.text)}</div>
+      <div class="ot-done-text">${esc(items[0].text)}</div>
       <button class="ot-change" onclick="openOtSheet()">שנה</button>
     </div>`;
     return;
   }
-  const focusBtn=`<button class="ot-focus-btn" onclick="startFocusOT()">⏱ פוקוס</button>`;
+  if(items.length===1){
+    const focusBtn=`<button class="ot-focus-btn" onclick="startFocusOT()">⏱ פוקוס</button>`;
+    el.innerHTML=`<div class="ot-active">
+      <div class="ot-label">🎯 המשימה האחת להיום</div>
+      <div class="ot-text">${esc(items[0].text)}</div>
+      <div class="ot-actions">
+        <button class="ot-done-btn" onclick="toggleOtItem(0)">${items[0].completed?'↶ ביטול':'✓ סיימתי'}</button>
+        ${focusBtn}
+        <button class="ot-change" onclick="openOtSheet()">שנה</button>
+      </div>
+    </div>`;
+    return;
+  }
+  // List view (multi-item)
+  const doneCount=items.filter(i=>i.completed).length;
+  const rows=items.map((it,i)=>`<div class="ot-list-row${it.completed?' done':''}">
+    <button class="ot-list-check" onclick="toggleOtItem(${i})">${it.completed?'✓':'○'}</button>
+    <span class="ot-list-text">${esc(it.text)}</span>
+  </div>`).join('');
   el.innerHTML=`<div class="ot-active">
-    <div class="ot-label">🎯 המשימה האחת להיום</div>
-    <div class="ot-text">${esc(d.text)}</div>
+    <div class="ot-label">🎯 המשימות להיום (${doneCount}/${items.length})</div>
+    <div class="ot-list">${rows}</div>
     <div class="ot-actions">
-      <button class="ot-done-btn" onclick="completeOneThing()">✓ סיימתי</button>
-      ${focusBtn}
-      <button class="ot-change" onclick="openOtSheet()">שנה</button>
+      <button class="ot-change" onclick="openOtSheet()">ערוך רשימה</button>
     </div>
   </div>`;
 }
-function completeOneThing(){
-  const d=getOneThing();if(!d)return;
-  d.completed=true;saveOneThing(d);renderOneThing();
-  toast('🏆 מצוין! השגת את המשימה האחת שלך היום!');
+function toggleOtItem(idx){
+  const d=getOneThingList();if(!d||!d.items[idx])return;
+  d.items[idx].completed=!d.items[idx].completed;
+  saveOneThingList(d.items);
+  renderOneThing();
+  if(d.items[idx].completed&&d.items.length===1)toast('🏆 כל הכבוד!');
 }
+function completeOneThing(){toggleOtItem(0);}// back-compat
+
+let _otBuilderItems=[];
+let _otMode='today';
+
 function openOtSheet(){
-  const el=document.getElementById('otTaskList');
-  if(el){
-    const today=getTodayItems();
-    const all=[...today.tasks,...today.routines];
-    if(all.length){
-      el.innerHTML=all.map(t=>`<div class="ot-task-row" onclick="setOneThing(${JSON.stringify(t.text)},${t.id||'null'})">
-        <span class="ot-task-ico">${t.routineId?'🔄':'📌'}</span>
-        <span class="ot-task-txt">${esc(t.text)}</span>
-      </div>`).join('');
-    }else{
-      el.innerHTML=`<div style="color:var(--muted);font-size:13px;padding:12px 0;direction:rtl">אין משימות להיום — כתוב בעצמך למעלה</div>`;
-    }
-  }
+  // Initialize builder with current saved items
+  const d=getOneThingList();
+  _otBuilderItems=d&&d.items?d.items.map(i=>({text:i.text,taskId:i.taskId,completed:i.completed})):[];
+  _otMode='today';
+  document.querySelectorAll('.ot-tab').forEach(t=>t.classList.toggle('on',t.dataset.otmode==='today'));
+  renderOtBuilder();
+  renderOtTaskList();
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('otSheet').classList.add('on');
 }
@@ -5704,10 +5742,80 @@ function closeOtSheet(){
   document.getElementById('otSheet').classList.remove('on');
   document.getElementById('routineOverlay').classList.remove('on');
 }
-function setOneThing(text,taskId=null){
-  saveOneThing({text,taskId,date:_ymd(new Date()),completed:false});
-  closeOtSheet();renderOneThing();
+
+function renderOtBuilder(){
+  const el=document.getElementById('otBuilder');if(!el)return;
+  if(!_otBuilderItems.length){
+    el.innerHTML='<div class="ot-builder-empty">הרשימה שלך תופיע כאן — בחר ממשימות או כתוב חופשי</div>';
+    return;
+  }
+  el.innerHTML=_otBuilderItems.map((it,i)=>`<div class="ot-builder-row${it.completed?' done':''}">
+    <span class="ot-builder-num">${i+1}</span>
+    <span class="ot-builder-text">${esc(it.text)}</span>
+    <button class="ot-builder-del" onclick="removeOtItem(${i})">✕</button>
+  </div>`).join('');
 }
+
+function addOtItem(){
+  const inp=document.getElementById('otCustomText');
+  const t=(inp?.value||'').trim();if(!t){toast('כתוב משימה');return;}
+  if(_otBuilderItems.length>=5){toast('מקסימום 5 פריטים');return;}
+  _otBuilderItems.push({text:t,taskId:null,completed:false});
+  inp.value='';
+  renderOtBuilder();
+}
+
+function removeOtItem(idx){
+  _otBuilderItems.splice(idx,1);
+  renderOtBuilder();
+}
+
+function pickOtTask(text,taskId){
+  if(_otBuilderItems.length>=5){toast('מקסימום 5 פריטים');return;}
+  // Avoid duplicates by text
+  if(_otBuilderItems.some(i=>i.text===text)){toast('כבר קיים ברשימה');return;}
+  _otBuilderItems.push({text,taskId,completed:false});
+  renderOtBuilder();
+  toast('נוסף לרשימה');
+}
+
+function saveOtList(){
+  if(!_otBuilderItems.length){toast('הוסף לפחות פריט אחד');return;}
+  saveOneThingList(_otBuilderItems);
+  closeOtSheet();
+  renderOneThing();
+  toast(_otBuilderItems.length===1?'🎯 משימת היום נשמרה':`🎯 רשימה של ${_otBuilderItems.length} משימות נשמרה`);
+}
+
+function switchOtMode(mode){
+  _otMode=mode;
+  document.querySelectorAll('.ot-tab').forEach(t=>t.classList.toggle('on',t.dataset.otmode===mode));
+  renderOtTaskList();
+}
+
+function renderOtTaskList(){
+  const el=document.getElementById('otTaskList');if(!el)return;
+  let list=[];
+  if(_otMode==='today'){
+    const today=getTodayItems();
+    list=[...today.tasks.map(t=>({text:t.text,id:t.id,kind:'task'})),...today.routines.map(r=>({text:r.text,id:r.routineId||r.id,kind:'routine'}))];
+  }else{
+    // All incomplete tasks (and routines)
+    list=tasks.filter(t=>!t.completed).slice(0,30).map(t=>({text:t.text,id:t.id,kind:'task'}));
+  }
+  if(!list.length){
+    el.innerHTML=`<div style="color:var(--muted);font-size:13px;padding:12px 0;direction:rtl">${_otMode==='today'?'אין משימות להיום':'אין משימות פתוחות'}</div>`;
+    return;
+  }
+  el.innerHTML=list.map(t=>`<div class="ot-task-row" onclick="pickOtTask(${JSON.stringify(t.text)},${t.id||'null'})">
+    <span class="ot-task-ico">${t.kind==='routine'?'🔄':'📌'}</span>
+    <span class="ot-task-txt">${esc(t.text)}</span>
+    <span class="ot-task-add">＋</span>
+  </div>`).join('');
+}
+
+// Back-compat helpers (kept in case anything still calls them)
+function setOneThing(text,taskId=null){saveOneThingList([{text,taskId,completed:false}]);closeOtSheet();renderOneThing();}
 function setOneThingCustom(){
   const t=document.getElementById('otCustomText')?.value.trim();
   if(!t){toast('כתוב משימה');return;}
@@ -5723,8 +5831,11 @@ function startFocusById(id){
   if(t)startFocusTimer(id,t.text);
 }
 function startFocusOT(){
-  const d=getOneThing();
-  if(d)startFocusTimer(d.taskId||null,d.text);
+  const d=getOneThingList();
+  if(d&&d.items&&d.items.length){
+    const item=d.items.find(i=>!i.completed)||d.items[0];
+    startFocusTimer(item.taskId||null,item.text);
+  }
 }
 function startFocusTimer(taskId,taskText){
   if(_ft.active)stopFocusTimer();
