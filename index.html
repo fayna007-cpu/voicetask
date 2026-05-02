@@ -7052,6 +7052,7 @@ async function executeTool(name,args){
           timeWindow:verbParsed.timeWindow||'morning',
           specificTime:'09:00',
           preferredDays:verbParsed.daySlots.length?verbParsed.daySlots.map(s=>s.day):[],
+          category:'כללי',
           weeklyReminderDay:-1,
           weeklyReminderTime:'08:00',
           scheduledWeeks:{},
@@ -7061,26 +7062,35 @@ async function executeTool(name,args){
           verbCondition:schedule,
           verbParsed,
           morningReminder:true,
-          reminder:30
+          reminder:30,
+          createdAt:new Date().toISOString()
         };
-        routines.push(r);
+        routines.unshift(r);
         saveRoutines();
-        // Generate this week's slots and create calendar events
-        const slots=generateWeekSlots(r,0);
-        const wk=getWeekKey();
-        if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
-        for(const dt of slots){
-          let evId=null;
-          try{const ev=await createCalendarEvent(r,dt);evId=ev?.id||null;}catch(_){}
-          r.scheduledWeeks[wk].push({dt,eventId:evId});
+        // Generate slots for THIS week + next week so it shows even when
+        // current week's time has passed
+        const allSlots=[];
+        for(let wo=0;wo<=1;wo++){
+          const slots=generateWeekSlots(r,wo);
+          if(!slots||!slots.length)continue;
+          // Compute week-key based on the slot date itself (not "current week + offset")
+          for(const dt of slots){
+            let evId=null;
+            try{const ev=await createCalendarEvent(r,dt);evId=ev?.id||null;}catch(_){}
+            const wk=getWeekKey(new Date(dt));
+            if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
+            r.scheduledWeeks[wk].push({dt,eventId:evId});
+            allSlots.push(dt);
+          }
         }
         saveRoutines();render();if(typeof renderRoutineList==='function')renderRoutineList();
+        scheduleSmartPushNotifs();
         const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-        const summary=slots.slice(0,7).map(s=>{
+        const summary=allSlots.slice(0,5).map(s=>{
           const d=new Date(s);
-          return dayNames[d.getDay()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+          return dayNames[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
         }).join(' · ');
-        return{success:true,name:r.name,timesPerWeek:r.timesPerWeek,scheduledThisWeek:slots.length,schedule:summary};
+        return{success:true,name:r.name,timesPerWeek:r.timesPerWeek,scheduledTotal:allSlots.length,schedule:summary||'אין מופעים בעתיד הקרוב — בדוק את התזמון'};
       }
       case 'defer_routine':{
         const name=(args.routineName||'').trim();
@@ -7367,7 +7377,7 @@ function summarizeToolsExecuted(list){
     if(t.name==='complete_task')return '✓ משימה "'+(t.result?.text||'').slice(0,50)+'" סומנה כבוצעה';
     if(t.name==='defer_task')return '✓ משימה נדחתה';
     if(t.name==='delete_task')return '✓ משימה נמחקה';
-    if(t.name==='create_routine')return '✓ שגרה "'+(t.result?.name||'').slice(0,40)+'" נוצרה — '+(t.result?.scheduledThisWeek||0)+' מופעים השבוע: '+(t.result?.schedule||'');
+    if(t.name==='create_routine')return '✓ שגרה "'+(t.result?.name||'').slice(0,40)+'" נוצרה — '+(t.result?.scheduledTotal||0)+' מופעים: '+(t.result?.schedule||'');
     if(t.name==='defer_routine')return '✓ שגרה "'+(t.result?.routine||'').slice(0,40)+'" נדחתה';
     if(t.name==='add_bill')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" נוסף';
     if(t.name==='mark_bill_paid')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" סומן כשולם';
