@@ -4123,6 +4123,12 @@ function parseVerbSchedule(text){
   if(res.daySlots.length){
     const fb=res.timeWindow||'morning';
     res.daySlots.forEach(s=>{if(!s.timeWindow)s.timeWindow=fb;});
+    // If explicit days outnumber the parsed count, raise total to fit all of them.
+    // E.g. "אמצע שבוע פעמיים עם הפרדה ויום שישי בצהריים" — counts to 2 but
+    // we end up with 3 daySlots (Mon, Wed, Fri). Use 3.
+    if(res.daySlots.length>res.timesPerWeek){
+      res.timesPerWeek=res.daySlots.length;
+    }
   }
   return res;
 }
