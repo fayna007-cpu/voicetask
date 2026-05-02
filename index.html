@@ -1210,6 +1210,10 @@
   </div>
   <div class="rsheet-scroll">
     <div class="bills-summary" id="billsSummary"></div>
+    <button class="bills-add-cta" onclick="openBillForm(null)">
+      <span class="bills-add-cta-icon">＋</span>
+      <span class="bills-add-cta-text">הוסף חשבון חדש</span>
+    </button>
     <div class="bills-filter-row" id="billsFilterRow">
       <button class="bp-chip" data-bf="dashboard" onclick="setBillFilter('dashboard')">📊 דשבורד</button>
       <button class="bp-chip on" data-bf="pending" onclick="setBillFilter('pending')">ממתינים</button>
@@ -7668,8 +7672,8 @@ function openBillsSheet(){
   document.getElementById('billsOverlay').classList.add('on');
   document.getElementById('billsListSheet').classList.add('on');
   document.getElementById('billFormSheet').classList.remove('on');
-  _billFilter='pending';
-  document.querySelectorAll('#billsFilterRow .bp-chip').forEach(b=>b.classList.toggle('on',b.dataset.bf==='pending'));
+  _billFilter='dashboard';
+  document.querySelectorAll('#billsFilterRow .bp-chip').forEach(b=>b.classList.toggle('on',b.dataset.bf==='dashboard'));
   renderBillsList();
   updateBillsSideBadge();
 }
