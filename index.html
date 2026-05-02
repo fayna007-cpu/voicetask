@@ -1211,6 +1211,7 @@
   <div class="rsheet-scroll">
     <div class="bills-summary" id="billsSummary"></div>
     <div class="bills-filter-row" id="billsFilterRow">
+      <button class="bp-chip" data-bf="dashboard" onclick="setBillFilter('dashboard')">📊 דשבורד</button>
       <button class="bp-chip on" data-bf="pending" onclick="setBillFilter('pending')">ממתינים</button>
       <button class="bp-chip" data-bf="paid" onclick="setBillFilter('paid')">שולמו</button>
       <button class="bp-chip" data-bf="all" onclick="setBillFilter('all')">הכל</button>
@@ -2727,6 +2728,8 @@ function render(){
     return;
   }
   let html='';
+  // Urgent: bills due today (most prominent, top of screen)
+  html+=renderUrgentBillsBanner();
   // Section -1: Alfred top insight card
   html+=renderAlfredTopCard();
   // Section 0: Open bills (above tasks)
@@ -7666,6 +7669,11 @@ function renderBillsSummary(){
 function renderBillsList(){
   renderBillsSummary();
   const el=document.getElementById('billsList');if(!el)return;
+  // Dashboard mode
+  if(_billFilter==='dashboard'){
+    el.innerHTML=renderBillsDashboard();
+    return;
+  }
   let list=bills;
   if(_billFilter==='pending')list=bills.filter(b=>b.status==='pending');
   else if(_billFilter==='paid')list=bills.filter(b=>b.status==='paid');
@@ -7681,6 +7689,126 @@ function renderBillsList(){
     return;
   }
   el.innerHTML=list.map(renderBillCard).join('');
+}
+
+function renderBillsDashboard(){
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const paidThisMonth=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart);
+  const totalThisMonth=paidThisMonth.reduce((s,b)=>s+(b.amount||0),0);
+
+  // Pie by category (paid this month)
+  const byCat={};
+  paidThisMonth.forEach(b=>{byCat[b.category]=(byCat[b.category]||0)+(b.amount||0);});
+  const catEntries=Object.entries(byCat).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+  // Monthly trend (last 6 months)
+  const trend=[];
+  for(let i=5;i>=0;i--){
+    const m=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mEnd=new Date(now.getFullYear(),now.getMonth()-i+1,0,23,59,59);
+    const sum=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=m&&new Date(b.paidAt)<=mEnd).reduce((s,b)=>s+(b.amount||0),0);
+    trend.push({month:m.toLocaleDateString('he-IL',{month:'short'}),sum});
+  }
+  const maxTrend=Math.max(...trend.map(t=>t.sum),1);
+
+  // Pending stats
+  const pending=bills.filter(b=>b.status==='pending');
+  const pendingTotal=pending.reduce((s,b)=>s+(b.amount||0),0);
+  const overdueCount=pending.filter(b=>b.deadline&&new Date(b.deadline)<now).length;
+
+  // Build SVG pie
+  const COLORS=['#fbbf24','#34d399','#818cf8','#f87171','#60a5fa','#c084fc','#fb923c','#a78bfa','#22d3ee','#fb7185','#facc15'];
+  let pieSvg='';
+  if(catEntries.length){
+    const total=catEntries.reduce((s,[_,v])=>s+v,0);
+    let acc=0;const cx=80,cy=80,r=70;
+    pieSvg='<svg viewBox="0 0 160 160" class="bills-pie">';
+    if(catEntries.length===1){
+      pieSvg+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${COLORS[0]}"/>`;
+    }else{
+      catEntries.forEach(([cat,val],i)=>{
+        const startA=(acc/total)*Math.PI*2-Math.PI/2;
+        acc+=val;
+        const endA=(acc/total)*Math.PI*2-Math.PI/2;
+        const x1=cx+r*Math.cos(startA),y1=cy+r*Math.sin(startA);
+        const x2=cx+r*Math.cos(endA),y2=cy+r*Math.sin(endA);
+        const large=(endA-startA)>Math.PI?1:0;
+        pieSvg+=`<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${COLORS[i%COLORS.length]}" stroke="var(--surface)" stroke-width="1"/>`;
+      });
+    }
+    pieSvg+=`<circle cx="${cx}" cy="${cy}" r="32" fill="var(--surface2)"/>`;
+    pieSvg+=`<text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="inherit">סה"כ</text>`;
+    pieSvg+=`<text x="${cx}" y="${cy+11}" text-anchor="middle" font-size="13" font-weight="800" fill="var(--text)" font-family="inherit">₪${Math.round(total).toLocaleString('he-IL')}</text>`;
+    pieSvg+='</svg>';
+  }
+
+  // Build trend bar chart
+  const trendBars=trend.map(t=>{
+    const h=Math.max(2,Math.round(t.sum/maxTrend*100));
+    return `<div class="bd-bar-col"><div class="bd-bar-wrap"><div class="bd-bar" style="height:${h}%" title="₪${Math.round(t.sum)}"></div></div><div class="bd-bar-label">${t.month}</div><div class="bd-bar-val">₪${Math.round(t.sum/1000*10)/10}k</div></div>`;
+  }).join('');
+
+  // Category legend
+  const legend=catEntries.slice(0,8).map(([cat,val],i)=>{
+    const pct=Math.round(val/totalThisMonth*100);
+    return `<div class="bd-legend-row"><span class="bd-legend-dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="bd-legend-name">${BILL_CATS[cat]||'📄'} ${esc(cat)}</span><span class="bd-legend-val">₪${Math.round(val).toLocaleString('he-IL')} · ${pct}%</span></div>`;
+  }).join('');
+
+  return `<div class="bills-dashboard">
+    <div class="bd-card">
+      <div class="bd-card-title">📊 פילוח חודשי לפי קטגוריה</div>
+      ${catEntries.length?`<div class="bd-pie-wrap">${pieSvg}<div class="bd-legend">${legend}</div></div>`:'<div class="bd-empty">אין חשבונות ששולמו החודש עדיין</div>'}
+    </div>
+    <div class="bd-card">
+      <div class="bd-card-title">📈 מגמה — 6 חודשים אחרונים</div>
+      <div class="bd-bars">${trendBars}</div>
+    </div>
+    <div class="bd-card">
+      <div class="bd-card-title">🔔 חשבונות פתוחים</div>
+      <div class="bd-stats">
+        <div class="bd-stat"><div class="bd-stat-num">${pending.length}</div><div class="bd-stat-lbl">ממתינים</div></div>
+        <div class="bd-stat ${overdueCount?'warn':''}"><div class="bd-stat-num">${overdueCount}</div><div class="bd-stat-lbl">באיחור</div></div>
+        <div class="bd-stat"><div class="bd-stat-num">₪${Math.round(pendingTotal).toLocaleString('he-IL')}</div><div class="bd-stat-lbl">לתשלום</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderUrgentBillsBanner(){
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  const tEnd=new Date(today);tEnd.setHours(23,59,59,999);
+  // Bills with pay-date today OR deadline today or earlier (overdue)
+  const todayBills=bills.filter(b=>{
+    if(b.status!=='pending')return false;
+    if(b.payDate){
+      const pd=new Date(b.payDate);pd.setHours(0,0,0,0);
+      if(pd.getTime()<=today.getTime())return true;
+    }
+    if(b.deadline){
+      const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
+      if(dl.getTime()<=today.getTime())return true;
+    }
+    return false;
+  });
+  if(!todayBills.length)return '';
+  const totalAmount=todayBills.reduce((s,b)=>s+(b.amount||0),0);
+  const overdue=todayBills.filter(b=>{
+    if(!b.deadline)return false;
+    const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
+    return dl<today;
+  }).length;
+  const title=overdue?`🚨 ${overdue} חשבונות באיחור!`:`🔔 חשבונות לתשלום היום`;
+  const detailParts=[`${todayBills.length} חשבונות`];
+  if(totalAmount)detailParts.push(`₪${Math.round(totalAmount).toLocaleString('he-IL')}`);
+  return `<div class="urgent-bills-banner${overdue?' overdue':''}" onclick="openBillsSheet()">
+    <div class="ubb-icon">${overdue?'🚨':'💳'}</div>
+    <div class="ubb-body">
+      <div class="ubb-title">${title}</div>
+      <div class="ubb-detail">${detailParts.join(' · ')} — לחץ לטיפול</div>
+    </div>
+    <div class="ubb-arrow">›</div>
+  </div>`;
 }
 
 function renderBillCard(bill){
@@ -7737,7 +7865,10 @@ function renderBillCard(bill){
     <button class="bill-pay-btn" onclick="event.stopPropagation();markBillPaid(${bill.id})">✓ שולם</button>
     <button class="defer-chip" onclick="event.stopPropagation();openPostpone('bill',${bill.id})">דחייה</button>
     <button class="bill-sync-btn" onclick="event.stopPropagation();syncBillNow(${bill.id})" title="סנכרן ליומן">${bill.calendarEventId||bill.deadlineEventId?'📅 מסונכרן':'📅 סנכרן ליומן'}</button>
-  </div>`:''}
+    <button class="bill-del-btn" onclick="event.stopPropagation();deleteBillById(${bill.id})" title="מחק">🗑️</button>
+  </div>`:`<div class="bill-card-actions">
+    <button class="bill-del-btn" onclick="event.stopPropagation();deleteBillById(${bill.id})" title="מחק">🗑️</button>
+  </div>`}
 </div>`;
 }
 
@@ -7865,6 +7996,19 @@ function deleteBill(){
   closeBillForm();
   scheduleSmartPushNotifs();
   render();
+}
+
+function deleteBillById(id){
+  const b=bills.find(x=>x.id===id);if(!b)return;
+  if(!confirm(`למחוק את החשבון "${b.name}"?`))return;
+  if(b.calendarEventId)deleteCalendarEvent(b.calendarEventId);
+  if(b.deadlineEventId)deleteCalendarEvent(b.deadlineEventId);
+  bills=bills.filter(x=>x.id!==id);
+  saveBills();
+  toast('🗑️ חשבון נמחק');
+  renderBillsList();
+  render();
+  scheduleSmartPushNotifs();
 }
 
 function markBillPaid(id){

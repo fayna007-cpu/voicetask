@@ -1413,3 +1413,45 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-mini-card.overdue{background:oklch(0.55 0.18 25 / 0.08)}
 .bill-mini-name{flex:1;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bill-mini-amount{font-size:13px;font-weight:800;color:var(--accent);direction:ltr;flex-shrink:0}
+
+/* ── Urgent bills banner (top of main screen) ── */
+.urgent-bills-banner{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,oklch(0.78 0.16 72 / 0.18) 0%,oklch(0.65 0.2 50 / 0.14) 100%);border:2px solid oklch(0.78 0.16 72 / 0.55);border-radius:14px;padding:14px 16px;margin:0 16px 12px;cursor:pointer;animation:urgentPulse 2s ease-in-out infinite;touch-action:manipulation}
+.urgent-bills-banner.overdue{background:linear-gradient(135deg,oklch(0.65 0.22 25 / 0.18) 0%,oklch(0.55 0.22 25 / 0.14) 100%);border-color:oklch(0.65 0.22 25 / 0.6)}
+.urgent-bills-banner:active{filter:brightness(0.92)}
+@keyframes urgentPulse{0%,100%{box-shadow:0 0 0 0 oklch(0.78 0.16 72 / 0.4)}50%{box-shadow:0 0 0 6px oklch(0.78 0.16 72 / 0)}}
+.urgent-bills-banner.overdue{animation:overduePulse 1.5s ease-in-out infinite}
+@keyframes overduePulse{0%,100%{box-shadow:0 0 0 0 oklch(0.65 0.22 25 / 0.5)}50%{box-shadow:0 0 0 8px oklch(0.65 0.22 25 / 0)}}
+.ubb-icon{font-size:32px;flex-shrink:0;line-height:1}
+.ubb-body{flex:1;min-width:0}
+.ubb-title{font-size:15px;font-weight:800;color:var(--text);line-height:1.2}
+.ubb-detail{font-size:12px;color:var(--muted);margin-top:3px;font-weight:600}
+.ubb-arrow{font-size:24px;color:var(--muted);flex-shrink:0;font-weight:300}
+
+/* ── Bill delete button on cards ── */
+.bill-del-btn{padding:5px 12px;background:oklch(0.55 0.22 25 / 0.12);border:1px solid oklch(0.55 0.22 25 / 0.35);border-radius:12px;color:oklch(0.75 0.2 25);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.bill-del-btn:active{background:oklch(0.55 0.22 25 / 0.25)}
+
+/* ── Bills Dashboard ── */
+.bills-dashboard{padding:0 16px;display:flex;flex-direction:column;gap:14px}
+.bd-card{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:16px}
+.bd-card-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:14px}
+.bd-empty{padding:24px 0;text-align:center;color:var(--muted);font-size:13px}
+.bd-pie-wrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.bills-pie{width:160px;height:160px;flex-shrink:0}
+.bd-legend{flex:1;min-width:140px;display:flex;flex-direction:column;gap:6px}
+.bd-legend-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.bd-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.bd-legend-name{flex:1;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-legend-val{color:var(--muted);font-weight:700;font-size:11px;direction:ltr}
+.bd-bars{display:flex;align-items:flex-end;gap:6px;height:140px;padding-top:8px}
+.bd-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.bd-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+.bd-bar{width:100%;background:linear-gradient(to top,oklch(0.55 0.16 285),oklch(0.65 0.18 320));border-radius:6px 6px 0 0;min-height:2px;transition:height 0.4s ease}
+.bd-bar-label{font-size:10px;color:var(--muted);font-weight:600}
+.bd-bar-val{font-size:9px;color:var(--text);font-weight:700;direction:ltr}
+.bd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.bd-stat{background:var(--surface);border-radius:12px;padding:14px 8px;text-align:center}
+.bd-stat.warn{background:oklch(0.65 0.22 25 / 0.1)}
+.bd-stat-num{font-size:18px;font-weight:800;color:var(--text);direction:ltr}
+.bd-stat.warn .bd-stat-num{color:oklch(0.75 0.2 25)}
+.bd-stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;font-weight:600}
