@@ -2952,9 +2952,26 @@ function renderSmartSuggest(){
       return{day,score:e+comp+base};
     }).sort((a,b)=>b.score-a.score);
 
-    // Pick best N days (timesPerWeek)
+    // Pick best N days (timesPerWeek) — respect rest day if set
     const count=r.timesPerWeek||3;
-    const bestDays=scoredDays.slice(0,count).map(x=>x.day).sort((a,b)=>a-b);
+    const restDay=!!(r.verbParsed?.restDayBetween||r.restDayBetween);
+    let picked=[];
+    if(restDay){
+      // Pick top scoring days with at least 1 day gap (no adjacent)
+      for(const sd of scoredDays){
+        if(picked.length>=count)break;
+        if(picked.some(p=>Math.abs(p-sd.day)<2||Math.abs(p-sd.day)===6))continue;
+        picked.push(sd.day);
+      }
+      // If not enough with separation, fill rest
+      for(const sd of scoredDays){
+        if(picked.length>=count)break;
+        if(!picked.includes(sd.day))picked.push(sd.day);
+      }
+    }else{
+      picked=scoredDays.slice(0,count).map(x=>x.day);
+    }
+    const bestDays=picked.sort((a,b)=>a-b);
     const h=windowStartHour(r);
     const m=r.timeWindow==='specific'?+(r.specificTime||'09:00').split(':')[1]:0;
 
@@ -4052,8 +4069,8 @@ function parseVerbSchedule(text){
   const twm=text.match(/(פעמיים)\s*בשבוע|(\d+|אחת|אחד|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\s*(?:פעמים|אימונים|פגישות|פעילויות|אירועים|ריצות|אימון)?\s*בשבוע/);
   if(twm)res.timesPerWeek=twm[1]?2:(NUM[twm[2]]||+twm[2]||3);
   else if(/פעם אחת|פעם בשבוע/.test(text))res.timesPerWeek=1;
-  // Rest day
-  res.restDayBetween=/יום מנוח|הפרש יום|לפחות יום|מנוחה ביניה|מנוחה בניה/.test(text);
+  // Rest day / day separation between sessions
+  res.restDayBetween=/יום מנוח|מנוחה ביני|מנוחה בני|הפרש יום|לפחות יום|יום הפרד|הפרדה בין|הפרדה של יום|להפריד יום|להפריד בין|יום הפסקה|הפסקה של יום|לא רצוף|לא עוקב|לא ימים עוקב|לא יומיים ברצף|רווח של יום|יום אחרי אימון|יום בין/.test(text);
   const WIN={'ערב':'evening','הערב':'evening','בוקר':'morning','הבוקר':'morning','אחה"צ':'afternoon','אחר הצהריים':'afternoon','צהריים':'afternoon','לילה':'evening'};
   const GROUP={'אמצע שבוע':[1,2,3],'אמצע-שבוע':[1,2,3],'ימי אמצע':[1,2,3],'סוף שבוע':[5,6],'סופ"ש':[5,6],'סופש':[5,6],'ימי שבוע':[0,1,2,3,4],'ימי עבודה':[0,1,2,3,4]};
   const DAYS=[{re:/ראשון|א׳/,d:0},{re:/שני(?!ה)|ב׳/,d:1},{re:/שלישי|ג׳/,d:2},{re:/רביעי|ד׳/,d:3},{re:/חמישי|ה׳/,d:4},{re:/שישי|ו׳/,d:5},{re:/שבת|שב׳/,d:6}];
