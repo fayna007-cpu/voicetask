@@ -7667,7 +7667,10 @@ function renderBillsSummary(){
 }
 
 function renderBillsList(){
-  renderBillsSummary();
+  // Hide normal summary when dashboard is active
+  const sumEl=document.getElementById('billsSummary');
+  if(sumEl)sumEl.style.display=_billFilter==='dashboard'?'none':'';
+  if(_billFilter!=='dashboard')renderBillsSummary();
   const el=document.getElementById('billsList');if(!el)return;
   // Dashboard mode
   if(_billFilter==='dashboard'){
@@ -7694,36 +7697,66 @@ function renderBillsList(){
 function renderBillsDashboard(){
   const now=new Date();
   const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const lastMonthEnd=new Date(now.getFullYear(),now.getMonth(),0,23,59,59);
+  const monthName=now.toLocaleDateString('he-IL',{month:'long',year:'numeric'});
+
   const paidThisMonth=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart);
   const totalThisMonth=paidThisMonth.reduce((s,b)=>s+(b.amount||0),0);
+  const paidLastMonth=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=lastMonthStart&&new Date(b.paidAt)<=lastMonthEnd);
+  const totalLastMonth=paidLastMonth.reduce((s,b)=>s+(b.amount||0),0);
+  const deltaPct=totalLastMonth?Math.round((totalThisMonth-totalLastMonth)/totalLastMonth*100):0;
 
-  // Pie by category (paid this month)
+  const pending=bills.filter(b=>b.status==='pending');
+  const pendingTotal=pending.reduce((s,b)=>s+(b.amount||0),0);
+  const overdueCount=pending.filter(b=>b.deadline&&new Date(b.deadline)<now).length;
+  const dueThisWeek=pending.filter(b=>{
+    if(!b.deadline)return false;
+    const dl=new Date(b.deadline);const wEnd=new Date(now);wEnd.setDate(now.getDate()+7);
+    return dl<=wEnd&&dl>=now;
+  }).length;
+
+  // Pie data
   const byCat={};
   paidThisMonth.forEach(b=>{byCat[b.category]=(byCat[b.category]||0)+(b.amount||0);});
   const catEntries=Object.entries(byCat).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1]);
 
-  // Monthly trend (last 6 months)
+  // Trend
   const trend=[];
   for(let i=5;i>=0;i--){
     const m=new Date(now.getFullYear(),now.getMonth()-i,1);
     const mEnd=new Date(now.getFullYear(),now.getMonth()-i+1,0,23,59,59);
     const sum=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=m&&new Date(b.paidAt)<=mEnd).reduce((s,b)=>s+(b.amount||0),0);
-    trend.push({month:m.toLocaleDateString('he-IL',{month:'short'}),sum});
+    trend.push({month:m.toLocaleDateString('he-IL',{month:'short'}),sum,isCurrent:i===0});
   }
   const maxTrend=Math.max(...trend.map(t=>t.sum),1);
 
-  // Pending stats
-  const pending=bills.filter(b=>b.status==='pending');
-  const pendingTotal=pending.reduce((s,b)=>s+(b.amount||0),0);
-  const overdueCount=pending.filter(b=>b.deadline&&new Date(b.deadline)<now).length;
+  // Recent paid (last 5)
+  const recentPaid=bills.filter(b=>b.status==='paid'&&b.paidAt).sort((a,b)=>new Date(b.paidAt)-new Date(a.paidAt)).slice(0,5);
 
-  // Build SVG pie
   const COLORS=['#fbbf24','#34d399','#818cf8','#f87171','#60a5fa','#c084fc','#fb923c','#a78bfa','#22d3ee','#fb7185','#facc15'];
-  let pieSvg='';
+
+  // ── Hero KPI card ──
+  const deltaSign=deltaPct>0?'↑':deltaPct<0?'↓':'';
+  const deltaCls=deltaPct>0?'down':deltaPct<0?'up':'';// up=less spent (good)
+  const heroHtml=`<div class="bd-hero">
+    <div class="bd-hero-label">סה"כ ${monthName}</div>
+    <div class="bd-hero-value">₪${Math.round(totalThisMonth).toLocaleString('he-IL')}</div>
+    ${totalLastMonth?`<div class="bd-hero-delta ${deltaCls}">${deltaSign} ${Math.abs(deltaPct)}% מחודש קודם (₪${Math.round(totalLastMonth).toLocaleString('he-IL')})</div>`:'<div class="bd-hero-delta">חודש ראשון של מעקב</div>'}
+    <div class="bd-hero-row">
+      <div class="bd-hero-stat"><span class="bd-hero-stat-num">${paidThisMonth.length}</span><span class="bd-hero-stat-lbl">שולמו</span></div>
+      <div class="bd-hero-stat"><span class="bd-hero-stat-num">${pending.length}</span><span class="bd-hero-stat-lbl">ממתינים</span></div>
+      <div class="bd-hero-stat ${overdueCount?'warn':''}"><span class="bd-hero-stat-num">${overdueCount}</span><span class="bd-hero-stat-lbl">איחור</span></div>
+      <div class="bd-hero-stat"><span class="bd-hero-stat-num">${dueThisWeek}</span><span class="bd-hero-stat-lbl">השבוע</span></div>
+    </div>
+  </div>`;
+
+  // ── Pie card ──
+  let pieHtml='';
   if(catEntries.length){
     const total=catEntries.reduce((s,[_,v])=>s+v,0);
-    let acc=0;const cx=80,cy=80,r=70;
-    pieSvg='<svg viewBox="0 0 160 160" class="bills-pie">';
+    let acc=0;const cx=90,cy=90,r=78,rIn=48;
+    let pieSvg='<svg viewBox="0 0 180 180" class="bills-pie">';
     if(catEntries.length===1){
       pieSvg+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${COLORS[0]}"/>`;
     }else{
@@ -7734,45 +7767,66 @@ function renderBillsDashboard(){
         const x1=cx+r*Math.cos(startA),y1=cy+r*Math.sin(startA);
         const x2=cx+r*Math.cos(endA),y2=cy+r*Math.sin(endA);
         const large=(endA-startA)>Math.PI?1:0;
-        pieSvg+=`<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${COLORS[i%COLORS.length]}" stroke="var(--surface)" stroke-width="1"/>`;
+        pieSvg+=`<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${COLORS[i%COLORS.length]}" stroke="var(--surface2)" stroke-width="2"/>`;
       });
     }
-    pieSvg+=`<circle cx="${cx}" cy="${cy}" r="32" fill="var(--surface2)"/>`;
-    pieSvg+=`<text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="inherit">סה"כ</text>`;
-    pieSvg+=`<text x="${cx}" y="${cy+11}" text-anchor="middle" font-size="13" font-weight="800" fill="var(--text)" font-family="inherit">₪${Math.round(total).toLocaleString('he-IL')}</text>`;
+    pieSvg+=`<circle cx="${cx}" cy="${cy}" r="${rIn}" fill="var(--surface2)"/>`;
+    pieSvg+=`<text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="inherit">קטגוריות</text>`;
+    pieSvg+=`<text x="${cx}" y="${cy+12}" text-anchor="middle" font-size="20" font-weight="800" fill="var(--text)" font-family="inherit">${catEntries.length}</text>`;
     pieSvg+='</svg>';
+    const legendItems=catEntries.slice(0,6).map(([cat,val],i)=>{
+      const pct=Math.round(val/total*100);
+      return `<div class="bd-legend-row">
+        <span class="bd-legend-dot" style="background:${COLORS[i%COLORS.length]}"></span>
+        <span class="bd-legend-name">${BILL_CATS[cat]||'📄'} ${esc(cat)}</span>
+        <div class="bd-legend-bar"><div style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
+        <span class="bd-legend-val">₪${Math.round(val).toLocaleString('he-IL')}</span>
+        <span class="bd-legend-pct">${pct}%</span>
+      </div>`;
+    }).join('');
+    pieHtml=`<div class="bd-card">
+      <div class="bd-card-head"><span class="bd-card-title">פילוח לפי קטגוריה</span><span class="bd-card-sub">${monthName}</span></div>
+      <div class="bd-pie-wrap">${pieSvg}</div>
+      <div class="bd-legend">${legendItems}</div>
+    </div>`;
+  }else{
+    pieHtml=`<div class="bd-card"><div class="bd-card-head"><span class="bd-card-title">פילוח לפי קטגוריה</span></div><div class="bd-empty">אין חשבונות ששולמו החודש</div></div>`;
   }
 
-  // Build trend bar chart
+  // ── Trend card ──
   const trendBars=trend.map(t=>{
-    const h=Math.max(2,Math.round(t.sum/maxTrend*100));
-    return `<div class="bd-bar-col"><div class="bd-bar-wrap"><div class="bd-bar" style="height:${h}%" title="₪${Math.round(t.sum)}"></div></div><div class="bd-bar-label">${t.month}</div><div class="bd-bar-val">₪${Math.round(t.sum/1000*10)/10}k</div></div>`;
+    const h=Math.max(3,Math.round(t.sum/maxTrend*100));
+    const valShort=t.sum>=1000?'₪'+Math.round(t.sum/1000*10)/10+'k':'₪'+t.sum;
+    return `<div class="bd-bar-col${t.isCurrent?' current':''}">
+      <div class="bd-bar-val-top">${t.sum?valShort:'—'}</div>
+      <div class="bd-bar-wrap"><div class="bd-bar" style="height:${h}%"></div></div>
+      <div class="bd-bar-label">${t.month}</div>
+    </div>`;
   }).join('');
-
-  // Category legend
-  const legend=catEntries.slice(0,8).map(([cat,val],i)=>{
-    const pct=Math.round(val/totalThisMonth*100);
-    return `<div class="bd-legend-row"><span class="bd-legend-dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="bd-legend-name">${BILL_CATS[cat]||'📄'} ${esc(cat)}</span><span class="bd-legend-val">₪${Math.round(val).toLocaleString('he-IL')} · ${pct}%</span></div>`;
-  }).join('');
-
-  return `<div class="bills-dashboard">
-    <div class="bd-card">
-      <div class="bd-card-title">📊 פילוח חודשי לפי קטגוריה</div>
-      ${catEntries.length?`<div class="bd-pie-wrap">${pieSvg}<div class="bd-legend">${legend}</div></div>`:'<div class="bd-empty">אין חשבונות ששולמו החודש עדיין</div>'}
-    </div>
-    <div class="bd-card">
-      <div class="bd-card-title">📈 מגמה — 6 חודשים אחרונים</div>
-      <div class="bd-bars">${trendBars}</div>
-    </div>
-    <div class="bd-card">
-      <div class="bd-card-title">🔔 חשבונות פתוחים</div>
-      <div class="bd-stats">
-        <div class="bd-stat"><div class="bd-stat-num">${pending.length}</div><div class="bd-stat-lbl">ממתינים</div></div>
-        <div class="bd-stat ${overdueCount?'warn':''}"><div class="bd-stat-num">${overdueCount}</div><div class="bd-stat-lbl">באיחור</div></div>
-        <div class="bd-stat"><div class="bd-stat-num">₪${Math.round(pendingTotal).toLocaleString('he-IL')}</div><div class="bd-stat-lbl">לתשלום</div></div>
-      </div>
-    </div>
+  const trendHtml=`<div class="bd-card">
+    <div class="bd-card-head"><span class="bd-card-title">מגמה</span><span class="bd-card-sub">6 חודשים אחרונים</span></div>
+    <div class="bd-bars">${trendBars}</div>
   </div>`;
+
+  // ── Recent activity card ──
+  let recentHtml='';
+  if(recentPaid.length){
+    const rows=recentPaid.map(b=>{
+      const cat=BILL_CATS[b.category]||'📄';
+      const ds=new Date(b.paidAt).toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+      return `<div class="bd-recent-row" onclick="openBillForm(${b.id})">
+        <span class="bd-recent-ico">${cat}</span>
+        <div class="bd-recent-body"><div class="bd-recent-name">${esc(b.name)}</div><div class="bd-recent-meta">${ds} · ${b.category}</div></div>
+        <div class="bd-recent-amt">₪${Number(b.amount||0).toLocaleString('he-IL')}</div>
+      </div>`;
+    }).join('');
+    recentHtml=`<div class="bd-card">
+      <div class="bd-card-head"><span class="bd-card-title">תשלומים אחרונים</span></div>
+      <div class="bd-recent">${rows}</div>
+    </div>`;
+  }
+
+  return `<div class="bills-dashboard">${heroHtml}${pieHtml}${trendHtml}${recentHtml}</div>`;
 }
 
 function renderUrgentBillsBanner(){
