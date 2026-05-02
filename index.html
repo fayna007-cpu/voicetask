@@ -1264,13 +1264,13 @@
         </select>
         <input type="text" class="bill-form-input" id="billCategoryCustom" placeholder="שם קטגוריה (למשל: חוגים)" style="display:none;margin-top:6px" maxlength="40">
       </div>
-      <div class="bill-form-row2">
-        <div class="bill-form-group" style="flex:1">
+      <div class="bill-form-row2" id="billDatesRow">
+        <div class="bill-form-group" id="billPayDateGroup" style="flex:1">
           <label class="bill-form-lbl">📅 תאריך תשלום שלי</label>
           <input class="bill-form-input" id="billPayDate" type="date">
         </div>
         <div class="bill-form-group" style="flex:1">
-          <label class="bill-form-lbl">⏰ תאריך תשלום של החברה</label>
+          <label class="bill-form-lbl" id="billDeadlineLbl">⏰ תאריך תשלום של החברה</label>
           <input class="bill-form-input" id="billDeadline" type="date">
         </div>
       </div>
@@ -1319,7 +1319,7 @@
         </div>
       </div>
       <div class="bill-form-group" style="flex-direction:row;align-items:center;gap:12px">
-        <label class="rtoggle"><input type="checkbox" id="billAutoDebit"><span class="rtoggle-sl"></span></label>
+        <label class="rtoggle"><input type="checkbox" id="billAutoDebit" onchange="onBillAutoDebitChange()"><span class="rtoggle-sl"></span></label>
         <div style="flex:1">
           <span class="bill-form-lbl" style="margin:0">💳 חיוב אשראי אוטומטי</span>
           <div style="font-size:11px;color:var(--muted);margin-top:2px">יירד אוטומטית — רק אמת סכום במייל</div>
@@ -7637,6 +7637,21 @@ function onBillCategoryChange(){
   if(sel.value==='__custom__'){custom.style.display='block';custom.focus();}
   else custom.style.display='none';
 }
+function onBillAutoDebitChange(){
+  const auto=document.getElementById('billAutoDebit')?.checked;
+  const payGroup=document.getElementById('billPayDateGroup');
+  const dlLbl=document.getElementById('billDeadlineLbl');
+  const payDate=document.getElementById('billPayDate');
+  if(auto){
+    if(payGroup)payGroup.style.display='none';
+    if(payDate)payDate.value='';
+    if(dlLbl)dlLbl.textContent='💳 תאריך חיוב אוטומטי';
+  }else{
+    if(payGroup)payGroup.style.display='';
+    if(dlLbl)dlLbl.textContent='⏰ תאריך תשלום של החברה';
+  }
+}
+
 function getBillCategoryValue(){
   const sel=document.getElementById('billCategory');
   if(!sel)return 'כללי';
@@ -7978,6 +7993,7 @@ function openBillForm(id){
   document.getElementById('billRecurring').value='none';
   document.getElementById('billAmountType').value='fixed';
   document.getElementById('billAutoDebit').checked=false;
+  onBillAutoDebitChange();
   ['week','3days','1day','payday','deadline'].forEach(k=>{const el=document.getElementById('billRem_'+k);if(el)el.checked=false;});
   document.getElementById('billImgPreview').style.display='none';
   document.getElementById('billImgPreview').src='';
@@ -8003,6 +8019,7 @@ function openBillForm(id){
     document.getElementById('billRecurring').value=b.recurring||'none';
     document.getElementById('billAmountType').value=b.amountType||'fixed';
     document.getElementById('billAutoDebit').checked=!!b.autoDebit;
+    onBillAutoDebitChange();
     const rems=b.reminders||[];
     ['week','3days','1day','payday','deadline'].forEach(k=>{const el=document.getElementById('billRem_'+k);if(el)el.checked=rems.includes(k);});
     if(b.image){
@@ -8047,12 +8064,13 @@ function saveBill(){
   const amount=parseFloat(document.getElementById('billAmount').value)||0;
   const category=getBillCategoryValue();
   const deadline=document.getElementById('billDeadline').value||null;
-  const payDate=document.getElementById('billPayDate').value||null;
+  const autoDebit=document.getElementById('billAutoDebit').checked;
+  // Auto-debit ignores user pay date (charge happens automatically by bank)
+  const payDate=autoDebit?null:(document.getElementById('billPayDate').value||null);
   const url=document.getElementById('billUrl').value.trim()||null;
   const notes=document.getElementById('billNotes').value.trim()||'';
   const recurring=document.getElementById('billRecurring').value;
   const amountType=document.getElementById('billAmountType').value;
-  const autoDebit=document.getElementById('billAutoDebit').checked;
   const reminders=['week','3days','1day','payday','deadline'].filter(k=>document.getElementById('billRem_'+k)?.checked);
   const image=_billPendingImage||null;
 
