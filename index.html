@@ -6863,6 +6863,10 @@ const GEMINI_TOOLS=[{functionDeclarations:[
 
 const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
 const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill']);
+// Tools that need LLM follow-up to summarize/interpret results
+const QUERY_TOOLS=new Set(['gcal_list_events','gcal_find_free_slots','gmail_search','gmail_read']);
+// Tools that just need a local confirmation — skip extra LLM call after these
+const ACTION_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','save_memory','delete_memory']);
 
 // ── Tool executor ────────────────────────────────────────────────────────────
 async function executeTool(name,args){
@@ -7067,29 +7071,29 @@ function buildAssistantContext(){
   const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
 
   const upcomingTasks=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<=weekEnd)
-    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,15)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,8)
     .map(t=>({id:t.id,text:t.text,datetime:t.datetime,category:t.category}));
-  const overdueTasks=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today).slice(0,5)
+  const overdueTasks=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today).slice(0,3)
     .map(t=>({id:t.id,text:t.text,datetime:t.datetime}));
   const recentDone=tasks.filter(t=>t.completed&&t.datetime&&new Date(t.datetime)>=monthStart)
-    .sort((a,b)=>new Date(b.datetime)-new Date(a.datetime)).slice(0,5)
-    .map(t=>({text:t.text,datetime:t.datetime}));
-  const activeRoutines=routines.filter(r=>r.enabled).map(r=>{
+    .sort((a,b)=>new Date(b.datetime)-new Date(a.datetime)).slice(0,3)
+    .map(t=>({text:t.text}));
+  const activeRoutines=routines.filter(r=>r.enabled).slice(0,8).map(r=>{
     const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay());
     const completed=(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
     return{id:r.id,name:r.name||r.text,target:r.timesPerWeek,completedThisWeek:completed};
   });
-  // Upcoming routine instances (this & next week)
+  // Upcoming routine instances (this week only)
   const allInstances=(typeof getRoutineInstances==='function')?getRoutineInstances():[];
   const upcomingRoutines=allInstances.filter(r=>!r.completed&&new Date(r.datetime)>=today&&new Date(r.datetime)<=weekEnd)
-    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,15)
-    .map(r=>({name:r.text||r.name,datetime:r.datetime,duration:r.duration||60}));
-  const pendingBills=bills.filter(b=>b.status==='pending').slice(0,15)
-    .map(b=>({id:b.id,name:b.name,amount:b.amount,deadline:b.deadline,payDate:b.payDate,category:b.category,recurring:b.recurring}));
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime)).slice(0,8)
+    .map(r=>({name:r.text||r.name,datetime:r.datetime}));
+  const pendingBills=bills.filter(b=>b.status==='pending').slice(0,8)
+    .map(b=>({id:b.id,name:b.name,amount:b.amount,deadline:b.deadline,payDate:b.payDate,category:b.category}));
   const monthSpent=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=monthStart)
     .reduce((s,b)=>s+(b.amount||0),0);
-  const recentBillsPaid=bills.filter(b=>b.status==='paid').sort((a,b)=>new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt)).slice(0,8)
-    .map(b=>({name:b.name,amount:b.amount,paidAt:b.paidAt,category:b.category}));
+  const recentBillsPaid=bills.filter(b=>b.status==='paid').sort((a,b)=>new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt)).slice(0,4)
+    .map(b=>({name:b.name,amount:b.amount,paidAt:b.paidAt}));
 
   const memoryBlock=aiSettings.memoryEnabled&&assistantMemory.length
     ?'\n\n💭 דברים שהמשתמש סיפר לך (זיכרון ארוך טווח):\n'+assistantMemory.map(m=>`- [id:${m.id}] ${m.content}`).join('\n')
@@ -7168,6 +7172,25 @@ function askQuick(q){
   sendChat();
 }
 
+function summarizeToolsExecuted(list){
+  if(!list||!list.length)return null;
+  const lines=list.map(t=>{
+    if(t.name==='add_task')return '✓ משימה "'+(t.result?.text||'').slice(0,50)+'" נוספה';
+    if(t.name==='complete_task')return '✓ משימה "'+(t.result?.text||'').slice(0,50)+'" סומנה כבוצעה';
+    if(t.name==='defer_task')return '✓ משימה נדחתה';
+    if(t.name==='delete_task')return '✓ משימה נמחקה';
+    if(t.name==='defer_routine')return '✓ שגרה "'+(t.result?.routine||'').slice(0,40)+'" נדחתה';
+    if(t.name==='add_bill')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" נוסף';
+    if(t.name==='mark_bill_paid')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" סומן כשולם';
+    if(t.name==='gcal_create_event')return '✓ אירוע "'+(t.result?.summary||'').slice(0,40)+'" נוסף ליומן';
+    if(t.name==='gmail_send')return '✓ מייל נשלח אל '+(t.result?.to||'');
+    if(t.name==='save_memory')return '💭 נשמר לזיכרון';
+    if(t.name==='delete_memory')return '🗑️ זיכרון נמחק';
+    return '✓ בוצע';
+  }).filter((v,i,a)=>a.indexOf(v)===i);
+  return lines.join('\n');
+}
+
 async function runChatLoop(){
   _chatBusy=true;
   document.getElementById('asstSendBtn').textContent='…';
@@ -7219,8 +7242,10 @@ async function runChatLoop(){
       if(!calls.length)break;
       chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall})),ts:Date.now(),provider:lastProvider});
       const toolResponses=[];
+      let allActions=true;// whether ALL calls in this batch are action-only (no query)
       for(const c of calls){
         const fc=c.functionCall;
+        if(QUERY_TOOLS.has(fc.name))allActions=false;
         let toolResult;
         if(CONFIRM_TOOLS.has(fc.name)&&!aiSettings.readOnly){
           toolResult=await confirmToolCall(fc);
@@ -7234,6 +7259,16 @@ async function runChatLoop(){
         }
       }
       chatHistory.push({role:'function',parts:toolResponses,ts:Date.now()});
+      // If all tools were pure actions (no query), skip the extra LLM call
+      // and show a local confirmation instead — saves quota + avoids rate limits
+      if(allActions){
+        const summary=summarizeToolsExecuted(toolsExecuted);
+        if(summary){
+          chatHistory.push({role:'model',parts:[{text:summary}],ts:Date.now(),provider:lastProvider});
+          producedText=true;
+        }
+        break;
+      }
     }
     // If we hit iteration cap without text but tools ran, append summary
     if(!producedText&&toolsExecuted.length){
