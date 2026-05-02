@@ -8115,7 +8115,13 @@ async function scanGmailForNewBills(forceNow){
   if(forceNow)toast('⏳ סורק מייל...');
   try{
     // Search invoices from last 3 days only
-    const q=encodeURIComponent('subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:3d');
+    loadBillVendors();
+    let qStr='subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:3d';
+    if(billVendors.length){
+      // Also include emails from saved vendors (regardless of subject)
+      qStr='('+qStr+') OR ('+billVendors.map(v=>'from:'+v.email).join(' OR ')+' newer_than:3d)';
+    }
+    const q=encodeURIComponent(qStr);
     const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,{headers:{Authorization:'Bearer '+token}});
     if(!r.ok){if(forceNow)toast('❌ שגיאה בגישה למייל (נדרשת הרשאת Gmail)');return;}
     const data=await r.json();
@@ -8240,10 +8246,31 @@ async function syncBillToCalendar(bill){
 }
 
 // Email import — search Gmail for bills/invoices
-async function openBillEmailImport(){
+// Saved recurring vendors
+let billVendors=[];
+function loadBillVendors(){try{billVendors=JSON.parse(localStorage.getItem('vt_bill_vendors')||'[]');}catch(_){billVendors=[];}}
+function saveBillVendors(){localStorage.setItem('vt_bill_vendors',JSON.stringify(billVendors));}
+function extractEmailAddr(from){
+  // "Name <email@x.com>" → "email@x.com"
+  const m=(from||'').match(/<([^>]+)>/);
+  return (m?m[1]:from||'').toLowerCase().trim();
+}
+function addBillVendor(from,name,category){
+  loadBillVendors();
+  const addr=extractEmailAddr(from);if(!addr)return;
+  const exists=billVendors.find(v=>v.email===addr);
+  if(exists){exists.lastSeen=Date.now();exists.name=name||exists.name;exists.category=category||exists.category;}
+  else billVendors.push({email:addr,name:name||from,category:category||'כללי',lastSeen:Date.now()});
+  saveBillVendors();
+}
+function isBillVendor(from){
+  loadBillVendors();
+  return billVendors.some(v=>v.email===extractEmailAddr(from));
+}
+
+async function ensureGmailReadAccess(){
   const token=await getToken();
-  if(!token){toast('⚠️ יש להתחבר ל-Google תחילה');return;}
-  // Request Gmail scope if needed
+  if(!token){toast('⚠️ יש להתחבר ל-Google תחילה');return false;}
   if(!SCOPES.includes('gmail.readonly')){
     toast('⏳ מבקש הרשאת Gmail...');
     try{
@@ -8259,52 +8286,111 @@ async function openBillEmailImport(){
         });
         tc.requestAccessToken();
       });
-    }catch(e){toast('❌ הרשאת Gmail נדחתה');return;}
+    }catch(e){toast('❌ הרשאת Gmail נדחתה');return false;}
   }
-  toast('⏳ מחפש חשבוניות במייל...');
-  try{
-    const q=encodeURIComponent('subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:60d');
-    const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=10`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
-    if(!r.ok){toast('❌ שגיאה בחיפוש מייל');return;}
-    const data=await r.json();
-    if(!data.messages||!data.messages.length){toast('לא נמצאו חשבוניות ב-60 יום אחרונים');return;}
-    // Fetch details for each message
-    const msgs=await Promise.all(data.messages.slice(0,8).map(async m=>{
-      const mr=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
-      if(!mr.ok)return null;
-      const md=await mr.json();
-      const headers=md.payload?.headers||[];
-      const subject=headers.find(h=>h.name==='Subject')?.value||'(ללא נושא)';
-      const from=headers.find(h=>h.name==='From')?.value||'';
-      const date=headers.find(h=>h.name==='Date')?.value||'';
-      return{id:m.id,subject,from,date};
-    }));
-    const valid=msgs.filter(Boolean);
-    if(!valid.length){toast('לא נמצאו חשבוניות');return;}
-    showEmailPickerForBills(valid);
-  }catch(e){toast('❌ שגיאה: '+e.message);}
+  return true;
 }
 
-let _billEmailCache=[];
-function showEmailPickerForBills(emails){
-  _billEmailCache=emails;
-  const html=emails.map((e,i)=>{
-    const fromShort=(e.from||'').replace(/<.*>/,'').trim().slice(0,30);
-    const dateStr=e.date?new Date(e.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
-    return `<div class="bill-email-item" data-idx="${i}" onclick="selectBillEmail(${i})">
-      <div class="bill-email-subject">${esc(e.subject)}</div>
-      <div class="bill-email-from">${esc(fromShort)} · ${dateStr}</div>
-    </div>`;
-  }).join('');
+async function fetchEmailsByQuery(q,maxResults){
+  const r=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=${maxResults||15}`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+  if(!r.ok)return [];
+  const data=await r.json();
+  if(!data.messages||!data.messages.length)return [];
+  const msgs=await Promise.all(data.messages.map(async m=>{
+    const mr=await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,{headers:{Authorization:'Bearer '+gAuth.access_token}});
+    if(!mr.ok)return null;
+    const md=await mr.json();
+    const headers=md.payload?.headers||[];
+    return{
+      id:m.id,
+      subject:headers.find(h=>h.name==='Subject')?.value||'(ללא נושא)',
+      from:headers.find(h=>h.name==='From')?.value||'',
+      date:headers.find(h=>h.name==='Date')?.value||'',
+      snippet:md.snippet||''
+    };
+  }));
+  return msgs.filter(Boolean);
+}
+
+async function openBillEmailImport(){
+  if(!(await ensureGmailReadAccess()))return;
+  showEmailPickerEmpty();
+  await runEmailMode('smart','');
+}
+
+function showEmailPickerEmpty(){
   const existing=document.getElementById('billEmailPicker');
   if(existing)existing.remove();
   const div=document.createElement('div');
   div.id='billEmailPicker';
   div.className='bill-email-picker on';
-  div.innerHTML=`<div class="bill-email-picker-head"><span>📧 בחר חשבונית מהמייל</span><button onclick="this.closest('.bill-email-picker').remove()" style="background:none;border:none;color:var(--text);font-size:18px;cursor:pointer">✕</button></div>
+  div.innerHTML=`<div class="bill-email-picker-head">
+    <span>📧 בחר חשבונית מהמייל</span>
+    <button onclick="this.closest('.bill-email-picker').remove()" style="background:none;border:none;color:var(--text);font-size:18px;cursor:pointer">✕</button>
+  </div>
+  <div class="bill-email-modes">
+    <button class="bill-email-mode-chip on" data-mode="smart" onclick="switchEmailMode('smart')">חשבוניות חכם</button>
+    <button class="bill-email-mode-chip" data-mode="recent" onclick="switchEmailMode('recent')">אחרונים</button>
+    <button class="bill-email-mode-chip" data-mode="vendors" onclick="switchEmailMode('vendors')">ספקים שמורים${billVendors.length?` (${billVendors.length})`:''}</button>
+  </div>
+  <div class="bill-email-search-row">
+    <input class="bill-email-search" id="billEmailSearchInput" type="text" placeholder="חפש לפי שולח, נושא, מילה... (למשל: partner, פרטנר, חברת חשמל)" onkeydown="if(event.key==='Enter')doEmailSearch()">
+    <button class="bill-email-search-btn" onclick="doEmailSearch()">🔍 חפש</button>
+  </div>
   <div class="bill-email-extract-row"><label class="bill-email-extract-label"><input type="checkbox" id="billExtractData" checked><span>נסה לחלץ פרטים אוטומטית מהמייל</span></label></div>
-  ${html}`;
+  <div id="billEmailResults"><div class="bill-email-loading">⏳ טוען...</div></div>`;
   document.getElementById('billFormSheet').querySelector('.rsheet-scroll').appendChild(div);
+}
+
+async function switchEmailMode(mode){
+  document.querySelectorAll('.bill-email-mode-chip').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
+  await runEmailMode(mode,document.getElementById('billEmailSearchInput')?.value||'');
+}
+
+async function doEmailSearch(){
+  const q=document.getElementById('billEmailSearchInput')?.value.trim()||'';
+  if(!q){toast('הקלד טקסט לחיפוש');return;}
+  document.querySelectorAll('.bill-email-mode-chip').forEach(b=>b.classList.remove('on'));
+  await runEmailMode('search',q);
+}
+
+async function runEmailMode(mode,query){
+  const res=document.getElementById('billEmailResults');if(!res)return;
+  res.innerHTML='<div class="bill-email-loading">⏳ מחפש...</div>';
+  loadBillVendors();
+  let q='';
+  if(mode==='smart'){
+    q='subject:(חשבונית OR חשבון OR invoice OR תשלום OR bill) newer_than:60d';
+  }else if(mode==='recent'){
+    q='in:inbox newer_than:14d';
+  }else if(mode==='vendors'){
+    if(!billVendors.length){
+      res.innerHTML='<div class="bill-email-loading">אין ספקים שמורים עדיין.<br><span style="font-size:11px;color:var(--muted)">בחר מייל ולחץ "שמור כספק חוזר"</span></div>';
+      return;
+    }
+    q='('+billVendors.map(v=>`from:${v.email}`).join(' OR ')+') newer_than:90d';
+  }else if(mode==='search'){
+    // free search — try to find by sender or subject or anywhere
+    q=query+' newer_than:90d';
+  }
+  try{
+    const emails=await fetchEmailsByQuery(q,20);
+    if(!emails.length){
+      res.innerHTML=`<div class="bill-email-loading">לא נמצאו תוצאות<br><span style="font-size:11px;color:var(--muted)">${mode==='search'?'נסה מילה אחרת':'נסה מצב אחר'}</span></div>`;
+      return;
+    }
+    _billEmailCache=emails;
+    const html=emails.map((e,i)=>{
+      const fromShort=(e.from||'').replace(/<.*>/,'').trim().slice(0,40);
+      const dateStr=e.date?new Date(e.date).toLocaleDateString('he-IL',{day:'numeric',month:'short'}):'';
+      const isVendor=isBillVendor(e.from);
+      return `<div class="bill-email-item" data-idx="${i}" onclick="selectBillEmail(${i})">
+        <div class="bill-email-subject">${esc(e.subject)}${isVendor?' <span class="bill-email-vendor-tag">ספק שמור</span>':''}</div>
+        <div class="bill-email-from">${esc(fromShort)} · ${dateStr}</div>
+      </div>`;
+    }).join('');
+    res.innerHTML=html;
+  }catch(e){res.innerHTML='<div class="bill-email-loading">❌ '+e.message+'</div>';}
 }
 
 function detectBillCategory(text){
@@ -8349,6 +8435,32 @@ function extractDateFromText(text){
   return null;
 }
 
+function showVendorSavePrompt(from,name,category){
+  const sheet=document.getElementById('billFormSheet')?.querySelector('.rsheet-scroll');
+  if(!sheet)return;
+  const existing=document.getElementById('vendorSavePrompt');if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='vendorSavePrompt';
+  div.className='vendor-save-prompt';
+  div.innerHTML=`<div class="vsp-icon">🔁</div>
+    <div class="vsp-body">
+      <div class="vsp-title">שמור את "${esc(name.slice(0,40))}" כספק חוזר?</div>
+      <div class="vsp-detail">בפעם הבאה שיגיע מייל ממנו, האפליקציה תזהה אוטומטית</div>
+    </div>
+    <div class="vsp-actions">
+      <button class="vsp-yes" onclick="confirmSaveVendor('${esc(from).replace(/'/g,'&#39;')}','${esc(name).replace(/'/g,'&#39;')}','${esc(category)}')">✓ שמור</button>
+      <button class="vsp-no" onclick="document.getElementById('vendorSavePrompt')?.remove()">לא</button>
+    </div>`;
+  sheet.appendChild(div);
+}
+function confirmSaveVendor(from,name,category){
+  // Use category from current form (user may have changed it)
+  const formCat=document.getElementById('billCategory')?.value||category;
+  addBillVendor(from,name,formCat);
+  document.getElementById('vendorSavePrompt')?.remove();
+  toast('✅ ספק נשמר — יזוהה אוטומטית בעתיד');
+}
+
 async function selectBillEmail(idx){
   const e=_billEmailCache[idx];if(!e)return;
   const extract=document.getElementById('billExtractData')?.checked;
@@ -8364,6 +8476,11 @@ async function selectBillEmail(idx){
 
   // Remove picker
   const picker=document.getElementById('billEmailPicker');if(picker)picker.remove();
+
+  // Offer to save as recurring vendor (only if not already saved)
+  if(!isBillVendor(e.from)){
+    setTimeout(()=>showVendorSavePrompt(e.from,fromShort,cat),400);
+  }
 
   if(!extract){
     toast('📧 מייל נבחר — השלם פרטים ושמור');
