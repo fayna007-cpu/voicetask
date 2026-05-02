@@ -1095,13 +1095,6 @@
   <span class="asst-fab-pulse"></span>
 </button>
 
-<!-- Prominent Alfred input bar above bottom nav -->
-<div class="alfred-bar" id="alfredBar">
-  <div class="alfred-bar-avatar">🤖</div>
-  <input class="alfred-bar-input" id="alfredBarInput" placeholder="שאל את אלפרד..." onkeydown="if(event.key==='Enter'){alfredBarSend();}">
-  <button class="alfred-bar-mic" id="alfredBarMicBtn" onclick="alfredBarMic()" title="דיבור">🎤</button>
-  <button class="alfred-bar-send" onclick="alfredBarSend()" title="שלח">↑</button>
-</div>
 
 <!-- Agent persona sheet -->
 <div class="rsheet" id="agentPersonaSheet">
@@ -1415,7 +1408,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);if(typeof updateAlfredBarVisibility==='function')updateAlfredBarVisibility();if(typeof updateAlfredBarPlaceholder==='function')updateAlfredBarPlaceholder();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);if(typeof initFabDrag==='function')initFabDrag();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -4364,7 +4357,7 @@ function stopCalNowLine(){if(_calNowTimer){clearInterval(_calNowTimer);_calNowTi
 function renderCalView(){renderCalStrip();if(calExpanded&&calSelectedDay)renderCalTimeline();}
 
 window.addEventListener('online',()=>{if(calGcalOn&&calExpanded)fetchCalViewEvents();});
-window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();loadAlfredInsights();updateAlfredBarPlaceholder();updateAlfredBarVisibility();setTimeout(()=>{try{runProactiveScan();refreshAlfredUI();}catch(_){}scanGmailForNewBills(false).catch(()=>{});scheduleMorningBrief();},5000);});
+window.addEventListener('load',()=>{initAuth();initSwipeGestures();scheduleCustomNotifs();loadNotifSettings();loadAiSettings();loadAgentPersona();loadAlfredInsights();setTimeout(()=>{try{runProactiveScan();refreshAlfredUI();initFabDrag();}catch(_){}scanGmailForNewBills(false).catch(()=>{});scheduleMorningBrief();},5000);});
 
 // ── Backlog ───────────────────────────────────────────────────────────────────
 let backlogLists=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');
@@ -6378,7 +6371,75 @@ function updateFabVisibility(){
   const sheetOpen=document.getElementById('assistantSheet')?.classList.contains('on');
   const settingsOpen=document.getElementById('settingsSheet')?.classList.contains('on');
   if(fab)fab.style.display=(sheetOpen||settingsOpen)?'none':'flex';
-  if(typeof updateAlfredBarVisibility==='function')updateAlfredBarVisibility();
+}
+
+// ── Draggable FAB ────────────────────────────────────────────────────────────
+function initFabDrag(){
+  const fab=document.getElementById('asstFab');if(!fab)return;
+  // Restore saved position
+  try{
+    const saved=JSON.parse(localStorage.getItem('vt_fab_pos')||'null');
+    if(saved&&saved.x!=null&&saved.y!=null){
+      fab.style.left=saved.x+'px';
+      fab.style.top=saved.y+'px';
+      fab.style.bottom='auto';
+      fab.style.right='auto';
+    }
+  }catch(_){}
+  let startX=0,startY=0,origX=0,origY=0,moved=false,dragging=false;
+  const DRAG_THRESHOLD=6;// px before considered drag
+  function getXY(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+  function onStart(e){
+    const r=fab.getBoundingClientRect();
+    const p=getXY(e);
+    startX=p.x;startY=p.y;origX=r.left;origY=r.top;moved=false;dragging=true;
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onEnd);
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('touchend',onEnd);
+  }
+  function onMove(e){
+    if(!dragging)return;
+    const p=getXY(e);
+    const dx=p.x-startX,dy=p.y-startY;
+    if(!moved&&(Math.abs(dx)>DRAG_THRESHOLD||Math.abs(dy)>DRAG_THRESHOLD)){
+      moved=true;fab.classList.add('dragging');
+      // Switch to absolute top/left positioning
+      fab.style.left=origX+'px';fab.style.top=origY+'px';fab.style.bottom='auto';fab.style.right='auto';
+    }
+    if(moved){
+      e.preventDefault?.();
+      let nx=origX+dx,ny=origY+dy;
+      const w=fab.offsetWidth,h=fab.offsetHeight;
+      // Constrain to viewport with margin
+      const navH=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-h'))||70;
+      const safeBottom=parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)'))||0;
+      nx=Math.max(8,Math.min(nx,window.innerWidth-w-8));
+      ny=Math.max(60,Math.min(ny,window.innerHeight-h-navH-safeBottom-8));
+      fab.style.left=nx+'px';fab.style.top=ny+'px';
+    }
+  }
+  function onEnd(){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onEnd);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onEnd);
+    if(moved){
+      fab.classList.remove('dragging');
+      // Save final position
+      const r=fab.getBoundingClientRect();
+      localStorage.setItem('vt_fab_pos',JSON.stringify({x:r.left,y:r.top}));
+    }
+    dragging=false;
+    // Suppress the click if we actually dragged
+    if(moved){
+      const stop=ev=>{ev.stopImmediatePropagation();ev.preventDefault();fab.removeEventListener('click',stop,true);};
+      fab.addEventListener('click',stop,true);
+      setTimeout(()=>fab.removeEventListener('click',stop,true),100);
+    }
+  }
+  fab.addEventListener('mousedown',onStart);
+  fab.addEventListener('touchstart',onStart,{passive:true});
 }
 
 // ── AI Settings & Gemini Client ──────────────────────────────────────────────
@@ -7115,15 +7176,36 @@ async function runChatLoop(){
   document.getElementById('chatScroll')?.appendChild(typing);
   scrollChatBottom();
   let lastProvider='';
+  let toolsExecuted=[];
+  let producedText=false;
   try{
     let iterations=0;
-    while(iterations<5){
+    while(iterations<3){
       iterations++;
       const sys=buildAssistantContext();
       aiSettings.dailyCount++;saveAiSettings();updateAiUsageInfo();
       let result;
       try{result=await callLLM(sys);}catch(e){
-        chatHistory.push({role:'model',parts:[{text:'❌ '+e.message}],ts:Date.now()});break;
+        // If tools already executed successfully this turn, suppress the error
+        // and show a brief confirmation instead
+        if(toolsExecuted.length){
+          const summary=toolsExecuted.map(t=>{
+            if(t.name==='add_task')return '✓ משימה "'+(t.result?.text||'').slice(0,40)+'" נוספה';
+            if(t.name==='complete_task')return '✓ משימה סומנה כבוצעה';
+            if(t.name==='defer_task'||t.name==='defer_routine')return '✓ נדחה';
+            if(t.name==='delete_task')return '✓ נמחק';
+            if(t.name==='add_bill')return '✓ חשבון "'+(t.result?.name||'')+'" נוסף';
+            if(t.name==='mark_bill_paid')return '✓ חשבון סומן כשולם';
+            if(t.name==='gcal_create_event')return '✓ אירוע נוסף ליומן';
+            if(t.name==='gmail_send')return '✓ מייל נשלח';
+            if(t.name==='save_memory')return '✓ נשמר לזיכרון';
+            return '✓ '+t.name;
+          }).filter((v,i,a)=>a.indexOf(v)===i).join('\n');
+          chatHistory.push({role:'model',parts:[{text:summary+'\n\n(הספק נחסם זמנית — הפעולה בוצעה במלואה)'}],ts:Date.now(),provider:lastProvider});
+        }else{
+          chatHistory.push({role:'model',parts:[{text:'❌ '+e.message}],ts:Date.now()});
+        }
+        break;
       }
       if(!result||!result.parts){break;}
       lastProvider=result.provider||'';
@@ -7132,6 +7214,7 @@ async function runChatLoop(){
       const textParts=parts.filter(p=>p.text).map(p=>p.text).join('');
       if(textParts){
         chatHistory.push({role:'model',parts:[{text:textParts}],ts:Date.now(),provider:lastProvider});
+        producedText=true;
       }
       if(!calls.length)break;
       chatHistory.push({role:'model',parts:calls.map(c=>({functionCall:c.functionCall})),ts:Date.now(),provider:lastProvider});
@@ -7146,12 +7229,24 @@ async function runChatLoop(){
         }
         if(fc.name==='save_memory'&&toolResult.success)showMemorySaved(toolResult.content);
         toolResponses.push({functionResponse:{name:fc.name,response:toolResult}});
+        if(toolResult&&toolResult.success!==false&&!toolResult.error){
+          toolsExecuted.push({name:fc.name,result:toolResult});
+        }
       }
       chatHistory.push({role:'function',parts:toolResponses,ts:Date.now()});
     }
+    // If we hit iteration cap without text but tools ran, append summary
+    if(!producedText&&toolsExecuted.length){
+      const last=toolsExecuted[toolsExecuted.length-1];
+      let msg='✓ הפעולה בוצעה';
+      if(last.name==='add_task'&&last.result?.text)msg='✓ משימה "'+last.result.text.slice(0,50)+'" נוספה';
+      chatHistory.push({role:'model',parts:[{text:msg}],ts:Date.now(),provider:lastProvider});
+    }
     saveChatHistory();
   }catch(e){
-    chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+e.message}],ts:Date.now()});
+    if(!toolsExecuted.length){
+      chatHistory.push({role:'model',parts:[{text:'❌ שגיאה: '+e.message}],ts:Date.now()});
+    }
   }finally{
     typing.remove();
     _chatBusy=false;
