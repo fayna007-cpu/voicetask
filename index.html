@@ -1242,19 +1242,27 @@
       </div>
       <div class="bill-form-group">
         <label class="bill-form-lbl">קטגוריה</label>
-        <select class="bill-form-select" id="billCategory">
+        <select class="bill-form-select" id="billCategory" onchange="onBillCategoryChange()">
           <option value="חשמל">⚡ חשמל</option>
           <option value="מים">💧 מים</option>
+          <option value="גז">🔥 גז</option>
           <option value="אינטרנט">🌐 אינטרנט</option>
           <option value="סלולר">📱 סלולר</option>
+          <option value="אינטרנט + סלולר">📡 אינטרנט + סלולר</option>
+          <option value="תקשורת">📡 תקשורת (משולב)</option>
           <option value="ביטוח">🛡️ ביטוח</option>
           <option value="ארנונה">🏠 ארנונה</option>
           <option value="ועד בית">🏢 ועד בית</option>
           <option value="כרטיס אשראי">💳 כרטיס אשראי</option>
           <option value="הלוואה">🏦 הלוואה</option>
           <option value="מנוי">📺 מנוי</option>
+          <option value="דלק">⛽ דלק</option>
+          <option value="חינוך">🎓 חינוך</option>
+          <option value="בריאות">⚕️ בריאות</option>
           <option value="כללי" selected>📄 כללי</option>
+          <option value="__custom__">✏️ קטגוריה אחרת...</option>
         </select>
+        <input type="text" class="bill-form-input" id="billCategoryCustom" placeholder="שם קטגוריה (למשל: חוגים)" style="display:none;margin-top:6px" maxlength="40">
       </div>
       <div class="bill-form-row2">
         <div class="bill-form-group" style="flex:1">
@@ -7512,7 +7520,7 @@ function asstMoney(){
   paidThisMonth.forEach(b=>{byCat[b.category]=(byCat[b.category]||0)+(b.amount||0);});
   const catArr=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,3);
   if(catArr.length){
-    out.push({icon:'📊',title:'קטגוריות מובילות החודש',detail:catArr.map(([c,v])=>`${BILL_CATS[c]||'📄'} ${c}: ₪${Math.round(v).toLocaleString('he-IL')}`).join(' · ')});
+    out.push({icon:'📊',title:'קטגוריות מובילות החודש',detail:catArr.map(([c,v])=>`${billCatIcon(c)} ${c}: ₪${Math.round(v).toLocaleString('he-IL')}`).join(' · ')});
   }
   // Budget status
   const budget=notifSettings?.bills?.monthlyBudget||0;
@@ -7612,7 +7620,32 @@ let bills=JSON.parse(localStorage.getItem('vt_bills')||'[]');
 let _billEditId=null;
 let _billPendingImage=null;
 let _billFilter='pending';
-const BILL_CATS={'חשמל':'⚡','מים':'💧','אינטרנט':'🌐','סלולר':'📱','ביטוח':'🛡️','ארנונה':'🏠','ועד בית':'🏢','כרטיס אשראי':'💳','הלוואה':'🏦','מנוי':'📺','כללי':'📄'};
+const BILL_CATS={'חשמל':'⚡','מים':'💧','אינטרנט':'🌐','סלולר':'📱','אינטרנט + סלולר':'📡','תקשורת':'📡','ביטוח':'🛡️','ארנונה':'🏠','ועד בית':'🏢','כרטיס אשראי':'💳','הלוואה':'🏦','מנוי':'📺','גז':'🔥','דלק':'⛽','חינוך':'🎓','בריאות':'⚕️','כללי':'📄'};
+function billCatIcon(cat){
+  if(BILL_CATS[cat])return BILL_CATS[cat];
+  const c=(cat||'').toLowerCase();
+  if(/אינטרנט|סלולר|תקשור|partner|cellcom|bezeq|hot|telecom/i.test(c))return '📡';
+  if(/חשמל|electric/i.test(c))return '⚡';
+  if(/מים|water/i.test(c))return '💧';
+  if(/ביטוח|insur/i.test(c))return '🛡️';
+  return '📄';
+}
+function onBillCategoryChange(){
+  const sel=document.getElementById('billCategory');
+  const custom=document.getElementById('billCategoryCustom');
+  if(!sel||!custom)return;
+  if(sel.value==='__custom__'){custom.style.display='block';custom.focus();}
+  else custom.style.display='none';
+}
+function getBillCategoryValue(){
+  const sel=document.getElementById('billCategory');
+  if(!sel)return 'כללי';
+  if(sel.value==='__custom__'){
+    const c=document.getElementById('billCategoryCustom')?.value.trim();
+    return c||'כללי';
+  }
+  return sel.value;
+}
 
 function saveBills(){localStorage.setItem('vt_bills',JSON.stringify(bills));}
 
@@ -7778,7 +7811,7 @@ function renderBillsDashboard(){
       const pct=Math.round(val/total*100);
       return `<div class="bd-legend-row">
         <span class="bd-legend-dot" style="background:${COLORS[i%COLORS.length]}"></span>
-        <span class="bd-legend-name">${BILL_CATS[cat]||'📄'} ${esc(cat)}</span>
+        <span class="bd-legend-name">${billCatIcon(cat)} ${esc(cat)}</span>
         <div class="bd-legend-bar"><div style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div></div>
         <span class="bd-legend-val">₪${Math.round(val).toLocaleString('he-IL')}</span>
         <span class="bd-legend-pct">${pct}%</span>
@@ -7812,7 +7845,7 @@ function renderBillsDashboard(){
   let recentHtml='';
   if(recentPaid.length){
     const rows=recentPaid.map(b=>{
-      const cat=BILL_CATS[b.category]||'📄';
+      const cat=billCatIcon(b.category);
       const ds=new Date(b.paidAt).toLocaleDateString('he-IL',{day:'numeric',month:'short'});
       return `<div class="bd-recent-row" onclick="openBillForm(${b.id})">
         <span class="bd-recent-ico">${cat}</span>
@@ -7866,7 +7899,7 @@ function renderUrgentBillsBanner(){
 }
 
 function renderBillCard(bill){
-  const cat=BILL_CATS[bill.category]||'📄';
+  const cat=billCatIcon(bill.category);
   const now=new Date();now.setHours(0,0,0,0);
   const deadline=bill.deadline?new Date(bill.deadline):null;
   if(deadline)deadline.setHours(0,0,0,0);
@@ -7936,6 +7969,8 @@ function openBillForm(id){
   document.getElementById('billName').value='';
   document.getElementById('billAmount').value='';
   document.getElementById('billCategory').value='כללי';
+  document.getElementById('billCategoryCustom').value='';
+  document.getElementById('billCategoryCustom').style.display='none';
   document.getElementById('billDeadline').value='';
   document.getElementById('billPayDate').value='';
   document.getElementById('billUrl').value='';
@@ -7955,7 +7990,12 @@ function openBillForm(id){
     delBtn.style.display='';
     document.getElementById('billName').value=b.name||'';
     document.getElementById('billAmount').value=b.amount||'';
-    document.getElementById('billCategory').value=b.category||'כללי';
+    // Handle category - if not in dropdown options, use custom mode
+    const cat=b.category||'כללי';
+    const sel=document.getElementById('billCategory');
+    const hasOption=Array.from(sel.options).some(o=>o.value===cat);
+    if(hasOption){sel.value=cat;}
+    else{sel.value='__custom__';document.getElementById('billCategoryCustom').value=cat;document.getElementById('billCategoryCustom').style.display='block';}
     document.getElementById('billDeadline').value=b.deadline||'';
     document.getElementById('billPayDate').value=b.payDate||'';
     document.getElementById('billUrl').value=b.url||'';
@@ -8005,7 +8045,7 @@ function saveBill(){
   const name=document.getElementById('billName').value.trim();
   if(!name){toast('⚠️ יש להזין שם חשבון');return;}
   const amount=parseFloat(document.getElementById('billAmount').value)||0;
-  const category=document.getElementById('billCategory').value;
+  const category=getBillCategoryValue();
   const deadline=document.getElementById('billDeadline').value||null;
   const payDate=document.getElementById('billPayDate').value||null;
   const url=document.getElementById('billUrl').value.trim()||null;
@@ -8397,8 +8437,10 @@ function detectBillCategory(text){
   const s=text.toLowerCase();
   if(/חשמל|electric|iec|חברת חשמל/.test(s))return 'חשמל';
   if(/מים|water|מקורות|תאגיד/.test(s))return 'מים';
-  if(/אינטרנט|internet|בזק|פרטנר|הוט|cellcom|partner|yes/.test(s))return 'אינטרנט';
-  if(/סלולר|cellular|פלאפון|גולן|פלאפון/.test(s))return 'סלולר';
+  // Partner/Bezeq/Hot/Cellcom etc usually combined internet+cellular
+  if(/partner|פרטנר|בזק|hot\b|הוט|cellcom|סלקום|yes\b|019/.test(s))return 'אינטרנט + סלולר';
+  if(/אינטרנט|internet/.test(s))return 'אינטרנט';
+  if(/סלולר|cellular|פלאפון|גולן/.test(s))return 'סלולר';
   if(/ביטוח|insurance|הראל|מגדל|כלל|הפניקס|מנורה/.test(s))return 'ביטוח';
   if(/ארנונה|עירייה|municipality|עיריית/.test(s))return 'ארנונה';
   if(/ועד.?בית/.test(s))return 'ועד בית';
@@ -8555,7 +8597,7 @@ function renderBillsSection(){
     if(deadline)deadline.setHours(0,0,0,0);
     const daysLeft=deadline?Math.ceil((deadline-now)/(1000*60*60*24)):null;
     const isOverdue=daysLeft!==null&&daysLeft<0;
-    const cat=BILL_CATS[b.category]||'📄';
+    const cat=billCatIcon(b.category);
     let badge='';
     // Use soonest of pay date or deadline
     const payD2=b.payDate?new Date(b.payDate):null;if(payD2)payD2.setHours(0,0,0,0);
