@@ -3245,9 +3245,11 @@ async function createCalendarEvent(routine,dateTimeStr){
   const start=new Date(dateTimeStr);
   const end=new Date(start.getTime()+(routine.duration||60)*60000);
   const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Include VoiceTask marker so sync/dedup can identify our events
+  const desc=(routine.notes||'')+(routine.notes?'\n\n':'')+`נוצר מ-VoiceTask 🔄\nvt_routine_id:${routine.id}`;
   const ev={
     summary:routine.name||routine.text||'',
-    description:routine.notes||'',
+    description:desc,
     start:{dateTime:start.toISOString(),timeZone:tz},
     end:{dateTime:end.toISOString(),timeZone:tz},
     reminders:{useDefault:false,overrides:routine.reminder>0?[{method:'popup',minutes:+routine.reminder}]:[]}
@@ -7520,29 +7522,73 @@ async function runCalendarSync(){
     bills.forEach(b=>{if(b.calendarEventId)validEventIds.add(b.calendarEventId);if(b.deadlineEventId)validEventIds.add(b.deadlineEventId);});
     routines.forEach(rr=>{Object.values(rr.scheduledWeeks||{}).flat().forEach(it=>{const ev=typeof it==='object'?it.eventId:null;if(ev)validEventIds.add(ev);});});
 
-    let deleted=0;
-    const seenSlots=new Map();
-    for(const ev of items){
+    // Build routine name set for fuzzy matching (events without vt marker)
+    const routineNames=new Set(routines.map(rr=>(rr.name||rr.text||'').trim()).filter(Boolean));
+    // Helper: normalize summary (strip emoji, whitespace)
+    const normSum=s=>(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').replace(/\s+/g,' ').trim();
+    // Helper: normalize start to "YYYY-MM-DDTHH:MM"
+    const normSlot=ev=>{const s=ev.start?.dateTime||ev.start?.date||'';const d=new Date(s);return isNaN(d)?s:d.toISOString().slice(0,16);};
+
+    // Pass 1: classify each event
+    const classified=items.map(ev=>{
       const desc=ev.description||'';
+      const summary=ev.summary||'';
       const taskMatch=desc.match(/vt_task_id:(\d+)/);
       const billMatch=desc.match(/vt_bill_id:(\d+)/);
       const routineMatch=desc.match(/vt_routine_id:(\d+)/);
-      const isVtEvent=taskMatch||billMatch||routineMatch||/VoiceTask/.test(desc);
-      if(!isVtEvent)continue;
-      const sig=(ev.summary||'')+'|'+(ev.start?.dateTime||ev.start?.date||'');
+      const hasMarker=!!(taskMatch||billMatch||routineMatch||/VoiceTask/.test(desc));
+      // Loose routine match by summary (for old events without marker)
+      const looseRoutineMatch=!hasMarker&&routineNames.has(normSum(summary));
+      const isVtEvent=hasMarker||looseRoutineMatch;
       const isOrphan=
         (taskMatch&&!taskIds.has(taskMatch[1]))||
         (billMatch&&!billIds.has(billMatch[1]))||
-        (routineMatch&&!routineIds.has(routineMatch[1]))||
-        (!validEventIds.has(ev.id));
-      const isDuplicate=seenSlots.has(sig);
-      if(isOrphan||isDuplicate){
-        try{
-          await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
-          deleted++;
-        }catch(_){}
-      }else{seenSlots.set(sig,ev.id);}
+        (routineMatch&&!routineIds.has(routineMatch[1]));
+      return{ev,sig:normSum(summary)+'|'+normSlot(ev),hasMarker,isVtEvent,isOrphan};
+    });
+
+    // Pass 2: pick keepers — for each signature, prefer marker-bearing event,
+    // then prefer non-orphan, then earliest in list.
+    const groups={};
+    for(const c of classified){
+      if(!c.isVtEvent)continue;
+      if(!groups[c.sig])groups[c.sig]=[];
+      groups[c.sig].push(c);
     }
+    const keepIds=new Set();
+    Object.values(groups).forEach(group=>{
+      const eligible=group.filter(c=>!c.isOrphan);
+      const candidates=eligible.length?eligible:group;
+      // Prefer marker-bearing
+      const marked=candidates.filter(c=>c.hasMarker);
+      const winner=(marked.length?marked:candidates)[0];
+      if(winner)keepIds.add(winner.ev.id);
+    });
+
+    // Pass 3: delete everything that isn't a keeper but is a VT event
+    let deleted=0;
+    for(const c of classified){
+      if(!c.isVtEvent)continue;
+      if(keepIds.has(c.ev.id))continue;
+      try{
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${c.ev.id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+        deleted++;
+      }catch(_){}
+    }
+
+    // Update routine.scheduledWeeks to point to surviving event IDs
+    routines.forEach(rr=>{
+      Object.keys(rr.scheduledWeeks||{}).forEach(wk=>{
+        rr.scheduledWeeks[wk]=(rr.scheduledWeeks[wk]||[]).map(it=>{
+          const dt=typeof it==='string'?it:it?.dt;if(!dt)return it;
+          const sig=normSum(rr.name||rr.text||'')+'|'+(new Date(dt).toISOString().slice(0,16));
+          const winner=groups[sig]?.find(c=>keepIds.has(c.ev.id));
+          if(winner)return{dt,eventId:winner.ev.id};
+          return typeof it==='object'?it:{dt,eventId:null};
+        });
+      });
+    });
+    saveRoutines();
 
     let added=0;
     // Tasks missing event
