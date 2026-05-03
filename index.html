@@ -1189,7 +1189,8 @@
       <button class="asst-quick-chip" onclick="askQuick('מה יש לי היום?')">מה היום?</button>
       <button class="asst-quick-chip" onclick="askQuick('מה הכי דחוף לי השבוע?')">מה דחוף?</button>
       <button class="asst-quick-chip" onclick="askQuick('סיכום הוצאות החודש')">סיכום חודשי</button>
-      <button class="asst-quick-chip" onclick="askQuick('תן לי טיפ פרודוקטיביות לפי הנתונים שלי')">טיפ</button>
+      <button class="asst-quick-chip" onclick="askQuick('מידע')">📚 מידע</button>
+      <button class="asst-quick-chip" onclick="askQuick('סנכרן יומן')">🔄 סנכרן יומן</button>
     </div>
     <div class="asst-input-row">
       <button class="asst-voice-btn" id="asstVoiceBtn" onclick="toggleChatVoice()" title="דיבור">🎤</button>
@@ -7376,6 +7377,11 @@ function buildAssistantContext(){
 
 ⚠️ הוראה חשובה: כשהמשתמש שואל "מה יש לי השבוע" / "אימונים שלי" / "פגישות שלי" — חפש קודם בקונטקסט שלמעלה (משימות, שגרות, מופעי שגרות, חשבונות), ורק אם לא מצאת — קרא ל-gcal_list_events. אסור לומר "אין לי מידע" לפני שבדקת הכל. שגרות = אימונים = הרגלים — תסתכל על "מופעי שגרות מתוכננים" לראות את האימונים השבוע.
 
+⚡ פקודות מהירות שהמשתמש יכול לכתוב כמילה אחת — אלה מטופלות לוקאלית בלי קריאה אליך:
+• "מידע" / "עזרה" — מציג רשימת היכולות שלך
+• "סנכרן יומן" — מנקה אירועים כפולים/יתומים מגוגל קאלנדר ומסנכרן רק את מה שיש באפליקציה
+אם המשתמש מבקש פעולה דומה אבל בנוסח אחר ("נקה לי את היומן", "סדר את היומן") — הצע לו לכתוב "סנכרן יומן".
+
 🔄 הנחיית שיחה אקטיבית (חובה):
 - אתה לא בוט שעונה ושותק. אתה עוזר אישי אקטיבי — דוחף את השיחה קדימה תמיד.
 - בסוף *כל* תשובה שלך, המשך את השיחה באחת מהדרכים:
@@ -7416,12 +7422,181 @@ async function sendChat(){
   if(_chatBusy)return;
   const inp=document.getElementById('asstInput');
   const text=inp.value.trim();if(!text)return;
-  if(!aiSettings.key){toast('⚠️ הגדר מפתח Gemini בהגדרות');return;}
   inp.value='';inp.style.height='auto';
+
+  // Local intercepts — execute instantly without any API call
+  const lower=text.toLowerCase().replace(/[?.!,]/g,'').trim();
+  if(/^(מידע|עזרה|help|info|מה אתה יכול|מה היכולות שלך|איזה פקודות|פקודות)$/.test(lower)){
+    chatHistory.push({role:'user',parts:[{text}],ts:Date.now()});
+    chatHistory.push({role:'model',parts:[{text:buildAlfredHelpText()}],ts:Date.now()});
+    saveChatHistory();renderChatMessages();
+    return;
+  }
+  if(/^(סנכרן יומן|סנכרון יומן|נקה יומן|נקה כפילויות|sync|sync calendar)$/.test(lower)){
+    chatHistory.push({role:'user',parts:[{text}],ts:Date.now()});
+    saveChatHistory();renderChatMessages();
+    await runCalendarSync();
+    return;
+  }
+
+  if(!aiSettings.key){toast('⚠️ הגדר מפתח Gemini בהגדרות');return;}
   chatHistory.push({role:'user',parts:[{text}],ts:Date.now()});
   saveChatHistory();
   renderChatMessages();
   await runChatLoop();
+}
+
+function buildAlfredHelpText(){
+  const name=agentPersona.name||'אלפרד';
+  return `📚 *מה ${name} יודע לעשות*
+
+📌 *משימות*
+• "תוסיף משימה לקנות חלב מחר ב-9"
+• "תסמן את משימת X כבוצעה"
+• "תדחה את המשימה ליום ה'"
+• "תמחק את משימת X"
+
+🔄 *שגרות*
+• "תיצור שגרת אימון FB פעמיים אמצע שבוע עם הפרדה ויום שישי בצהריים"
+• "תדחה את אימון FB ליום שלישי"
+• "תבטל את האימון של מחר"
+• "תמחק את שגרת היוגה"
+
+💳 *חשבונות*
+• "תוסיף חשבון חשמל ₪380 דדליין 15.5"
+• "תסמן חשבון מים כשולם"
+
+📅 *יומן גוגל*
+• "מתי פנוי לי שעתיים השבוע?"
+• "מה יש לי ביום ה'?"
+• "תקבע פגישה עם דני ביום ב' ב-15:00"
+
+📧 *Gmail*
+• "תשלח מייל לאמא שאני מאחר"
+• "מצא לי את המייל מרואה החשבון"
+
+💭 *זיכרון*
+• "אני אוהב לעבוד מהבית" — נשמר אוטומטית
+• "תזכור שהמשרד שלי בתל אביב"
+
+📊 *תובנות*
+• "מה הכי דחוף השבוע?"
+• "כמה הוצאתי על חשמל החודש?"
+• "מה הספקתי השבוע?"
+
+⚡ *פקודות מהירות (מילה בלבד)*
+• *מידע* — מסך זה
+• *סנכרן יומן* — מנקה כפילויות + מסנכרן רק את מה שיש באפליקציה
+• *פוקוס* — 3 משימות הכי חשובות
+• *סיכום* — סיכום היום
+• *מצב* — מצב כללי
+• *כסף* — סיכום פיננסי
+• *מה הלאה* — הפריט הבא ביומן`;
+}
+
+async function runCalendarSync(){
+  const typing=document.createElement('div');
+  typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
+  document.getElementById('chatScroll')?.appendChild(typing);
+  scrollChatBottom();
+  _chatBusy=true;
+  const sendBtn=document.getElementById('asstSendBtn');
+  if(sendBtn)sendBtn.textContent='…';
+  try{
+    const token=await getToken();
+    if(!token)throw new Error('לא מחובר ל-Google Calendar');
+    const past=new Date();past.setDate(past.getDate()-7);
+    const future=new Date();future.setDate(future.getDate()+90);
+    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${past.toISOString()}&timeMax=${future.toISOString()}&singleEvents=true&maxResults=500`;
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)throw new Error('שגיאה בקריאת יומן');
+    const{items=[]}=await r.json();
+
+    const taskIds=new Set(tasks.map(t=>String(t.id)));
+    const billIds=new Set(bills.map(b=>String(b.id)));
+    const routineIds=new Set(routines.map(rr=>String(rr.id)));
+    const validEventIds=new Set();
+    tasks.forEach(t=>{if(t.calendarEventId)validEventIds.add(t.calendarEventId);});
+    bills.forEach(b=>{if(b.calendarEventId)validEventIds.add(b.calendarEventId);if(b.deadlineEventId)validEventIds.add(b.deadlineEventId);});
+    routines.forEach(rr=>{Object.values(rr.scheduledWeeks||{}).flat().forEach(it=>{const ev=typeof it==='object'?it.eventId:null;if(ev)validEventIds.add(ev);});});
+
+    let deleted=0;
+    const seenSlots=new Map();
+    for(const ev of items){
+      const desc=ev.description||'';
+      const taskMatch=desc.match(/vt_task_id:(\d+)/);
+      const billMatch=desc.match(/vt_bill_id:(\d+)/);
+      const routineMatch=desc.match(/vt_routine_id:(\d+)/);
+      const isVtEvent=taskMatch||billMatch||routineMatch||/VoiceTask/.test(desc);
+      if(!isVtEvent)continue;
+      const sig=(ev.summary||'')+'|'+(ev.start?.dateTime||ev.start?.date||'');
+      const isOrphan=
+        (taskMatch&&!taskIds.has(taskMatch[1]))||
+        (billMatch&&!billIds.has(billMatch[1]))||
+        (routineMatch&&!routineIds.has(routineMatch[1]))||
+        (!validEventIds.has(ev.id));
+      const isDuplicate=seenSlots.has(sig);
+      if(isOrphan||isDuplicate){
+        try{
+          await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+          deleted++;
+        }catch(_){}
+      }else{seenSlots.set(sig,ev.id);}
+    }
+
+    let added=0;
+    // Tasks missing event
+    for(const t of tasks){
+      if(t.completed||!t.datetime)continue;
+      const evExists=t.calendarEventId&&items.some(ev=>ev.id===t.calendarEventId);
+      if(evExists)continue;
+      try{const evId=await createTaskCalendarEvent(t);if(evId){t.calendarEventId=evId;added++;}}catch(_){}
+    }
+    save();
+    // Bills missing events
+    for(const b of bills){
+      if(b.status==='paid')continue;
+      if(!b.payDate&&!b.deadline)continue;
+      const payOk=!b.payDate||(b.calendarEventId&&items.some(ev=>ev.id===b.calendarEventId));
+      const dlOk=!b.deadline||(b.deadlineEventId&&items.some(ev=>ev.id===b.deadlineEventId));
+      if(!payOk||!dlOk){
+        try{await syncBillToCalendar(b);added++;}catch(_){}
+      }
+    }
+    // Routines missing events for this week
+    for(const rt of routines){
+      if(!rt.enabled)continue;
+      const wk=getWeekKey();
+      const wkSlots=rt.scheduledWeeks?.[wk]||[];
+      for(const it of wkSlots){
+        const dt=typeof it==='string'?it:it?.dt;
+        const oldEv=typeof it==='object'?it.eventId:null;
+        if(!dt)continue;
+        const evExists=oldEv&&items.some(ev=>ev.id===oldEv);
+        if(evExists)continue;
+        try{
+          const ev=await createCalendarEvent(rt,dt);
+          if(ev?.id){
+            const idx=rt.scheduledWeeks[wk].indexOf(it);
+            if(idx>=0)rt.scheduledWeeks[wk][idx]={dt,eventId:ev.id};
+            added++;
+          }
+        }catch(_){}
+      }
+    }
+    saveRoutines();render();
+
+    chatHistory.push({role:'model',parts:[{text:`✅ *סנכרון יומן הושלם*\n\n• 🗑️ ${deleted} אירועים מיותרים/כפולים נמחקו\n• ➕ ${added} אירועים חדשים נוצרו\n• 🔄 היומן עכשיו תואם בדיוק למה שיש באפליקציה`}],ts:Date.now()});
+    saveChatHistory();
+  }catch(e){
+    chatHistory.push({role:'model',parts:[{text:'❌ שגיאת סנכרון: '+e.message}],ts:Date.now()});
+    saveChatHistory();
+  }finally{
+    typing.remove();
+    _chatBusy=false;
+    if(sendBtn)sendBtn.textContent='↑';
+    renderChatMessages();
+  }
 }
 function askQuick(q){
   document.getElementById('asstInput').value=q;
