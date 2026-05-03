@@ -6965,6 +6965,13 @@ const GEMINI_TOOLS=[{functionDeclarations:[
     schedule:{type:'string',description:'תיאור מילולי של התזמון בעברית — בדיוק כמו שהמשתמש אמר'},
     duration:{type:'number',description:'משך בדקות (אופציונלי, ברירת מחדל 60)'}
   },required:['name','schedule']}},
+  {name:'delete_routine',description:'מחיקה מוחלטת של שגרה (כל המופעים + אירועים ביומן). השתמש כשהמשתמש רוצה לבטל שגרה לחלוטין. דוגמה: "תמחק את שגרת היוגה".',parameters:{type:'object',properties:{
+    routineName:{type:'string',description:'שם השגרה למחיקה — מתאים גם להתאמה חלקית'}
+  },required:['routineName']}},
+  {name:'skip_routine_instance',description:'דילוג על מופע יחיד של שגרה (לבטל אימון מסוים). השגרה ממשיכה. דוגמה: "תבטל את האימון של מחר", "תמחק את האימון של יום שלישי".',parameters:{type:'object',properties:{
+    routineName:{type:'string',description:'שם השגרה'},
+    date:{type:'string',description:'תאריך ISO של המופע לבטל'}
+  },required:['routineName','date']}},
   {name:'defer_routine',description:'דחה מופע של שגרה לתאריך/שעה אחר. חובה: שם השגרה (או id) + התאריך הנוכחי של המופע + התאריך החדש. דוגמה: לדחות אימון FB מיום ראשון ליום שני.',parameters:{type:'object',properties:{
     routineName:{type:'string',description:'שם השגרה (כמו שמופיע בקונטקסט)'},
     currentDate:{type:'string',description:'תאריך/שעה ISO של המופע הנוכחי (כמו שמופיע בקונטקסט)'},
@@ -7000,12 +7007,12 @@ const GEMINI_TOOLS=[{functionDeclarations:[
   },required:['to','subject','body']}}
 ]}];
 
-const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
-const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill']);
+const WRITE_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','delete_routine','skip_routine_instance','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','delete_memory']);
+const CONFIRM_TOOLS=new Set(['gmail_send','gcal_create_event','delete_task','add_bill','delete_routine']);
 // Tools that need LLM follow-up to summarize/interpret results
 const QUERY_TOOLS=new Set(['gcal_list_events','gcal_find_free_slots','gmail_search','gmail_read']);
 // Tools that just need a local confirmation — skip extra LLM call after these
-const ACTION_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','save_memory','delete_memory']);
+const ACTION_TOOLS=new Set(['add_task','complete_task','defer_task','delete_task','create_routine','delete_routine','skip_routine_instance','defer_routine','add_bill','mark_bill_paid','gcal_create_event','gmail_send','save_memory','delete_memory']);
 
 // ── Tool executor ────────────────────────────────────────────────────────────
 async function executeTool(name,args){
@@ -7091,6 +7098,57 @@ async function executeTool(name,args){
           return dayNames[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
         }).join(' · ');
         return{success:true,name:r.name,timesPerWeek:r.timesPerWeek,scheduledTotal:allSlots.length,schedule:summary||'אין מופעים בעתיד הקרוב — בדוק את התזמון'};
+      }
+      case 'delete_routine':{
+        const name=(args.routineName||'').trim();
+        if(!name)return{error:'חסר שם שגרה'};
+        const r=routines.find(x=>{const n=x.name||x.text||'';return n.includes(name)||name.includes(n);});
+        if(!r)return{error:'לא נמצאה שגרה בשם '+name};
+        // Delete all its calendar events
+        const allItems=Object.values(r.scheduledWeeks||{}).flat();
+        for(const it of allItems){
+          const evId=typeof it==='object'?it.eventId:null;
+          if(evId&&!String(evId).startsWith('local_')){
+            try{const tk=await getToken();if(tk)await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${evId}`,{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(_){}
+          }
+        }
+        const deletedName=r.name||r.text||'';
+        routines=routines.filter(x=>x.id!==r.id);
+        saveRoutines();render();
+        if(typeof renderRoutineList==='function')renderRoutineList();
+        scheduleSmartPushNotifs();
+        return{success:true,name:deletedName,instances:allItems.length};
+      }
+      case 'skip_routine_instance':{
+        const name=(args.routineName||'').trim();
+        const dateStr=(args.date||'').trim();
+        if(!name||!dateStr)return{error:'חסרים פרטים'};
+        const r=routines.find(x=>{const n=x.name||x.text||'';return n.includes(name)||name.includes(n);});
+        if(!r)return{error:'לא נמצאה שגרה בשם '+name};
+        const dt=new Date(dateStr);if(isNaN(dt))return{error:'תאריך לא תקין'};
+        // Remove the instance from scheduledWeeks
+        let removed=null;let oldEventId=null;
+        Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+          const before=r.scheduledWeeks[wk]?.length||0;
+          r.scheduledWeeks[wk]=(r.scheduledWeeks[wk]||[]).filter(item=>{
+            const itDt=typeof item==='string'?item:item?.dt;
+            if(new Date(itDt).toDateString()===dt.toDateString()){
+              if(!removed){removed=itDt;oldEventId=typeof item==='object'?item.eventId:null;}
+              return false;
+            }
+            return true;
+          });
+        });
+        if(!removed)return{error:'לא נמצא מופע ב-'+dt.toLocaleDateString('he-IL')};
+        // Delete calendar event
+        if(oldEventId&&!String(oldEventId).startsWith('local_')){
+          try{const tk=await getToken();if(tk)await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${oldEventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(_){}
+        }
+        if(!r.skippedDates)r.skippedDates=[];
+        if(!r.skippedDates.includes(removed))r.skippedDates.push(removed);
+        saveRoutines();render();
+        if(typeof renderRoutineList==='function')renderRoutineList();
+        return{success:true,name:r.name||r.text,date:dt.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'short'})};
       }
       case 'defer_routine':{
         const name=(args.routineName||'').trim();
@@ -7378,6 +7436,8 @@ function summarizeToolsExecuted(list){
     if(t.name==='defer_task')return '✓ משימה נדחתה';
     if(t.name==='delete_task')return '✓ משימה נמחקה';
     if(t.name==='create_routine')return '✓ שגרה "'+(t.result?.name||'').slice(0,40)+'" נוצרה — '+(t.result?.scheduledTotal||0)+' מופעים: '+(t.result?.schedule||'');
+    if(t.name==='delete_routine')return '🗑️ שגרה "'+(t.result?.name||'').slice(0,40)+'" נמחקה כולל '+(t.result?.instances||0)+' מופעים';
+    if(t.name==='skip_routine_instance')return '✓ אימון של "'+(t.result?.name||'').slice(0,30)+'" ב-'+(t.result?.date||'')+' בוטל';
     if(t.name==='defer_routine')return '✓ שגרה "'+(t.result?.routine||'').slice(0,40)+'" נדחתה';
     if(t.name==='add_bill')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" נוסף';
     if(t.name==='mark_bill_paid')return '✓ חשבון "'+(t.result?.name||'').slice(0,40)+'" סומן כשולם';
