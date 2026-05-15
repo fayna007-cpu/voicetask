@@ -1,11 +1,11 @@
 {
-  "name": "VoiceTask",
-  "short_name": "VoiceTask",
-  "description": "ניהול משימות קולי חכם",
+  "name": "Alfred — עוזר אישי לחיים",
+  "short_name": "Alfred",
+  "description": "האסיסטנט האישי שלך — משימות, חשבונות, שגרות ויומן במקום אחד",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#1e1a16",
-  "theme_color": "#1e1a16",
+  "background_color": "#0f0c14",
+  "theme_color": "#0f0c14",
   "lang": "he",
   "dir": "rtl",
   "orientation": "portrait-primary",
@@ -23,7 +23,7 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": ["productivity", "lifestyle", "utilities"],
   "share_target": {
     "action": "./index.html",
     "method": "GET",

@@ -1,4 +1,4 @@
-const V = 'vt-v64';
+const V = 'alfred-v1';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -16,7 +16,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('push', e => {
-  let data={title:'VoiceTask 🔔',body:''};
+  let data={title:'Alfred 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
   const opts={
     body:data.body||'',
