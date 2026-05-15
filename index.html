@@ -1262,9 +1262,9 @@
   <!-- Chat input bar — shown only in chat tab -->
   <div class="asst-chat-input-bar" id="asstChatBar" style="display:none">
     <div class="asst-quick-chips">
+      <button class="asst-quick-chip primary" onclick="alfredMorningRound()">🎩 סיור בוקר</button>
       <button class="asst-quick-chip" onclick="askQuick('מה יש לי היום?')">מה היום?</button>
       <button class="asst-quick-chip" onclick="askQuick('מה הכי דחוף לי השבוע?')">מה דחוף?</button>
-      <button class="asst-quick-chip" onclick="askQuick('סיכום הוצאות החודש')">סיכום חודשי</button>
       <button class="asst-quick-chip" onclick="askQuick('מידע')">📚 מידע</button>
       <button class="asst-quick-chip" onclick="askQuick('סנכרן יומן')">🔄 סנכרן יומן</button>
     </div>
@@ -1492,7 +1492,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);if(typeof initFabDrag==='function')initFabDrag();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -2911,7 +2911,7 @@ function render(){
       :routineInstances.filter(r=>r.category===filter&&!r.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
 
   if(!taskList.length&&!routineList.length){
-    el.innerHTML=`<div style="padding:0 16px"><div class="empty"><span class="empty-icon">🎯</span><p>אין משימות כאן.<br>לחץ על הכדור ודבר!</p></div></div>`;
+    el.innerHTML=`<div style="padding:0 16px"><div class="empty"><span class="empty-icon">🎩</span><p>הלוח פנוי, אדוני.<br>תיהנה מהשקט.</p></div></div>`;
     return;
   }
   let html='';
@@ -7828,6 +7828,136 @@ async function sendChat(){
   await runChatLoop();
 }
 
+// ── Alfred Morning Round (instant, no API) ──
+function alfredMorningRound(){
+  const now=new Date();const today=new Date();today.setHours(0,0,0,0);
+  const tEnd=new Date(today);tEnd.setHours(23,59,59,999);
+  const todayT=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)>=today&&new Date(t.datetime)<=tEnd)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  const todayR=(typeof getRoutineInstances==='function'?getRoutineInstances():[])
+    .filter(r=>!r.completed&&new Date(r.datetime)>=today&&new Date(r.datetime)<=tEnd)
+    .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  const todayB=bills.filter(b=>{
+    if(b.status!=='pending'||!b.payDate)return false;
+    const pd=new Date(b.payDate);pd.setHours(0,0,0,0);
+    return pd.getTime()===today.getTime();
+  });
+  const overdue=tasks.filter(t=>!t.completed&&t.datetime&&new Date(t.datetime)<today).length;
+  const fmtTime=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  let body='🎩 **סיור הבוקר**\n\n';
+  if(!todayT.length&&!todayR.length&&!todayB.length&&!overdue){
+    body+='הלוח שלך פנוי, אדוני. תנצל את היום היטב.';
+  }else{
+    const lines=[];
+    if(todayR.length){
+      lines.push('🔄 **שגרות היום:**\n'+todayR.slice(0,4).map(r=>`• ${fmtTime(new Date(r.datetime))} — ${r.text}`).join('\n'));
+    }
+    if(todayT.length){
+      lines.push('📌 **משימות היום:**\n'+todayT.slice(0,5).map(t=>`• ${fmtTime(new Date(t.datetime))} — ${t.text}`).join('\n'));
+    }
+    if(todayB.length){
+      lines.push('💳 **חשבונות לתשלום היום:**\n'+todayB.map(b=>`• ${b.name}${b.amount?' — ₪'+b.amount:''}`).join('\n'));
+    }
+    if(overdue){
+      lines.push(`⚠️ **באיחור:** ${overdue} משימות מימים קודמים. ממליץ לטפל קודם.`);
+    }
+    body+=lines.join('\n\n');
+    // Recommendation
+    body+='\n\n';
+    if(overdue>0)body+='**ההצעה שלי:** התחל בלסגור את הפיגורים — הם תופסים נפח רגשי.';
+    else if(todayR.length&&todayR[0])body+='**ההצעה שלי:** התחל ב-"'+todayR[0].text+'" — היא הראשונה ביומן.';
+    else if(todayT.length)body+='**ההצעה שלי:** התחל ב-"'+todayT[0].text+'".';
+    else body+='**ההצעה שלי:** השתמש בזמן הפנוי ללמידה או להירגעות.';
+  }
+  chatHistory.push({role:'user',parts:[{text:'🎩 סיור בוקר'}],ts:Date.now()});
+  chatHistory.push({role:'model',parts:[{text:body}],ts:Date.now()});
+  saveChatHistory();renderChatMessages();
+}
+
+// ── Welcome ritual (first time user) ──
+function maybeAlfredWelcome(){
+  if(localStorage.getItem('vt_alfred_welcomed')==='1')return;
+  if(!gAuth)return;
+  // Open chat with intro
+  setTimeout(()=>{
+    openAssistantChat&&openAssistantChat();
+    setTimeout(()=>{
+      const firstName=(gAuth.name||'').split(' ')[0]||'';
+      const intro=`ערב טוב.\n\nשמי **אלפרד**, ומעתה אשרת אותך בכל הקשור למשימות, חשבונות, יומן והרגלים.\n\nאיך תרצה שאפנה אליך?`;
+      chatHistory.push({role:'model',parts:[{text:intro}],ts:Date.now()});
+      // Add inline choice card
+      chatHistory.push({role:'model',parts:[{text:`__welcome_choice__${firstName}`}],ts:Date.now(),isWelcome:true});
+      saveChatHistory();
+      renderChatMessages();
+    },500);
+  },300);
+}
+function alfredSetAddress(form){
+  let phrase='';
+  if(form==='sir')phrase='פנה אליי תמיד כ"אדוני" — בסגנון רשמי, בטלרי.';
+  else if(form==='first')phrase='פנה אליי תמיד בשם הפרטי שלי (לא "אדוני").';
+  else if(form==='custom'){
+    const c=prompt('איך תרצה שאקרא לך?');
+    if(!c||!c.trim())return;
+    phrase=`פנה אליי תמיד כ"${c.trim()}".`;
+  }
+  // Save to assistant memory
+  if(typeof memorySave==='function')memorySave(phrase,'preference');
+  localStorage.setItem('vt_alfred_welcomed','1');
+  // Confirm in chat
+  chatHistory.push({role:'model',parts:[{text:'מצוין. לקחתי לתשומת לבי.\n\nאני כאן בכל רגע — ב-🤖 הצף או דרך הקלטה קולית. אם תרצה לדעת מה אני יודע לעשות — כתוב "מידע".\n\nאיך אפשר לעזור עכשיו?'}],ts:Date.now()});
+  saveChatHistory();renderChatMessages();
+}
+
+// ── Weekly letter from Alfred (Sunday evening) ──
+function maybeWeeklyLetter(){
+  const now=new Date();
+  // Sunday evening 20:00-22:00
+  if(now.getDay()!==0)return;
+  if(now.getHours()<20||now.getHours()>=22)return;
+  const lastKey='vt_weekly_letter_'+now.toISOString().slice(0,10);
+  if(localStorage.getItem(lastKey))return;
+  setTimeout(()=>{
+    const letter=buildWeeklyLetter();
+    if(!letter)return;
+    chatHistory.push({role:'model',parts:[{text:letter}],ts:Date.now()});
+    saveChatHistory();
+    localStorage.setItem(lastKey,'1');
+    // Notification too
+    if('Notification' in window && Notification.permission==='granted'){
+      navigator.serviceWorker?.ready.then(reg=>{
+        reg.showNotification('✉️ מכתב שבועי מאלפרד',{
+          body:'סיכום השבוע ומבט קדימה — פתח את הצ\'אט',
+          icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',
+          tag:'vt-weekly-letter',requireInteraction:true
+        });
+      }).catch(()=>{});
+    }
+  },1500);
+}
+function buildWeeklyLetter(){
+  const now=new Date();const weekStart=new Date(now);weekStart.setDate(now.getDate()-7);
+  const doneTasks=tasks.filter(t=>t.completed&&t.datetime&&new Date(t.datetime)>=weekStart).length;
+  const totalThisWeek=tasks.filter(t=>t.datetime&&new Date(t.datetime)>=weekStart&&new Date(t.datetime)<=now).length;
+  const billsPaid=bills.filter(b=>b.status==='paid'&&b.paidAt&&new Date(b.paidAt)>=weekStart);
+  const billsPaidSum=billsPaid.reduce((s,b)=>s+(b.amount||0),0);
+  const routinesCount=routines.filter(r=>r.enabled).reduce((s,r)=>{
+    return s+(r.completedDates||[]).filter(d=>new Date(d)>=weekStart).length;
+  },0);
+  const completionPct=totalThisWeek?Math.round(doneTasks/totalThisWeek*100):0;
+  // Observations
+  const obs=[];
+  if(completionPct>=80)obs.push('🔥 שבוע יוצא דופן — '+completionPct+'% מהמשימות הושלמו.');
+  else if(completionPct>=60)obs.push('👍 שבוע טוב — '+completionPct+'% השלמה.');
+  else if(totalThisWeek>=3)obs.push('שמתי לב שהיו השבוע משימות שדחית. אולי שווה לפנות זמן השבוע הקרוב.');
+  if(routinesCount>=5)obs.push('🎯 עמדת היטב בשגרות — '+routinesCount+' מופעים השבוע.');
+  else if(routinesCount===0&&routines.filter(r=>r.enabled).length)obs.push('השבוע לא הספקת שגרה. אדגיש כיוון חזרה?');
+  if(billsPaidSum>0)obs.push('💳 שילמת '+Math.round(billsPaidSum).toLocaleString('he-IL')+' ₪ בחשבונות.');
+  const pending=bills.filter(b=>b.status==='pending').length;
+  if(pending>0)obs.push('💡 השבוע הבא: '+pending+' חשבונות ממתינים.');
+  return `✉️ **מכתב שבועי מאלפרד**\n\nאדוני,\n\nסיכום השבוע שחלף:\n\n📌 ${doneTasks} משימות הושלמו${totalThisWeek?' מתוך '+totalThisWeek:''}\n🔄 ${routinesCount} מופעי שגרה בוצעו\n💳 ${billsPaid.length} חשבונות סולקו\n\n${obs.join('\n')||'שבוע שגרתי. נמשיך הלאה.'}\n\nמצפה לעוד שבוע מוצלח.\n\n— Alfred`;
+}
+
 function buildAlfredHelpText(){
   const name=agentPersona.name||'אלפרד';
   return `📚 *מה ${name} יודע לעשות*
@@ -8259,11 +8389,23 @@ function renderChatMessages(){
     }
 
     if(txt){
+      // Welcome choice card — render special UI
+      if(txt.startsWith('__welcome_choice__')){
+        const firstName=txt.slice(18).trim();
+        html+=`<div class="chat-welcome-choice">
+          <button class="chat-welcome-btn primary" onclick="alfredSetAddress('sir')">🎩 פנה אליי כ"אדוני"</button>
+          ${firstName?`<button class="chat-welcome-btn" onclick="alfredSetAddress('first')">בשם הפרטי — ${esc(firstName)}</button>`:''}
+          <button class="chat-welcome-btn" onclick="alfredSetAddress('custom')">✏️ כינוי אחר…</button>
+        </div>`;
+        return;
+      }
       const time=m.ts?`<span class="chat-time">${timeLabel(m.ts)}</span>`:'';
       const prov=m.role==='model'&&m.provider?`<span class="chat-provider">via ${esc(m.provider)}</span>`:'';
       const isErr=m.role==='model'&&txt.startsWith('❌');
       const retry=isErr?'<button class="chat-retry-btn" onclick="retryLastChat()">↻ נסה שוב</button>':'';
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${esc(txt).replace(/\n/g,'<br>')}${time}${prov}${retry}</div>`;
+      // Light markdown: **bold**
+      const formatted=esc(txt).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${formatted}${time}${prov}${retry}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{
@@ -8730,7 +8872,7 @@ function renderBillsList(){
     return new Date(b.paidAt||b.createdAt)-new Date(a.paidAt||a.createdAt);
   });
   if(!list.length){
-    el.innerHTML=`<div class="empty" style="padding:40px 16px"><span class="empty-icon">💳</span><p>${_billFilter==='paid'?'אין חשבונות ששולמו':'אין חשבונות'}<br>לחץ ＋ להוספה</p></div>`;
+    el.innerHTML=`<div class="empty" style="padding:40px 16px"><span class="empty-icon">${_billFilter==='paid'?'🏆':'💳'}</span><p>${_billFilter==='paid'?'עוד לא שולמו השנה — הכל לפניך.':'הכל סגור, אדוני.<br>שום דבר לא ממתין.'}</p></div>`;
     return;
   }
   el.innerHTML=list.map(renderBillCard).join('');
