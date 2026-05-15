@@ -1577,13 +1577,19 @@ function editFromJourney(notifId){
   },400);
 }
 function exportData(){
-  const data={version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills};
+  let aiSet=null,persona=null,memory=null;
+  try{aiSet=JSON.parse(localStorage.getItem('vt_ai_settings')||'null');}catch(_){}
+  try{persona=JSON.parse(localStorage.getItem('vt_agent_persona')||'null');}catch(_){}
+  try{memory=JSON.parse(localStorage.getItem('vt_assistant_memory')||'null');}catch(_){}
+  let billVend=null;
+  try{billVend=JSON.parse(localStorage.getItem('vt_bill_vendors')||'null');}catch(_){}
+  const data={version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:aiSet,agentPersona:persona,assistantMemory:memory,billVendors:billVend};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;a.download=`alfred-backup-${new Date().toISOString().split('T')[0]}.json`;
   a.click();URL.revokeObjectURL(url);
-  toast('✅ קובץ גיבוי הורד');
+  toast('💾 גיבוי הורד, אדוני');
 }
 function importData(e){
   const file=e.target.files[0];if(!file)return;
@@ -1612,8 +1618,36 @@ function importData(e){
         const newB=data.bills.filter(b=>!existIds.has(b.id));
         bills=[...newB,...bills];saveBills();added+=newB.length;
       }
+      // Restore AI settings, persona, memory, vendors — overwrite if local empty
+      if(data.aiSettings){
+        const cur=localStorage.getItem('vt_ai_settings');
+        if(!cur||cur==='null'||cur==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(data.aiSettings));
+      }
+      if(data.agentPersona){
+        const cur=localStorage.getItem('vt_agent_persona');
+        if(!cur||cur==='null')localStorage.setItem('vt_agent_persona',JSON.stringify(data.agentPersona));
+      }
+      if(Array.isArray(data.assistantMemory)&&data.assistantMemory.length){
+        try{const existing=JSON.parse(localStorage.getItem('vt_assistant_memory')||'[]');
+          const ids=new Set(existing.map(m=>m.id));
+          const merged=[...existing,...data.assistantMemory.filter(m=>!ids.has(m.id))];
+          localStorage.setItem('vt_assistant_memory',JSON.stringify(merged));
+        }catch(_){}
+      }
+      if(Array.isArray(data.billVendors)){
+        try{const existing=JSON.parse(localStorage.getItem('vt_bill_vendors')||'[]');
+          const emails=new Set(existing.map(v=>v.email));
+          const merged=[...existing,...data.billVendors.filter(v=>!emails.has(v.email))];
+          localStorage.setItem('vt_bill_vendors',JSON.stringify(merged));
+        }catch(_){}
+      }
+      if(Array.isArray(data.backlogLists))try{const cur=JSON.parse(localStorage.getItem('vt_backlog_lists')||'[]');const ids=new Set(cur.map(l=>l.id));localStorage.setItem('vt_backlog_lists',JSON.stringify([...cur,...data.backlogLists.filter(l=>!ids.has(l.id))]));}catch(_){}
+      if(Array.isArray(data.backlogItems))try{const cur=JSON.parse(localStorage.getItem('vt_backlog_items')||'[]');const ids=new Set(cur.map(i=>i.id));localStorage.setItem('vt_backlog_items',JSON.stringify([...cur,...data.backlogItems.filter(i=>!ids.has(i.id))]));}catch(_){}
       render();scheduleCustomNotifs();
-      toast(`✅ יובאו ${added} פריטים חדשים`);
+      // Reload AI settings into memory
+      if(typeof loadAiSettings==='function')loadAiSettings();
+      if(typeof loadAgentPersona==='function')loadAgentPersona();
+      toast(`✓ שוחזרו ${added} פריטים + הגדרות AI, אדוני`);
     }catch(_){toast('❌ קובץ לא תקין');}
     e.target.value='';
   };
