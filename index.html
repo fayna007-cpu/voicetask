@@ -2620,10 +2620,15 @@ async function confirmPostpone(){
   const {type,taskId,routineId,dateStr,bpItemId}=_postponeCtx;
   if(type==='task'){
     const t=tasks.find(x=>x.id===taskId);if(!t)return;
-    if(t.calendarEventId)await deleteFromCalendar(t);
+    closePostpone();toast('⏳ דוחה ומנקה יומן...');
+    // Purge ALL calendar events for this task (handles duplicates from any source)
+    await purgeCalendarEventsByMarker('vt_task_id:'+t.id).catch(()=>{});
     t.datetime=new Date(inp.value).toISOString();
     t.calendarEventId=null;t.completed=false;
-    save();render();closePostpone();await syncTask(t);toast('📅 נדחתה בהצלחה');
+    save();render();
+    await syncTask(t);
+    scheduleSmartPushNotifs();
+    toast('📅 נדחתה בהצלחה');
   } else if(type==='routine'){
     const r=routines.find(x=>x.id==routineId);if(!r)return;
     const newDt=new Date(inp.value).toISOString();
@@ -2639,32 +2644,34 @@ async function confirmPostpone(){
       });
     });
     if(oldIndex===-1){toast('לא נמצא האירוע');return;}
-    closePostpone();toast('⏳ דוחה ומסנכרן...');
-    // Delete old calendar event
-    if(oldEventId&&!String(oldEventId).startsWith('local_')){
-      try{const tk=await getToken();if(tk)await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${oldEventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(_){}
-    }
+    closePostpone();toast('⏳ דוחה ומנקה יומן...');
+    // Purge ALL events for this routine on the old date (handles duplicates)
+    await purgeRoutineInstance(r.id,dateStr).catch(()=>{});
     // Remove from old week
     r.scheduledWeeks[oldWk].splice(oldIndex,1);
     // Create new calendar event
     let newEventId=null;
     try{const ev=await createCalendarEvent(r,newDt);newEventId=ev?.id||null;}catch(_){}
-    // Add to new week
     if(!r.scheduledWeeks[newWk])r.scheduledWeeks[newWk]=[];
     r.scheduledWeeks[newWk].push({dt:newDt,eventId:newEventId});
-    // Update completed/skipped trackers
     [r.completedDates,r.skippedDates].forEach(arr=>{
       if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
     });
     saveRoutines();render();
-    toast(newEventId?'📅 שגרה נדחתה וסונכרנה ליומן':'📅 שגרה נדחתה (ללא יומן)');
+    scheduleSmartPushNotifs();
+    toast(newEventId?'📅 שגרה נדחתה — היומן עודכן':'📅 שגרה נדחתה');
   } else if(type==='bill'){
     const b=bills.find(x=>x.id===taskId);if(!b)return;
+    closePostpone();toast('⏳ דוחה ומנקה יומן...');
+    // Purge ALL bill events (pay date + deadline + any duplicates)
+    await purgeCalendarEventsByMarker('vt_bill_id:'+b.id).catch(()=>{});
     b.payDate=inp.value;
-    if(b.calendarEventId)await deleteCalendarEvent(b.calendarEventId);
     b.calendarEventId=null;
-    saveBills();renderBillsList();render();closePostpone();
-    syncBillToCalendar(b);toast('📅 חשבון נדחה');
+    b.deadlineEventId=null;
+    saveBills();renderBillsList();render();
+    await syncBillToCalendar(b);
+    scheduleSmartPushNotifs();
+    toast('📅 חשבון נדחה');
   } else if(type==='crm'){
     const item=backlogItems.find(i=>i.id===bpItemId);if(!item)return;
     item.dueDate=inp.value;
@@ -5793,6 +5800,68 @@ if('serviceWorker' in navigator){
 
 // Track current follow-up payload (for popup actions)
 let _fupCurrent=null;
+let _fupShown=new Set();
+
+// Purge ALL Google Calendar events that contain a given vt_*_id marker.
+// Returns count deleted. Used on defer to eliminate duplicates.
+async function purgeCalendarEventsByMarker(marker,startDate,endDate){
+  const token=await getToken();if(!token)return 0;
+  const past=startDate||(()=>{const d=new Date();d.setDate(d.getDate()-30);return d;})();
+  const future=endDate||(()=>{const d=new Date();d.setDate(d.getDate()+180);return d;})();
+  try{
+    const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${encodeURIComponent(marker)}&timeMin=${past.toISOString()}&timeMax=${future.toISOString()}&singleEvents=true&maxResults=250`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)return 0;
+    const{items=[]}=await r.json();
+    let deleted=0;
+    await Promise.all(items.map(async ev=>{
+      if(!(ev.description||'').includes(marker))return;// safety check
+      try{
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+        deleted++;
+      }catch(_){}
+    }));
+    return deleted;
+  }catch(_){return 0;}
+}
+
+// Purge calendar events for a routine instance on a specific date.
+async function purgeRoutineInstance(routineId,dateIso){
+  const dayStart=new Date(dateIso);dayStart.setHours(0,0,0,0);
+  const dayEnd=new Date(dayStart);dayEnd.setHours(23,59,59,999);
+  return purgeCalendarEventsByMarker('vt_routine_id:'+routineId,dayStart,dayEnd);
+}
+
+// Auto-show popup when app is open and a follow-up time arrives
+function checkActiveFollowups(){
+  if(document.hidden)return;
+  if(document.getElementById('fupPopup')?.classList.contains('on'))return;
+  const now=Date.now();
+  const fresh=5*60000;// 5 min window
+  const taskMins=(notifSettings?.tasks?.followupMins||20)*60000;
+  const rMins=(notifSettings?.routines?.followupMins||20)*60000;
+  if(notifSettings?.tasks?.followupEnabled!==false){
+    for(const t of tasks){
+      if(t.completed||t.skipped||!t.datetime)continue;
+      const fup=new Date(t.datetime).getTime()+taskMins;
+      if(now>=fup&&now-fup<fresh){
+        const k='t_'+t.id+'_'+t.datetime;
+        if(!_fupShown.has(k)){_fupShown.add(k);showFollowupPopup({type:'task',id:String(t.id)});return;}
+      }
+    }
+  }
+  if(notifSettings?.routines?.followupEnabled!==false&&typeof getRoutineInstances==='function'){
+    for(const inst of getRoutineInstances()){
+      if(inst.completed)continue;
+      const fup=new Date(inst.datetime).getTime()+rMins;
+      if(now>=fup&&now-fup<fresh){
+        const k='r_'+inst.routineId+'_'+inst.datetime;
+        if(!_fupShown.has(k)){_fupShown.add(k);showFollowupPopup({type:'routine',id:inst.routineId+'__'+inst.datetime});return;}
+      }
+    }
+  }
+}
+setInterval(checkActiveFollowups,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(checkActiveFollowups,500);});
 
 function showFollowupPopup(payload){
   if(!payload||!payload.type||!payload.id)return;
