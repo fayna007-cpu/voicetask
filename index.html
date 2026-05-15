@@ -4465,7 +4465,30 @@ async function fetchCalViewEvents(){
     const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${ws.toISOString()}&timeMax=${we.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=100`,{headers:{Authorization:'Bearer '+token}});
     if(!r.ok)throw new Error('api');
     const{items=[]}=await r.json();
-    calGcalEvents=items.filter(ev=>ev.status!=='cancelled'&&!(ev.description||'').includes('vt_task_id:'));
+    // Exclude any event created by VoiceTask (already shown via task/routine/bill cards in the timeline)
+    calGcalEvents=items.filter(ev=>{
+      if(ev.status==='cancelled')return false;
+      const desc=ev.description||'';
+      if(/vt_task_id:|vt_routine_id:|vt_bill_id:|VoiceTask/.test(desc))return false;
+      // Also drop if the summary exactly matches an active routine/task name + same start hour
+      // (catches legacy events without markers)
+      const evStart=new Date(ev.start?.dateTime||ev.start?.date||'');
+      const evKey=(ev.summary||'').trim()+'|'+evStart.toISOString().slice(0,16);
+      const matchesRoutine=routines.some(r=>{
+        const name=(r.name||r.text||'').trim();if(!name||name!==(ev.summary||'').trim())return false;
+        return Object.values(r.scheduledWeeks||{}).flat().some(it=>{
+          const dt=typeof it==='string'?it:it?.dt;if(!dt)return false;
+          return new Date(dt).toISOString().slice(0,16)===evStart.toISOString().slice(0,16);
+        });
+      });
+      if(matchesRoutine)return false;
+      const matchesTask=tasks.some(t=>{
+        if(!t.datetime||(t.text||'').trim()!==(ev.summary||'').trim())return false;
+        return new Date(t.datetime).toISOString().slice(0,16)===evStart.toISOString().slice(0,16);
+      });
+      if(matchesTask)return false;
+      return true;
+    });
     calGcalFetchWeek=calWeekOffset;
   }catch(e){
     calGcalEvents=[];
