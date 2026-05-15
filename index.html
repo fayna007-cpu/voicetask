@@ -362,6 +362,14 @@
         </div>
         <div class="settings-row-arrow">›</div>
       </div>
+      <div class="settings-row" onclick="testFollowupNow()">
+        <div class="settings-row-ico" style="background:oklch(0.78 0.16 72 / 0.2);color:var(--accent)">🔔</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">בדוק Follow-up עכשיו</div>
+          <div class="settings-row-sub">שלח התראת follow-up דמה מיד עם כפתורים</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
     </div>
     <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between">לוח התראות<button onclick="refreshJourneyOnly()" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:8px">↺ רענן</button></div>
     <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px;border-radius:18px;overflow:visible;border:none;margin:0 16px 4px;background:transparent"></div>
@@ -1934,6 +1942,34 @@ async function sendPushJourneyItem(id,title,body){
     const d=await r.json();
     if(d.ok)toast('✅ נשלח! סגור את האפליקציה');
     else toast('❌ שגיאה: '+d.status);
+  }catch(e){toast('❌ '+e.message);}
+}
+
+async function testFollowupNow(){
+  // Show a local follow-up notification immediately via SW
+  try{
+    if(!('Notification' in window)){toast('הדפדפן לא תומך');return;}
+    if(Notification.permission!=='granted'){
+      toast('⏳ מבקש הרשאה...');
+      const p=await Notification.requestPermission();
+      if(p!=='granted'){toast('❌ לא ניתנה הרשאה');return;}
+    }
+    const reg=await navigator.serviceWorker.ready;
+    // Use any existing pending task or a fake id
+    const t=tasks.find(x=>!x.completed)||{id:'demo',text:'אימון בוקר (דמה)'};
+    reg.active?.postMessage({type:'SHOW_NOTIFICATION',
+      title:'🏋️ איך הלך?',
+      body:(t.text||'משימה דמה').slice(0,80)+' — בוצע?',
+      tag:'vt-followup-test',
+      actions:[
+        {action:'done',title:'✓ בוצע'},
+        {action:'snooze',title:'⏰ עוד 15 דק'},
+        {action:'skip',title:'דלגתי'}
+      ],
+      requireInteraction:true,
+      payload:{type:'task',id:String(t.id)}
+    });
+    toast('🔔 התראה נשלחה — בדוק את שורת ההתראות');
   }catch(e){toast('❌ '+e.message);}
 }
 
