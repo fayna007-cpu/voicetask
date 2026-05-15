@@ -222,7 +222,7 @@ body{
 /* ── Siri Overlay ── */
 #siriOverlay{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;pointer-events:none;opacity:0;transition:opacity .35s ease}
 #siriOverlay.on{opacity:1;pointer-events:all}
-.siri-bg{position:absolute;inset:0;background:oklch(0.08 0.006 45 / 0.92);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
+.siri-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center top,oklch(0.15 0.04 285 / 0.96) 0%,oklch(0.08 0.025 285 / 0.98) 100%);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
 .siri-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;padding-bottom:calc(48px + var(--sab))}
 .siri-text{width:100%;max-width:340px;min-height:64px;text-align:center;font-size:21px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:1.45;margin-bottom:20px;padding:0 24px;transition:opacity .2s}
 .siri-text.muted{color:var(--muted);font-size:16px;font-weight:500}
@@ -237,26 +237,52 @@ body{
 @keyframes bar-speak{from{height:6px}to{height:var(--h,40px)}}
 
 /* Siri orb — warm amber */
-.siri-orb{width:160px;height:160px;border-radius:50%;position:relative;margin-bottom:40px;animation:orb-breathe 2.2s ease-in-out infinite}
-@keyframes orb-pulse{from{transform:scale(1)}to{transform:scale(1.09)}}
-.siri-orb.speaking{animation:orb-pulse .5s ease-in-out infinite alternate}
-.siri-orb-spin{
+/* ── Alfred Siri Orb — alive, listening, refined ── */
+.siri-orb{width:180px;height:180px;border-radius:50%;position:relative;margin-bottom:44px;animation:siri-float 4s ease-in-out infinite}
+@keyframes siri-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+.siri-orb-aura{
+  position:absolute;inset:-40px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,oklch(0.62 0.20 285 / 0.55) 0%,oklch(0.55 0.16 285 / 0.18) 35%,transparent 65%);
+  animation:siri-aura-breathe 3s ease-in-out infinite;
+  filter:blur(8px);
+}
+@keyframes siri-aura-breathe{0%,100%{opacity:.65;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+
+.siri-orb-ring{
+  position:absolute;inset:-6px;border-radius:50%;pointer-events:none;
+  border:1.5px solid oklch(0.65 0.18 285 / 0.35);
+}
+.siri-orb-ring-1{animation:siri-ring 6s linear infinite}
+.siri-orb-ring-2{inset:-18px;border-color:oklch(0.72 0.18 295 / 0.22);animation:siri-ring 9s linear infinite reverse}
+.siri-orb-ring-3{inset:-32px;border-color:oklch(0.78 0.16 305 / 0.14);animation:siri-ring 13s linear infinite}
+@keyframes siri-ring{to{transform:rotate(360deg)}}
+.siri-orb-ring::before{content:'';position:absolute;top:-2px;left:50%;width:6px;height:6px;border-radius:50%;background:oklch(0.85 0.16 285);box-shadow:0 0 12px oklch(0.78 0.18 285 / 0.8);transform:translateX(-50%)}
+
+.siri-orb-face{
   position:absolute;inset:0;border-radius:50%;
-  background:conic-gradient(from 0deg,
-    oklch(0.78 0.16 72),
-    oklch(0.70 0.18 62),
-    oklch(0.65 0.14 50),
-    oklch(0.72 0.12 80),
-    oklch(0.78 0.16 72));
-  animation:orb-spin 5s linear infinite;
+  background:radial-gradient(circle at 35% 30%,#ffffff 0%,#e9def6 50%,#b89aef 100%);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 16px 50px oklch(0.55 0.16 285 / 0.55),inset 0 -10px 24px oklch(0.55 0.16 285 / 0.35);
 }
-.siri-orb-inner{
-  position:absolute;inset:6px;border-radius:50%;
-  background:radial-gradient(circle at 38% 35%,oklch(0.90 0.10 80 / 0.35) 0%,transparent 55%),
-             oklch(0.22 0.015 50);
+.siri-orb-eyes{display:flex;gap:22px;margin-top:-4px}
+.siri-orb-eye{
+  width:14px;height:26px;background:#1a1029;border-radius:50%;
+  animation:siri-eye-blink 5s ease-in-out infinite;
 }
-.siri-orb-glow{position:absolute;inset:-24px;border-radius:50%;background:radial-gradient(circle,oklch(0.78 0.16 72 / 0.28) 0%,transparent 68%);animation:glow-pulse 2s ease-in-out infinite}
-@keyframes glow-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes siri-eye-blink{0%,46%,50%,100%{transform:scaleY(1)}48%{transform:scaleY(0.08)}}
+
+/* When listening — eyes dart back and forth, aura intensifies, rings spin faster */
+.siri-orb.speaking{animation:siri-listen-pulse .6s ease-in-out infinite alternate}
+.siri-orb.speaking .siri-orb-aura{animation:siri-aura-breathe 1s ease-in-out infinite;background:radial-gradient(circle,oklch(0.65 0.22 285 / 0.7) 0%,oklch(0.55 0.18 285 / 0.3) 35%,transparent 70%)}
+.siri-orb.speaking .siri-orb-ring-1{animation:siri-ring 2s linear infinite}
+.siri-orb.speaking .siri-orb-ring-2{animation:siri-ring 3s linear infinite reverse}
+.siri-orb.speaking .siri-orb-ring-3{animation:siri-ring 4s linear infinite}
+.siri-orb.speaking .siri-orb-eyes{animation:siri-eye-listen 1.6s ease-in-out infinite}
+.siri-orb.speaking .siri-orb-eye{animation:siri-eye-blink-fast 3s ease-in-out infinite}
+@keyframes siri-listen-pulse{from{transform:scale(1)}to{transform:scale(1.04)}}
+@keyframes siri-eye-listen{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+@keyframes siri-eye-blink-fast{0%,42%,46%,80%,84%,100%{transform:scaleY(1)}44%,82%{transform:scaleY(0.08)}}
 
 /* Siri cancel + retry */
 .siri-cancel{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;background:oklch(0.78 0.16 72 / 0.10);border:1px solid oklch(0.78 0.16 72 / 0.25);color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s,transform .1s;margin-bottom:8px}
