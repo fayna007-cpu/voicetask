@@ -1,37 +1,60 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   color-scheme:dark;
-  --bg:oklch(0.12 0.007 45);
-  --surface:oklch(0.17 0.008 45);
-  --surface2:oklch(0.21 0.009 45);
-  --border:oklch(0.27 0.009 45);
-  --border2:oklch(0.33 0.010 45);
-  --text:oklch(0.94 0.006 70);
-  --muted:oklch(0.52 0.010 60);
-  --accent:oklch(0.78 0.16 72);
-  --accent2:oklch(0.68 0.18 65);
-  --r:16px;--r-sm:12px;
+  /* Alfred — deep purple-night palette with gold accent */
+  --bg:oklch(0.13 0.025 285);
+  --surface:oklch(0.18 0.032 285);
+  --surface2:oklch(0.23 0.038 285);
+  --surface3:oklch(0.28 0.040 285);
+  --border:oklch(0.30 0.045 285);
+  --border2:oklch(0.38 0.050 285);
+  --text:oklch(0.96 0.012 285);
+  --muted:oklch(0.65 0.030 285);
+  --muted2:oklch(0.55 0.035 285);
+  /* Primary accent: rich lavender — Alfred's signature */
+  --accent:oklch(0.72 0.18 285);
+  --accent-deep:oklch(0.55 0.16 285);
+  --accent-glow:oklch(0.78 0.18 295);
+  /* Gold — for moments of importance (achievements, "!" markers, primary CTAs) */
+  --gold:oklch(0.80 0.15 75);
+  --gold-deep:oklch(0.72 0.16 70);
+  /* Semantic */
+  --success:oklch(0.68 0.14 145);
+  --warn:oklch(0.78 0.16 60);
+  --danger:oklch(0.62 0.20 25);
+  /* Backwards-compat alias (lots of existing CSS uses --accent2 = gold) */
+  --accent2:var(--gold);
+  --r:18px;--r-sm:12px;--r-xs:8px;
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
   --nav-h:calc(64px + env(safe-area-inset-bottom,0px));
+  /* Typography */
+  --font-body:'Heebo','SF Pro Display',-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Frank Ruhl Libre','Heebo',serif;
 }
 body.light{
   color-scheme:light;
-  --bg:oklch(0.97 0.005 70);
-  --surface:oklch(0.99 0.003 70);
-  --surface2:oklch(0.93 0.008 70);
-  --border:oklch(0.85 0.010 65);
-  --border2:oklch(0.78 0.012 65);
-  --text:oklch(0.18 0.008 45);
-  --muted:oklch(0.50 0.012 60);
-  --accent:oklch(0.68 0.18 65);
-  --accent2:oklch(0.58 0.20 62);
+  --bg:oklch(0.97 0.012 285);
+  --surface:oklch(0.99 0.005 285);
+  --surface2:oklch(0.93 0.018 285);
+  --surface3:oklch(0.88 0.022 285);
+  --border:oklch(0.86 0.020 285);
+  --border2:oklch(0.78 0.025 285);
+  --text:oklch(0.20 0.025 285);
+  --muted:oklch(0.50 0.028 285);
+  --muted2:oklch(0.42 0.030 285);
+  --accent:oklch(0.55 0.18 285);
+  --accent-deep:oklch(0.45 0.18 285);
+  --accent-glow:oklch(0.62 0.20 290);
+  --gold:oklch(0.68 0.16 70);
+  --gold-deep:oklch(0.60 0.18 65);
 }
 html,body{height:100%;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 body{
-  font-family:'Rubik',-apple-system,'SF Pro Display','Segoe UI',sans-serif;
+  font-family:var(--font-body);
   background:var(--bg);color:var(--text);
   direction:rtl;-webkit-user-select:none;user-select:none;
+  font-feature-settings:'tnum' 1;
 }
 #app{
   position:fixed;inset:0;
@@ -90,9 +113,13 @@ body{
 
 .login-brand{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:8px;z-index:2;position:relative}
 .login-title{
-  font-size:54px;font-weight:900;letter-spacing:-2px;text-align:center;line-height:1;
+  font-family:var(--font-display);
+  font-size:64px;font-weight:900;letter-spacing:-2.5px;text-align:center;line-height:0.95;
   color:#ffffff;margin:0;
-  text-shadow:0 4px 30px oklch(0.65 0.18 285 / 0.5);
+  text-shadow:0 4px 30px oklch(0.65 0.18 285 / 0.55);
+}
+.login-subtitle{
+  font-family:var(--font-body);
 }
 .login-subtitle{font-size:13px;font-weight:700;color:oklch(0.78 0.16 72);letter-spacing:0.8px;text-transform:uppercase;margin-top:2px}
 .login-tagline{font-size:14px;color:oklch(0.75 0.04 285);margin:18px 0 36px;text-align:center;line-height:1.7;max-width:300px;font-weight:500;z-index:2;position:relative}
@@ -153,9 +180,9 @@ body{
 .logo-orb-eyes{display:flex;gap:4px;margin-top:-1px}
 .logo-orb-eye{width:3px;height:5px;background:#1a1029;border-radius:50%;animation:logo-blink 6s ease-in-out infinite}
 @keyframes logo-blink{0%,42%,46%,100%{transform:scaleY(1)}44%{transform:scaleY(0.1)}}
-.logo{font-size:20px;font-weight:900;letter-spacing:-.8px;color:var(--text)}
+.logo{font-family:var(--font-display);font-size:24px;font-weight:900;letter-spacing:-1px;color:var(--text);line-height:1}
 .header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.badge{font-size:11px;font-weight:700;color:var(--accent);background:oklch(0.78 0.16 72 / 0.12);border:1px solid oklch(0.78 0.16 72 / 0.25);padding:5px 12px;border-radius:20px;flex-shrink:0}
+.badge{font-size:11px;font-weight:700;color:var(--accent);background:oklch(0.72 0.18 285 / 0.14);border:1px solid oklch(0.72 0.18 285 / 0.32);padding:5px 12px;border-radius:20px;flex-shrink:0;letter-spacing:0.2px}
 .menu-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s;color:var(--muted)}
 .menu-btn:active{background:var(--border)}
 
@@ -188,9 +215,9 @@ body{
 /* ── Greeting bar ── */
 .mic-wrap{display:none}
 .tap-orb,.tap-orb-inner,.tap-lbl{display:none}
-.greeting-bar{padding:18px 20px 8px;display:flex;flex-direction:column;gap:2px}
-.greeting-date{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px}
-.greeting-sub{font-size:13px;color:var(--muted);font-weight:500}
+.greeting-bar{padding:22px 20px 10px;display:flex;flex-direction:column;gap:3px}
+.greeting-date{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.8px;line-height:1.1}
+.greeting-sub{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0.1px}
 
 /* ── Siri Overlay ── */
 #siriOverlay{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;pointer-events:none;opacity:0;transition:opacity .35s ease}
@@ -619,9 +646,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bnav-item.active{color:var(--accent)}
 .bnav-icon{font-size:20px;line-height:1}
 .bnav-fab-wrap{flex:1;display:flex;justify-content:center;align-items:center}
-.bnav-fab{width:54px;height:54px;border-radius:50%;background:var(--accent);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px oklch(0.78 0.16 72 / 0.4);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s,box-shadow .2s;margin-top:-16px}
-.bnav-fab:active{transform:scale(.91);box-shadow:0 2px 10px oklch(0.78 0.16 72 / 0.25)}
-.bnav-fab svg{stroke:oklch(0.12 0.007 45) !important}
+.bnav-fab{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent-deep) 0%,var(--accent) 50%,var(--accent-glow) 100%);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 24px oklch(0.55 0.18 285 / 0.55),0 0 0 4px oklch(0.55 0.18 285 / 0.15);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s,box-shadow .2s;margin-top:-18px}
+.bnav-fab:active{transform:scale(.91);box-shadow:0 3px 14px oklch(0.55 0.18 285 / 0.35)}
+.bnav-fab svg{stroke:#ffffff !important;filter:drop-shadow(0 1px 1px oklch(0.20 0.05 285 / 0.5))}
 
 /* ── Notification Manager ── */
 .notif-section-title{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;padding:14px 20px 8px;border-bottom:1px solid var(--border)}
@@ -1208,7 +1235,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .routine-cons-label{font-size:10px;font-weight:700;color:var(--muted)}
 
 /* ── Defer chip — text label in meta row ── */
-.defer-chip{display:inline-flex;align-items:center;padding:2px 10px;background:oklch(0.28 0.08 250);border:1px solid oklch(0.50 0.14 250 / 0.5);border-radius:12px;color:oklch(0.82 0.12 250);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;margin-inline-start:4px;vertical-align:middle}
+.defer-chip{display:inline-flex;align-items:center;padding:3px 11px;background:oklch(0.28 0.06 285);border:1px solid oklch(0.50 0.14 285 / 0.55);border-radius:12px;color:oklch(0.82 0.14 285);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;margin-inline-start:4px;vertical-align:middle;letter-spacing:0.2px}
 .defer-chip:active{background:oklch(0.35 0.10 250)}
 
 /* ── Postpone popup ── */
@@ -1306,7 +1333,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bill-days-badge.pulse{animation:billPulse 1.8s ease-in-out infinite}
 @keyframes billPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:0.85}}
 
-.bill-sync-btn{padding:5px 12px;background:oklch(0.28 0.08 250);border:1px solid oklch(0.50 0.14 250 / 0.5);border-radius:12px;color:oklch(0.82 0.12 250);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-right:auto}
+.bill-sync-btn{padding:5px 12px;background:oklch(0.28 0.06 285);border:1px solid oklch(0.50 0.14 285 / 0.55);border-radius:12px;color:oklch(0.82 0.14 285);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-right:auto}
 .bill-sync-btn:active{background:oklch(0.35 0.10 250)}
 
 .bill-countdown-wrap{display:flex;flex-direction:column;gap:4px;align-items:flex-end;margin-top:4px}
@@ -1416,9 +1443,9 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .asst-fab.dragging{animation:none;transition:none;cursor:grabbing;box-shadow:0 12px 32px oklch(0.55 0.16 285 / 0.6), 0 0 0 6px oklch(0.55 0.16 285 / 0.25);transform:scale(1.1)}
 .asst-fab:active{transform:scale(0.92)}
 @keyframes fabFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.asst-fab-orb{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #fff 0%, oklch(0.92 0.05 285) 60%, oklch(0.85 0.10 285) 100%);position:relative;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -4px 8px oklch(0.6 0.15 285 / 0.3)}
+.asst-fab-orb{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #ffffff 0%, #e9def6 55%, #b89aef 100%);position:relative;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -5px 10px oklch(0.55 0.16 285 / 0.35)}
 .asst-fab-eyes{display:flex;gap:6px;margin-top:-2px}
-.asst-fab-eye{width:5px;height:8px;background:oklch(0.25 0.05 285);border-radius:50%;animation:fabBlink 4s ease-in-out infinite}
+.asst-fab-eye{width:5px;height:10px;background:#1a1029;border-radius:50%;animation:fabBlink 4s ease-in-out infinite}
 @keyframes fabBlink{0%,40%,42%,100%{transform:scaleY(1)}41%{transform:scaleY(0.1)}}
 .asst-fab-pulse{position:absolute;inset:-6px;border-radius:50%;border:2px solid oklch(0.55 0.16 285 / 0.5);animation:fabPulse 2.4s ease-out infinite;pointer-events:none}
 @keyframes fabPulse{0%{transform:scale(1);opacity:0.7}100%{transform:scale(1.4);opacity:0}}

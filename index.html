@@ -14,7 +14,7 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -1641,7 +1641,7 @@ function saveNotifSettings(){
   localStorage.setItem('vt_notif_settings',JSON.stringify(notifSettings));
   scheduleSmartPushNotifs();
   if(typeof scheduleMorningBrief==='function')scheduleMorningBrief();
-  toast('✅ הגדרות נשמרו');
+  toast('✓ הוגדר');
 }
 function notifCtx(name){
   const n=(name||'').toLowerCase();
@@ -2244,7 +2244,7 @@ function findTaskByQuery(query){
 function executeCommand(cmd){
   if(cmd.action==='delete'){
     const t=findTaskByQuery(cmd.query);
-    if(t){del(t.id);toast('משימה נמחקה');stopSiri();}
+    if(t){del(t.id);toast('🗑️ המשימה הוסרה');stopSiri();}
     else{showSiriFeedback('לא מצאתי משימה כזו');}
     return;
   }
@@ -2461,7 +2461,7 @@ function addTask(text,extras){
   const reminderMins=+(document.getElementById('siriReminderMins')?.value||0);
   const morningAlert=document.getElementById('siriMorningAlert')?.checked!==false;
   const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
-  tasks.unshift(task);save();render();toast('משימה נוספה');vibrate([10,30,10]);syncTask(task);
+  tasks.unshift(task);save();render();toast('✓ נרשם, אדוני');vibrate([10,30,10]);syncTask(task);
   scheduleSmartPushNotifs();
 }
 function sendEmailNotification(task){
@@ -2475,7 +2475,7 @@ async function syncTask(task){
   try{evId=await createTaskCalendarEvent(task);}catch(e){console.warn('syncTask calendar error:',e);}
   const t=tasks.find(x=>x.id===task.id);
   if(t){t.calendarEventId=evId||null;save();render();}
-  if(evId)toast('✅ נוסף לגוגל קאלנדר');else toast('⚠️ שמור — ממתין לסנכרון עם קאלנדר');
+  if(evId)toast('✓ נוסף ליומן, אדוני');else toast('⚠️ שמור — ממתין לסנכרון עם קאלנדר');
   sendEmailNotification(task); // always send email regardless of calendar result
 }
 async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId);}
@@ -2486,7 +2486,7 @@ async function syncOneTask(id){
   if(t.calendarEventId&&!t.calendarEventId.startsWith('local_'))await deleteCalendarEvent(t.calendarEventId);
   const evId=await createTaskCalendarEvent(t);
   t.calendarEventId=evId||null;save();render();
-  if(evId){toast('✅ נוסף לגוגל קאלנדר');sendEmailNotification(t);}
+  if(evId){toast('✓ נוסף ליומן, אדוני');sendEmailNotification(t);}
   else toast('❌ לא הצליח — בדוק חיבור');
 }
 async function unsyncTask(id){
@@ -2530,7 +2530,7 @@ function toggleRoutineImportant(id){
   r.important=!r.important;vibrate(15);saveRoutines();render();
   toast(r.important?'⚠️ שגרה סומנה כחשובה':'הוסר סימון חשוב');
 }
-async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה');scheduleSmartPushNotifs();}
+async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('🗑️ המשימה הוסרה');scheduleSmartPushNotifs();}
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
 function editTask(id){const el=document.getElementById('edit-'+id);if(el)el.classList.toggle('on')}
 async function saveEdit(id){
@@ -2643,7 +2643,7 @@ async function confirmPostpone(){
     save();render();
     await syncTask(t);
     scheduleSmartPushNotifs();
-    toast('📅 נדחתה בהצלחה');
+    toast('✓ הוזז למועד החדש');
   } else if(type==='routine'){
     const r=routines.find(x=>x.id==routineId);if(!r)return;
     const newDt=new Date(inp.value).toISOString();
@@ -2959,9 +2959,8 @@ function updateGreeting(){
   if(!dateEl||!subEl)return;
   const now=new Date();
   const h=now.getHours();
-  const greet=h<5?'לילה טוב':h<12?'בוקר טוב':h<17?'צהריים טובים':h<21?'ערב טוב':'לילה טוב';
-  const name=gAuth?.name?.split(' ')[0]||'';
-  dateEl.textContent=`${greet}${name?' '+name:''}!`;
+  const greet=h<5?'לילה טוב, אדוני':h<12?'בוקר טוב, אדוני':h<17?'צהריים טובים, אדוני':h<21?'ערב טוב, אדוני':'לילה טוב, אדוני';
+  dateEl.textContent=greet;
   const active=tasks.filter(t=>!t.completed).length;
   const routineCount=routines.filter(r=>r.enabled).length;
   const billCount=bills.filter(b=>b.status==='pending').length;
@@ -2969,7 +2968,7 @@ function updateGreeting(){
   if(active)parts.push(active+' משימות');
   if(routineCount)parts.push(routineCount+' שגרות');
   if(billCount)parts.push(billCount+' חשבונות');
-  subEl.textContent=parts.length?parts.join(' · '):' אין משימות — לחץ 🎤 להוספה';
+  subEl.textContent=parts.length?'הכל מוכן · '+parts.join(' · '):'הלוח שלך פנוי — איך אוכל לסייע?';
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
@@ -5962,7 +5961,7 @@ function handleFollowupAction(action,payload){
   if(payload.type==='task'){
     const t=tasks.find(x=>x.id==payload.id);if(!t)return;
     if(action==='done'){
-      t.completed=true;save();render();toast('🎉 משימה הושלמה — כל הכבוד!');vibrate([20,40,20]);
+      t.completed=true;save();render();toast('🎉 כל הכבוד, אדוני! עוד הישג');vibrate([20,40,20]);
     }else if(action==='snooze'){
       const newTime=new Date(t.datetime).getTime()+15*60000;
       t.datetime=new Date(newTime).toISOString();
