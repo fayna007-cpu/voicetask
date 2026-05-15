@@ -383,6 +383,17 @@
         <div class="settings-row-body"><div class="settings-row-title">התראת פיגור</div><div class="settings-row-sub">משימה שחלפה ולא הושלמה</div></div>
         <label class="rtoggle"><input type="checkbox" id="ns-tasks-overdueAlert" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">Follow-up — בוצע?</div><div class="settings-row-sub">התראה עם כפתורי "בוצע / דחה / דלגתי"</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-tasks-followupEnabled" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">דקות אחרי המשימה</div><div class="settings-row-sub">מתי לשאול אם בוצעה</div></div>
+        <select class="settings-select" id="ns-tasks-followupMins" onchange="saveNotifSettings()">
+          <option value="15">15 דק׳</option><option value="20" selected>20 דק׳</option>
+          <option value="30">30 דק׳</option><option value="60">שעה</option>
+        </select>
+      </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">🔄 שגרות</div>
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">תזכורת לפני שגרה</div><div class="settings-row-sub">כמה זמן לפני</div></div>
@@ -394,6 +405,17 @@
       <div class="settings-row" style="cursor:default">
         <div class="settings-row-body"><div class="settings-row-title">סיכום שגרות בבוקר</div><div class="settings-row-sub">שעת שליחה</div></div>
         <input type="time" class="settings-select" id="ns-routines-morningTime" onchange="saveNotifSettings()" style="background-image:none">
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">Follow-up — בוצע?</div><div class="settings-row-sub">התראה עם כפתורי "בוצע / דחה / דלגתי"</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ns-routines-followupEnabled" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">דקות אחרי השגרה</div><div class="settings-row-sub">מתי לשאול אם בוצעה</div></div>
+        <select class="settings-select" id="ns-routines-followupMins" onchange="saveNotifSettings()">
+          <option value="15">15 דק׳</option><option value="20" selected>20 דק׳</option>
+          <option value="30">30 דק׳</option><option value="60">שעה</option>
+        </select>
       </div>
       <div class="settings-notif-sub" style="padding-top:10px;border-top:1px solid var(--border)">💳 חשבונות</div>
       <div class="settings-row" style="cursor:default">
@@ -1551,20 +1573,20 @@ function confirmClearData(){
 }
 // ── Smart Push Notification Settings ─────────────────────────────────────────
 let notifSettings=null;
-const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true},routines:{reminderMins:30,morningTime:'07:00'},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true,monthlyBudget:0,gmailScan:false},alfred:{morningBrief:true,morningBriefTime:'07:30'},productivity:{eveningTime:'21:00',weeklyReview:true}};
+const NS_DEFAULTS={tasks:{reminderMins:30,morningTime:'08:00',overdueAlert:true,followupEnabled:true,followupMins:20},routines:{reminderMins:30,morningTime:'07:00',followupEnabled:true,followupMins:20},bills:{payDayTime:'08:00',earlyReminderDays:2,overdueAlert:true,monthlyBudget:0,gmailScan:false},alfred:{morningBrief:true,morningBriefTime:'07:30'},productivity:{eveningTime:'21:00',weeklyReview:true}};
 function loadNotifSettings(){
   try{const s=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');
     notifSettings=s?{tasks:{...NS_DEFAULTS.tasks,...s.tasks},routines:{...NS_DEFAULTS.routines,...s.routines},bills:{...NS_DEFAULTS.bills,...(s.bills||{})},alfred:{...NS_DEFAULTS.alfred,...(s.alfred||{})},productivity:{...NS_DEFAULTS.productivity,...s.productivity}}:{...NS_DEFAULTS,tasks:{...NS_DEFAULTS.tasks},routines:{...NS_DEFAULTS.routines},bills:{...NS_DEFAULTS.bills},alfred:{...NS_DEFAULTS.alfred},productivity:{...NS_DEFAULTS.productivity}};
   }catch(e){notifSettings=JSON.parse(JSON.stringify(NS_DEFAULTS));}
   // Sync values to DOM elements (if settings sheet already rendered)
-  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-bills-monthlyBudget','bills','monthlyBudget','value'],['ns-bills-gmailScan','bills','gmailScan','checked'],['ns-alfred-morningBrief','alfred','morningBrief','checked'],['ns-alfred-morningBriefTime','alfred','morningBriefTime','value'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
+  const pairs=[['ns-tasks-reminderMins','tasks','reminderMins','value'],['ns-tasks-morningTime','tasks','morningTime','value'],['ns-tasks-overdueAlert','tasks','overdueAlert','checked'],['ns-tasks-followupEnabled','tasks','followupEnabled','checked'],['ns-tasks-followupMins','tasks','followupMins','value'],['ns-routines-reminderMins','routines','reminderMins','value'],['ns-routines-morningTime','routines','morningTime','value'],['ns-routines-followupEnabled','routines','followupEnabled','checked'],['ns-routines-followupMins','routines','followupMins','value'],['ns-bills-payDayTime','bills','payDayTime','value'],['ns-bills-earlyReminderDays','bills','earlyReminderDays','value'],['ns-bills-overdueAlert','bills','overdueAlert','checked'],['ns-bills-monthlyBudget','bills','monthlyBudget','value'],['ns-bills-gmailScan','bills','gmailScan','checked'],['ns-alfred-morningBrief','alfred','morningBrief','checked'],['ns-alfred-morningBriefTime','alfred','morningBriefTime','value'],['ns-productivity-eveningTime','productivity','eveningTime','value'],['ns-productivity-weeklyReview','productivity','weeklyReview','checked']];
   pairs.forEach(([id,section,key,prop])=>{const el=document.getElementById(id);if(!el)return;if(prop==='checked')el.checked=!!notifSettings[section][key];else el.value=notifSettings[section][key];});
 }
 function saveNotifSettings(){
   const g=id=>document.getElementById(id);
   notifSettings={
-    tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked},
-    routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00'},
+    tasks:{reminderMins:+(g('ns-tasks-reminderMins')?.value||30),morningTime:g('ns-tasks-morningTime')?.value||'08:00',overdueAlert:!!g('ns-tasks-overdueAlert')?.checked,followupEnabled:!!g('ns-tasks-followupEnabled')?.checked,followupMins:+(g('ns-tasks-followupMins')?.value||20)},
+    routines:{reminderMins:+(g('ns-routines-reminderMins')?.value||30),morningTime:g('ns-routines-morningTime')?.value||'07:00',followupEnabled:!!g('ns-routines-followupEnabled')?.checked,followupMins:+(g('ns-routines-followupMins')?.value||20)},
     bills:{payDayTime:g('ns-bills-payDayTime')?.value||'08:00',earlyReminderDays:+(g('ns-bills-earlyReminderDays')?.value||2),overdueAlert:!!g('ns-bills-overdueAlert')?.checked,monthlyBudget:+(g('ns-bills-monthlyBudget')?.value||0),gmailScan:!!g('ns-bills-gmailScan')?.checked},
     alfred:{morningBrief:!!g('ns-alfred-morningBrief')?.checked,morningBriefTime:g('ns-alfred-morningBriefTime')?.value||'07:30'},
     productivity:{eveningTime:g('ns-productivity-eveningTime')?.value||'21:00',weeklyReview:!!g('ns-productivity-weeklyReview')?.checked}
@@ -1590,11 +1612,27 @@ function buildSmartPushBatch(windowMs){
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fmt=d=>d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
   const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return t.getUTCFullYear()+'-W'+String(Math.ceil((((t-y)/86400000)+1)/7)).padStart(2,'0');};
-  function queue(id,title,body,fireAt){
+  function queue(id,title,body,fireAt,extras){
     if(seen.has(id))return;const delay=fireAt-now;
     if(delay<=0||delay>WIN)return;seen.add(id);
-    batch.push({id,title,body,fireAt:fireAt.toISOString()});
+    // Cap title to 80 chars, body to 140 chars (mobile-friendly)
+    const t=String(title||'').slice(0,80);
+    const b=String(body||'').slice(0,140);
+    const entry={id,title:t,body:b,fireAt:fireAt.toISOString()};
+    if(extras){
+      if(extras.actions)entry.actions=extras.actions;
+      if(extras.payload)entry.payload=extras.payload;
+      if(extras.requireInteraction)entry.requireInteraction=true;
+    }
+    batch.push(entry);
   }
+  const FOLLOWUP_QUOTES=['🏋️ איך הלך?','💪 גמרת? כל הכבוד!','✨ נסגרת פעולה?','🎯 איך אתה מרגיש אחרי?','🔥 רוצה לסמן הישג?','🚀 איך התקדמת?'];
+  const rndFup=()=>FOLLOWUP_QUOTES[Math.floor(Math.random()*FOLLOWUP_QUOTES.length)];
+  const FOLLOWUP_ACTIONS=[
+    {action:'done',title:'✓ בוצע'},
+    {action:'snooze',title:'⏰ עוד 15 דק'},
+    {action:'skip',title:'דלגתי'}
+  ];
   // Morning briefing
   [0,1].forEach(off=>{
     const base=new Date(now);base.setDate(now.getDate()+off);
@@ -1609,6 +1647,8 @@ function buildSmartPushBatch(windowMs){
     queue('morning_'+ds,'☀️ סיכום בוקר'+(off===0?' — היום':' — מחר'),tc+rc>0?`${tc} משימות · ${rc} שגרות`:'אין פריטים מתוכננים',fire);
   });
   // Task reminders — per-task override OR global setting
+  const followupMins=s.tasks.followupMins||20;
+  const followupEnabled=s.tasks.followupEnabled!==false;
   tasks.filter(t=>!t.completed&&t.datetime).forEach(t=>{
     const mins=t.reminderMins!=null?t.reminderMins:s.tasks.reminderMins;
     if(mins>0){
@@ -1624,6 +1664,13 @@ function buildSmartPushBatch(windowMs){
       if(isToday||isTomorrow){
         queue('tmorning_'+t.id,'📌 תזכורת: '+t.text,`${isToday?'היום':' מחר'} בשעה ${fmt(taskTime)} ⏰`,morningFire);
       }
+    }
+    // Follow-up: ask if completed after the task time
+    if(followupEnabled){
+      const taskTime=new Date(t.datetime);
+      const fupAt=new Date(taskTime.getTime()+followupMins*60000);
+      queue('fup_task_'+t.id,rndFup(),(t.text||'').slice(0,80)+' — בוצע?',fupAt,
+        {actions:FOLLOWUP_ACTIONS,payload:{type:'task',id:String(t.id)},requireInteraction:true});
     }
   });
   // Overdue alerts
@@ -1646,6 +1693,13 @@ function buildSmartPushBatch(windowMs){
       const routineReminderMins=r.reminder!=null?r.reminder:s.routines.reminderMins;
       if(routineReminderMins>0){
         queue('rslot_'+r.id+'_'+ds,'⚡ '+name,ctx.pre(routineReminderMins),new Date(slot-routineReminderMins*60000));
+      }
+      // Follow-up for routine slot
+      if(s.routines.followupEnabled!==false){
+        const fupMins=s.routines.followupMins||20;
+        const fupAt=new Date(slot.getTime()+fupMins*60000);
+        queue('fup_r_'+r.id+'_'+ds,rndFup(),name+' — בוצע?',fupAt,
+          {actions:FOLLOWUP_ACTIONS,payload:{type:'routine',id:r.id+'__'+iso},requireInteraction:true});
       }
     });});
   });
@@ -2374,6 +2428,16 @@ async function syncAllPending(){
 }
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
+function toggleTaskImportant(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.important=!t.important;vibrate(15);save();render();
+  toast(t.important?'⚠️ סומן כחשוב':'הוסר סימון חשוב');
+}
+function toggleRoutineImportant(id){
+  const r=routines.find(x=>x.id==id);if(!r)return;
+  r.important=!r.important;vibrate(15);saveRoutines();render();
+  toast(r.important?'⚠️ שגרה סומנה כחשובה':'הוסר סימון חשוב');
+}
 async function del(id){const t=tasks.find(x=>x.id===id);if(t)await deleteFromCalendar(t);tasks=tasks.filter(x=>x.id!==id);vibrate(15);save();render();toast('משימה נמחקה');scheduleSmartPushNotifs();}
 function setCat(id,c){const t=tasks.find(x=>x.id===id);if(t){t.category=c;save();render()}}
 function editTask(id){const el=document.getElementById('edit-'+id);if(el)el.classList.toggle('on')}
@@ -2623,7 +2687,8 @@ function renderTaskCard(task){
   const isSynced=task.calendarEventId&&!task.calendarEventId.startsWith('local_');
   const calBadge=isSynced?`<button class="cal-badge synced" onclick="unsyncTask(${task.id})" title="לחץ לביטול סנכרון">${ICO.calSynced}מסונכרן ✕<\/button>`:`<button class="cal-badge pending" onclick="syncOneTask(${task.id})" title="לחץ לסנכרון עם קאלנדר">${ICO.calPending}ממתין — סנכרן</button>`;
   const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}<\/button>`:'';
-  return `<div class="card${task.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
+  return `<div class="card${task.completed?' done':isOverdue?' overdue':''}${task.important?' important':''}" style="--cc:${cat.c}">
+  ${task.important?'<button class="important-marker on" onclick="toggleTaskImportant('+task.id+')" title="הסר סימון חשוב">!</button>':'<button class="important-marker" onclick="toggleTaskImportant('+task.id+')" title="סמן כחשוב">!</button>'}
   ${isOverdue?'<div class="overdue-label">⏰ עבר הזמן<\/div>':''}
   <div class="card-row">
     <div class="card-main">
@@ -2688,7 +2753,10 @@ function renderRoutineInstance(inst){
     <div class="routine-cons-track"><div class="routine-cons-fill" style="width:${cons.pct}%;background:${cons.pct>=80?'oklch(0.72 0.18 145)':cons.pct>=50?'var(--accent)':'oklch(0.65 0.22 25)'}"></div></div>
     <span class="routine-cons-label">${cons.pct}% עקביות${avgE?` · ${energyIco[avgE]}`:''}</span>
   </div>`:'';
-  return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}" style="--cc:${cat.c}">
+  const routineRef=routines.find(rr=>rr.id===inst.routineId);
+  const isImportant=routineRef?.important;
+  return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}${isImportant?' important':''}" style="--cc:${cat.c}">
+  ${isImportant?`<button class="important-marker on" onclick="toggleRoutineImportant('${inst.routineId}')" title="הסר סימון חשוב">!</button>`:`<button class="important-marker" onclick="toggleRoutineImportant('${inst.routineId}')" title="סמן כחשוב">!</button>`}
   <div class="routine-badge">🔄 שגרה</div>
   <div class="card-row">
     <div class="card-main">
@@ -5640,8 +5708,75 @@ if('serviceWorker' in navigator){
     if(e.data&&e.data.type==='VT_SHARE'){
       addPendingItem(e.data.text||'',e.data.title||'',e.data.url||'');
     }
+    if(e.data&&e.data.type==='VT_NOTIF_ACTION'){
+      handleFollowupAction(e.data.action,e.data.payload);
+    }
   });
 }
+
+// Handle follow-up actions from notification clicks (with or without action button)
+function handleFollowupAction(action,payload){
+  if(!payload||!payload.type||!payload.id)return;
+  if(payload.type==='task'){
+    const t=tasks.find(x=>x.id==payload.id);if(!t)return;
+    if(action==='done'){
+      t.completed=true;save();render();toast('🎉 משימה הושלמה — כל הכבוד!');vibrate([20,40,20]);
+    }else if(action==='snooze'){
+      const newTime=new Date(t.datetime).getTime()+15*60000;
+      t.datetime=new Date(newTime).toISOString();
+      t.completed=false;save();render();toast('⏰ נדחתה ב-15 דקות');
+      scheduleSmartPushNotifs&&scheduleSmartPushNotifs();
+    }else if(action==='skip'){
+      t.skipped=true;save();render();toast('דלגתי על המשימה');
+    }else{
+      // click without action — open the task edit
+      try{editTask(payload.id);}catch(_){}
+    }
+  }else if(payload.type==='routine'){
+    // payload.id format: "routineId__isoSlot"
+    const parts=String(payload.id).split('__');
+    const routineId=parts[0];const slotIso=parts[1];
+    const r=routines.find(x=>x.id==routineId);if(!r)return;
+    if(action==='done'){
+      if(!r.completedDates)r.completedDates=[];
+      if(!r.completedDates.includes(slotIso))r.completedDates.push(slotIso);
+      saveRoutines();render();toast('🎉 כל הכבוד!');vibrate([20,40,20]);
+    }else if(action==='snooze'){
+      // Move slot 15 min later
+      Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+        r.scheduledWeeks[wk]=(r.scheduledWeeks[wk]||[]).map(it=>{
+          const dt=typeof it==='string'?it:it?.dt;
+          if(dt===slotIso){
+            const newDt=new Date(new Date(slotIso).getTime()+15*60000).toISOString();
+            return typeof it==='string'?newDt:{...it,dt:newDt};
+          }
+          return it;
+        });
+      });
+      saveRoutines();render();toast('⏰ נדחתה ב-15 דקות');
+      scheduleSmartPushNotifs&&scheduleSmartPushNotifs();
+    }else if(action==='skip'){
+      if(!r.skippedDates)r.skippedDates=[];
+      if(!r.skippedDates.includes(slotIso))r.skippedDates.push(slotIso);
+      saveRoutines();render();toast('דלגתי על האימון');
+    }
+  }
+}
+
+// On load: check URL for pending action from notification tap
+(function checkUrlAction(){
+  try{
+    const u=new URL(location.href);
+    const action=u.searchParams.get('action');
+    const type=u.searchParams.get('type');
+    const id=u.searchParams.get('id');
+    if(action&&type&&id){
+      setTimeout(()=>handleFollowupAction(action,{type,id}),1500);
+      u.searchParams.delete('action');u.searchParams.delete('type');u.searchParams.delete('id');
+      history.replaceState(null,'',u.toString());
+    }
+  }catch(_){}
+})();
 // Pick up share stored in SW cache (app was closed when shared)
 async function checkSWShare(){
   if(!('serviceWorker' in navigator))return;

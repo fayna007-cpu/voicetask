@@ -1,4 +1,4 @@
-const V = 'vt-v59';
+const V = 'vt-v60';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -18,26 +18,55 @@ self.addEventListener('activate', e => {
 self.addEventListener('push', e => {
   let data={title:'VoiceTask 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
-  e.waitUntil(self.registration.showNotification(data.title,{
-    body:data.body,icon:'./icon.svg',badge:'./icon.svg',
-    dir:'rtl',vibrate:[200,100,200],tag:data.tag||'vt-push'
-  }));
+  const opts={
+    body:data.body||'',
+    icon:'./icon.svg',badge:'./icon.svg',
+    dir:'rtl',vibrate:[200,100,200],
+    tag:data.tag||'vt-push',
+    data:data.payload||data.data||null
+  };
+  if(data.actions&&Array.isArray(data.actions))opts.actions=data.actions;
+  if(data.requireInteraction)opts.requireInteraction=true;
+  // Show full body on lock screen / drawer
+  if(data.body&&data.body.length>40)opts.requireInteraction=true;
+  e.waitUntil(self.registration.showNotification(data.title,opts));
 });
 
 self.addEventListener('notificationclick', e => {
+  const action=e.action;
+  const payload=e.notification.data||{};
   e.notification.close();
-  e.waitUntil(clients.matchAll({type:'window'}).then(cs=>{
+  e.waitUntil((async()=>{
+    const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    // Notify any open client about the action (or just click)
+    cs.forEach(c=>{
+      try{c.postMessage({type:'VT_NOTIF_ACTION',action:action||'click',payload});}catch(_){}
+    });
+    if(action&&payload&&payload.id){
+      if(cs.length){
+        if('focus' in cs[0])return cs[0].focus();
+      }else{
+        // No client open — open with query so client applies on load
+        const url=`/?action=${encodeURIComponent(action)}&type=${encodeURIComponent(payload.type||'')}&id=${encodeURIComponent(payload.id||'')}`;
+        return clients.openWindow(url);
+      }
+      return;
+    }
     const c=cs.find(x=>x.url.includes(self.location.origin)&&'focus'in x);
     return c?c.focus():clients.openWindow('/');
-  }));
+  })());
 });
 
 self.addEventListener('message', event => {
   if(event.data&&event.data.type==='SHOW_NOTIFICATION'){
-    self.registration.showNotification(event.data.title,{
+    const opts={
       body:event.data.body,icon:'./icon.svg',badge:'./icon.svg',
-      tag:event.data.tag,dir:'rtl',vibrate:[200,100,200]
-    });
+      tag:event.data.tag,dir:'rtl',vibrate:[200,100,200],
+      data:event.data.payload||null
+    };
+    if(event.data.actions)opts.actions=event.data.actions;
+    if(event.data.requireInteraction||(event.data.body&&event.data.body.length>40))opts.requireInteraction=true;
+    self.registration.showNotification(event.data.title,opts);
   }
 });
 
