@@ -9094,15 +9094,15 @@ function renderBillsDashboard(){
 
   // ── Monthly history — all months with paid bills ──
   const byMonth={};
-  bills.filter(b=>b.status==='paid'&&b.paidAt).forEach(b=>{
-    const d=new Date(b.paidAt);
+  bills.filter(b=>b.status==='paid').forEach(b=>{
+    const d=new Date(b.paidAt||b.createdAt||Date.now());
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     if(!byMonth[key])byMonth[key]={sum:0,count:0,label:d.toLocaleDateString('he-IL',{month:'long',year:'numeric'})};
     byMonth[key].sum+=(b.amount||0);byMonth[key].count++;
   });
   const monthKeys=Object.keys(byMonth).sort().reverse();
   let historyHtml='';
-  if(monthKeys.length>1){
+  if(monthKeys.length>=1){
     const rows=monthKeys.map(k=>{
       const m=byMonth[k];
       const isCur=k===(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
