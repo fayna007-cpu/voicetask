@@ -1663,3 +1663,12 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bd-recent-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bd-recent-meta{font-size:10px;color:var(--muted);margin-top:2px;font-weight:600}
 .bd-recent-amt{font-size:14px;font-weight:800;color:var(--text);direction:ltr;flex-shrink:0}
+
+/* Monthly history */
+.bd-months{display:flex;flex-direction:column;gap:8px}
+.bd-month-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-radius:12px;cursor:pointer;touch-action:manipulation}
+.bd-month-row:active{filter:brightness(0.92)}
+.bd-month-row.current{background:oklch(0.72 0.18 285 / 0.12);border:1px solid oklch(0.72 0.18 285 / 0.3)}
+.bd-month-name{flex:1;font-size:13px;font-weight:700;color:var(--text)}
+.bd-month-meta{font-size:11px;color:var(--muted);font-weight:600}
+.bd-month-sum{font-size:15px;font-weight:800;color:var(--accent);direction:ltr;flex-shrink:0;min-width:70px;text-align:left}

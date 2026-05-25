@@ -314,6 +314,17 @@
     </div>
     <div class="settings-section">סטטיסטיקה</div>
     <div class="settings-stat-row" id="settingsStats"></div>
+    <div class="settings-section">חיבורים</div>
+    <div class="settings-cards">
+      <div class="settings-row" onclick="connectGoogle()">
+        <div class="settings-row-ico" style="background:oklch(0.45 0.15 250 / 0.2);color:oklch(0.65 0.18 250)">📅</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">חיבור ליומן Google</div>
+          <div class="settings-row-sub" id="googleConnSub">לסנכרון משימות, שגרות וחשבונות ליומן</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
     <div class="settings-section">גיבוי ושחזור</div>
     <div class="settings-cards">
       <div class="settings-row" onclick="driveBackup(true)">
@@ -1531,6 +1542,8 @@ function initLightMode(){
 function openSettings(){
   document.getElementById('lightModeToggle').checked=document.body.classList.contains('light');
   loadDpSettings();updateBackupStatus();
+  const gcs=document.getElementById('googleConnSub');
+  if(gcs)gcs.textContent=gAuth?.access_token?'✓ מחובר — סנכרון פעיל':'לחץ לחיבור — סנכרון משימות ליומן';
   // stats
   const done=tasks.filter(t=>t.completed).length;
   document.getElementById('settingsStats').innerHTML=`
@@ -2522,13 +2535,47 @@ async function syncTask(task){
 async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId);}
 async function syncOneTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
+  // If not connected to Google, prompt to connect first
+  if(!gAuth?.access_token){
+    const ok=await connectGoogle();
+    if(!ok){toast('יש להתחבר ל-Google כדי לסנכרן ליומן');return;}
+  }
   toast('⏳ מסנכרן...');
-  // If there's already a real calendar event, delete it first to avoid duplicates
   if(t.calendarEventId&&!t.calendarEventId.startsWith('local_'))await deleteCalendarEvent(t.calendarEventId);
   const evId=await createTaskCalendarEvent(t);
   t.calendarEventId=evId||null;save();render();
   if(evId){toast('✓ נוסף ליומן, אדוני');sendEmailNotification(t);}
-  else toast('❌ לא הצליח — בדוק חיבור');
+  else toast('❌ הסנכרון נכשל — נסה שוב');
+}
+
+// Connect Google Calendar to an existing session (e.g. after email login)
+function connectGoogle(){
+  return new Promise(resolve=>{
+    if(!window.google){toast('טוען Google...');setTimeout(()=>resolve(false),500);return;}
+    try{
+      const tc=google.accounts.oauth2.initTokenClient({
+        client_id:GOOGLE_CLIENT_ID,scope:SCOPES,
+        callback:async(resp)=>{
+          if(resp.error){resolve(false);return;}
+          try{
+            const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}});
+            const u=await r.json();
+            gAuth=gAuth||{};
+            gAuth.access_token=resp.access_token;
+            gAuth.expiry=Date.now()+(+(resp.expires_in||3600))*1000;
+            if(u.email)gAuth.email=gAuth.email||u.email;
+            if(u.name)gAuth.name=gAuth.name||u.name;
+            if(u.picture)gAuth.picture=gAuth.picture||u.picture;
+            localStorage.setItem('vt_auth',JSON.stringify(gAuth));
+            updateUserChip&&updateUserChip();
+            toast('✓ Google מחובר, אדוני');
+            resolve(true);
+          }catch(e){resolve(false);}
+        }
+      });
+      tc.requestAccessToken({prompt:'consent'});
+    }catch(e){resolve(false);}
+  });
 }
 async function unsyncTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
@@ -9045,7 +9092,48 @@ function renderBillsDashboard(){
     </div>`;
   }
 
-  return `<div class="bills-dashboard">${heroHtml}${pieHtml}${trendHtml}${recentHtml}</div>`;
+  // ── Monthly history — all months with paid bills ──
+  const byMonth={};
+  bills.filter(b=>b.status==='paid'&&b.paidAt).forEach(b=>{
+    const d=new Date(b.paidAt);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!byMonth[key])byMonth[key]={sum:0,count:0,label:d.toLocaleDateString('he-IL',{month:'long',year:'numeric'})};
+    byMonth[key].sum+=(b.amount||0);byMonth[key].count++;
+  });
+  const monthKeys=Object.keys(byMonth).sort().reverse();
+  let historyHtml='';
+  if(monthKeys.length>1){
+    const rows=monthKeys.map(k=>{
+      const m=byMonth[k];
+      const isCur=k===(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
+      return `<div class="bd-month-row${isCur?' current':''}" onclick="filterBillsByMonth('${k}')">
+        <div class="bd-month-name">${m.label}${isCur?' • הנוכחי':''}</div>
+        <div class="bd-month-meta">${m.count} חשבונות</div>
+        <div class="bd-month-sum">₪${Math.round(m.sum).toLocaleString('he-IL')}</div>
+      </div>`;
+    }).join('');
+    const grandTotal=monthKeys.reduce((s,k)=>s+byMonth[k].sum,0);
+    historyHtml=`<div class="bd-card">
+      <div class="bd-card-head"><span class="bd-card-title">היסטוריה חודשית</span><span class="bd-card-sub">סה"כ ₪${Math.round(grandTotal).toLocaleString('he-IL')}</span></div>
+      <div class="bd-months">${rows}</div>
+    </div>`;
+  }
+
+  return `<div class="bills-dashboard">${heroHtml}${pieHtml}${trendHtml}${historyHtml}${recentHtml}</div>`;
+}
+
+// Show all paid bills for a specific month (YYYY-MM)
+function filterBillsByMonth(monthKey){
+  const monthBills=bills.filter(b=>{
+    if(b.status!=='paid'||!b.paidAt)return false;
+    const d=new Date(b.paidAt);
+    return (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'))===monthKey;
+  }).sort((a,b)=>new Date(b.paidAt)-new Date(a.paidAt));
+  if(!monthBills.length)return;
+  const total=monthBills.reduce((s,b)=>s+(b.amount||0),0);
+  const label=new Date(monthKey+'-01').toLocaleDateString('he-IL',{month:'long',year:'numeric'});
+  const lines=monthBills.map(b=>`${billCatIcon(b.category)} ${b.name} — ₪${Number(b.amount||0).toLocaleString('he-IL')}`).join('\n');
+  alert(`📅 ${label}\nסה"כ: ₪${Math.round(total).toLocaleString('he-IL')} · ${monthBills.length} חשבונות\n\n${lines}`);
 }
 
 function renderUrgentBillsBanner(){
@@ -9413,10 +9501,14 @@ async function testBillNotifs(){
 async function syncBillNow(id){
   const b=bills.find(x=>x.id===id);if(!b)return;
   if(!b.payDate&&!b.deadline){toast('⚠️ חסרים תאריכים לסנכרון');return;}
+  if(!gAuth?.access_token){
+    const ok=await connectGoogle();
+    if(!ok){toast('יש להתחבר ל-Google כדי לסנכרן ליומן');return;}
+  }
   toast('⏳ מסנכרן ליומן...');
   await syncBillToCalendar(b);
   const synced=b.calendarEventId||b.deadlineEventId;
-  toast(synced?'✅ סונכרן ליומן גוגל':'❌ סנכרון נכשל — בדוק חיבור');
+  toast(synced?'✓ סונכרן ליומן, אדוני':'❌ הסנכרון נכשל — נסה שוב');
   renderBillsList();render();
 }
 
