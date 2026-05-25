@@ -1,0 +1,14 @@
+# Local Netlify folder
+.netlify
+.deploytmp
+
+# Organized non-app folders (not part of the deployed site)
+agents/
+misc/
+
+# Secrets — never commit
+**/client_secret_*.json
+
+# Editor / OS
+.DS_Store
+Thumbs.db
