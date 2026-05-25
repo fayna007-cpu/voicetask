@@ -1417,6 +1417,17 @@
           <div style="font-size:11px;color:var(--muted);margin-top:2px">יירד אוטומטית — רק אמת סכום במייל</div>
         </div>
       </div>
+      <div class="bill-form-group" style="flex-direction:row;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px">
+        <label class="rtoggle"><input type="checkbox" id="billAlreadyPaid" onchange="onBillAlreadyPaidChange()"><span class="rtoggle-sl"></span></label>
+        <div style="flex:1">
+          <span class="bill-form-lbl" style="margin:0">✅ כבר שולם</span>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">להזנת חשבון מהעבר — נכנס להיסטוריה</div>
+        </div>
+      </div>
+      <div class="bill-form-group" id="billPaidDateGroup" style="display:none">
+        <label class="bill-form-lbl">📆 מתי שולם?</label>
+        <input class="bill-form-input" id="billPaidDate" type="date">
+      </div>
       <div class="bill-form-actions">
         <button class="bill-form-save" onclick="saveBill()">💾 שמור</button>
         <button class="bill-form-import" onclick="openBillEmailImport()">📧 ייבא מהמייל</button>
@@ -8870,6 +8881,16 @@ function onBillCategoryChange(){
   if(sel.value==='__custom__'){custom.style.display='block';custom.focus();}
   else custom.style.display='none';
 }
+function onBillAlreadyPaidChange(){
+  const paid=document.getElementById('billAlreadyPaid')?.checked;
+  const grp=document.getElementById('billPaidDateGroup');
+  const inp=document.getElementById('billPaidDate');
+  if(grp)grp.style.display=paid?'':'none';
+  if(paid&&inp&&!inp.value){
+    // default to today
+    const d=new Date();inp.value=d.toISOString().slice(0,10);
+  }
+}
 function onBillAutoDebitChange(){
   const auto=document.getElementById('billAutoDebit')?.checked;
   const payGroup=document.getElementById('billPayDateGroup');
@@ -9268,6 +9289,9 @@ function openBillForm(id){
   document.getElementById('billAmountType').value='fixed';
   document.getElementById('billAutoDebit').checked=false;
   onBillAutoDebitChange();
+  const apEl=document.getElementById('billAlreadyPaid');if(apEl)apEl.checked=false;
+  const pdEl=document.getElementById('billPaidDate');if(pdEl)pdEl.value='';
+  onBillAlreadyPaidChange();
   ['week','3days','1day','payday','deadline'].forEach(k=>{const el=document.getElementById('billRem_'+k);if(el)el.checked=false;});
   document.getElementById('billImgPreview').style.display='none';
   document.getElementById('billImgPreview').src='';
@@ -9347,6 +9371,10 @@ function saveBill(){
   const amountType=document.getElementById('billAmountType').value;
   const reminders=['week','3days','1day','payday','deadline'].filter(k=>document.getElementById('billRem_'+k)?.checked);
   const image=_billPendingImage||null;
+  // Already-paid (historical entry)
+  const alreadyPaid=document.getElementById('billAlreadyPaid')?.checked;
+  const paidDateVal=document.getElementById('billPaidDate')?.value;
+  const paidAtIso=alreadyPaid&&paidDateVal?new Date(paidDateVal+'T12:00:00').toISOString():null;
 
   if(_billEditId){
     const b=bills.find(x=>x.id===_billEditId);
@@ -9354,18 +9382,23 @@ function saveBill(){
       b.name=name;b.amount=amount;b.category=category;b.deadline=deadline;b.payDate=payDate;
       b.url=url;b.notes=notes;b.recurring=recurring;b.amountType=amountType;
       b.autoDebit=autoDebit;b.reminders=reminders;b.image=image;
+      if(alreadyPaid){b.status='paid';b.paidAt=paidAtIso||b.paidAt||new Date().toISOString();}
     }
   }else{
-    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,autoDebit,reminders,image,status:'pending',createdAt:new Date().toISOString(),calendarEventId:null,deadlineEventId:null,paidAt:null});
+    bills.unshift({id:Date.now(),name,amount,category,deadline,payDate,url,notes,recurring,amountType,autoDebit,reminders,image,
+      status:alreadyPaid?'paid':'pending',
+      createdAt:paidAtIso||new Date().toISOString(),
+      calendarEventId:null,deadlineEventId:null,
+      paidAt:alreadyPaid?(paidAtIso||new Date().toISOString()):null});
   }
   saveBills();
-  // sync to calendar if either date set
+  // sync to calendar only if pending + has a date (don't sync historical paid bills)
   const bill=_billEditId?bills.find(x=>x.id===_billEditId):bills[0];
-  if(bill&&(bill.payDate||bill.deadline))syncBillToCalendar(bill);
-  toast('✅ חשבון נשמר');
+  if(bill&&bill.status==='pending'&&(bill.payDate||bill.deadline))syncBillToCalendar(bill);
+  toast(alreadyPaid?'✓ נרשם בהיסטוריה, אדוני':'✓ חשבון נשמר');
   closeBillForm();
   scheduleSmartPushNotifs();
-  render();// refresh main screen bills section
+  render();
 }
 
 function deleteBill(){
