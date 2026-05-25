@@ -5777,7 +5777,13 @@ async function driveBackup(manual=false){
     if(manual)toast('⏳ מגבה...');
     const token=await driveGetToken();
     if(!token){toast('❌ לא ניתן לקבל הרשאה');return;}
-    const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,backlogLists,backlogItems,geProfile:geLoad(),gePipeline:gePipeLoad(),geSkills:geSkillsLoad()});
+    let aiSet=null,persona=null,memory=null,billVend=null,notif=null;
+    try{aiSet=JSON.parse(localStorage.getItem('vt_ai_settings')||'null');}catch(_){}
+    try{persona=JSON.parse(localStorage.getItem('vt_agent_persona')||'null');}catch(_){}
+    try{memory=JSON.parse(localStorage.getItem('vt_assistant_memory')||'null');}catch(_){}
+    try{billVend=JSON.parse(localStorage.getItem('vt_bill_vendors')||'null');}catch(_){}
+    try{notif=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');}catch(_){}
+    const data=JSON.stringify({version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:aiSet,agentPersona:persona,assistantMemory:memory,billVendors:billVend,notifSettings:notif,geProfile:geLoad(),gePipeline:gePipeLoad(),geSkills:geSkillsLoad()});
     const existingId=await driveFindFile(token);
     const blob=new Blob([data],{type:'application/json'});
     const form=new FormData();
@@ -5809,13 +5815,22 @@ async function driveRestore(){
     const data=await res.json();
     if(data.tasks)tasks=[...data.tasks,...tasks.filter(t=>!data.tasks.find(x=>x.id===t.id))];
     if(data.routines)routines=[...data.routines,...routines.filter(r=>!data.routines.find(x=>x.id===r.id))];
+    if(data.bills)bills=[...data.bills,...bills.filter(b=>!data.bills.find(x=>x.id===b.id))];
     if(data.backlogLists)backlogLists=[...data.backlogLists,...backlogLists.filter(l=>!data.backlogLists.find(x=>x.id===l.id))];
     if(data.backlogItems)backlogItems=[...data.backlogItems,...backlogItems.filter(i=>!data.backlogItems.find(x=>x.id===i.id))];
     if(data.geProfile)geSave(data.geProfile);
     if(data.gePipeline)gePipeSave(data.gePipeline);
     if(data.geSkills)geSkillsSave(data.geSkills);
-    save();saveRoutines();saveBpLists();saveBpItems();render();
-    toast('✅ גיבוי שוחזר — '+((data.tasks||[]).length)+' משימות');
+    // Restore AI/persona/memory/vendors/notif only if local is empty
+    if(data.aiSettings){const c=localStorage.getItem('vt_ai_settings');if(!c||c==='null'||c==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(data.aiSettings));}
+    if(data.agentPersona){const c=localStorage.getItem('vt_agent_persona');if(!c||c==='null')localStorage.setItem('vt_agent_persona',JSON.stringify(data.agentPersona));}
+    if(Array.isArray(data.assistantMemory)&&data.assistantMemory.length){try{const ex=JSON.parse(localStorage.getItem('vt_assistant_memory')||'[]');const ids=new Set(ex.map(m=>m.id));localStorage.setItem('vt_assistant_memory',JSON.stringify([...ex,...data.assistantMemory.filter(m=>!ids.has(m.id))]));}catch(_){}}
+    if(Array.isArray(data.billVendors)){try{const ex=JSON.parse(localStorage.getItem('vt_bill_vendors')||'[]');const em=new Set(ex.map(v=>v.email));localStorage.setItem('vt_bill_vendors',JSON.stringify([...ex,...data.billVendors.filter(v=>!em.has(v.email))]));}catch(_){}}
+    if(data.notifSettings){const c=localStorage.getItem('vt_notif_settings');if(!c||c==='null')localStorage.setItem('vt_notif_settings',JSON.stringify(data.notifSettings));}
+    save();saveRoutines();saveBpLists();saveBpItems();if(typeof saveBills==='function')saveBills();
+    if(typeof loadAiSettings==='function')loadAiSettings();if(typeof loadAgentPersona==='function')loadAgentPersona();if(typeof loadNotifSettings==='function')loadNotifSettings();
+    render();
+    toast('✓ שוחזר: '+((data.tasks||[]).length)+' משימות, '+((data.bills||[]).length)+' חשבונות');
   }catch(e){console.warn(e);toast('❌ שחזור נכשל');}
 }
 function updateBackupStatus(){

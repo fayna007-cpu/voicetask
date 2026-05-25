@@ -1,4 +1,4 @@
-const V = 'alfred-v8';
+const V = 'alfred-v9';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
