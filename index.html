@@ -7311,7 +7311,40 @@ async function tryProviderWithResilience(provider,systemPrompt,errors){
       const status=e.status||0;
       const isQuota=/quota|insufficient|exceeded.*tier|free_tier/i.test(e.message||'');
       const isRate=/rate.?limit|too many|retry/i.test(e.message||'')||status===429;
+      const isTooLarge=/too large|context.?length|context.?window|tokens.?per.?minute|max.?tokens|prompt.?too.?long|tpm/i.test(e.message||'');
       const isAuth=status===401||status===403||/api key|invalid|unauthorized/i.test(e.message||'');
+
+      // "Too large" → switch to smaller model + slim context, retry
+      if(isTooLarge){
+        if(provider==='groq'&&aiSettings.groqModel!=='llama-3.1-8b-instant'){
+          aiSettings.groqModel='llama-3.1-8b-instant';
+          localStorage.setItem('vt_ai_settings',JSON.stringify(aiSettings));
+          // Retry with slim system prompt (no full context)
+          try{
+            const slim=buildSlimContext();
+            return await callProvider(provider,slim);
+          }catch(e2){
+            errors.push(`${provider}: גם המודל הקטן נכשל (${(e2.message||'').slice(0,40)})`);
+            providerCooldowns[provider]=Date.now()+90*1000;
+            return null;
+          }
+        }
+        if(provider==='gemini'){
+          aiSettings.model='gemini-2.5-flash-lite';
+          localStorage.setItem('vt_ai_settings',JSON.stringify(aiSettings));
+          try{
+            const slim=buildSlimContext();
+            return await callProvider(provider,slim);
+          }catch(e2){
+            errors.push(`${provider}: גם flash-lite נכשל`);
+            providerCooldowns[provider]=Date.now()+90*1000;
+            return null;
+          }
+        }
+        errors.push(`${provider}: ההקשר גדול מדי`);
+        providerCooldowns[provider]=Date.now()+90*1000;
+        return null;
+      }
 
       // Hard quota → cooldown 5 minutes, no more attempts on this provider
       if(isQuota){
@@ -7829,6 +7862,28 @@ function requestExtraScope(scope){
 }
 
 // ── Context Builder ──────────────────────────────────────────────────────────
+// Minimal context for fallback when full prompt is too large
+function buildSlimContext(){
+  const now=new Date();
+  const today=new Date();today.setHours(0,0,0,0);
+  const days=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const upcomingT=tasks.filter(t=>!t.completed&&t.datetime).slice(0,5)
+    .map(t=>`[id:${t.id}] ${t.text.slice(0,60)} (${new Date(t.datetime).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})})`).join('\n');
+  const pendingB=bills.filter(b=>b.status==='pending').slice(0,3)
+    .map(b=>`[id:${b.id}] ${b.name}${b.amount?' ₪'+b.amount:''}`).join('\n');
+  return `אתה אלפרד — עוזר אישי-AI של ${gAuth?.name||'המשתמש'} (פנה אליו "אדוני"). דבר עברית, קצר, ענייני.
+היום: ${days[now.getDay()]}, ${now.toLocaleDateString('he-IL')} ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}
+
+5 משימות קרובות:
+${upcomingT||'אין'}
+
+חשבונות ממתינים:
+${pendingB||'אין'}
+
+כלים זמינים: add_task, complete_task, defer_task, delete_task, create_routine, defer_routine, add_bill, mark_bill_paid, gcal_list_events, gcal_create_event, gmail_send, save_memory.
+ענה תמציתי ובצע פעולה אם המשתמש מבקש.`;
+}
+
 function buildAssistantContext(){
   const now=new Date();
   const today=new Date();today.setHours(0,0,0,0);
