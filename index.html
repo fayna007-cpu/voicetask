@@ -7510,10 +7510,30 @@ async function executeTool(name,args){
   try{
     switch(name){
       case 'add_task':{
-        const dt=new Date(args.datetime);
-        const t={id:Date.now(),text:args.text,category:args.category||'כללי',datetime:dt.toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins:30,morningAlert:true,url:null,image:null};
-        tasks.unshift(t);save();render();syncTask(t);
-        return{success:true,id:t.id,text:t.text,datetime:t.datetime};
+        const text=(args.text||args.task||args.title||'').trim();
+        if(!text)return{error:'חסר טקסט למשימה'};
+        // Robust datetime parsing — accept ISO, Hebrew relative, or fall back to +2h
+        let dt=null;
+        const rawDt=args.datetime||args.date||args.when;
+        if(rawDt){
+          const tryDt=new Date(rawDt);
+          if(!isNaN(tryDt))dt=tryDt;
+          else{
+            // Hebrew relative
+            const s=String(rawDt).toLowerCase();
+            const now=new Date();
+            if(/היום/.test(s)){dt=new Date(now);dt.setHours(now.getHours()+1,0,0,0);}
+            else if(/מחר/.test(s)){dt=new Date(now);dt.setDate(dt.getDate()+1);dt.setHours(9,0,0,0);}
+            else if(/מחרתיים/.test(s)){dt=new Date(now);dt.setDate(dt.getDate()+2);dt.setHours(9,0,0,0);}
+          }
+        }
+        if(!dt||isNaN(dt)){dt=new Date();dt.setHours(dt.getHours()+2,0,0,0);}
+        const t={id:Date.now(),text,category:args.category||'כללי',datetime:dt.toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins:30,morningAlert:true,url:null,image:null};
+        tasks.unshift(t);save();
+        // Force filter to "all" so the new task is visible (was probably the bug — user had filter on a specific category)
+        if(filter!=='all'&&filter!=='done'){filter='all';try{document.querySelectorAll('.filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f==='all'));}catch(_){}}
+        render();syncTask(t);
+        return{success:true,id:t.id,text:t.text,datetime:t.datetime,visible:'במסך הראשי תחת "משימות שוטפות"'};
       }
       case 'complete_task':{
         const t=tasks.find(x=>x.id==args.id);if(!t)return{error:'משימה לא נמצאה'};
