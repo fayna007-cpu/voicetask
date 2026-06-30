@@ -7250,7 +7250,7 @@ function isErrorMessage(m){
 }
 function chatHistoryToOpenai(systemPrompt){
   const msgs=[{role:'system',content:systemPrompt}];
-  chatHistory.filter(m=>!isErrorMessage(m)).forEach(m=>{
+  chatHistory.filter(m=>!isErrorMessage(m)).slice(-20).forEach(m=>{
     if(m.role==='user'){
       const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('');
       if(txt)msgs.push({role:'user',content:txt});
@@ -7367,7 +7367,7 @@ async function callProvider(provider,systemPrompt){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         systemInstruction:{parts:[{text:systemPrompt}]},
-        contents:chatHistory.filter(m=>!isErrorMessage(m)).map(m=>({role:m.role==='function'?'function':m.role,parts:m.parts})).filter(m=>m.role!=='function'||m.parts.length),
+        contents:chatHistory.filter(m=>!isErrorMessage(m)).slice(-20).map(m=>({role:m.role==='function'?'function':m.role,parts:m.parts})).filter(m=>m.role!=='function'||m.parts.length),
         tools:GEMINI_TOOLS,
         generationConfig:{temperature:0.4,maxOutputTokens:1500}
       })
@@ -8311,6 +8311,8 @@ function summarizeToolsExecuted(list){
 
 async function runChatLoop(){
   _chatBusy=true;
+  // Reset cooldowns at every user-initiated chat — give providers a fresh chance
+  providerCooldowns={};
   document.getElementById('asstSendBtn').textContent='…';
   const typing=document.createElement('div');
   typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
