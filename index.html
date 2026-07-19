@@ -637,6 +637,10 @@
         <div class="settings-row-body" style="width:100%"><div class="settings-row-title">📊 סטטיסטיקות</div></div>
         <div id="ms-stats-view" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px"></div>
       </div>
+      <div class="settings-row" style="cursor:default" onclick="msSpawnTestCard()">
+        <div class="settings-row-body"><div class="settings-row-title">🧪 בדיקה: הצג פופ-אפ דחייה לדוגמה</div><div class="settings-row-sub">מייצר כרטיס משימה מדומה במסך הראשי כדי לבחון את העיצוב</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
     </div>
     <div class="settings-section">אזור מסוכן</div>
     <div class="settings-cards">
@@ -8365,6 +8369,7 @@ async function _ensureSuggestionsForPending(){
 }
 
 function _missedItemDisplayData(p){
+  if(p._isTest){return{icon:'📌',title:'לא הספקת: '+(p._testText||'משימת בדיקה'),extra:'(בדיקה — לא נשמר)'};}
   if(p.sourceType==='task'){
     const t=tasks.find(x=>x.id==p.sourceId);
     if(!t||t.completed){return null;}
@@ -8396,10 +8401,11 @@ function _missedItemDisplayData(p){
 }
 
 let _msExpanded=false;
+let _msTestItems=[];
 function renderMissedCards(){
   const st=getMissedSettings();
   if(!st.enabled)return '';
-  const pending=getMissedPending().filter(p=>p.status==='pending_suggestion');
+  const pending=[..._msTestItems,...getMissedPending().filter(p=>p.status==='pending_suggestion')];
   if(!pending.length)return '';
   // Validate — filter out items whose source is now completed/gone
   const valid=pending.filter(p=>_missedItemDisplayData(p));
@@ -8467,7 +8473,19 @@ function renderMissedCards(){
 }
 function msExpand(){_msExpanded=true;try{render();}catch(_){}}
 
+function msSpawnTestCard(){
+  const t=new Date();t.setDate(t.getDate()+1);t.setHours(10,0,0,0);
+  _msTestItems.push({id:'test_'+Date.now(),_isTest:true,_testText:'משימת בדיקה',sourceType:'task',sourceId:'__test__',status:'pending_suggestion',suggestedSlot:t.toISOString()});
+  try{closeSettings&&closeSettings();}catch(_){}
+  try{render();}catch(_){}
+  toast('כרטיס בדיקה נוצר במסך הראשי');
+}
+
 async function msSuggestAnother(pendingId){
+  const tp=_msTestItems.find(x=>x.id===pendingId);
+  if(tp){console.log('test — calendar sync skipped (suggest another)');
+    const d=new Date(tp.suggestedSlot||Date.now());d.setDate(d.getDate()+1);d.setHours(10+Math.floor(Math.random()*8),0,0,0);
+    tp.suggestedSlot=d.toISOString();try{render();}catch(_){}return;}
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
   const prev=p.suggestedSlot;
   p.suggestedSlot=await suggestNextSlot(p,prev);
@@ -8475,12 +8493,21 @@ async function msSuggestAnother(pendingId){
 }
 
 async function msConfirm(pendingId){
+  const tp=_msTestItems.find(x=>x.id===pendingId);
+  if(tp){console.log('test — calendar sync skipped (confirm)',tp.suggestedSlot);
+    _msTestItems=_msTestItems.filter(x=>x.id!==pendingId);
+    toast('✓ (בדיקה) נקבע ל-'+new Date(tp.suggestedSlot).toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}));
+    try{render();}catch(_){}return;}
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p||!p.suggestedSlot){toast('אין הצעה זמינה');return;}
   const newIso=p.suggestedSlot;
   await _applyReschedule(p,newIso);
 }
 
 function msManualPick(pendingId){
+  const tp=_msTestItems.find(x=>x.id===pendingId);
+  if(tp){console.log('test — calendar sync skipped (manual pick)');
+    _msTestItems=_msTestItems.filter(x=>x.id!==pendingId);
+    toast('✓ (בדיקה) נבחר ידנית');try{render();}catch(_){}return;}
   // Use existing postpone flow. Store pendingId globally so we know to complete after picker confirms.
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
   _msManualPendingId=pendingId;
