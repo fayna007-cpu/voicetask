@@ -8203,7 +8203,7 @@ function scanMissedItems(){
   if(!s.enabled)return;
   const now=Date.now();
   const pending=getMissedPending();
-  const existingSig=new Set(pending.filter(p=>p.status==='pending_suggestion'||p.status==='awaiting_response').map(p=>p.sourceType+':'+p.sourceId));
+  const existingSig=new Set(pending.filter(p=>p.status==='pending_suggestion'||p.status==='awaiting_response'||p.status==='dismissed').map(p=>p.sourceType+':'+p.sourceId));
   let dirty=false;
   const winMs=(s.defaultWindowMode==='eod'?null:(s.defaultWindowMinutes*60*1000));
   const endOfToday=(()=>{const d=new Date();d.setHours(23,59,59,999);return d.getTime();})();
@@ -8447,6 +8447,7 @@ function renderMissedCards(){
         <button class="asst-action" onclick="msConfirm('${p.id}')">✓ אשר</button>
         <button class="asst-action-secondary" onclick="msSuggestAnother('${p.id}')">↻ הצע אחר</button>
         <button class="asst-action-secondary" onclick="msManualPick('${p.id}')">✏️ אני אקבע</button>
+        <button class="asst-action-secondary" onclick="msNotRelevant('${p.id}')">✕ לא רלוונטי</button>
       </div></div>`;
     }else if(p.sourceType==='bill_soft'){
       html+=`<div class="asst-card sev-info" style="margin:0 16px 8px"><div class="asst-card-top">
@@ -8616,6 +8617,17 @@ function msBillPaid(pendingId){
   const b=bills.find(x=>x.id==p.sourceId);
   if(b&&typeof markBillPaid==='function'){markBillPaid(b.id);}
   saveMissedPending(arr.filter(x=>x.id!==pendingId));
+  try{render();}catch(_){}
+}
+function msNotRelevant(pendingId){
+  // Test mock — just drop it, no side effects.
+  const tp=_msTestItems.find(x=>x.id===pendingId);
+  if(tp){_msTestItems=_msTestItems.filter(x=>x.id!==pendingId);toast('הוסר (בדיקה)');try{render();}catch(_){}return;}
+  // Real item: mark dismissed so scanner won't re-flag; source untouched, calendar untouched, no stat bump.
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
+  p.status='dismissed';p.dismissedAt=new Date().toISOString();
+  saveMissedPending(arr);
+  toast('סומן כלא רלוונטי');
   try{render();}catch(_){}
 }
 function msDismiss(pendingId,days){
