@@ -606,6 +606,38 @@
         <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px">פרטיות</div><div class="settings-row-sub" style="font-size:11px">המפתח נשמר אצלך בלבד. הנתונים שלך נשלחים ישירות ל-Google בכל שיחה לצורך ההקשר.</div></div>
       </div>
     </div>
+    <div class="settings-section">משימות שהוחמצו</div>
+    <div class="settings-cards">
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">זיהוי משימות שהוחמצו</div><div class="settings-row-sub">אלפרד יזהה משימות, חשבונות ואימונים שלא בוצעו במועדם ויציע מועד חדש</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ms-enabled" checked onchange="saveMissedSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">אחרי כמה זמן להתריע?</div><div class="settings-row-sub">משימות רגילות, CRM, וחשבונות soft</div></div>
+        <select class="settings-select" id="ms-defaultWindow" onchange="saveMissedSettings()">
+          <option value="30">30 דקות</option>
+          <option value="60">שעה</option>
+          <option value="180" selected>3 שעות</option>
+          <option value="eod">עד סוף היום</option>
+        </select>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">שעות פעילות להצעות</div><div class="settings-row-sub">אלפרד יציע מועדים בטווח הזה בלבד</div></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="time" class="settings-select" id="ms-wakeStart" value="08:00" onchange="saveMissedSettings()" style="background-image:none;width:auto">
+          <span style="color:var(--muted);font-size:11px">עד</span>
+          <input type="time" class="settings-select" id="ms-wakeEnd" value="22:00" onchange="saveMissedSettings()" style="background-image:none;width:auto">
+        </div>
+      </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">טון מעודד לשגרה חוזרת</div><div class="settings-row-sub">"יאללה, הפעם סוגרים את זה" כשמעבירים אימון</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ms-enthusiastic" checked onchange="saveMissedSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch">
+        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">📊 סטטיסטיקות</div></div>
+        <div id="ms-stats-view" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px"></div>
+      </div>
+    </div>
     <div class="settings-section">אזור מסוכן</div>
     <div class="settings-cards">
       <div class="settings-row" onclick="confirmClearData()">
@@ -798,6 +830,11 @@
       <div class="rfield">
         <div class="rform-lbl">הערות (אופציונלי)</div>
         <input class="rfi" id="rNotes" type="text" placeholder="מה להביא, איפה להגיע..."/>
+      </div>
+
+      <div class="rfield">
+        <div class="rform-lbl">אחרי כמה שעות להתריע על אימון שהוחמץ?</div>
+        <input class="rfi" id="rMissedWindow" type="number" min="1" max="24" value="3"/>
       </div>
 
       <button class="rform-save" onclick="saveRoutine()">שמור שגרה ✓</button>
@@ -1514,7 +1551,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();setTimeout(()=>{try{startMissedScanLoop();}catch(_){}},6000);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -1564,6 +1601,7 @@ function openSettings(){
     <div class="settings-stat"><div class="settings-stat-num">${customNotifs.length}</div><div class="settings-stat-lbl">התראות</div></div>`;
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('settingsSheet').classList.add('on');
+  try{loadMissedSettingsToDom();}catch(_){}
   loadNotifSettings();
   renderPushJourney();
 }
@@ -2618,7 +2656,9 @@ async function syncAllPending(){
   scheduleSmartPushNotifs();
 }
 function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
-function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;vibrate(8);save();render()}}
+function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){const wasComp=t.completed;t.completed=!t.completed;vibrate(8);save();
+  if(!wasComp&&t.completed&&t.wasRescheduled&&typeof bumpMissedStat==='function'){try{bumpMissedStat('totalCompletedAfterReschedule','task');delete t.wasRescheduled;save();}catch(_){}}
+  render();}}
 function toggleTaskImportant(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   t.important=!t.important;vibrate(15);save();render();
@@ -2791,6 +2831,7 @@ async function confirmPostpone(){
     item.dueDate=inp.value;
     saveBpItems();renderBpItems();closePostpone();toast('📅 תאריך עודכן');
   }
+  try{window.dispatchEvent(new Event('vt-postpone-confirmed'));}catch(_){}
 }
 
 // ── CRM image ──────────────────────────────────────────────────────────────────
@@ -3009,6 +3050,7 @@ function render(){
   let html='';
   // Urgent: bills due today (most prominent, top of screen)
   html+=renderUrgentBillsBanner();
+  try{html+=renderMissedCards();}catch(_){}
   // Section -1: Alfred top insight card
   html+=renderAlfredTopCard();
   // Section 0: Open bills (above tasks)
@@ -3539,6 +3581,7 @@ function openRoutineForm(prefill,editId){
   document.getElementById('rReminder').value=String(prefill?.reminder||30);
   document.getElementById('rMorningReminder').checked=prefill?.morningReminder!==false;
   document.getElementById('rNotes').value=prefill?.notes||'';
+  const rmw=document.getElementById('rMissedWindow');if(rmw)rmw.value=String(prefill?.missedWindowHours??3);
   document.getElementById('rWeekReminderDay').value=String(prefill?.weeklyReminderDay??0);
   document.getElementById('rWeekReminderTime').value=prefill?.weeklyReminderTime||'08:00';
   document.getElementById('rSpecificTime').value=prefill?.specificTime||'07:00';
@@ -3586,6 +3629,7 @@ function saveRoutine(){
     reminder,
     morningReminder:document.getElementById('rMorningReminder')?.checked!==false,
     notes:document.getElementById('rNotes').value.trim(),
+    missedWindowHours:Math.max(1,Math.min(24,+(document.getElementById('rMissedWindow')?.value||3))),
     scheduleMode:rScheduleMode,
     verbCondition,
     verbParsed,
@@ -3626,6 +3670,13 @@ function toggleRoutineComplete(routineId,dateStr){
   if(idx===-1){
     r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');
     saveRoutines();
+    // If this instance was a rescheduled make-up, count it toward completedAfterReschedule
+    try{
+      const inst=Object.values(r.scheduledWeeks||{}).flat().find(it=>(typeof it==='object'?it.dt:it)===dateStr);
+      if(inst&&typeof inst==='object'&&inst.wasRescheduled===true&&typeof bumpMissedStat==='function'){
+        bumpMissedStat('totalCompletedAfterReschedule','routine');
+      }
+    }catch(_){}
     try{render();}catch(e){console.error('render error in toggleRoutineComplete',e);}
     // Show energy check-in after short delay
     setTimeout(()=>openEnergyPopup(routineId,dateStr),600);
@@ -3688,6 +3739,23 @@ function openEnergyPopup(routineId,dateStr){
   const el=document.getElementById('energyPopup');
   const nameEl=document.getElementById('energyRoutineName');
   if(nameEl)nameEl.textContent=r.name||r.text||'השגרה';
+  // Check if this instance was rescheduled via missed-tasks flow — show make-up line
+  try{
+    const inst=Object.values(r.scheduledWeeks||{}).flat().find(it=>(typeof it==='object'?it.dt:it)===dateStr);
+    const wasRescheduled=inst&&typeof inst==='object'&&inst.wasRescheduled===true;
+    let mkEl=document.getElementById('energyMakeupLine');
+    if(wasRescheduled){
+      if(!mkEl){
+        mkEl=document.createElement('div');
+        mkEl.id='energyMakeupLine';
+        mkEl.style.cssText='margin:6px 20px 0;padding:8px 12px;background:oklch(0.72 0.18 285 / 0.14);border:1px solid oklch(0.72 0.18 285 / 0.32);border-radius:10px;font-size:12px;font-weight:600;color:var(--accent);text-align:center';
+        mkEl.textContent='💪 האימון הזה הרוויח אותו — פספסת בזמנו ועמדת ביעד בכל זאת';
+        const parent=el?.querySelector('.energy-sub')?.parentNode;
+        const anchor=el?.querySelector('.energy-btns');
+        if(parent&&anchor)parent.insertBefore(mkEl,anchor);
+      }else{mkEl.style.display='';}
+    }else if(mkEl){mkEl.style.display='none';}
+  }catch(_){}
   document.getElementById('energyOverlay')?.classList.add('on');
   if(el)el.classList.add('on');
 }
@@ -8058,6 +8126,501 @@ function alfredMorningRound(){
 }
 
 // ── Welcome ritual (first time user) ──
+// ═══════════════════════════════════════════════════════════════════
+// ── Missed Task Smart Reschedule — additive, never touches existing logic
+// ═══════════════════════════════════════════════════════════════════
+const MS_DEFAULTS={
+  enabled:true,
+  defaultWindowMinutes:180,  // "3 שעות"
+  defaultWindowMode:'minutes', // or 'eod'
+  wakingHours:{start:'08:00',end:'22:00'},
+  enthusiasticRoutineTone:true
+};
+function getMissedSettings(){
+  try{const s=JSON.parse(localStorage.getItem('vt_missed_settings')||'null');
+    if(!s)return {...MS_DEFAULTS,wakingHours:{...MS_DEFAULTS.wakingHours}};
+    return{...MS_DEFAULTS,...s,wakingHours:{...MS_DEFAULTS.wakingHours,...(s.wakingHours||{})}};
+  }catch(_){return{...MS_DEFAULTS,wakingHours:{...MS_DEFAULTS.wakingHours}};}
+}
+function saveMissedSettings(){
+  const g=id=>document.getElementById(id);
+  const winSel=g('ms-defaultWindow')?.value||'180';
+  const s={
+    enabled:!!g('ms-enabled')?.checked,
+    defaultWindowMode:winSel==='eod'?'eod':'minutes',
+    defaultWindowMinutes:winSel==='eod'?null:+winSel,
+    wakingHours:{start:g('ms-wakeStart')?.value||'08:00',end:g('ms-wakeEnd')?.value||'22:00'},
+    enthusiasticRoutineTone:!!g('ms-enthusiastic')?.checked
+  };
+  localStorage.setItem('vt_missed_settings',JSON.stringify(s));
+  renderMissedStatsView();
+  try{render();}catch(_){}
+}
+function loadMissedSettingsToDom(){
+  const s=getMissedSettings();
+  const g=id=>document.getElementById(id);
+  if(g('ms-enabled'))g('ms-enabled').checked=!!s.enabled;
+  if(g('ms-defaultWindow'))g('ms-defaultWindow').value=s.defaultWindowMode==='eod'?'eod':String(s.defaultWindowMinutes||180);
+  if(g('ms-wakeStart'))g('ms-wakeStart').value=s.wakingHours.start;
+  if(g('ms-wakeEnd'))g('ms-wakeEnd').value=s.wakingHours.end;
+  if(g('ms-enthusiastic'))g('ms-enthusiastic').checked=!!s.enthusiasticRoutineTone;
+  renderMissedStatsView();
+}
+
+function getMissedPending(){try{return JSON.parse(localStorage.getItem('vt_missed_pending')||'[]');}catch(_){return[];}}
+function saveMissedPending(arr){localStorage.setItem('vt_missed_pending',JSON.stringify(arr));}
+
+const MS_STATS_DEFAULT={totalDetected:0,totalRescheduled:0,totalCompletedAfterReschedule:0,byType:{task:{detected:0,rescheduled:0},routine:{detected:0,rescheduled:0},crm:{detected:0,rescheduled:0},bill:{detected:0,rescheduled:0}}};
+function getMissedStats(){try{const s=JSON.parse(localStorage.getItem('vt_missed_stats')||'null');if(!s)return JSON.parse(JSON.stringify(MS_STATS_DEFAULT));// deep default
+  return{...MS_STATS_DEFAULT,...s,byType:{...MS_STATS_DEFAULT.byType,...(s.byType||{})}};}catch(_){return JSON.parse(JSON.stringify(MS_STATS_DEFAULT));}}
+function saveMissedStats(s){localStorage.setItem('vt_missed_stats',JSON.stringify(s));}
+function bumpMissedStat(field,type){
+  const s=getMissedStats();
+  s[field]=(s[field]||0)+1;
+  if(type&&s.byType[type]){
+    const key=field==='totalDetected'?'detected':field==='totalRescheduled'?'rescheduled':null;
+    if(key)s.byType[type][key]=(s.byType[type][key]||0)+1;
+  }
+  saveMissedStats(s);renderMissedStatsView();
+}
+
+function renderMissedStatsView(){
+  const el=document.getElementById('ms-stats-view');if(!el)return;
+  const s=getMissedStats();
+  const pct=s.totalRescheduled?Math.round((s.totalCompletedAfterReschedule||0)/s.totalRescheduled*100):0;
+  el.innerHTML=`<div style="background:var(--surface);padding:12px 8px;border-radius:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text)">${s.totalDetected||0}</div><div style="font-size:10px;color:var(--muted);font-weight:600;margin-top:2px">הוחמצו</div></div>
+    <div style="background:var(--surface);padding:12px 8px;border-radius:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--accent)">${s.totalRescheduled||0}</div><div style="font-size:10px;color:var(--muted);font-weight:600;margin-top:2px">נקבעו מחדש</div></div>
+    <div style="background:var(--surface);padding:12px 8px;border-radius:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:oklch(0.72 0.16 145)">${s.totalCompletedAfterReschedule||0}</div><div style="font-size:10px;color:var(--muted);font-weight:600;margin-top:2px">${pct}% הצלחה</div></div>`;
+}
+
+// ── Detection ──
+function scanMissedItems(){
+  const s=getMissedSettings();
+  if(!s.enabled)return;
+  const now=Date.now();
+  const pending=getMissedPending();
+  const existingSig=new Set(pending.filter(p=>p.status==='pending_suggestion'||p.status==='awaiting_response').map(p=>p.sourceType+':'+p.sourceId));
+  let dirty=false;
+  const winMs=(s.defaultWindowMode==='eod'?null:(s.defaultWindowMinutes*60*1000));
+  const endOfToday=(()=>{const d=new Date();d.setHours(23,59,59,999);return d.getTime();})();
+
+  // Regular tasks
+  tasks.forEach(t=>{
+    if(t.completed||t.skipped)return;if(!t.datetime)return;
+    const dt=new Date(t.datetime).getTime();if(isNaN(dt))return;
+    const threshold=s.defaultWindowMode==='eod'?endOfToday:(dt+winMs);
+    if(now<=threshold)return;
+    const sig='task:'+t.id;if(existingSig.has(sig))return;
+    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'task',sourceId:t.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+    existingSig.add(sig);bumpMissedStat('totalDetected','task');dirty=true;
+  });
+
+  // Routine instances
+  routines.forEach(r=>{
+    if(!r.enabled)return;
+    const winH=(r.missedWindowHours!=null?r.missedWindowHours:3);
+    const winMsR=winH*3600*1000;
+    Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item?.dt;if(!dt)return;
+      const dtMs=new Date(dt).getTime();if(isNaN(dtMs))return;
+      if((r.completedDates||[]).includes(dt))return;
+      if((r.skippedDates||[]).includes(dt))return;
+      if(now-dtMs<=winMsR)return;// too fresh
+      if(now-dtMs>14*86400000)return;// too old, ignore
+      const sig='routine:'+r.id+'__'+dt;if(existingSig.has(sig))return;
+      pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'routine',sourceId:r.id+'__'+dt,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+      existingSig.add(sig);bumpMissedStat('totalDetected','routine');dirty=true;
+    });
+  });
+
+  // Bills — soft & urgent (not reschedule)
+  bills.forEach(b=>{
+    if(b.status!=='pending')return;
+    // Soft: past personal payDate
+    if(b.payDate){
+      const pd=new Date(b.payDate+'T23:59:59').getTime();
+      if(now>pd){
+        const sig='bill:soft:'+b.id;if(!existingSig.has(sig)){
+          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_soft',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+          existingSig.add(sig);bumpMissedStat('totalDetected','bill');dirty=true;
+        }
+      }
+    }
+    // Urgent: deadline within 3 days
+    if(b.deadline){
+      const dl=new Date(b.deadline+'T23:59:59').getTime();
+      const daysLeft=Math.ceil((dl-now)/86400000);
+      if(daysLeft>=0&&daysLeft<=3){
+        const sig='bill:urgent:'+b.id;if(!existingSig.has(sig)){
+          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_urgent',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',daysLeft});
+          existingSig.add(sig);bumpMissedStat('totalDetected','bill');dirty=true;
+        }
+      }
+    }
+  });
+
+  // CRM items with dueDate
+  (typeof backlogItems!=='undefined'?backlogItems:[]).forEach(item=>{
+    if(item.status==='done')return;if(!item.dueDate)return;
+    const dd=new Date(item.dueDate).getTime();if(isNaN(dd))return;
+    if(now<=dd)return;// not overdue yet
+    const sig='crm:'+item.id;if(existingSig.has(sig))return;
+    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'crm',sourceId:item.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+    existingSig.add(sig);bumpMissedStat('totalDetected','crm');dirty=true;
+  });
+
+  if(dirty){saveMissedPending(pending);try{render();}catch(_){}}
+}
+
+// ── Slot Suggestion ──
+async function _getBusyMs(){
+  // Prefer already-cached calendar events (calGcalEvents) if calendar panel was used; else attempt fetch
+  try{
+    if(typeof calGcalEvents!=='undefined'&&Array.isArray(calGcalEvents)&&calGcalEvents.length){
+      return calGcalEvents.map(ev=>{
+        const s=new Date(ev.start?.dateTime||ev.start?.date||0).getTime();
+        const e=new Date(ev.end?.dateTime||ev.end?.date||s+3600000).getTime();
+        return[s,e];
+      });
+    }
+  }catch(_){}
+  // Fall back to app-known busy blocks (tasks + routine instances upcoming)
+  const busy=[];
+  const now=Date.now();
+  tasks.forEach(t=>{if(t.completed||!t.datetime)return;const s=new Date(t.datetime).getTime();if(isNaN(s)||s<now-86400000)return;busy.push([s,s+3600000]);});
+  routines.forEach(r=>{Object.values(r.scheduledWeeks||{}).flat().forEach(it=>{const dt=typeof it==='string'?it:it?.dt;if(!dt)return;const s=new Date(dt).getTime();if(isNaN(s)||s<now-86400000)return;busy.push([s,s+((r.duration||60)*60000)]);});});
+  return busy;
+}
+function _inWakingHours(d,st){
+  const h=d.getHours();const m=d.getMinutes();
+  const[sh,sm]=st.wakingHours.start.split(':').map(Number);
+  const[eh,em]=st.wakingHours.end.split(':').map(Number);
+  const cur=h*60+m,startM=sh*60+sm,endM=eh*60+em;
+  return cur>=startM&&cur<endM;
+}
+async function suggestNextSlot(item,excludeIso){
+  const st=getMissedSettings();
+  const busy=await _getBusyMs();
+  const now=new Date();
+  const isRoutine=item.sourceType==='routine';
+  // Duration guess
+  let durMin=60;
+  let preferHour=null;
+  if(isRoutine){
+    const routineId=String(item.sourceId).split('__')[0];
+    const r=routines.find(x=>String(x.id)===routineId);
+    if(r){
+      durMin=r.duration||60;
+      if(r.timeWindow==='specific'&&r.specificTime){const[hh,mm]=r.specificTime.split(':').map(Number);preferHour=hh+(mm/60);}
+      else if(r.timeWindow==='morning')preferHour=9;
+      else if(r.timeWindow==='afternoon')preferHour=15;
+      else if(r.timeWindow==='evening')preferHour=19;
+    }
+  }
+  // Scan next 5 days in 30-min increments within waking hours
+  for(let d=0;d<5;d++){
+    const day=new Date(now);day.setDate(now.getDate()+d);day.setSeconds(0,0);
+    const[sh,sm]=st.wakingHours.start.split(':').map(Number);
+    const[eh,em]=st.wakingHours.end.split(':').map(Number);
+    const startCandidates=[];
+    if(isRoutine&&preferHour!=null){
+      // Try preferred hour first, then step outward
+      const preferMs=Math.round(preferHour*60);// minutes since midnight
+      startCandidates.push(preferMs);
+      for(let off=30;off<=180;off+=30){startCandidates.push(preferMs+off);startCandidates.push(preferMs-off);}
+    }
+    // Then fill with all half-hour slots
+    for(let m=sh*60+sm;m<eh*60+em-durMin;m+=30){if(!startCandidates.includes(m))startCandidates.push(m);}
+    for(const startMinutes of startCandidates){
+      const cand=new Date(day);cand.setHours(0,startMinutes,0,0);
+      if(cand<=now)continue;
+      if(!_inWakingHours(cand,st))continue;
+      const candEnd=new Date(cand.getTime()+durMin*60000);
+      // Exclude previous proposal
+      if(excludeIso&&Math.abs(cand.getTime()-new Date(excludeIso).getTime())<15*60000)continue;
+      // Check busy
+      const conflict=busy.some(([bs,be])=>cand.getTime()<be&&candEnd.getTime()>bs);
+      if(conflict)continue;
+      return cand.toISOString();
+    }
+  }
+  // Fallback: tomorrow at 9am
+  const fb=new Date(now);fb.setDate(now.getDate()+1);fb.setHours(9,0,0,0);
+  return fb.toISOString();
+}
+
+// ── Rendering ──
+async function _ensureSuggestionsForPending(){
+  const pending=getMissedPending();
+  let dirty=false;
+  for(const p of pending){
+    if(p.status!=='pending_suggestion')continue;
+    if(p.sourceType==='bill_soft'||p.sourceType==='bill_urgent')continue;
+    if(!p.suggestedSlot){
+      p.suggestedSlot=await suggestNextSlot(p);
+      dirty=true;
+    }
+  }
+  if(dirty)saveMissedPending(pending);
+}
+
+function _missedItemDisplayData(p){
+  if(p.sourceType==='task'){
+    const t=tasks.find(x=>x.id==p.sourceId);
+    if(!t||t.completed){return null;}
+    return{icon:'📌',title:'לא הספקת: '+(t.text||'').slice(0,60),extra:''};
+  }
+  if(p.sourceType==='routine'){
+    const parts=String(p.sourceId).split('__');
+    const routineId=parts[0];const dt=parts.slice(1).join('__');
+    const r=routines.find(x=>String(x.id)===routineId);
+    if(!r)return null;
+    if((r.completedDates||[]).includes(dt)||(r.skippedDates||[]).includes(dt))return null;
+    const orig=new Date(dt);
+    return{icon:'💪',title:'פספסת אימון: '+(r.name||r.text||''),extra:'היה אמור להיות ב-'+orig.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})};
+  }
+  if(p.sourceType==='crm'){
+    const it=(typeof backlogItems!=='undefined'?backlogItems:[]).find(x=>x.id==p.sourceId);
+    if(!it||it.status==='done')return null;
+    return{icon:'📋',title:'משימה תקועה: '+(it.text||'').slice(0,60),extra:''};
+  }
+  if(p.sourceType==='bill_soft'){
+    const b=bills.find(x=>x.id==p.sourceId);if(!b||b.status!=='pending')return null;
+    return{icon:'💳',title:'תזכורת עדינה: '+(b.name||'')+' עדיין מסומן כלא שולם',extra:''};
+  }
+  if(p.sourceType==='bill_urgent'){
+    const b=bills.find(x=>x.id==p.sourceId);if(!b||b.status!=='pending')return null;
+    return{icon:'🚨',title:(b.name||'')+' — נשארו '+(p.daysLeft||0)+' ימים למועד התשלום מהחברה',extra:''};
+  }
+  return null;
+}
+
+let _msExpanded=false;
+function renderMissedCards(){
+  const st=getMissedSettings();
+  if(!st.enabled)return '';
+  const pending=getMissedPending().filter(p=>p.status==='pending_suggestion');
+  if(!pending.length)return '';
+  // Validate — filter out items whose source is now completed/gone
+  const valid=pending.filter(p=>_missedItemDisplayData(p));
+  if(valid.length!==pending.length){
+    saveMissedPending(getMissedPending().filter(p=>p.status!=='pending_suggestion'||_missedItemDisplayData(p)));
+  }
+  if(!valid.length)return '';
+  // Summary card if 3+
+  if(valid.length>=3&&!_msExpanded){
+    return `<div class="asst-insights-wrap"><div class="asst-card sev-warn" style="margin:0 16px 8px"><div class="asst-card-top">
+      <span class="asst-card-ico">🔔</span>
+      <div class="asst-card-body">
+        <div class="asst-card-title">יש לך ${valid.length} משימות שהוחמצו — בוא נסדר אותן</div>
+        <div class="asst-card-detail">לחץ להצגה ולקביעת מועדים חדשים</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin:0 16px 12px">
+      <button class="asst-action" onclick="msExpand()">הצג הכל</button>
+    </div></div>`;
+  }
+  // Full list — reuses asst-card component
+  let html='<div class="asst-insights-wrap"><div class="asst-insights-title" style="margin:0 16px 8px">🔔 משימות שהוחמצו</div>';
+  valid.forEach(p=>{
+    const d=_missedItemDisplayData(p);if(!d)return;
+    let actions='';
+    if(p.sourceType==='task'||p.sourceType==='routine'||p.sourceType==='crm'){
+      const slot=p.suggestedSlot;
+      const slotTxt=slot?new Date(slot).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+      const proposedLine=slot?`<div class="asst-card-detail">${p.sourceType==='routine'?'מציע להעביר ל-':'מציע '}${slotTxt}</div>`:'';
+      html+=`<div class="asst-card sev-warn" style="margin:0 16px 8px"><div class="asst-card-top">
+        <span class="asst-card-ico">${d.icon}</span>
+        <div class="asst-card-body">
+          <div class="asst-card-title">${esc(d.title)}</div>
+          ${d.extra?`<div class="asst-card-detail">${esc(d.extra)}</div>`:''}
+          ${proposedLine}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin:9px 16px 12px;flex-wrap:wrap">
+        <button class="asst-action" onclick="msConfirm('${p.id}')">✓ אשר</button>
+        <button class="asst-action-secondary" onclick="msSuggestAnother('${p.id}')">↻ הצע אחר</button>
+        <button class="asst-action-secondary" onclick="msManualPick('${p.id}')">✏️ אני אקבע</button>
+      </div></div>`;
+    }else if(p.sourceType==='bill_soft'){
+      html+=`<div class="asst-card sev-info" style="margin:0 16px 8px"><div class="asst-card-top">
+        <span class="asst-card-ico">${d.icon}</span>
+        <div class="asst-card-body"><div class="asst-card-title">${esc(d.title)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;margin:9px 16px 12px;flex-wrap:wrap">
+        <button class="asst-action" onclick="msBillPaid('${p.id}')">✓ סימנתי כשולם</button>
+        <button class="asst-action-secondary" onclick="msDismiss('${p.id}',1)">⏰ תזכיר מחר</button>
+      </div></div>`;
+    }else if(p.sourceType==='bill_urgent'){
+      html+=`<div class="asst-card sev-high" style="margin:0 16px 8px"><div class="asst-card-top">
+        <span class="asst-card-ico">${d.icon}</span>
+        <div class="asst-card-body"><div class="asst-card-title">${esc(d.title)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;margin:9px 16px 12px;flex-wrap:wrap">
+        <button class="asst-action" onclick="msBillPaid('${p.id}')">✓ סימנתי כשולם</button>
+        <button class="asst-action-secondary" onclick="msDismiss('${p.id}',7)">👁 הבנתי</button>
+      </div></div>`;
+    }
+  });
+  html+='</div>';
+  return html;
+}
+function msExpand(){_msExpanded=true;try{render();}catch(_){}}
+
+async function msSuggestAnother(pendingId){
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
+  const prev=p.suggestedSlot;
+  p.suggestedSlot=await suggestNextSlot(p,prev);
+  saveMissedPending(arr);try{render();}catch(_){}
+}
+
+async function msConfirm(pendingId){
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p||!p.suggestedSlot){toast('אין הצעה זמינה');return;}
+  const newIso=p.suggestedSlot;
+  await _applyReschedule(p,newIso);
+}
+
+function msManualPick(pendingId){
+  // Use existing postpone flow. Store pendingId globally so we know to complete after picker confirms.
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
+  _msManualPendingId=pendingId;
+  if(p.sourceType==='task'){openPostpone('task',+String(p.sourceId));}
+  else if(p.sourceType==='routine'){const parts=String(p.sourceId).split('__');openPostpone('routine',parts[0],parts.slice(1).join('__'));}
+  else if(p.sourceType==='crm'){openPostpone('crm',+String(p.sourceId));}
+}
+let _msManualPendingId=null;
+// After the existing confirmPostpone finishes, it will call this hook if set
+function _msManualPickDone(){
+  if(!_msManualPendingId)return;
+  const arr=getMissedPending();const p=arr.find(x=>x.id===_msManualPendingId);
+  if(!p){_msManualPendingId=null;return;}
+  // Look up the item's new datetime
+  let newIso=null;
+  if(p.sourceType==='task'){const t=tasks.find(x=>x.id==p.sourceId);if(t)newIso=t.datetime;}
+  else if(p.sourceType==='routine'){/* postpone already applied — mark routine reschedule flag via helper */
+    const parts=String(p.sourceId).split('__');const routineId=parts[0];const oldDt=parts.slice(1).join('__');
+    const r=routines.find(x=>String(x.id)===routineId);
+    if(r){// Find any new instance not matching oldDt on any wk
+      const all=Object.values(r.scheduledWeeks||{}).flat().map(x=>typeof x==='string'?{dt:x}:x);
+      // Best-effort: newest instance that isn't the old one
+      const cand=all.map(x=>x.dt).filter(dt=>dt&&dt!==oldDt).sort((a,b)=>new Date(b)-new Date(a));
+      newIso=cand[0]||null;
+      if(newIso){
+        // Tag the new instance as wasRescheduled
+        Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+          r.scheduledWeeks[wk]=(r.scheduledWeeks[wk]||[]).map(it=>{
+            const dt=typeof it==='string'?it:it?.dt;
+            if(dt===newIso){return typeof it==='object'?{...it,wasRescheduled:true}:{dt:newIso,eventId:null,wasRescheduled:true};}
+            return it;
+          });
+        });
+        saveRoutines();
+      }
+    }
+  }
+  else if(p.sourceType==='crm'){const it=backlogItems.find(x=>x.id==p.sourceId);if(it)newIso=it.dueDate;}
+  if(newIso){
+    _finalizeReschedule(p,newIso);
+  }
+  _msManualPendingId=null;
+}
+
+async function _applyReschedule(p,newIso){
+  // For task: update datetime, sync via existing syncTask
+  if(p.sourceType==='task'){
+    const t=tasks.find(x=>x.id==p.sourceId);
+    if(!t){_finalizeReschedule(p,newIso);return;}
+    if(t.calendarEventId)try{await deleteFromCalendar(t);}catch(_){}
+    t.datetime=newIso;t.calendarEventId=null;t.completed=false;t.wasRescheduled=true;
+    save();try{await syncTask(t);}catch(_){}
+    if(typeof scheduleSmartPushNotifs==='function')scheduleSmartPushNotifs();
+  }
+  else if(p.sourceType==='routine'){
+    // Reuse the same defer path as confirmPostpone routine
+    const parts=String(p.sourceId).split('__');const routineId=parts[0];const oldDt=parts.slice(1).join('__');
+    const r=routines.find(x=>String(x.id)===routineId);
+    if(!r){_finalizeReschedule(p,newIso);return;}
+    // Purge any duplicate calendar events for the old instance
+    try{if(typeof purgeRoutineInstance==='function')await purgeRoutineInstance(r.id,oldDt);}catch(_){}
+    // Remove old instance from scheduledWeeks
+    Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
+      r.scheduledWeeks[wk]=(r.scheduledWeeks[wk]||[]).filter(it=>{
+        const dt=typeof it==='string'?it:it?.dt;return dt!==oldDt;
+      });
+    });
+    // Add new instance in the appropriate week — reuse getWeekKey if available
+    const wk=(typeof getWeekKey==='function')?getWeekKey(new Date(newIso)):'ms_'+newIso.slice(0,10);
+    if(!r.scheduledWeeks[wk])r.scheduledWeeks[wk]=[];
+    let newEventId=null;
+    try{if(typeof createCalendarEvent==='function'){const ev=await createCalendarEvent(r,newIso);newEventId=ev?.id||null;}}catch(_){}
+    r.scheduledWeeks[wk].push({dt:newIso,eventId:newEventId,wasRescheduled:true});
+    // Migrate old completedDates entry if present (not expected — usually missed → not completed)
+    saveRoutines();
+    if(typeof scheduleSmartPushNotifs==='function')scheduleSmartPushNotifs();
+  }
+  else if(p.sourceType==='crm'){
+    const it=backlogItems.find(x=>x.id==p.sourceId);
+    if(!it){_finalizeReschedule(p,newIso);return;}
+    it.dueDate=newIso;
+    if(typeof saveBpItems==='function')saveBpItems();
+  }
+  _finalizeReschedule(p,newIso);
+}
+
+function _finalizeReschedule(p,newIso){
+  // Remove from pending, bump stat, show success toast (enthusiastic for routine if enabled)
+  const arr=getMissedPending().filter(x=>x.id!==p.id);saveMissedPending(arr);
+  const typeKey=p.sourceType==='task'?'task':p.sourceType==='routine'?'routine':p.sourceType==='crm'?'crm':'bill';
+  bumpMissedStat('totalRescheduled',typeKey);
+  const st=getMissedSettings();
+  const slotTxt=newIso?new Date(newIso).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  if(p.sourceType==='routine'&&st.enthusiasticRoutineTone){
+    toast('💪 יאללה! נקבע ל-'+slotTxt+' — הפעם סוגרים את זה');
+    try{vibrate([20,40,20]);}catch(_){}
+  }else{
+    toast('✓ נקבע ל-'+slotTxt);
+    try{vibrate([10,30,10]);}catch(_){}
+  }
+  try{render();}catch(_){}
+}
+
+function msBillPaid(pendingId){
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
+  const b=bills.find(x=>x.id==p.sourceId);
+  if(b&&typeof markBillPaid==='function'){markBillPaid(b.id);}
+  saveMissedPending(arr.filter(x=>x.id!==pendingId));
+  try{render();}catch(_){}
+}
+function msDismiss(pendingId,days){
+  const arr=getMissedPending().filter(x=>x.id!==pendingId);saveMissedPending(arr);
+  // Also register a temporary suppression so scan doesn't immediately re-flag
+  try{
+    const sup=JSON.parse(localStorage.getItem('vt_missed_suppressed')||'{}');
+    const p=getMissedPending().find(()=>false); // no re-lookup — use pendingId which we already popped
+    sup[pendingId]=Date.now()+(days||1)*86400000;
+    localStorage.setItem('vt_missed_suppressed',JSON.stringify(sup));
+  }catch(_){}
+  try{render();}catch(_){}
+}
+
+// Kick off periodic scan while app is open
+let _msScanTimer=null;
+function startMissedScanLoop(){
+  if(_msScanTimer)return;
+  const run=async()=>{
+    try{scanMissedItems();}catch(_){}
+    try{await _ensureSuggestionsForPending();}catch(_){}
+    try{render();}catch(_){}
+  };
+  run();
+  _msScanTimer=setInterval(run,5*60*1000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)run();});
+  window.addEventListener('focus',run);
+}
+
+// Hook after existing confirmPostpone flow — called at end via helper we inject
+window.addEventListener('vt-postpone-confirmed',()=>{try{_msManualPickDone();}catch(_){}});
+
 function maybeAlfredWelcome(){
   if(localStorage.getItem('vt_alfred_welcomed')==='1')return;
   if(!gAuth)return;
