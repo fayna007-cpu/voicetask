@@ -8198,13 +8198,23 @@ function renderMissedStatsView(){
 }
 
 // ── Detection ──
+function _msDayKey(d){const x=(d instanceof Date)?d:new Date(d);return x.getFullYear()+'-'+(x.getMonth()+1)+'-'+x.getDate();}
+function _msIsToday(iso){if(!iso)return false;try{return _msDayKey(iso)===_msDayKey(new Date());}catch(_){return false;}}
+
 function scanMissedItems(){
   const s=getMissedSettings();
   if(!s.enabled)return;
   const now=Date.now();
   const pending=getMissedPending();
-  const existingSig=new Set(pending.filter(p=>p.status==='pending_suggestion'||p.status==='awaiting_response'||p.status==='dismissed').map(p=>p.sourceType+':'+p.sourceId));
+  // Revival pass: dismissed entries whose last surface/dismiss was on a previous day become eligible again.
   let dirty=false;
+  pending.forEach(p=>{
+    if(p.status==='dismissed'&&p.lastShownAt&&!_msIsToday(p.lastShownAt)){
+      p.status='pending_suggestion';p.lastShownAt=null;p.suggestedSlot=null;dirty=true;
+    }
+  });
+  // Dedup against ANY existing entry for the same source (regardless of status).
+  const existingSig=new Set(pending.map(p=>p.sourceType+':'+p.sourceId));
   const winMs=(s.defaultWindowMode==='eod'?null:(s.defaultWindowMinutes*60*1000));
   const endOfToday=(()=>{const d=new Date();d.setHours(23,59,59,999);return d.getTime();})();
 
@@ -8215,7 +8225,7 @@ function scanMissedItems(){
     const threshold=s.defaultWindowMode==='eod'?endOfToday:(dt+winMs);
     if(now<=threshold)return;
     const sig='task:'+t.id;if(existingSig.has(sig))return;
-    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'task',sourceId:t.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'task',sourceId:t.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',lastShownAt:null});
     existingSig.add(sig);bumpMissedStat('totalDetected','task');dirty=true;
   });
 
@@ -8232,7 +8242,7 @@ function scanMissedItems(){
       if(now-dtMs<=winMsR)return;// too fresh
       if(now-dtMs>14*86400000)return;// too old, ignore
       const sig='routine:'+r.id+'__'+dt;if(existingSig.has(sig))return;
-      pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'routine',sourceId:r.id+'__'+dt,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+      pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'routine',sourceId:r.id+'__'+dt,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',lastShownAt:null});
       existingSig.add(sig);bumpMissedStat('totalDetected','routine');dirty=true;
     });
   });
@@ -8244,8 +8254,8 @@ function scanMissedItems(){
     if(b.payDate){
       const pd=new Date(b.payDate+'T23:59:59').getTime();
       if(now>pd){
-        const sig='bill:soft:'+b.id;if(!existingSig.has(sig)){
-          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_soft',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+        const sig='bill_soft:'+b.id;if(!existingSig.has(sig)){
+          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_soft',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',lastShownAt:null});
           existingSig.add(sig);bumpMissedStat('totalDetected','bill');dirty=true;
         }
       }
@@ -8255,8 +8265,8 @@ function scanMissedItems(){
       const dl=new Date(b.deadline+'T23:59:59').getTime();
       const daysLeft=Math.ceil((dl-now)/86400000);
       if(daysLeft>=0&&daysLeft<=3){
-        const sig='bill:urgent:'+b.id;if(!existingSig.has(sig)){
-          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_urgent',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',daysLeft});
+        const sig='bill_urgent:'+b.id;if(!existingSig.has(sig)){
+          pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'bill_urgent',sourceId:b.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',daysLeft,lastShownAt:null});
           existingSig.add(sig);bumpMissedStat('totalDetected','bill');dirty=true;
         }
       }
@@ -8269,7 +8279,7 @@ function scanMissedItems(){
     const dd=new Date(item.dueDate).getTime();if(isNaN(dd))return;
     if(now<=dd)return;// not overdue yet
     const sig='crm:'+item.id;if(existingSig.has(sig))return;
-    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'crm',sourceId:item.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion'});
+    pending.push({id:'ms_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),sourceType:'crm',sourceId:item.id,detectedAt:new Date().toISOString(),suggestedSlot:null,status:'pending_suggestion',lastShownAt:null});
     existingSig.add(sig);bumpMissedStat('totalDetected','crm');dirty=true;
   });
 
@@ -8402,17 +8412,55 @@ function _missedItemDisplayData(p){
 
 let _msExpanded=false;
 let _msTestItems=[];
+const _msShownThisSession=new Set();
+
+// One-time cleanup: collapse any pre-existing duplicates in vt_missed_pending
+// (side effect of the bill_soft/bill_urgent sig typo bug fixed 2026-07-20).
+function _msDedupePending(){
+  const arr=getMissedPending();const seen=new Map();const keep=[];
+  arr.forEach(p=>{
+    const key=p.sourceType+':'+p.sourceId;
+    if(!seen.has(key)){seen.set(key,keep.length);keep.push(p);}
+    else{
+      // Keep the entry with a lastShownAt or the older detectedAt; merge minimally.
+      const idx=seen.get(key);const winner=keep[idx];
+      if(!winner.lastShownAt&&p.lastShownAt)winner.lastShownAt=p.lastShownAt;
+      if(p.status==='dismissed'&&winner.status==='pending_suggestion')winner.status='dismissed';
+    }
+  });
+  if(keep.length!==arr.length){saveMissedPending(keep);return true;}
+  return false;
+}
+try{_msDedupePending();}catch(_){}
+
 function renderMissedCards(){
   const st=getMissedSettings();
   if(!st.enabled)return '';
-  const pending=[..._msTestItems,...getMissedPending().filter(p=>p.status==='pending_suggestion')];
-  if(!pending.length)return '';
+  const raw=[..._msTestItems,...getMissedPending().filter(p=>p.status==='pending_suggestion')];
+  if(!raw.length)return '';
+  // Once-per-day gate: hide items whose lastShownAt is today AND we haven't stamped them this session.
+  // (Stamping in-session so the card doesn't vanish on the next repaint.)
+  const eligible=raw.filter(p=>{
+    if(p._isTest)return true;
+    if(_msShownThisSession.has(p.id))return true;
+    if(p.lastShownAt&&_msIsToday(p.lastShownAt))return false;
+    return true;
+  });
+  if(!eligible.length)return '';
   // Validate — filter out items whose source is now completed/gone
-  const valid=pending.filter(p=>_missedItemDisplayData(p));
-  if(valid.length!==pending.length){
+  const valid=eligible.filter(p=>_missedItemDisplayData(p));
+  if(valid.length!==eligible.length){
     saveMissedPending(getMissedPending().filter(p=>p.status!=='pending_suggestion'||_missedItemDisplayData(p)));
   }
   if(!valid.length)return '';
+  // Stamp lastShownAt on items being surfaced fresh this session.
+  const nowIso=new Date().toISOString();const persist=getMissedPending();let dirty=false;
+  valid.forEach(p=>{
+    if(p._isTest||_msShownThisSession.has(p.id))return;
+    _msShownThisSession.add(p.id);
+    const rec=persist.find(x=>x.id===p.id);if(rec&&!rec.lastShownAt){rec.lastShownAt=nowIso;dirty=true;}
+  });
+  if(dirty)saveMissedPending(persist);
   // Summary card if 3+
   if(valid.length>=3&&!_msExpanded){
     return `<div class="asst-insights-wrap"><div class="asst-card sev-warn" style="margin:0 16px 8px"><div class="asst-card-top">
@@ -8620,25 +8668,24 @@ function msBillPaid(pendingId){
   try{render();}catch(_){}
 }
 function msNotRelevant(pendingId){
-  // Test mock — just drop it, no side effects.
   const tp=_msTestItems.find(x=>x.id===pendingId);
   if(tp){_msTestItems=_msTestItems.filter(x=>x.id!==pendingId);toast('הוסר (בדיקה)');try{render();}catch(_){}return;}
-  // Real item: mark dismissed so scanner won't re-flag; source untouched, calendar untouched, no stat bump.
+  // Mark dismissed + stamp lastShownAt so scanner won't revive until a new day.
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
-  p.status='dismissed';p.dismissedAt=new Date().toISOString();
+  p.status='dismissed';p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
   saveMissedPending(arr);
+  _msShownThisSession.delete(pendingId);
   toast('סומן כלא רלוונטי');
   try{render();}catch(_){}
 }
 function msDismiss(pendingId,days){
-  const arr=getMissedPending().filter(x=>x.id!==pendingId);saveMissedPending(arr);
-  // Also register a temporary suppression so scan doesn't immediately re-flag
-  try{
-    const sup=JSON.parse(localStorage.getItem('vt_missed_suppressed')||'{}');
-    const p=getMissedPending().find(()=>false); // no re-lookup — use pendingId which we already popped
-    sup[pendingId]=Date.now()+(days||1)*86400000;
-    localStorage.setItem('vt_missed_suppressed',JSON.stringify(sup));
-  }catch(_){}
+  // Mark dismissed + stamp lastShownAt so the once-per-day cap applies naturally.
+  // The `days` arg is legacy — the daily revival logic in scanMissedItems handles re-surfacing tomorrow.
+  const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);
+  if(!p){try{render();}catch(_){}return;}
+  p.status='dismissed';p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
+  saveMissedPending(arr);
+  _msShownThisSession.delete(pendingId);
   try{render();}catch(_){}
 }
 
