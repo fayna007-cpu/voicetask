@@ -3390,13 +3390,21 @@ function closeTaskImgFull(){
 // ── Postpone ───────────────────────────────────────────────────────────────────
 let _postponeCtx={type:null,taskId:null,routineId:null,dateStr:null};
 function openPostpone(type,a,b){
-  console.log('[v2:openPostpone] type=',type,'a=',a,'b=',b);
+  console.log('[v2:openPostpone] ENTER type=',type,'a=',a,'b=',b);
+  try{
   _postponeCtx={type,taskId:null,routineId:null,dateStr:null};
+  console.log('[v2:openPostpone] step1: ctx reset');
   const inp=document.getElementById('postponeDtInput');
   const popup=document.getElementById('postponePopup');
   const ov=document.getElementById('postponeOverlay');
   const sub=document.getElementById('postponeSubtitle');
+  console.log('[v2:openPostpone] step2: DOM lookup — inp=',!!inp,'popup=',!!popup,'ov=',!!ov,'sub=',!!sub);
   if(!inp||!popup||!ov){console.error('[v2:openPostpone] popup DOM missing',{inp:!!inp,popup:!!popup,ov:!!ov});return;}
+  // Diagnostic: what does the popup look like BEFORE we touch it?
+  try{
+    const preCS=getComputedStyle(popup);
+    console.log('[v2:openPostpone] step3-pre: popup.display=',preCS.display,'popup.z=',preCS.zIndex,'has-on=',popup.classList.contains('on'),'parent=',popup.parentElement?.id||popup.parentElement?.tagName);
+  }catch(e){console.error('[v2:openPostpone] pre-cs failed',e);}
   const pad=n=>n.toString().padStart(2,'0');
   const fmtDateTime=d=>d.toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   const fmtDate=d=>d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'});
@@ -3404,6 +3412,7 @@ function openPostpone(type,a,b){
   if(type==='task'){
     _postponeCtx.taskId=a;
     const t=tasks.find(x=>x.id===a);
+    console.log('[v2:openPostpone] step4-task: found task=',!!t,'text=',t?.text,'datetime=',t?.datetime);
     const dt=t?new Date(t.datetime):new Date();
     dt.setDate(dt.getDate()+1);
     inp.type='datetime-local';
@@ -3411,6 +3420,7 @@ function openPostpone(type,a,b){
     subtitle=t
       ?`📌 <b>${(t.text||'משימה').slice(0,80).replace(/</g,'&lt;')}</b><br><span style="font-size:11px">כרגע: ${fmtDateTime(new Date(t.datetime))}</span>`
       :`⚠️ משימה לא נמצאה (id ${a}) — יתכן שנמחקה`;
+    console.log('[v2:openPostpone] step5-task: inp.value=',inp.value,'subtitle built');
   } else if(type==='routine'){
     _postponeCtx.routineId=a;_postponeCtx.dateStr=b;
     const dt=new Date(b);
@@ -3442,8 +3452,27 @@ function openPostpone(type,a,b){
       ?`📋 <b>${(it.text||'פריט').slice(0,80).replace(/</g,'&lt;')}</b>${it.dueDate?'<br><span style="font-size:11px">יעד נוכחי: '+fmtDate(new Date(it.dueDate))+'</span>':''}`
       :`⚠️ פריט לא נמצא (id ${a}) — יתכן שנמחק`;
   }
+  console.log('[v2:openPostpone] step6: about to write subtitle len=',subtitle.length);
   if(sub)sub.innerHTML=subtitle||'';
+  console.log('[v2:openPostpone] step7: subtitle written, adding .on classes');
   ov.classList.add('on');popup.classList.add('on');
+  // Belt-and-suspenders: also force display inline in case some other code
+  // path has stripped the class or CSS didn't cascade.
+  try{ov.style.display='block';popup.style.display='flex';}catch(_){}
+  // Immediate post-check
+  try{
+    const rect=popup.getBoundingClientRect();
+    const cs=getComputedStyle(popup);
+    console.log('[v2:openPostpone] step8: popup.display=',cs.display,'ov.display=',getComputedStyle(ov).display,'has-on=',popup.classList.contains('on'),'rect=',JSON.stringify({w:Math.round(rect.width),h:Math.round(rect.height),t:Math.round(rect.top),l:Math.round(rect.left)}));
+  }catch(e){console.error('[v2:openPostpone] post-cs failed',e);}
+  // Delayed post-check — catches races where something else removes the class
+  // 200ms later (e.g. a competing render/setTimeout).
+  setTimeout(()=>{try{
+    const stillOn=popup.classList.contains('on');
+    const cs=getComputedStyle(popup);
+    console.log('[v2:openPostpone] step9 (+200ms): still-on=',stillOn,'display=',cs.display,'visibility=',cs.visibility,'opacity=',cs.opacity);
+  }catch(_){}},200);
+  }catch(e){console.error('[v2:openPostpone] EXCEPTION',e&&e.stack||String(e));}
 }
 function closePostpone(){
   document.getElementById('postponeOverlay')?.classList.remove('on');
