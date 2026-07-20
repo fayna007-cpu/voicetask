@@ -411,6 +411,21 @@
         </div>
         <div class="settings-row-arrow">›</div>
       </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body">
+          <div class="settings-row-title">מערכת התראות חדשה (v2)</div>
+          <div class="settings-row-sub">כפתורי "בוצע"/"דחה" בהתראה + סינון התראות למשימות שכבר טופלו · תכונה בבדיקה</div>
+        </div>
+        <label class="rtoggle"><input type="checkbox" id="v2-toggle" onchange="onV2ToggleChange(this.checked)"><span class="rtoggle-sl"></span></label>
+      </div>
+      <div class="settings-row" onclick="testV2PushNow()">
+        <div class="settings-row-ico" style="background:oklch(0.55 0.18 285 / 0.2);color:oklch(0.78 0.18 285)">🧪</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">בדיקת פוש v2 מיידי</div>
+          <div class="settings-row-sub">שלח פוש חי עם כפתורי בוצע/דחה על משימה אמיתית</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
     </div>
     <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between">לוח התראות<button onclick="refreshJourneyOnly()" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:8px">↺ רענן</button></div>
     <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px;border-radius:18px;overflow:visible;border:none;margin:0 16px 4px;background:transparent"></div>
@@ -1534,8 +1549,17 @@ const CATS={
 // downstream effects), but SW filtering/actions/escalation are dormant.
 
 function notifV2Enabled(){try{return localStorage.getItem('vt_notif_v2_enabled')==='1';}catch(_){return false;}}
-function notifV2SetEnabled(on){try{localStorage.setItem('vt_notif_v2_enabled',on?'1':'0');}catch(_){}}
+function notifV2SetEnabled(on){
+  try{localStorage.setItem('vt_notif_v2_enabled',on?'1':'0');}catch(_){}
+  // Mirror to IDB so the Service Worker can read the flag in the push handler.
+  // Fire-and-forget: if IDB is unreachable, the SW will fall back to today's
+  // behavior (fail-open) which is fine.
+  try{notifStatePut({key:'meta:v2Enabled',enabled:!!on,updatedAt:Date.now()}).catch(()=>{});}catch(_){}
+}
 function notifV2BumpWriteFailure(){try{const n=+(localStorage.getItem('vt_notif_write_failures')||0)+1;localStorage.setItem('vt_notif_write_failures',String(n));return n;}catch(_){return -1;}}
+// One-time-per-boot sync so the SW always sees the latest flag even if the
+// client hasn't toggled it in a while.
+setTimeout(()=>{try{notifStatePut({key:'meta:v2Enabled',enabled:notifV2Enabled(),updatedAt:Date.now()}).catch(()=>{});}catch(_){}},50);
 
 const NOTIF_DB_NAME='vt_notif_db';
 const NOTIF_DB_VERSION=1;
@@ -1784,6 +1808,7 @@ function openSettings(){
   document.getElementById('routineOverlay').classList.add('on');
   document.getElementById('settingsSheet').classList.add('on');
   try{loadMissedSettingsToDom();}catch(_){}
+  try{const v2=document.getElementById('v2-toggle');if(v2)v2.checked=notifV2Enabled();}catch(_){}
   loadNotifSettings();
   renderPushJourney();
 }
@@ -2357,6 +2382,43 @@ async function testFollowupNow(){
       payload:{type:'task',id:String(t.id)}
     });
   }catch(_){}
+}
+
+function onV2ToggleChange(on){
+  notifV2SetEnabled(on);
+  toast(on?'v2 מופעל — התראות יסוננו לפי סטטוס':'v2 כבוי — התנהגות רגילה');
+  // Re-schedule so the current batch picks up (or drops) the actions field.
+  try{scheduleSmartPushNotifs();}catch(_){}
+}
+
+async function testV2PushNow(){
+  toast('⏳ שולח...');
+  const subOk=await subscribeToPush();
+  if(!subOk){toast('❌ לא רשום — פתח מהאייקון');return;}
+  if(!notifV2Enabled()){toast('⚠️ הפעל תחילה את הטוגל v2');return;}
+  // Pick a real open task if available; otherwise a synthetic id (SW will
+  // still show the notification since IDB won't find a "done" record).
+  const openTask=tasks.find(t=>!t.completed&&t.datetime);
+  const payload=openTask
+    ?{type:'task',id:String(openTask.id),stage:'primary'}
+    :{type:'task',id:'__demo__',stage:'primary'};
+  const title=openTask?('📌 '+String(openTask.text||'').slice(0,60)):'🧪 v2 בדיקה';
+  const body=openTask?'לחץ בוצע / דחה על ההתראה כדי לבחון':'משימה מדומה — בדיקת שלד v2';
+  const userId=gAuth?.email||'anon';
+  try{
+    const r=await fetch(PUSH_SERVER+'/send-now',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        userId,title,body,
+        payload,
+        actions:[{action:'done',title:'✓ בוצע'},{action:'snooze',title:'⏰ דחה'}],
+        requireInteraction:true
+      })
+    });
+    const d=await r.json();
+    if(d.ok)toast('✅ נשלח! אם האפליקציה סגורה תראה כפתורים');
+    else toast('❌ שגיאה: '+d.status);
+  }catch(e){toast('❌ '+e.message);}
 }
 
 async function testPushFromSettings(){
