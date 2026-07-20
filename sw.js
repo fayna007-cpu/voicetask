@@ -1,4 +1,4 @@
-const V = 'alfred-v23';
+const V = 'alfred-v24';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -207,22 +207,37 @@ self.addEventListener('notificationclick', e => {
     // Body-tap with no action opens the snooze deep link for that item.
     // Explicit "snooze" action does the same.
     const isSnooze=action==='snooze'||(!action&&v2&&payload&&payload.type&&payload.id!=null);
+    // Persist a pending deep-link in IDB before opening the window. iOS PWA
+    // is known to sometimes re-navigate to the manifest's start_url on
+    // cold-launch, discarding the query string we set. The client reads
+    // this record on boot and, if present, uses it regardless of the URL.
+    // TTL: 60s — the client should consume it within that window.
+    async function _swStashDeepLink(action,payload){
+      try{await _swIdbPut({key:'meta:pendingDeepLink',action,payload,ts:Date.now()});}catch(_){}
+    }
+
     if(isSnooze&&payload&&payload.type&&payload.id!=null){
+      console.log('[sw:v2] snooze click, cs=',cs.length,'payload=',payload);
       const url=_v2DeepLinkUrl(payload,'snooze');
       const dl={type:'VT_NOTIF_DEEP_LINK',action:'snooze',payload};
       if(cs.length){
+        await _swStashDeepLink('snooze',payload);
         return _v2WarmDispatch(cs[0],dl);
       }
+      await _swStashDeepLink('snooze',payload);
       return clients.openWindow(url);
     }
 
     // Legacy path (v1 / no payload): existing behavior unchanged except the
     // URL is now absolute so cold-start opens the right origin+path.
     if(action&&payload&&payload.id){
+      console.log('[sw:v2] legacy action click, action=',action,'cs=',cs.length);
       if(cs.length){
         const dl={type:'VT_NOTIF_DEEP_LINK',action,payload};
+        await _swStashDeepLink(action,payload);
         return _v2WarmDispatch(cs[0],dl);
       }
+      await _swStashDeepLink(action,payload);
       return clients.openWindow(_v2DeepLinkUrl(payload,action));
     }
     const c=cs.find(x=>x.url.includes(self.location.origin)&&'focus'in x);

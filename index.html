@@ -1759,9 +1759,14 @@ async function notifV2BootSync(){
 // the postMessage listener (warm client). Idempotent enough to be safe on
 // either path.
 function _v2RouteAction(action,type,id){
-  if(!action||!type||id==null||id==='')return false;
+  console.log('[v2:route] action=',action,'type=',type,'id=',id);
+  if(!action||!type||id==null||id===''){console.warn('[v2:route] missing fields, aborting');return false;}
   if(action==='snooze'){
-    if(type==='task'){openPostpone('task',+id);return true;}
+    if(type==='task'){
+      const tid=+id;const found=(typeof tasks!=='undefined'?tasks:[]).find(x=>x.id===tid);
+      console.log('[v2:route] task lookup tid=',tid,'found=',!!found,'total-tasks=',tasks?.length);
+      openPostpone('task',tid);return true;
+    }
     if(type==='routine'){const parts=String(id).split('__');openPostpone('routine',parts[0],parts.slice(1).join('__'));return true;}
     if(type==='crm'){openPostpone('crm',+id);return true;}
     if(type==='bill'){openPostpone('bill',+id);return true;}
@@ -1770,20 +1775,41 @@ function _v2RouteAction(action,type,id){
     mppSpawnFromPayload({type,id});
     return true;
   }
+  console.warn('[v2:route] unhandled action/type combo');
   return false;
 }
 
 // Read location.search once and route action params to the right in-app UI.
-function notifV2HandleUrlAction(){
+// Also checks IDB meta:pendingDeepLink as a fallback for iOS PWA cold-start
+// (where the manifest's start_url can override query params).
+async function notifV2HandleUrlAction(){
   try{
+    // Path 1 — URL query params (works when the URL is preserved on launch)
     const p=new URLSearchParams(location.search||'');
-    const action=p.get('action');const type=p.get('type');const id=p.get('id');
-    if(!action||!type||!id)return;
-    // Clear the query from the address bar so a refresh doesn't re-trigger.
+    let action=p.get('action'),type=p.get('type'),id=p.get('id');
+    let source='url';
+    console.log('[v2:handleUrl] search=',location.search,'action=',action,'type=',type,'id=',id);
+
+    // Path 2 — IDB pending record (fallback for iOS PWA that strips the URL)
+    if(!action||!type||!id){
+      try{
+        const rec=await notifStateGet('meta:pendingDeepLink');
+        if(rec&&rec.ts&&(Date.now()-rec.ts)<60000&&rec.payload){
+          action=rec.action;type=rec.payload.type;id=String(rec.payload.id);
+          source='idb';
+          console.log('[v2:handleUrl] fell back to IDB pendingDeepLink');
+        }
+      }catch(e){console.error('[v2:handleUrl] IDB read failed',e);}
+    }
+    if(!action||!type||!id){console.log('[v2:handleUrl] no pending deep link');return;}
+
+    // Clear both sources so refresh/relaunch doesn't re-trigger.
     try{history.replaceState({},'',location.pathname);}catch(_){}
-    // Wait one tick to make sure DOM/state is ready before opening a picker.
-    setTimeout(()=>{try{_v2RouteAction(action,type,id);}catch(e){console.error('[notif v2] route failed',e);}},0);
-  }catch(e){console.error('[notif v2] url handler failed',e);}
+    try{await notifStateDelete('meta:pendingDeepLink');}catch(_){}
+
+    console.log('[v2:handleUrl] routing (source='+source+')');
+    setTimeout(()=>{try{_v2RouteAction(action,type,id);}catch(e){console.error('[v2:handleUrl] route failed',e);}},0);
+  }catch(e){console.error('[v2:handleUrl] failed',e);}
 }
 
 // Live sync when the SW marks something done while the app is already open,
@@ -3241,11 +3267,12 @@ function closeTaskImgFull(){
 // ── Postpone ───────────────────────────────────────────────────────────────────
 let _postponeCtx={type:null,taskId:null,routineId:null,dateStr:null};
 function openPostpone(type,a,b){
+  console.log('[v2:openPostpone] type=',type,'a=',a,'b=',b);
   _postponeCtx={type,taskId:null,routineId:null,dateStr:null};
   const inp=document.getElementById('postponeDtInput');
   const popup=document.getElementById('postponePopup');
   const ov=document.getElementById('postponeOverlay');
-  if(!inp||!popup||!ov)return;
+  if(!inp||!popup||!ov){console.error('[v2:openPostpone] popup DOM missing',{inp:!!inp,popup:!!popup,ov:!!ov});return;}
   if(type==='task'){
     _postponeCtx.taskId=a;
     const t=tasks.find(x=>x.id===a);
