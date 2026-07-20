@@ -1,4 +1,4 @@
-const V = 'alfred-v22';
+const V = 'alfred-v23';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -181,32 +181,53 @@ self.addEventListener('notificationclick', e => {
       try{c.postMessage({type:'VT_NOTIF_ACTION',action:action||'click',payload});}catch(_){}
     });
 
+    // Build an ABSOLUTE URL rooted at the SW's registered scope. On GitHub
+    // Pages the app is served under /voicetask/, so a bare "/?action=..."
+    // would land at the domain root and 404. self.registration.scope always
+    // points to the correct base regardless of hosting path.
+    function _v2DeepLinkUrl(payload,act){
+      const qs=`?action=${encodeURIComponent(act)}&type=${encodeURIComponent(payload.type)}&id=${encodeURIComponent(payload.id)}`;
+      try{return new URL(qs,self.registration.scope).href;}
+      catch(_){return self.registration.scope+qs;}
+    }
+    // Warm-client dispatch: send the deep-link via postMessage and bring the
+    // window to focus. Do NOT call client.navigate() — a same-origin URL
+    // change causes a full reload that fights the message handler which
+    // already opened the picker. postMessage is universally supported wherever
+    // notification actions work.
+    // Pending payload is also stashed as a fallback (see below) so if the
+    // client is currently mid-boot the router picks it up on ready.
+    async function _v2WarmDispatch(c,dl){
+      try{c.postMessage(dl);}catch(_){}
+      try{if('focus'in c)await c.focus();}catch(_){}
+      return c;
+    }
+
     // v2 fallback for iOS / any browser without actions:
     // Body-tap with no action opens the snooze deep link for that item.
     // Explicit "snooze" action does the same.
     const isSnooze=action==='snooze'||(!action&&v2&&payload&&payload.type&&payload.id!=null);
     if(isSnooze&&payload&&payload.type&&payload.id!=null){
-      const url=`/?action=snooze&type=${encodeURIComponent(payload.type)}&id=${encodeURIComponent(payload.id)}`;
+      const url=_v2DeepLinkUrl(payload,'snooze');
+      const dl={type:'VT_NOTIF_DEEP_LINK',action:'snooze',payload};
       if(cs.length){
-        const c=cs[0];
-        try{c.postMessage({type:'VT_NOTIF_DEEP_LINK',action:'snooze',payload});}catch(_){}
-        if('focus'in c)return c.focus();
+        return _v2WarmDispatch(cs[0],dl);
       }
       return clients.openWindow(url);
     }
 
-    // Legacy path (v1 / no payload): existing behavior unchanged.
+    // Legacy path (v1 / no payload): existing behavior unchanged except the
+    // URL is now absolute so cold-start opens the right origin+path.
     if(action&&payload&&payload.id){
       if(cs.length){
-        if('focus' in cs[0])return cs[0].focus();
-      }else{
-        const url=`/?action=${encodeURIComponent(action)}&type=${encodeURIComponent(payload.type||'')}&id=${encodeURIComponent(payload.id||'')}`;
-        return clients.openWindow(url);
+        const dl={type:'VT_NOTIF_DEEP_LINK',action,payload};
+        return _v2WarmDispatch(cs[0],dl);
       }
-      return;
+      return clients.openWindow(_v2DeepLinkUrl(payload,action));
     }
     const c=cs.find(x=>x.url.includes(self.location.origin)&&'focus'in x);
-    return c?c.focus():clients.openWindow('/');
+    // Absolute scope URL as the "just open the app" fallback.
+    return c?c.focus():clients.openWindow(self.registration.scope);
   })());
 });
 

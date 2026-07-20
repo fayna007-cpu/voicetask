@@ -1755,6 +1755,24 @@ async function notifV2BootSync(){
   }catch(e){console.error('[notif v2] boot sync failed',e);notifV2BumpWriteFailure();}
 }
 
+// Central router — called from both the URL query handler (cold start) and
+// the postMessage listener (warm client). Idempotent enough to be safe on
+// either path.
+function _v2RouteAction(action,type,id){
+  if(!action||!type||id==null||id==='')return false;
+  if(action==='snooze'){
+    if(type==='task'){openPostpone('task',+id);return true;}
+    if(type==='routine'){const parts=String(id).split('__');openPostpone('routine',parts[0],parts.slice(1).join('__'));return true;}
+    if(type==='crm'){openPostpone('crm',+id);return true;}
+    if(type==='bill'){openPostpone('bill',+id);return true;}
+  }
+  if(action==='blocking'){
+    mppSpawnFromPayload({type,id});
+    return true;
+  }
+  return false;
+}
+
 // Read location.search once and route action params to the right in-app UI.
 function notifV2HandleUrlAction(){
   try{
@@ -1763,22 +1781,25 @@ function notifV2HandleUrlAction(){
     if(!action||!type||!id)return;
     // Clear the query from the address bar so a refresh doesn't re-trigger.
     try{history.replaceState({},'',location.pathname);}catch(_){}
-    if(action==='snooze'){
-      if(type==='task')openPostpone('task',+id);
-      else if(type==='routine'){const parts=String(id).split('__');openPostpone('routine',parts[0],parts.slice(1).join('__'));}
-      else if(type==='crm')openPostpone('crm',+id);
-      else if(type==='bill')openPostpone('bill',+id);
-    }else if(action==='blocking'){
-      // Stage 5 — SW arrived here from a stage:'blocking' notification.
-      mppSpawnFromPayload({type,id});
-    }
+    // Wait one tick to make sure DOM/state is ready before opening a picker.
+    setTimeout(()=>{try{_v2RouteAction(action,type,id);}catch(e){console.error('[notif v2] route failed',e);}},0);
   }catch(e){console.error('[notif v2] url handler failed',e);}
 }
 
-// Live sync when the SW marks something done while the app is already open.
+// Live sync when the SW marks something done while the app is already open,
+// AND deep-link routing when the user taps an already-open notification.
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',ev=>{
-    const m=ev.data;if(!m||m.type!=='VT_NOTIF_ACTION')return;
+    const m=ev.data;if(!m)return;
+    // Warm-client deep-link path — fired when user taps a notification while
+    // the app is running (foreground OR minimized). SW also called focus()
+    // and possibly client.navigate(), but the router runs regardless so the
+    // picker opens even on browsers where navigate() is unavailable.
+    if(m.type==='VT_NOTIF_DEEP_LINK'&&m.payload){
+      try{_v2RouteAction(m.action||'snooze',m.payload.type,m.payload.id);}catch(e){console.error('[notif v2] deep-link message route failed',e);}
+      return;
+    }
+    if(m.type!=='VT_NOTIF_ACTION')return;
     if(m.action==='done'&&m.payload&&m.payload.type&&m.payload.id!=null){
       // The SW already wrote to IDB — mirror into memory + localStorage.
       if(m.payload.type==='task'){
