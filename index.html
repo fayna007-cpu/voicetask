@@ -1700,6 +1700,174 @@ async function notifStateMigrateIfNeeded(){
 // Kick off migration on load; safe to run in parallel with the rest of boot.
 setTimeout(()=>{try{notifStateMigrateIfNeeded();}catch(_){}},0);
 
+// ═══════════════════════════════════════════════════════════════════
+// Stage 4 — IDB→localStorage boot sync + URL handler + SW message listener
+// ═══════════════════════════════════════════════════════════════════
+
+// Read all shadow records with doneViaSw:true and apply them to the primary
+// localStorage arrays. Clears the doneViaSw flag after consumption so the
+// same record isn't re-applied on the next boot.
+async function notifV2BootSync(){
+  if(!notifV2Enabled())return;
+  try{
+    const all=await notifStateGetAll();
+    if(!all.length)return;
+    let touched={task:0,routine:0,crm:0,bill:0};
+    const clearThese=[];
+    for(const rec of all){
+      if(!rec.doneViaSw)continue;
+      if(rec.type==='task'){
+        const t=(typeof tasks!=='undefined'?tasks:[]).find(x=>String(x.id)===String(rec.id));
+        if(t&&!t.completed){t.completed=true;touched.task++;}
+        clearThese.push(rec);
+      }else if(rec.type==='routine'){
+        const r=(typeof routines!=='undefined'?routines:[]).find(x=>String(x.id)===String(rec.id));
+        if(r&&Array.isArray(rec.completedDates)){
+          if(!r.completedDates)r.completedDates=[];
+          let added=0;
+          for(const dt of rec.completedDates){if(!r.completedDates.includes(dt)){r.completedDates.push(dt);added++;}}
+          if(added)touched.routine+=added;
+        }
+        clearThese.push(rec);
+      }else if(rec.type==='crm'){
+        const it=(typeof backlogItems!=='undefined'?backlogItems:[]).find(x=>String(x.id)===String(rec.id));
+        if(it&&it.status!=='done'){it.status='done';touched.crm++;}
+        clearThese.push(rec);
+      }else if(rec.type==='bill'){
+        const b=(typeof bills!=='undefined'?bills:[]).find(x=>String(x.id)===String(rec.id));
+        if(b&&b.status!=='paid'){b.status='paid';touched.bill++;}
+        clearThese.push(rec);
+      }
+    }
+    if(touched.task)save();
+    if(touched.routine)saveRoutines();
+    if(touched.crm&&typeof saveBpItems==='function')saveBpItems();
+    if(touched.bill&&typeof saveBills==='function')saveBills();
+    if(touched.task||touched.routine||touched.crm||touched.bill){
+      try{render();}catch(_){}
+      try{bumpMissedStat('totalResolvedAfterEscalation','task');}catch(_){}
+    }
+    // Clear the doneViaSw flag on all consumed records so re-boot doesn't re-apply.
+    // save() already re-shadows current state; that write happened above. We just
+    // need to null out doneViaSw on the shadow records themselves.
+    for(const rec of clearThese){delete rec.doneViaSw;try{notifStatePut(rec).catch(()=>{});}catch(_){}}
+    console.log('[notif v2] boot sync — task:',touched.task,'routine:',touched.routine,'crm:',touched.crm,'bill:',touched.bill);
+  }catch(e){console.error('[notif v2] boot sync failed',e);notifV2BumpWriteFailure();}
+}
+
+// Read location.search once and route action params to the right in-app UI.
+function notifV2HandleUrlAction(){
+  try{
+    const p=new URLSearchParams(location.search||'');
+    const action=p.get('action');const type=p.get('type');const id=p.get('id');
+    if(!action||!type||!id)return;
+    // Clear the query from the address bar so a refresh doesn't re-trigger.
+    try{history.replaceState({},'',location.pathname);}catch(_){}
+    if(action==='snooze'){
+      if(type==='task')openPostpone('task',+id);
+      else if(type==='routine'){const parts=String(id).split('__');openPostpone('routine',parts[0],parts.slice(1).join('__'));}
+      else if(type==='crm')openPostpone('crm',+id);
+      else if(type==='bill')openPostpone('bill',+id);
+    }else if(action==='blocking'){
+      // Stage 5 — SW arrived here from a stage:'blocking' notification.
+      mppSpawnFromPayload({type,id});
+    }
+  }catch(e){console.error('[notif v2] url handler failed',e);}
+}
+
+// Live sync when the SW marks something done while the app is already open.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',ev=>{
+    const m=ev.data;if(!m||m.type!=='VT_NOTIF_ACTION')return;
+    if(m.action==='done'&&m.payload&&m.payload.type&&m.payload.id!=null){
+      // The SW already wrote to IDB — mirror into memory + localStorage.
+      if(m.payload.type==='task'){
+        const t=(typeof tasks!=='undefined'?tasks:[]).find(x=>String(x.id)===String(m.payload.id));
+        if(t&&!t.completed){t.completed=true;save();try{render();}catch(_){}}
+      }else if(m.payload.type==='routine'){
+        const parts=String(m.payload.id).split('__');const rid=parts[0];const dt=parts.slice(1).join('__');
+        const r=(typeof routines!=='undefined'?routines:[]).find(x=>String(x.id)===rid);
+        if(r){if(!r.completedDates)r.completedDates=[];if(!r.completedDates.includes(dt))r.completedDates.push(dt);saveRoutines();try{render();}catch(_){}}
+      }else if(m.payload.type==='crm'){
+        const it=(typeof backlogItems!=='undefined'?backlogItems:[]).find(x=>String(x.id)===String(m.payload.id));
+        if(it&&it.status!=='done'){it.status='done';if(typeof saveBpItems==='function')saveBpItems();try{render();}catch(_){}}
+      }else if(m.payload.type==='bill'){
+        const b=(typeof bills!=='undefined'?bills:[]).find(x=>String(x.id)===String(m.payload.id));
+        if(b&&b.status!=='paid'){b.status='paid';if(typeof saveBills==='function')saveBills();try{render();}catch(_){}}
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Stage 5 — escalation, quiet hours, concentrated 5+, blocking modal wiring
+// ═══════════════════════════════════════════════════════════════════
+
+// Quiet hours are fixed 22:00–08:00 local time. CRM bypasses the rule
+// (per spec — urgent items go through regardless).
+function notifV2ShiftForQuietHours(fireAt,type){
+  if(type==='crm')return fireAt;// exempt
+  const d=new Date(fireAt);
+  const h=d.getHours();
+  if(h>=22){d.setDate(d.getDate()+1);d.setHours(8,0,0,0);return d;}
+  if(h<8){d.setHours(8,0,0,0);return d;}
+  return fireAt;
+}
+
+// Given a base fireAt and the type, return the additional stage fires
+// per escalation policy. Returns [] for tasks and other unhandled types.
+function notifV2EscalationChain(baseFireAt,type){
+  const b=new Date(baseFireAt);
+  if(type==='crm'){
+    const s30=new Date(b.getTime()+30*60000);
+    const s60=new Date(b.getTime()+60*60000);
+    return [{fireAt:s30,stage:'escalated'},{fireAt:s60,stage:'blocking'}];
+  }
+  if(type==='bill'){
+    const s2h=new Date(b.getTime()+2*3600000);
+    const eod=new Date(b);eod.setHours(22,0,0,0);// end-of-day = 22:00 local
+    if(eod<=s2h)eod.setDate(eod.getDate()+1);
+    return [{fireAt:s2h,stage:'escalated'},{fireAt:eod,stage:'blocking'}];
+  }
+  if(type==='routine'){
+    const eod=new Date(b);eod.setHours(22,0,0,0);
+    if(eod<=b)eod.setDate(eod.getDate()+1);
+    return [{fireAt:eod,stage:'blocking'}];
+  }
+  return [];// tasks and everything else — no escalation
+}
+
+// Spawn the blocking modal for a payload arriving from a notification.
+// Reuses the existing _mppQueue infrastructure from the priority-popup feature.
+function mppSpawnFromPayload(payload){
+  try{
+    if(!payload||!payload.type||payload.id==null)return;
+    const st=(typeof getMissedSettings==='function')?getMissedSettings():null;
+    // Respect the master toggle for missed-item popups — if the user turned
+    // off priority popups, we skip. Escalation is still the notification
+    // itself; the modal is only the "final" surface when foregrounded.
+    if(st&&st.priorityPopupEnabled===false)return;
+    // Feed a synthetic pending item into the queue.
+    if(!Array.isArray(_mppQueue))return;
+    if(_mppActiveId)return;// respect the one-at-a-time invariant
+    // Build a minimal pending record shape that _mppRender understands.
+    const pending=(typeof getMissedPending==='function')?getMissedPending():[];
+    const existing=pending.find(p=>p.sourceType===payload.type&&String(p.sourceId)===String(payload.id));
+    const p=existing||{
+      id:'ms_v2_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      sourceType:payload.type,sourceId:payload.id,
+      status:'pending_suggestion',detectedAt:new Date().toISOString(),
+      suggestedSlot:null,escalationCount:0
+    };
+    if(!existing){
+      pending.push(p);
+      if(typeof saveMissedPending==='function')saveMissedPending(pending);
+    }
+    _mppQueue.push(p.id);
+    _mppShowNext();
+  }catch(e){console.error('[notif v2] mppSpawnFromPayload failed',e);}
+}
+
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
 let customNotifs=JSON.parse(localStorage.getItem('vt_custom_notifs')||'[]');
 let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]').map(r=>r.timesPerWeek!=null?r:{...r,name:r.text||r.name||'',timesPerWeek:Math.max(1,r.days?.length||3),preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}});
@@ -1757,7 +1925,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();setTimeout(()=>{try{startMissedScanLoop();}catch(_){}},6000);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();setTimeout(()=>{try{startMissedScanLoop();}catch(_){}},6000);setTimeout(()=>{try{notifV2BootSync();}catch(_){}},100);setTimeout(()=>{try{notifV2HandleUrlAction();}catch(_){}},300);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -2211,6 +2379,40 @@ function buildSmartPushBatch(windowMs){
   if(s.productivity.weeklyReview){
     const rev=new Date(now);const days=(7-rev.getDay())%7||7;rev.setDate(rev.getDate()+days);rev.setHours(20,0,0,0);
     queue('weekly_'+isoWeek(rev),'📊 סקירה שבועית',`סיימת ${tasks.filter(t=>t.completed).length} מתוך ${tasks.length} משימות — מה השבוע הבא?`,rev);
+  }
+  // ── Stage 5 post-processing (v2 flag only) ──
+  // 1. Append escalation chain fires per type (CRM t+30/t+60, bills t+2h/EOD,
+  //    routines EOD). Tasks get no escalation.
+  // 2. Shift non-CRM fires that fall in 22:00-08:00 to 08:00 next day.
+  if(_v2Enabled){
+    const additions=[];
+    for(const e of batch){
+      if(!e.payload||!e.payload.type)continue;
+      const chain=notifV2EscalationChain(new Date(e.fireAt),e.payload.type);
+      for(const step of chain){
+        const eid=e.id+'_'+step.stage;
+        if(seen.has(eid))continue;seen.add(eid);
+        const suffix=step.stage==='blocking'?' 🚨':step.stage==='escalated'?' ⏰':'';
+        const stagedPayload={...e.payload,stage:step.stage};
+        additions.push({
+          id:eid,
+          title:(e.title||'')+suffix,
+          body:(step.stage==='blocking'?'עדיין לא סגור — בוא נסדר: ':(step.stage==='escalated'?'תזכורת חוזרת: ':''))+(e.body||''),
+          fireAt:step.fireAt.toISOString(),
+          payload:stagedPayload,
+          actions:e.actions,
+          requireInteraction:step.stage==='blocking'||e.requireInteraction
+        });
+      }
+    }
+    for(const a of additions)batch.push(a);
+    // Apply quiet-hours shift AFTER escalation is added so t+2h/EOD entries also get shifted.
+    for(const e of batch){
+      const type=e.payload&&e.payload.type;
+      if(type==='crm')continue;
+      const shifted=notifV2ShiftForQuietHours(new Date(e.fireAt),type);
+      if(shifted.getTime()!==new Date(e.fireAt).getTime())e.fireAt=shifted.toISOString();
+    }
   }
   return batch;
 }
@@ -8572,6 +8774,29 @@ function scanMissedItems(){
   });
 
   if(dirty){saveMissedPending(pending);try{render();}catch(_){}}
+  // ── Stage 5 — one-shot concentrated notification when 5+ regular tasks are missed ──
+  try{
+    if(notifV2Enabled()){
+      const missedRegulars=pending.filter(p=>p.sourceType==='task'&&p.status==='pending_suggestion');
+      if(missedRegulars.length>=5){
+        const dayKey=(new Date()).toISOString().slice(0,10);
+        const seenKey='vt_v2_concentrated_'+dayKey;
+        if(!localStorage.getItem(seenKey)){
+          localStorage.setItem(seenKey,'1');
+          if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(reg=>{
+            reg.active?.postMessage({
+              type:'SHOW_NOTIFICATION',
+              title:'📌 יש לך '+missedRegulars.length+' משימות שהוחמצו',
+              body:'בוא נסדר אותן — פתח את האפליקציה כדי לראות ולתזמן מחדש',
+              tag:'vt_v2_concentrated',
+              requireInteraction:true,
+              payload:{type:'concentrated',id:'multi',stage:'aggregate'}
+            });
+          }).catch(()=>{});}
+        }
+      }
+    }
+  }catch(_){}
 }
 
 // ── Slot Suggestion ──

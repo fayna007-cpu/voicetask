@@ -1,4 +1,4 @@
-const V = 'alfred-v21';
+const V = 'alfred-v22';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
