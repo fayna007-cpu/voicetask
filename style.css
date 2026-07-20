@@ -1672,3 +1672,33 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bd-month-name{flex:1;font-size:13px;font-weight:700;color:var(--text)}
 .bd-month-meta{font-size:11px;color:var(--muted);font-weight:600}
 .bd-month-sum{font-size:15px;font-weight:800;color:var(--accent);direction:ltr;flex-shrink:0;min-width:70px;text-align:left}
+
+/* ── Missed-Task Priority Popup (mpp) — reuses app tokens exactly ── */
+.mpp-overlay{position:fixed;inset:0;z-index:850;background:oklch(0 0 0 / 0.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .25s ease;display:flex;align-items:center;justify-content:center;padding:20px}
+.mpp-overlay.on{opacity:1;pointer-events:all}
+.mpp-card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface2) 100%);border:1px solid var(--border2);border-radius:24px;padding:26px 22px 22px;width:100%;max-width:420px;box-shadow:0 20px 60px oklch(0 0 0 / 0.55);transform:scale(0.92);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.15),opacity .25s ease;position:relative}
+.mpp-overlay.on .mpp-card{transform:scale(1);opacity:1;animation:mppGlow .6s ease-out}
+@keyframes mppGlow{
+  0%{box-shadow:0 20px 60px oklch(0 0 0 / 0.55),0 0 0 0 oklch(0.72 0.18 285 / 0.55)}
+  55%{box-shadow:0 20px 60px oklch(0 0 0 / 0.55),0 0 44px 10px oklch(0.78 0.18 295 / 0.38)}
+  100%{box-shadow:0 20px 60px oklch(0 0 0 / 0.55),0 0 0 0 oklch(0.72 0.18 285 / 0)}
+}
+.mpp-close{position:absolute;top:12px;left:12px;width:32px;height:32px;border-radius:50%;background:var(--surface3);border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.mpp-close:active{background:var(--border2);color:var(--text)}
+.mpp-title{font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--text);line-height:1.25;margin:2px 0 10px;letter-spacing:-0.3px;padding-inline-end:36px}
+.mpp-line{font-size:14px;color:var(--muted);line-height:1.6;margin:6px 0}
+.mpp-proposed{font-size:14px;color:var(--text);margin:14px 0 4px;font-weight:600}
+.mpp-streak{background:oklch(0.72 0.18 285 / 0.10);border:1px solid oklch(0.72 0.18 285 / 0.28);border-radius:14px;padding:12px 14px;margin:14px 0;display:flex;align-items:center;gap:12px}
+.mpp-streak-num{font-family:var(--font-display);font-size:30px;font-weight:800;color:var(--accent);letter-spacing:-0.6px;min-width:40px;text-align:center;line-height:1;text-shadow:0 2px 12px oklch(0.72 0.18 285 / 0.35)}
+.mpp-streak-txt{font-size:13px;color:var(--text);line-height:1.4;font-weight:500;flex:1}
+.mpp-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.mpp-btn{border:none;border-radius:14px;padding:14px 16px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s,filter .15s;line-height:1.2}
+.mpp-btn-primary{background:linear-gradient(135deg,oklch(0.55 0.16 285) 0%,oklch(0.65 0.18 300) 100%);color:oklch(0.98 0.005 285);box-shadow:0 6px 18px oklch(0.55 0.16 285 / 0.4);animation:mppPulse 2s ease-in-out infinite}
+.mpp-btn-primary:hover,.mpp-btn-primary:focus{animation-play-state:paused}
+.mpp-btn-primary:active{transform:scale(0.97);filter:brightness(1.05)}
+.mpp-btn-secondary{background:var(--surface3);color:var(--text);border:1px solid var(--border2)}
+.mpp-btn-secondary:active{background:var(--border2);transform:scale(0.98)}
+@keyframes mppPulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.03)}
+}

@@ -633,12 +633,20 @@
         <div class="settings-row-body"><div class="settings-row-title">טון מעודד לשגרה חוזרת</div><div class="settings-row-sub">"יאללה, הפעם סוגרים את זה" כשמעבירים אימון</div></div>
         <label class="rtoggle"><input type="checkbox" id="ms-enthusiastic" checked onchange="saveMissedSettings()"><span class="rtoggle-sl"></span></label>
       </div>
+      <div class="settings-row" style="cursor:default">
+        <div class="settings-row-body"><div class="settings-row-title">פופ-אפ חוסם למשימות בעדיפות גבוהה</div><div class="settings-row-sub">משימות ושגרות המסומנות כחשובות יקפיצו חלון מיידי בפתיחת האפליקציה, במקום להופיע רק כרטיס ברשימה</div></div>
+        <label class="rtoggle"><input type="checkbox" id="ms-priority-popup" checked onchange="saveMissedSettings()"><span class="rtoggle-sl"></span></label>
+      </div>
       <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch">
         <div class="settings-row-body" style="width:100%"><div class="settings-row-title">📊 סטטיסטיקות</div></div>
         <div id="ms-stats-view" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px"></div>
       </div>
       <div class="settings-row" style="cursor:default" onclick="msSpawnTestCard()">
         <div class="settings-row-body"><div class="settings-row-title">🧪 בדיקה: הצג פופ-אפ דחייה לדוגמה</div><div class="settings-row-sub">מייצר כרטיס משימה מדומה במסך הראשי כדי לבחון את העיצוב</div></div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-row" style="cursor:default" onclick="mppSpawnTestModal()">
+        <div class="settings-row-body"><div class="settings-row-title">🧪 בדיקה: פופ-אפ עדיפות גבוהה</div><div class="settings-row-sub">מציג את המודאל החוסם עם streak=5 לדוגמה</div></div>
         <div class="settings-row-arrow">›</div>
       </div>
     </div>
@@ -1190,6 +1198,18 @@
     <div class="dp-body" id="dpBody"></div>
   </div>
   <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
+</div>
+
+<!-- Missed-Task Priority Popup (blocking, for important items) -->
+<div class="mpp-overlay" id="mppOverlay">
+  <div class="mpp-card" id="mppCard" role="dialog" aria-modal="true">
+    <button class="mpp-close" onclick="mppDismiss()" aria-label="סגור">✕</button>
+    <div class="mpp-title" id="mppTitle"></div>
+    <div class="mpp-line" id="mppLine1"></div>
+    <div id="mppStreakWrap"></div>
+    <div class="mpp-proposed" id="mppProposed"></div>
+    <div class="mpp-actions" id="mppActions"></div>
+  </div>
 </div>
 
 <!-- Follow-up popup (opens when notification is tapped) -->
@@ -8138,7 +8158,8 @@ const MS_DEFAULTS={
   defaultWindowMinutes:180,  // "3 שעות"
   defaultWindowMode:'minutes', // or 'eod'
   wakingHours:{start:'08:00',end:'22:00'},
-  enthusiasticRoutineTone:true
+  enthusiasticRoutineTone:true,
+  priorityPopupEnabled:true
 };
 function getMissedSettings(){
   try{const s=JSON.parse(localStorage.getItem('vt_missed_settings')||'null');
@@ -8154,7 +8175,8 @@ function saveMissedSettings(){
     defaultWindowMode:winSel==='eod'?'eod':'minutes',
     defaultWindowMinutes:winSel==='eod'?null:+winSel,
     wakingHours:{start:g('ms-wakeStart')?.value||'08:00',end:g('ms-wakeEnd')?.value||'22:00'},
-    enthusiasticRoutineTone:!!g('ms-enthusiastic')?.checked
+    enthusiasticRoutineTone:!!g('ms-enthusiastic')?.checked,
+    priorityPopupEnabled:g('ms-priority-popup')?g('ms-priority-popup').checked:true
   };
   localStorage.setItem('vt_missed_settings',JSON.stringify(s));
   renderMissedStatsView();
@@ -8168,6 +8190,7 @@ function loadMissedSettingsToDom(){
   if(g('ms-wakeStart'))g('ms-wakeStart').value=s.wakingHours.start;
   if(g('ms-wakeEnd'))g('ms-wakeEnd').value=s.wakingHours.end;
   if(g('ms-enthusiastic'))g('ms-enthusiastic').checked=!!s.enthusiasticRoutineTone;
+  if(g('ms-priority-popup'))g('ms-priority-popup').checked=s.priorityPopupEnabled!==false;
   renderMissedStatsView();
 }
 
@@ -8436,7 +8459,13 @@ try{_msDedupePending();}catch(_){}
 function renderMissedCards(){
   const st=getMissedSettings();
   if(!st.enabled)return '';
-  const raw=[..._msTestItems,...getMissedPending().filter(p=>p.status==='pending_suggestion')];
+  // If priority-popup is enabled, important task/routine items route through the modal instead of a card.
+  const popupOn=!!st.priorityPopupEnabled;
+  const raw=[..._msTestItems,...getMissedPending().filter(p=>{
+    if(p.status!=='pending_suggestion')return false;
+    if(popupOn&&(p.sourceType==='task'||p.sourceType==='routine')&&_mppIsImportantSource(p))return false;
+    return true;
+  })];
   if(!raw.length)return '';
   // Once-per-day gate: hide items whose lastShownAt is today AND we haven't stamped them this session.
   // (Stamping in-session so the card doesn't vanish on the next repaint.)
@@ -8697,6 +8726,7 @@ function startMissedScanLoop(){
     try{scanMissedItems();}catch(_){}
     try{await _ensureSuggestionsForPending();}catch(_){}
     try{render();}catch(_){}
+    try{mppCheck();}catch(_){}
   };
   run();
   _msScanTimer=setInterval(run,5*60*1000);
@@ -8706,6 +8736,191 @@ function startMissedScanLoop(){
 
 // Hook after existing confirmPostpone flow — called at end via helper we inject
 window.addEventListener('vt-postpone-confirmed',()=>{try{_msManualPickDone();}catch(_){}});
+
+// ═══════════════════════════════════════════════════════════════════
+// ── Missed-Task Priority Popup (mpp) — blocking modal for important items
+// ═══════════════════════════════════════════════════════════════════
+let _mppQueue=[];let _mppActiveId=null;let _mppShownThisSession=new Set();
+
+function _mppIsImportantSource(p){
+  if(p.sourceType==='task'){const t=tasks.find(x=>x.id==p.sourceId);return !!(t&&t.important);}
+  if(p.sourceType==='routine'){const rid=String(p.sourceId).split('__')[0];const r=routines.find(x=>String(x.id)===rid);return !!(r&&r.important);}
+  return false;
+}
+function _mppRoutineStreak(r){
+  if(!r||!Array.isArray(r.completedDates))return 0;
+  // Consecutive completed scheduled instances counting backward from today.
+  const all=Object.values(r.scheduledWeeks||{}).flat().map(it=>typeof it==='string'?it:it?.dt).filter(Boolean).sort((a,b)=>new Date(b)-new Date(a));
+  const now=Date.now();
+  const past=all.filter(dt=>new Date(dt).getTime()<=now);
+  const done=new Set(r.completedDates||[]);
+  let streak=0;
+  for(const dt of past){if(done.has(dt))streak++;else break;}
+  return streak;
+}
+function _mppFormatDate(iso){try{return new Date(iso).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'long'});}catch(_){return iso||'';}}
+function _mppFormatTime(iso){try{return new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});}catch(_){return '';}}
+
+function mppCheck(){
+  const s=getMissedSettings();
+  if(!s.enabled||!s.priorityPopupEnabled)return;
+  if(_mppActiveId)return;
+  const pending=getMissedPending();
+  const eligible=pending.filter(p=>{
+    if(p.sourceType!=='task'&&p.sourceType!=='routine')return false;
+    if(p.status!=='pending_suggestion'&&p.status!=='dismissed')return false;
+    if(!_mppIsImportantSource(p))return false;
+    if(_mppShownThisSession.has(p.id))return false;
+    if(p.lastShownAt&&_msIsToday(p.lastShownAt))return false;
+    if(!_missedItemDisplayData(p))return false;
+    return true;
+  });
+  _mppQueue=eligible.map(p=>p.id);
+  _mppShowNext();
+}
+
+let _mppTestActive=null;
+async function _mppShowNext(){
+  if(_mppActiveId)return;
+  const id=_mppQueue.shift();if(!id)return;
+  const pending=getMissedPending();const p=pending.find(x=>x.id===id);
+  if(!p||!_mppIsImportantSource(p)){return _mppShowNext();}
+  // Ensure a suggested slot exists
+  if(!p.suggestedSlot){try{p.suggestedSlot=await suggestNextSlot(p);saveMissedPending(pending);}catch(_){}}
+  _mppActiveId=id;
+  _mppShownThisSession.add(id);
+  _mppRender(p);
+}
+
+function mppSpawnTestModal(){
+  if(_mppActiveId){console.log('test — skipped (modal already open)');return;}
+  try{closeSettings&&closeSettings();}catch(_){}
+  const orig=new Date();orig.setHours(6,30,0,0);
+  const slot=new Date();slot.setDate(slot.getDate()+1);slot.setHours(6,30,0,0);
+  _mppTestActive={
+    id:'mpp_test_'+Date.now(),_isTest:true,
+    _testName:'אימון בוקר',_testIsRoutine:true,_testStreak:5,
+    _testOrigIso:orig.toISOString(),
+    sourceType:'routine',sourceId:'__test__',
+    status:'pending_suggestion',escalationCount:0,
+    suggestedSlot:slot.toISOString()
+  };
+  _mppActiveId=_mppTestActive.id;
+  _mppRender(_mppTestActive);
+}
+
+function _mppRender(p){
+  const overlay=document.getElementById('mppOverlay');
+  const title=document.getElementById('mppTitle');
+  const line1=document.getElementById('mppLine1');
+  const streakWrap=document.getElementById('mppStreakWrap');
+  const proposed=document.getElementById('mppProposed');
+  const actions=document.getElementById('mppActions');
+  if(!overlay||!title)return;
+  const esc0=(s)=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escalated=(p.escalationCount||0)>=2;
+  let name='';let origIso=null;let isRoutine=false;let routineRef=null;let streak=0;
+  if(p._isTest){
+    name=p._testName||'משימת בדיקה';origIso=p._testOrigIso||null;isRoutine=!!p._testIsRoutine;streak=p._testStreak||0;
+  }else if(p.sourceType==='task'){const t=tasks.find(x=>x.id==p.sourceId);name=t?.text||'';origIso=t?.datetime||null;}
+  else if(p.sourceType==='routine'){isRoutine=true;const parts=String(p.sourceId).split('__');routineRef=routines.find(x=>String(x.id)===parts[0]);name=routineRef?.name||routineRef?.text||'';origIso=parts.slice(1).join('__');streak=_mppRoutineStreak(routineRef);}
+
+  if(escalated){
+    title.textContent='💪 עדיין לא סגרת: '+name;
+    line1.textContent='זו הפעם ה-'+((p.escalationCount||0)+1)+' שזה חוזר. מתי תרצה שזה יקרה בפועל?';
+    streakWrap.innerHTML='';
+    proposed.textContent='';
+    actions.innerHTML=`
+      <button class="mpp-btn mpp-btn-primary" onclick="mppDoNow()">✓ בצע עכשיו</button>
+      <button class="mpp-btn mpp-btn-secondary" onclick="mppManualPick()">✏️ קבע שעה עכשיו</button>`;
+  }else{
+    title.textContent='💪 פספסת: '+name;
+    const origTime=origIso?_mppFormatTime(origIso):'';
+    const origDay=origIso?(_msIsToday(origIso)?'היום':_mppFormatDate(origIso)):'';
+    line1.textContent='היה אמור להיות '+origDay+(origTime?' ב-'+origTime:'');
+    if(isRoutine&&streak>=2){
+      streakWrap.innerHTML=`<div class="mpp-streak"><div class="mpp-streak-num" id="mppStreakNum">0</div><div class="mpp-streak-txt">יש לך רצף של <b>${streak}</b> ימים — בוא לא נשבור אותו</div></div>`;
+    }else{streakWrap.innerHTML='';}
+    const slot=p.suggestedSlot;
+    const slotDay=slot?_mppFormatDate(slot):'';
+    const slotTime=slot?_mppFormatTime(slot):'';
+    proposed.textContent=slot?('מציע: '+slotDay+' ב-'+slotTime):'';
+    const dayBtnLabel=slot?('📅 קבע ל-'+slotDay):'📅 קבע מועד';
+    actions.innerHTML=`
+      <button class="mpp-btn mpp-btn-primary" onclick="mppDoNow()">✓ בצע עכשיו</button>
+      <button class="mpp-btn mpp-btn-secondary" onclick="mppConfirmSuggested()"${slot?'':' disabled'}>${esc0(dayBtnLabel)}</button>
+      <button class="mpp-btn mpp-btn-secondary" onclick="mppManualPick()">✏️ שעה אחרת</button>`;
+  }
+  overlay.classList.add('on');
+  try{navigator.vibrate&&navigator.vibrate(15);}catch(_){}
+  // Streak count-up
+  if(isRoutine&&streak>=2){
+    const el=document.getElementById('mppStreakNum');if(el){
+      const dur=500;const start=performance.now();
+      const tick=(t)=>{const pr=Math.min(1,(t-start)/dur);const v=Math.round(pr*streak);el.textContent=String(v);if(pr<1)requestAnimationFrame(tick);};
+      requestAnimationFrame(tick);
+    }
+  }
+}
+
+function _mppClose(){
+  const overlay=document.getElementById('mppOverlay');if(overlay)overlay.classList.remove('on');
+  _mppActiveId=null;
+  // Show next in queue after the exit transition
+  setTimeout(()=>{try{_mppShowNext();}catch(_){}},280);
+}
+
+async function mppDoNow(){
+  const id=_mppActiveId;if(!id)return;
+  if(_mppTestActive&&_mppTestActive.id===id){console.log('test — skipped (do now)');_mppTestActive=null;toast('✓ בוצע (בדיקה)');_mppClose();return;}
+  const arr=getMissedPending();const p=arr.find(x=>x.id===id);if(!p){_mppClose();return;}
+  if(p.sourceType==='task'){
+    const t=tasks.find(x=>x.id==p.sourceId);
+    if(t&&!t.completed){t.completed=true;delete t.wasRescheduled;vibrate(8);save();}
+  }else if(p.sourceType==='routine'){
+    const parts=String(p.sourceId).split('__');const rid=parts[0];const dt=parts.slice(1).join('__');
+    const r=routines.find(x=>String(x.id)===rid);
+    if(r){if(!r.completedDates)r.completedDates=[];if(!r.completedDates.includes(dt))r.completedDates.push(dt);saveRoutines();try{vibrate([10,30,10]);}catch(_){}}
+  }
+  // Resolve pending — remove entry, reset escalation, bump stat
+  const remaining=getMissedPending().filter(x=>x.id!==id);saveMissedPending(remaining);
+  try{bumpMissedStat('totalCompletedAfterReschedule',p.sourceType);}catch(_){}
+  toast('✓ בוצע');
+  try{render();}catch(_){}
+  _mppClose();
+}
+
+async function mppConfirmSuggested(){
+  const id=_mppActiveId;if(!id)return;
+  if(_mppTestActive&&_mppTestActive.id===id){console.log('test — skipped (confirm suggested, calendar sync skipped)');_mppTestActive=null;toast('✓ (בדיקה) נקבע');_mppClose();return;}
+  const arr=getMissedPending();const p=arr.find(x=>x.id===id);if(!p||!p.suggestedSlot){_mppClose();return;}
+  p.escalationCount=0;saveMissedPending(arr);
+  const iso=p.suggestedSlot;
+  _mppClose();
+  try{await _applyReschedule(p,iso);}catch(_){}
+}
+
+function mppManualPick(){
+  const id=_mppActiveId;if(!id)return;
+  if(_mppTestActive&&_mppTestActive.id===id){console.log('test — skipped (manual pick)');_mppTestActive=null;toast('✓ (בדיקה) בחירה ידנית');_mppClose();return;}
+  const arr=getMissedPending();const p=arr.find(x=>x.id===id);if(!p){_mppClose();return;}
+  p.escalationCount=0;saveMissedPending(arr);
+  _mppClose();
+  // Reuse the same manual-pick path as the card feature
+  try{msManualPick(id);}catch(_){}
+}
+
+function mppDismiss(){
+  const id=_mppActiveId;if(!id){_mppClose();return;}
+  if(_mppTestActive&&_mppTestActive.id===id){console.log('test — skipped (dismiss X)');_mppTestActive=null;_mppClose();return;}
+  const arr=getMissedPending();const p=arr.find(x=>x.id===id);
+  if(p){
+    p.escalationCount=(p.escalationCount||0)+1;
+    p.status='dismissed';p.lastShownAt=new Date().toISOString();
+    saveMissedPending(arr);
+  }
+  _mppClose();
+}
 
 function maybeAlfredWelcome(){
   if(localStorage.getItem('vt_alfred_welcomed')==='1')return;
