@@ -1266,6 +1266,7 @@
 <div class="postpone-overlay" id="postponeOverlay" onclick="closePostpone()"></div>
 <div class="postpone-popup" id="postponePopup">
   <div class="postpone-title">📅 דחה ל...</div>
+  <div id="postponeSubtitle" style="font-size:13px;color:var(--muted);text-align:center;line-height:1.5;padding:0 8px;min-height:18px"></div>
   <input class="postpone-dt" id="postponeDtInput" type="datetime-local">
   <div class="postpone-actions">
     <button class="postpone-confirm" onclick="confirmPostpone()">דחה</button>
@@ -3366,35 +3367,54 @@ function openPostpone(type,a,b){
   const inp=document.getElementById('postponeDtInput');
   const popup=document.getElementById('postponePopup');
   const ov=document.getElementById('postponeOverlay');
+  const sub=document.getElementById('postponeSubtitle');
   if(!inp||!popup||!ov){console.error('[v2:openPostpone] popup DOM missing',{inp:!!inp,popup:!!popup,ov:!!ov});return;}
+  const pad=n=>n.toString().padStart(2,'0');
+  const fmtDateTime=d=>d.toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const fmtDate=d=>d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'});
+  let subtitle='';
   if(type==='task'){
     _postponeCtx.taskId=a;
     const t=tasks.find(x=>x.id===a);
     const dt=t?new Date(t.datetime):new Date();
     dt.setDate(dt.getDate()+1);
     inp.type='datetime-local';
-    const pad=n=>n.toString().padStart(2,'0');
     inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    subtitle=t
+      ?`📌 <b>${(t.text||'משימה').slice(0,80).replace(/</g,'&lt;')}</b><br><span style="font-size:11px">כרגע: ${fmtDateTime(new Date(t.datetime))}</span>`
+      :`⚠️ משימה לא נמצאה (id ${a}) — יתכן שנמחקה`;
   } else if(type==='routine'){
     _postponeCtx.routineId=a;_postponeCtx.dateStr=b;
     const dt=new Date(b);
     dt.setDate(dt.getDate()+1);
     inp.type='datetime-local';
-    const pad=n=>n.toString().padStart(2,'0');
     inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    const r=(typeof routines!=='undefined'?routines:[]).find(x=>String(x.id)===String(a));
+    const name=r?(r.name||r.text||'שגרה'):null;
+    subtitle=r
+      ?`💪 <b>${String(name).slice(0,80).replace(/</g,'&lt;')}</b><br><span style="font-size:11px">מופע מתוכנן: ${fmtDateTime(new Date(b))}</span>`
+      :`⚠️ שגרה לא נמצאה (id ${a}) — יתכן שנמחקה`;
   } else if(type==='bill'){
     _postponeCtx.taskId=a;
     inp.type='date';
-    const b=bills.find(x=>x.id===a);
-    const dt=b&&b.payDate?new Date(b.payDate):new Date();
+    const bill=bills.find(x=>x.id===a);
+    const dt=bill&&bill.payDate?new Date(bill.payDate):new Date();
     dt.setDate(dt.getDate()+1);
     inp.value=dt.toISOString().slice(0,10);
+    subtitle=bill
+      ?`💳 <b>${(bill.name||'חשבון').slice(0,80).replace(/</g,'&lt;')}</b>${bill.amount?' — ₪'+bill.amount:''}<br><span style="font-size:11px">${bill.payDate?'תאריך תשלום: '+fmtDate(new Date(bill.payDate)):'ללא תאריך'}</span>`
+      :`⚠️ חשבון לא נמצא (id ${a}) — יתכן שנמחק`;
   } else if(type==='crm'){
     _postponeCtx.bpItemId=a;
     inp.type='date';
     const dt=new Date();dt.setDate(dt.getDate()+1);
     inp.value=dt.toISOString().slice(0,10);
+    const it=(typeof backlogItems!=='undefined'?backlogItems:[]).find(x=>x.id===a||String(x.id)===String(a));
+    subtitle=it
+      ?`📋 <b>${(it.text||'פריט').slice(0,80).replace(/</g,'&lt;')}</b>${it.dueDate?'<br><span style="font-size:11px">יעד נוכחי: '+fmtDate(new Date(it.dueDate))+'</span>':''}`
+      :`⚠️ פריט לא נמצא (id ${a}) — יתכן שנמחק`;
   }
+  if(sub)sub.innerHTML=subtitle||'';
   ov.classList.add('on');popup.classList.add('on');
 }
 function closePostpone(){
