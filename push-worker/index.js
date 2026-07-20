@@ -36,8 +36,20 @@ async function vapidAuth(endpoint,pub,privJwk,subject){
 }
 
 // ── Send push ──────────────────────────────────────────────────────────────────
-async function sendPush(sub,title,body,env){
-  const payload=JSON.stringify({title,body,icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',vibrate:[200,100,200]});
+// notif shape: {title, body, actions?, payload?, requireInteraction?, tag?}
+// - payload carries {type, id, stage} so the SW can filter by IDB status and
+//   route notificationclick to the right deep link.
+// - actions: array of {action, title} — SW passes to showNotification.
+async function sendPush(sub,notif,env){
+  const body={
+    title:notif.title||'Alfred 🔔',body:notif.body||'',
+    icon:'./icon.svg',badge:'./icon.svg',dir:'rtl',vibrate:[200,100,200]
+  };
+  if(notif.actions&&Array.isArray(notif.actions))body.actions=notif.actions;
+  if(notif.payload)body.payload=notif.payload;
+  if(notif.requireInteraction)body.requireInteraction=true;
+  if(notif.tag)body.tag=notif.tag;
+  const payload=JSON.stringify(body);
   const [enc,auth]=await Promise.all([encrypt(sub,payload),vapidAuth(sub.endpoint,env.VAPID_PUBLIC_KEY,env.VAPID_PRIVATE_JWK,env.VAPID_SUBJECT)]);
   return fetch(sub.endpoint,{method:'POST',headers:{Authorization:auth,'Content-Type':'application/octet-stream','Content-Encoding':'aes128gcm',TTL:'86400'},body:enc});
 }
@@ -57,12 +69,18 @@ export default {
       return new Response('OK',{headers:CORS});
     }
 
-    // POST /schedule — store scheduled notifications
+    // POST /schedule — store scheduled notifications (now also persists
+    // actions/payload/requireInteraction/tag for Stage 2+ SW-side filtering)
     if(url.pathname==='/schedule'&&req.method==='POST'){
       const{userId,notifications}=await req.json();
       for(const n of notifications){
         const ttl=Math.max(60,Math.ceil((new Date(n.fireAt)-Date.now())/1000)+3600);
-        await env.KV.put(`notif:${n.id}`,JSON.stringify({userId,title:n.title,body:n.body,fireAt:n.fireAt}),{expirationTtl:ttl});
+        const stored={userId,title:n.title,body:n.body,fireAt:n.fireAt};
+        if(n.actions)stored.actions=n.actions;
+        if(n.payload)stored.payload=n.payload;
+        if(n.requireInteraction)stored.requireInteraction=true;
+        if(n.tag)stored.tag=n.tag;
+        await env.KV.put(`notif:${n.id}`,JSON.stringify(stored),{expirationTtl:ttl});
       }
       return new Response('OK',{headers:CORS});
     }
@@ -96,12 +114,17 @@ export default {
       },{},2),{headers:{...CORS,'Content-Type':'application/json'}});
     }
 
-    // POST /send-now — immediately send a push (test)
+    // POST /send-now — immediately send a push (test). Accepts optional
+    // actions/payload/requireInteraction/tag for testing the v2 shape.
     if(url.pathname==='/send-now'&&req.method==='POST'){
-      const{userId,title,body}=await req.json();
+      const body=await req.json();
+      const{userId}=body;
       const sub=JSON.parse(await env.KV.get(`sub:${userId}`)||'null');
       if(!sub)return new Response(JSON.stringify({error:'no subscription for '+userId}),{status:404,headers:{...CORS,'Content-Type':'application/json'}});
-      const r=await sendPush(sub,title||'🧪 Test',body||'immediate test',env);
+      const r=await sendPush(sub,{
+        title:body.title||'🧪 Test',body:body.body||'immediate test',
+        actions:body.actions,payload:body.payload,requireInteraction:body.requireInteraction,tag:body.tag
+      },env);
       return new Response(JSON.stringify({status:r.status,ok:r.ok}),{headers:{...CORS,'Content-Type':'application/json'}});
     }
 
@@ -118,7 +141,7 @@ export default {
       const sub=JSON.parse(await env.KV.get(`sub:${notif.userId}`)||'null');
       if(sub){
         try{
-          const r=await sendPush(sub,notif.title,notif.body,env);
+          const r=await sendPush(sub,notif,env);
           // 410 = subscription expired, 404 = gone — delete subscription too
           if(r.status===410||r.status===404)await env.KV.delete(`sub:${notif.userId}`);
         }catch(e){console.error('sendPush failed:',e);}

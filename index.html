@@ -1944,6 +1944,40 @@ function buildSmartPushBatch(windowMs){
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fmt=d=>d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
   const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return t.getUTCFullYear()+'-W'+String(Math.ceil((((t-y)/86400000)+1)/7)).padStart(2,'0');};
+  // ── Stage 2: derive payload {type, id, stage} from notif id prefix so the
+  // SW (Stage 3+) can filter and route. Kept close to buildSmartPushBatch
+  // to co-locate id-format knowledge with the code that produces it.
+  function _derivePayloadFromId(id){
+    if(!id)return null;
+    if(id.startsWith('task_'))return{type:'task',id:id.slice(5),stage:'primary'};
+    if(id.startsWith('tmorning_'))return{type:'task',id:id.slice(9),stage:'morning'};
+    if(id.startsWith('overdue_'))return{type:'task',id:id.slice(8),stage:'overdue'};
+    if(id.startsWith('fup_task_'))return{type:'task',id:id.slice(9),stage:'followup'};
+    if(id.startsWith('fup_r_')){
+      const rest=id.slice(6);const us=rest.indexOf('_');
+      if(us<0)return null;
+      return{type:'routine',id:rest.slice(0,us)+'__'+rest.slice(us+1),stage:'followup'};
+    }
+    if(id.startsWith('rslot_')){
+      const rest=id.slice(6);const us=rest.indexOf('_');
+      if(us<0)return null;
+      return{type:'routine',id:rest.slice(0,us)+'__'+rest.slice(us+1),stage:'primary'};
+    }
+    if(id.startsWith('rmorning_')){
+      const rest=id.slice(9);const us=rest.indexOf('_');
+      if(us<0)return null;
+      return{type:'routine',id:rest.slice(0,us)+'__'+rest.slice(us+1),stage:'morning'};
+    }
+    if(id.startsWith('bill_')){
+      // Formats: bill_payday_<id>, bill_deadline_<id>, bill_<id>
+      const parts=id.split('_');
+      const bid=parts[parts.length-1];const stage=parts.length>=3?parts[1]:'primary';
+      return{type:'bill',id:bid,stage};
+    }
+    return null;// morning_ (daily briefing) and others — no per-item payload
+  }
+  const V2_DEFAULT_ACTIONS=[{action:'done',title:'✓ בוצע'},{action:'snooze',title:'⏰ דחה'}];
+  const _v2Enabled=(typeof notifV2Enabled==='function'&&notifV2Enabled());
   function queue(id,title,body,fireAt,extras){
     if(seen.has(id))return;const delay=fireAt-now;
     if(delay<=0||delay>WIN)return;seen.add(id);
@@ -1955,6 +1989,17 @@ function buildSmartPushBatch(windowMs){
       if(extras.actions)entry.actions=extras.actions;
       if(extras.payload)entry.payload=extras.payload;
       if(extras.requireInteraction)entry.requireInteraction=true;
+    }
+    // Auto-attach payload if caller didn't provide one — safe to include
+    // even with v2 flag off (SW currently ignores unknown fields).
+    if(!entry.payload){
+      const p=_derivePayloadFromId(id);
+      if(p)entry.payload=p;
+    }
+    // Auto-attach default v2 actions ONLY when flag is on AND the caller
+    // hasn't provided its own actions (followup notifications keep theirs).
+    if(_v2Enabled&&!entry.actions&&entry.payload){
+      entry.actions=V2_DEFAULT_ACTIONS;
     }
     batch.push(entry);
   }
