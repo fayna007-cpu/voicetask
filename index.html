@@ -1518,6 +1518,164 @@ const CATS={
   מקצועי:{kw:['לקוח','פגישה','עבודה','מייל','פרויקט','דוח','משרד','שיחה','זום','ישיבה'],c:'#818cf8'},
   כללי:{kw:[],c:'#fbbf24'}
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// ── Notification v2 — IndexedDB shadow store + feature flag (Stage 1)
+// ═══════════════════════════════════════════════════════════════════
+// notif_state is a minimal mirror of tasks/routines/backlogItems/bills
+// used by the Service Worker to filter push notifications by live status.
+// localStorage remains the primary source of truth in the client; this
+// mirror is written on every save() and never read by the client itself
+// (except during boot migration verification and boot re-sync from IDB
+// which is Stage 4). The SW reads it in the push event handler.
+//
+// Feature flag `vt_notif_v2_enabled` (default OFF for Stage 1) gates
+// Stages 3-5. When OFF, this module still writes to IDB (safe, no
+// downstream effects), but SW filtering/actions/escalation are dormant.
+
+function notifV2Enabled(){try{return localStorage.getItem('vt_notif_v2_enabled')==='1';}catch(_){return false;}}
+function notifV2SetEnabled(on){try{localStorage.setItem('vt_notif_v2_enabled',on?'1':'0');}catch(_){}}
+function notifV2BumpWriteFailure(){try{const n=+(localStorage.getItem('vt_notif_write_failures')||0)+1;localStorage.setItem('vt_notif_write_failures',String(n));return n;}catch(_){return -1;}}
+
+const NOTIF_DB_NAME='vt_notif_db';
+const NOTIF_DB_VERSION=1;
+const NOTIF_STORE='notif_state';
+let _notifDbPromise=null;
+function _notifOpenDb(){
+  if(_notifDbPromise)return _notifDbPromise;
+  _notifDbPromise=new Promise((resolve,reject)=>{
+    try{
+      const req=indexedDB.open(NOTIF_DB_NAME,NOTIF_DB_VERSION);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(NOTIF_STORE)){
+          const os=db.createObjectStore(NOTIF_STORE,{keyPath:'key'});
+          os.createIndex('type','type',{unique:false});
+        }
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    }catch(e){reject(e);}
+  }).catch(err=>{console.error('[notif_state] open failed',err);notifV2BumpWriteFailure();_notifDbPromise=null;throw err;});
+  return _notifDbPromise;
+}
+async function notifStatePut(record){
+  try{
+    const db=await _notifOpenDb();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(NOTIF_STORE,'readwrite');
+      tx.oncomplete=()=>res();
+      tx.onerror=()=>rej(tx.error);
+      tx.objectStore(NOTIF_STORE).put(record);
+    });
+  }catch(e){console.error('[notif_state] put failed',record?.key,e);notifV2BumpWriteFailure();throw e;}
+}
+async function notifStatePutBulk(records){
+  try{
+    const db=await _notifOpenDb();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(NOTIF_STORE,'readwrite');
+      tx.oncomplete=()=>res();
+      tx.onerror=()=>rej(tx.error);
+      const os=tx.objectStore(NOTIF_STORE);
+      for(const r of records)os.put(r);
+    });
+  }catch(e){console.error('[notif_state] bulk put failed',e);notifV2BumpWriteFailure();throw e;}
+}
+async function notifStateGet(key){
+  try{
+    const db=await _notifOpenDb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction(NOTIF_STORE,'readonly');
+      const req=tx.objectStore(NOTIF_STORE).get(key);
+      req.onsuccess=()=>res(req.result||null);
+      req.onerror=()=>rej(req.error);
+    });
+  }catch(e){console.error('[notif_state] get failed',key,e);return null;}
+}
+async function notifStateDelete(key){
+  try{
+    const db=await _notifOpenDb();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(NOTIF_STORE,'readwrite');
+      tx.oncomplete=()=>res();
+      tx.onerror=()=>rej(tx.error);
+      tx.objectStore(NOTIF_STORE).delete(key);
+    });
+  }catch(e){console.error('[notif_state] delete failed',key,e);notifV2BumpWriteFailure();throw e;}
+}
+async function notifStateGetAll(){
+  try{
+    const db=await _notifOpenDb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction(NOTIF_STORE,'readonly');
+      const req=tx.objectStore(NOTIF_STORE).getAll();
+      req.onsuccess=()=>res(req.result||[]);
+      req.onerror=()=>rej(req.error);
+    });
+  }catch(e){console.error('[notif_state] getAll failed',e);return[];}
+}
+
+// Build shadow record from a source item — kept minimal (SW-facing fields only).
+function _notifStateRecordFor(type,item){
+  if(!item||item.id==null)return null;
+  const key=type+':'+item.id;
+  const rec={key,type,id:item.id,updatedAt:Date.now()};
+  if(type==='task'){
+    rec.completed=!!item.completed;
+    rec.status=item.completed?'done':(item.skipped?'skipped':'open');
+    rec.datetime=item.datetime||null;
+    rec.important=!!item.important;
+  }else if(type==='routine'){
+    rec.enabled=item.enabled!==false;
+    rec.completedDates=Array.isArray(item.completedDates)?item.completedDates.slice():[];
+    rec.skippedDates=Array.isArray(item.skippedDates)?item.skippedDates.slice():[];
+    rec.important=!!item.important;
+  }else if(type==='crm'){
+    rec.status=item.status||'open';
+    rec.dueDate=item.dueDate||null;
+  }else if(type==='bill'){
+    rec.status=item.status||'pending';
+    rec.payDate=item.payDate||null;
+    rec.deadline=item.deadline||null;
+  }
+  return rec;
+}
+function shadowTasks(){try{const recs=(tasks||[]).map(t=>_notifStateRecordFor('task',t)).filter(Boolean);notifStatePutBulk(recs).catch(()=>{});}catch(e){console.error('[notif_state] shadowTasks failed',e);notifV2BumpWriteFailure();}}
+function shadowRoutines(){try{const recs=(routines||[]).map(r=>_notifStateRecordFor('routine',r)).filter(Boolean);notifStatePutBulk(recs).catch(()=>{});}catch(e){console.error('[notif_state] shadowRoutines failed',e);notifV2BumpWriteFailure();}}
+function shadowBacklog(){try{const recs=(typeof backlogItems!=='undefined'?backlogItems:[]).map(i=>_notifStateRecordFor('crm',i)).filter(Boolean);notifStatePutBulk(recs).catch(()=>{});}catch(e){console.error('[notif_state] shadowBacklog failed',e);notifV2BumpWriteFailure();}}
+function shadowBills(){try{const recs=(typeof bills!=='undefined'?bills:[]).map(b=>_notifStateRecordFor('bill',b)).filter(Boolean);notifStatePutBulk(recs).catch(()=>{});}catch(e){console.error('[notif_state] shadowBills failed',e);notifV2BumpWriteFailure();}}
+
+// One-time migration — verifies success before setting the flag.
+async function notifStateMigrateIfNeeded(){
+  try{
+    if(localStorage.getItem('vt_notif_migrated')==='1')return;
+    const recs=[];
+    (tasks||[]).forEach(t=>{const r=_notifStateRecordFor('task',t);if(r)recs.push(r);});
+    (routines||[]).forEach(x=>{const r=_notifStateRecordFor('routine',x);if(r)recs.push(r);});
+    (typeof backlogItems!=='undefined'?backlogItems:[]).forEach(x=>{const r=_notifStateRecordFor('crm',x);if(r)recs.push(r);});
+    (typeof bills!=='undefined'?bills:[]).forEach(x=>{const r=_notifStateRecordFor('bill',x);if(r)recs.push(r);});
+    if(!recs.length){localStorage.setItem('vt_notif_migrated','1');return;}
+    await notifStatePutBulk(recs);
+    // Verify: read back count for every key we just wrote — flag only set after full success.
+    const stored=await notifStateGetAll();
+    const storedKeys=new Set(stored.map(r=>r.key));
+    const missing=recs.filter(r=>!storedKeys.has(r.key));
+    if(missing.length){
+      console.error('[notif_state] migration incomplete — missing',missing.length,'records; flag NOT set');
+      notifV2BumpWriteFailure();
+      return;
+    }
+    localStorage.setItem('vt_notif_migrated','1');
+    console.log('[notif_state] migration OK —',recs.length,'records');
+  }catch(e){
+    console.error('[notif_state] migration failed',e);
+    notifV2BumpWriteFailure();
+  }
+}
+// Kick off migration on load; safe to run in parallel with the rest of boot.
+setTimeout(()=>{try{notifStateMigrateIfNeeded();}catch(_){}},0);
+
 let tasks=JSON.parse(localStorage.getItem('vt2')||'[]');
 let customNotifs=JSON.parse(localStorage.getItem('vt_custom_notifs')||'[]');
 let routines=JSON.parse(localStorage.getItem('vt_routines')||'[]').map(r=>r.timesPerWeek!=null?r:{...r,name:r.text||r.name||'',timesPerWeek:Math.max(1,r.days?.length||3),preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}});
@@ -2679,7 +2837,7 @@ async function syncAllPending(){
   toast(parts.join(' · ')||'✅ הכל תקין');
   scheduleSmartPushNotifs();
 }
-function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge()}
+function save(){localStorage.setItem('vt2',JSON.stringify(tasks));updateBadge();try{shadowTasks();}catch(e){console.error('[notif_state] shadowTasks in save() threw',e);notifV2BumpWriteFailure();}}
 function toggleDone(id){const t=tasks.find(x=>x.id===id);if(t){const wasComp=t.completed;t.completed=!t.completed;vibrate(8);save();
   if(!wasComp&&t.completed&&t.wasRescheduled&&typeof bumpMissedStat==='function'){try{bumpMissedStat('totalCompletedAfterReschedule','task');delete t.wasRescheduled;save();}catch(_){}}
   render();}}
@@ -3171,7 +3329,7 @@ function migrateRoutine(r){
     preferredDays:r.days||[],timeWindow:'specific',specificTime:r.time||'09:00',
     weeklyReminderDay:-1,weeklyReminderTime:'08:00',scheduledWeeks:{}};
 }
-function saveRoutines(){localStorage.setItem('vt_routines',JSON.stringify(routines));}
+function saveRoutines(){localStorage.setItem('vt_routines',JSON.stringify(routines));try{shadowRoutines();}catch(e){console.error('[notif_state] shadowRoutines in saveRoutines() threw',e);notifV2BumpWriteFailure();}}
 
 function getPrevWeekKey(){
   const d=new Date();d.setDate(d.getDate()-7);return getWeekKey(d);
@@ -4787,7 +4945,7 @@ const BP_PRI_DOT={high:'🔴',medium:'🟡',low:'🟢'};
 const BP_PRI_ORD={high:0,medium:1,low:2};
 const BP_STA_ORD={active:0,idea:1,blocked:2,done:3};
 function saveBpLists(){localStorage.setItem('vt_backlog_lists',JSON.stringify(backlogLists));}
-function saveBpItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(backlogItems));}
+function saveBpItems(){localStorage.setItem('vt_backlog_items',JSON.stringify(backlogItems));try{shadowBacklog();}catch(e){console.error('[notif_state] shadowBacklog in saveBpItems() threw',e);notifV2BumpWriteFailure();}}
 // keep old names as aliases for backward compat
 function saveBacklogLists(){saveBpLists();}
 function saveBacklogItems(){saveBpItems();}
@@ -9857,7 +10015,7 @@ function getBillCategoryValue(){
   return sel.value;
 }
 
-function saveBills(){localStorage.setItem('vt_bills',JSON.stringify(bills));}
+function saveBills(){localStorage.setItem('vt_bills',JSON.stringify(bills));try{shadowBills();}catch(e){console.error('[notif_state] shadowBills in saveBills() threw',e);notifV2BumpWriteFailure();}}
 
 function openBillsSheet(){
   document.getElementById('billsOverlay').classList.add('on');
