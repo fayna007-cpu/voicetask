@@ -426,6 +426,14 @@
         </div>
         <div class="settings-row-arrow">›</div>
       </div>
+      <div class="settings-row" onclick="v2DebugOpen()">
+        <div class="settings-row-ico" style="background:oklch(0.55 0.14 30 / 0.2);color:oklch(0.78 0.16 30)">🐛</div>
+        <div class="settings-row-body">
+          <div class="settings-row-title">יומן debug v2</div>
+          <div class="settings-row-sub">הצג את הלוגים האחרונים לאבחון בעיות עם התראות</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
     </div>
     <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between">לוח התראות<button onclick="refreshJourneyOnly()" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 8px;border-radius:8px">↺ רענן</button></div>
     <div class="settings-cards" id="pushJourneyList" style="margin-bottom:4px;border-radius:18px;overflow:visible;border:none;margin:0 16px 4px;background:transparent"></div>
@@ -1215,6 +1223,17 @@
   <button class="dp-btn" onclick="closeDailyPopup()">יאללה, בואו נתחיל ✓</button>
 </div>
 
+<!-- Debug log overlay (v2 diagnostics) -->
+<div id="v2DebugOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:oklch(0 0 0 / 0.92);color:#eee;font-family:monospace;font-size:11px;padding:14px;overflow-y:auto;padding-top:calc(14px + var(--sat,0px));padding-bottom:calc(14px + var(--sab,0px))">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;position:sticky;top:0;background:oklch(0 0 0 / 0.92);padding-bottom:8px">
+    <strong style="flex:1;font-size:14px">🐛 v2 debug log</strong>
+    <button onclick="v2DebugClear()" style="padding:6px 10px;background:#c33;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:11px;cursor:pointer">Clear</button>
+    <button onclick="v2DebugCopy()" style="padding:6px 10px;background:#369;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:11px;cursor:pointer">Copy</button>
+    <button onclick="v2DebugClose()" style="padding:6px 10px;background:#666;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:11px;cursor:pointer">✕</button>
+  </div>
+  <pre id="v2DebugContent" style="white-space:pre-wrap;word-break:break-all;line-height:1.5;margin:0"></pre>
+</div>
+
 <!-- Missed-Task Priority Popup (blocking, for important items) -->
 <div class="mpp-overlay" id="mppOverlay">
   <div class="mpp-card" id="mppCard" role="dialog" aria-modal="true">
@@ -1548,6 +1567,33 @@ const CATS={
 // Stages 3-5. When OFF, this module still writes to IDB (safe, no
 // downstream effects), but SW filtering/actions/escalation are dormant.
 
+// ── In-app debug log (client-side console tap) ──
+// Persists last 100 log lines that mention v2 to localStorage so they
+// survive cold-starts. SW logs are stored in IDB (below) and merged
+// on read.
+const VT_V2_LOG_KEY='vt_v2_debug_log';
+const VT_V2_LOG_MAX=120;
+function _v2LogPersist(level,args){
+  try{
+    let s=args.map(a=>{
+      if(typeof a==='string')return a;
+      if(a&&typeof a==='object'){try{return JSON.stringify(a).slice(0,300);}catch(_){return String(a);}}
+      return String(a);
+    }).join(' ');
+    if(!s.includes('v2:')&&!s.includes('[sw:'))return;
+    const arr=JSON.parse(localStorage.getItem(VT_V2_LOG_KEY)||'[]');
+    arr.push({t:Date.now(),lvl:level,msg:s,src:'client'});
+    if(arr.length>VT_V2_LOG_MAX)arr.splice(0,arr.length-VT_V2_LOG_MAX);
+    localStorage.setItem(VT_V2_LOG_KEY,JSON.stringify(arr));
+  }catch(_){}
+}
+(function(){
+  const _origLog=console.log,_origWarn=console.warn,_origErr=console.error;
+  console.log=function(...a){try{_v2LogPersist('log',a);}catch(_){}_origLog.apply(console,a);};
+  console.warn=function(...a){try{_v2LogPersist('warn',a);}catch(_){}_origWarn.apply(console,a);};
+  console.error=function(...a){try{_v2LogPersist('error',a);}catch(_){}_origErr.apply(console,a);};
+})();
+
 function notifV2Enabled(){try{return localStorage.getItem('vt_notif_v2_enabled')==='1';}catch(_){return false;}}
 function notifV2SetEnabled(on){
   try{localStorage.setItem('vt_notif_v2_enabled',on?'1':'0');}catch(_){}
@@ -1811,6 +1857,39 @@ async function notifV2HandleUrlAction(){
     setTimeout(()=>{try{_v2RouteAction(action,type,id);}catch(e){console.error('[v2:handleUrl] route failed',e);}},0);
   }catch(e){console.error('[v2:handleUrl] failed',e);}
 }
+
+// ── Debug overlay controls ──
+async function v2DebugOpen(){
+  const ov=document.getElementById('v2DebugOverlay');const el=document.getElementById('v2DebugContent');
+  if(!ov||!el)return;
+  // Merge client logs (localStorage) + SW logs (IDB) by timestamp.
+  let clientLogs=[];try{clientLogs=JSON.parse(localStorage.getItem(VT_V2_LOG_KEY)||'[]');}catch(_){}
+  let swLogs=[];try{const rec=await notifStateGet('debug:log');if(rec&&Array.isArray(rec.entries))swLogs=rec.entries.map(x=>({...x,src:'sw'}));}catch(_){}
+  const all=[...clientLogs,...swLogs].sort((a,b)=>a.t-b.t);
+  const fmt=t=>{const d=new Date(t);return d.toTimeString().slice(0,8)+'.'+String(d.getMilliseconds()).padStart(3,'0');};
+  const lvlColor=lvl=>lvl==='error'?'#f88':lvl==='warn'?'#fc8':'#8cf';
+  el.innerHTML=all.length
+    ?all.map(e=>`<div style="margin-bottom:4px;padding:4px 6px;background:oklch(1 0 0 / 0.05);border-right:2px solid ${lvlColor(e.lvl)}"><span style="color:#888">${fmt(e.t)} ${e.src==='sw'?'[sw]':'[cl]'}</span> <span style="color:${lvlColor(e.lvl)}">${(e.msg||'').replace(/</g,'&lt;')}</span></div>`).join('')
+    :'<div style="color:#888">אין לוגים עדיין. הפעל את הפעולה שברצונך לאבחן ופתח שוב.</div>';
+  ov.style.display='block';
+}
+function v2DebugClose(){const ov=document.getElementById('v2DebugOverlay');if(ov)ov.style.display='none';}
+async function v2DebugClear(){
+  try{localStorage.removeItem(VT_V2_LOG_KEY);}catch(_){}
+  try{await notifStateDelete('debug:log');}catch(_){}
+  const el=document.getElementById('v2DebugContent');if(el)el.textContent='(נוקה)';
+}
+async function v2DebugCopy(){
+  let clientLogs=[];try{clientLogs=JSON.parse(localStorage.getItem(VT_V2_LOG_KEY)||'[]');}catch(_){}
+  let swLogs=[];try{const rec=await notifStateGet('debug:log');if(rec&&Array.isArray(rec.entries))swLogs=rec.entries.map(x=>({...x,src:'sw'}));}catch(_){}
+  const all=[...clientLogs,...swLogs].sort((a,b)=>a.t-b.t);
+  const fmt=t=>new Date(t).toTimeString().slice(0,8);
+  const txt=all.map(e=>`${fmt(e.t)} ${e.src==='sw'?'[sw]':'[cl]'} ${e.lvl.toUpperCase()} ${e.msg}`).join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('הועתק ל-clipboard');}
+  catch(_){toast('העתק ידנית — לחץ ארוך על הטקסט');}
+}
+// URL trigger: /?debug=1 opens the overlay after boot.
+setTimeout(()=>{try{if(new URLSearchParams(location.search||'').get('debug')==='1')v2DebugOpen();}catch(_){}},600);
 
 // Live sync when the SW marks something done while the app is already open,
 // AND deep-link routing when the user taps an already-open notification.

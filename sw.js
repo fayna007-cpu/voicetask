@@ -1,4 +1,4 @@
-const V = 'alfred-v24';
+const V = 'alfred-v25';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -49,6 +49,31 @@ async function _swV2Enabled(){
   const rec=await _swIdbGet('meta:v2Enabled');
   return !!(rec&&rec.enabled);
 }
+// ── SW debug log — writes to IDB debug:log for the in-app viewer ──
+async function _swLogPersist(level,parts){
+  try{
+    const s='[sw:v2] '+parts.map(p=>{
+      if(typeof p==='string')return p;
+      if(p&&typeof p==='object'){try{return JSON.stringify(p).slice(0,300);}catch(_){return String(p);}}
+      return String(p);
+    }).join(' ');
+    const existing=await _swIdbGet('debug:log');
+    const arr=(existing&&Array.isArray(existing.entries))?existing.entries:[];
+    arr.push({t:Date.now(),lvl:level,msg:s});
+    if(arr.length>60)arr.splice(0,arr.length-60);
+    await _swIdbPut({key:'debug:log',entries:arr});
+  }catch(_){}
+}
+// Wrap console so all our existing [sw:v2] logs get captured without editing
+// every call site. Only messages containing [sw: are persisted to keep noise
+// (fetch/install/other SW chatter) out of the debug view.
+(function(){
+  const _l=console.log,_w=console.warn,_e=console.error;
+  const shouldCapture=a=>a.some(x=>typeof x==='string'&&x.includes('[sw:'));
+  console.log=function(...a){if(shouldCapture(a))_swLogPersist('log',a);_l.apply(console,a);};
+  console.warn=function(...a){if(shouldCapture(a))_swLogPersist('warn',a);_w.apply(console,a);};
+  console.error=function(...a){if(shouldCapture(a))_swLogPersist('error',a);_e.apply(console,a);};
+})();
 // Given the payload {type, id, stage}, return true if the item is already
 // resolved and the notification should be swallowed.
 async function _swShouldSwallow(payload){
@@ -129,6 +154,7 @@ self.addEventListener('push', e => {
   let data={title:'Alfred 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
   const payload=data.payload||data.data||null;
+  console.log('[sw:v2] push arrived, title=',data.title,'payload=',payload,'hasActions=',!!(data.actions&&data.actions.length));
   const opts={
     body:data.body||'',
     icon:'./icon.svg',badge:'./icon.svg',
@@ -161,6 +187,7 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   const action=e.action;
   const payload=e.notification.data||{};
+  console.log('[sw:v2] notificationclick action=',action||'(body)','payload=',payload);
   e.notification.close();
   e.waitUntil((async()=>{
     const v2=await _swV2Enabled().catch(()=>false);
