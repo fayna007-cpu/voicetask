@@ -1912,6 +1912,14 @@ setTimeout(()=>{try{if(new URLSearchParams(location.search||'').get('debug')==='
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',ev=>{
     const m=ev.data;if(!m)return;
+    // Announce SW takeover in the debug log (fires from the SW's activate
+    // handler after it calls clients.claim). Useful for verifying that a
+    // newly-deployed SW actually took over an already-open client without
+    // needing to force-close the app.
+    if(m.type==='VT_SW_ACTIVATED'){
+      console.log('[v2:sw] activated version:',m.version);
+      return;
+    }
     // Warm-client deep-link path — fired when user taps a notification while
     // the app is running (foreground OR minimized). SW also called focus()
     // and possibly client.navigate(), but the router runs regardless so the
@@ -3087,7 +3095,27 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&siriLive)s
 
 // ── PWA ───────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./sw.js').then(reg=>{
+    // Poll for SW updates when the tab becomes visible again. Combined with
+    // the SW's skipWaiting + clients.claim, this makes a newly-deployed
+    // version take control within seconds of the user returning to the app,
+    // instead of waiting until they force-close it.
+    const checkForUpdate=()=>{try{reg.update();}catch(_){}};
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdate();});
+    window.addEventListener('focus',checkForUpdate);
+    // Log any new SW installation so the debug view surfaces takeovers.
+    reg.addEventListener('updatefound',()=>{
+      const nw=reg.installing;
+      console.log('[v2:sw] updatefound — installing new SW');
+      if(nw)nw.addEventListener('statechange',()=>console.log('[v2:sw] new SW state:',nw.state));
+    });
+  }).catch(()=>{});
+  // If a new SW takes control while the app is open, log it (SW posts
+  // VT_SW_ACTIVATED from its activate handler). The client's other message
+  // handlers already ignore unknown types.
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    console.log('[v2:sw] controllerchange — new SW is now controlling this client');
+  });
   // Play sound when a push arrives while the app is open
   navigator.serviceWorker.addEventListener('message',e=>{
     if(e.data&&e.data.type==='SHOW_NOTIFICATION')playNotifSound();

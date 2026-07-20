@@ -1,4 +1,4 @@
-const V = 'alfred-v27';
+const V = 'alfred-v28';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -144,17 +144,40 @@ async function _swMarkDone(payload){
 }
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(V).then(c => c.addAll(STATIC)));
-  self.skipWaiting();
+  // skipWaiting() returns a promise; must be inside waitUntil so the
+  // install lifecycle actually waits for the "waiting" state to be
+  // skipped before completing. Fire-and-forget outside waitUntil lets
+  // the install resolve before skipWaiting has taken effect, leaving
+  // the old SW in control until the client closes the tab manually.
+  e.waitUntil((async()=>{
+    try{
+      const c=await caches.open(V);
+      await c.addAll(STATIC);
+    }catch(err){console.error('[sw] install cache failed',err);}
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== V).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  // clients.claim() returns a promise. Awaiting inside waitUntil
+  // guarantees this SW is controlling every open client BEFORE any
+  // subsequent push/notificationclick event is routed. Without this
+  // the newly-installed SW may activate but the old SW keeps serving
+  // events until the user force-closes the app — which is exactly
+  // what we're fixing.
+  e.waitUntil((async()=>{
+    try{
+      const keys=await caches.keys();
+      await Promise.all(keys.filter(k => k !== V).map(k => caches.delete(k)));
+    }catch(err){console.error('[sw] activate cache cleanup failed',err);}
+    await self.clients.claim();
+    // Announce takeover to any currently-open client so it can
+    // reload or at least sync in-memory state to match new code.
+    try{
+      const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+      cs.forEach(c=>{try{c.postMessage({type:'VT_SW_ACTIVATED',version:V});}catch(_){}});
+    }catch(_){}
+  })());
 });
 
 self.addEventListener('push', e => {
