@@ -1847,6 +1847,21 @@ async function notifV2HandleUrlAction(){
         }
       }catch(e){console.error('[v2:handleUrl] IDB read failed',e);}
     }
+    // Path 3 — lastPushArrival heuristic (iOS body-tap without
+    // notificationclick firing). If a push arrived <30s ago and hasn't been
+    // consumed yet, assume this app-open is a response to it.
+    if(!action||!type||!id){
+      try{
+        const rec=await notifStateGet('meta:lastPushArrival');
+        if(rec&&rec.at&&(Date.now()-rec.at)<30000&&!rec.consumed&&rec.payload&&rec.payload.type&&rec.payload.id!=null){
+          action='snooze';type=rec.payload.type;id=String(rec.payload.id);
+          source='lastArrival';
+          console.log('[v2:handleUrl] fell back to lastPushArrival heuristic (age='+(Date.now()-rec.at)+'ms)');
+          // Mark consumed so a second app-open in the same window doesn't re-fire.
+          try{await notifStatePut({...rec,consumed:true});}catch(_){}
+        }
+      }catch(e){console.error('[v2:handleUrl] lastPushArrival read failed',e);}
+    }
     if(!action||!type||!id){console.log('[v2:handleUrl] no pending deep link');return;}
 
     // Clear both sources so refresh/relaunch doesn't re-trigger.

@@ -1,4 +1,4 @@
-const V = 'alfred-v25';
+const V = 'alfred-v26';
 const STATIC = ['./manifest.json', './icon.svg'];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -50,9 +50,15 @@ async function _swV2Enabled(){
   return !!(rec&&rec.enabled);
 }
 // ── SW debug log — writes to IDB debug:log for the in-app viewer ──
+// Two entry points:
+//   _swLogPersist(...)   — returns a promise; callers inside waitUntil()
+//                          MUST await it or its IDB write races SW death.
+//   _swLogSync(msg)      — best-effort fire-and-forget, only used from the
+//                          console.log wrapper for casual logs where losing
+//                          the last line is acceptable.
 async function _swLogPersist(level,parts){
   try{
-    const s='[sw:v2] '+parts.map(p=>{
+    const s=(typeof parts==='string')?parts:parts.map(p=>{
       if(typeof p==='string')return p;
       if(p&&typeof p==='object'){try{return JSON.stringify(p).slice(0,300);}catch(_){return String(p);}}
       return String(p);
@@ -64,6 +70,7 @@ async function _swLogPersist(level,parts){
     await _swIdbPut({key:'debug:log',entries:arr});
   }catch(_){}
 }
+function _swLogSync(msg){_swLogPersist('log',msg);/* fire-and-forget */}
 // Wrap console so all our existing [sw:v2] logs get captured without editing
 // every call site. Only messages containing [sw: are persisted to keep noise
 // (fetch/install/other SW chatter) out of the debug view.
@@ -154,7 +161,6 @@ self.addEventListener('push', e => {
   let data={title:'Alfred 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
   const payload=data.payload||data.data||null;
-  console.log('[sw:v2] push arrived, title=',data.title,'payload=',payload,'hasActions=',!!(data.actions&&data.actions.length));
   const opts={
     body:data.body||'',
     icon:'./icon.svg',badge:'./icon.svg',
@@ -169,6 +175,15 @@ self.addEventListener('push', e => {
   // v2: read live status from IDB and swallow if resolved.
   // If IDB read or flag lookup throws → fail-open (show the notification).
   e.waitUntil((async()=>{
+    // Log FIRST inside waitUntil so the IDB write is guaranteed to commit
+    // before the SW is terminated. Awaited on purpose.
+    await _swLogPersist('log','[sw:v2] push arrived, title='+data.title+' payload='+JSON.stringify(payload||{})+' hasActions='+!!(data.actions&&data.actions.length));
+    // Also stash the last push arrival timestamp+payload so if
+    // notificationclick fails to fire (iOS quirk), the client can still
+    // spot "the most recent notification" on cold boot.
+    if(payload&&payload.type&&payload.id!=null){
+      try{await _swIdbPut({key:'meta:lastPushArrival',payload,at:Date.now()});}catch(_){}
+    }
     try{
       const v2=await _swV2Enabled();
       if(v2&&payload&&await _swShouldSwallow(payload)){
@@ -187,9 +202,13 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   const action=e.action;
   const payload=e.notification.data||{};
-  console.log('[sw:v2] notificationclick action=',action||'(body)','payload=',payload);
   e.notification.close();
   e.waitUntil((async()=>{
+    // Guaranteed-committed log AT THE TOP of waitUntil. If this line
+    // doesn't appear in the debug viewer after tapping a notification,
+    // notificationclick did NOT fire on the OS — iOS PWA quirk where
+    // body-taps sometimes just launch the app and skip the SW event.
+    await _swLogPersist('log','[sw:v2] notificationclick action='+(action||'(body)')+' payload='+JSON.stringify(payload||{}));
     const v2=await _swV2Enabled().catch(()=>false);
 
     // v2 "בוצע": write completion to IDB and STOP. No client open.
