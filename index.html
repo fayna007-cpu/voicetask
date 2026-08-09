@@ -3409,12 +3409,17 @@ function openPostpone(type,a,b){
   const fmtDateTime=d=>d.toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   const fmtDate=d=>d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'});
   let subtitle='';
+  // Never default to a past datetime — for missed items originally scheduled
+  // many days ago, "+1 day" is still in the past and would silently reschedule
+  // to the past → item reappears as missed immediately.
+  const _minFuture=()=>{const d=new Date();d.setMinutes(d.getMinutes()+60);d.setSeconds(0,0);return d;};
   if(type==='task'){
     _postponeCtx.taskId=a;
     const t=tasks.find(x=>x.id===a);
     console.log('[v2:openPostpone] step4-task: found task=',!!t,'text=',t?.text,'datetime=',t?.datetime);
-    const dt=t?new Date(t.datetime):new Date();
+    let dt=t?new Date(t.datetime):new Date();
     dt.setDate(dt.getDate()+1);
+    if(dt.getTime()<Date.now())dt=_minFuture();
     inp.type='datetime-local';
     inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     subtitle=t
@@ -3423,8 +3428,9 @@ function openPostpone(type,a,b){
     console.log('[v2:openPostpone] step5-task: inp.value=',inp.value,'subtitle built');
   } else if(type==='routine'){
     _postponeCtx.routineId=a;_postponeCtx.dateStr=b;
-    const dt=new Date(b);
+    let dt=new Date(b);
     dt.setDate(dt.getDate()+1);
+    if(dt.getTime()<Date.now())dt=_minFuture();
     inp.type='datetime-local';
     inp.value=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     const r=(typeof routines!=='undefined'?routines:[]).find(x=>String(x.id)===String(a));
@@ -3436,8 +3442,11 @@ function openPostpone(type,a,b){
     _postponeCtx.taskId=a;
     inp.type='date';
     const bill=bills.find(x=>x.id===a);
-    const dt=bill&&bill.payDate?new Date(bill.payDate):new Date();
+    let dt=bill&&bill.payDate?new Date(bill.payDate):new Date();
     dt.setDate(dt.getDate()+1);
+    // Never default to a past date for bill snooze either.
+    const nowMid=new Date();nowMid.setHours(0,0,0,0);
+    if(dt.getTime()<nowMid.getTime()){dt=new Date();dt.setDate(dt.getDate()+1);}
     inp.value=dt.toISOString().slice(0,10);
     subtitle=bill
       ?`💳 <b>${(bill.name||'חשבון').slice(0,80).replace(/</g,'&lt;')}</b>${bill.amount?' — ₪'+bill.amount:''}<br><span style="font-size:11px">${bill.payDate?'תאריך תשלום: '+fmtDate(new Date(bill.payDate)):'ללא תאריך'}</span>`
@@ -3475,8 +3484,10 @@ function openPostpone(type,a,b){
   }catch(e){console.error('[v2:openPostpone] EXCEPTION',e&&e.stack||String(e));}
 }
 function closePostpone(){
-  document.getElementById('postponeOverlay')?.classList.remove('on');
-  document.getElementById('postponePopup')?.classList.remove('on');
+  const ov=document.getElementById('postponeOverlay');
+  const popup=document.getElementById('postponePopup');
+  if(ov){ov.classList.remove('on');ov.style.display='';}
+  if(popup){popup.classList.remove('on');popup.style.display='';}
 }
 async function confirmPostpone(){
   const inp=document.getElementById('postponeDtInput');
@@ -3507,12 +3518,15 @@ async function confirmPostpone(){
         }
       });
     });
-    if(oldIndex===-1){toast('לא נמצא האירוע');return;}
+    // If the old instance is missing from scheduledWeeks (already purged
+    // by a previous reschedule or week cleanup), don't bail — proceed to
+    // create the new event. Old-instance calendar purge is best-effort
+    // via purgeRoutineInstance which handles missing gracefully.
     closePostpone();toast('⏳ דוחה ומנקה יומן...');
     // Purge ALL events for this routine on the old date (handles duplicates)
     await purgeRoutineInstance(r.id,dateStr).catch(()=>{});
-    // Remove from old week
-    r.scheduledWeeks[oldWk].splice(oldIndex,1);
+    // Remove from old week if it was found
+    if(oldIndex!==-1&&oldWk){r.scheduledWeeks[oldWk].splice(oldIndex,1);}
     // Create new calendar event
     let newEventId=null;
     try{const ev=await createCalendarEvent(r,newDt);newEventId=ev?.id||null;}catch(_){}
@@ -8915,13 +8929,28 @@ function scanMissedItems(){
   if(!s.enabled)return;
   const now=Date.now();
   const pending=getMissedPending();
-  // Revival pass: dismissed entries whose last surface/dismiss was on a previous day become eligible again.
+  // Revival pass: only 'snooze' dismisses re-appear next day (bills tap
+  // "תזכיר מחר"). Explicit "לא רלוונטי" dismisses are permanent — user
+  // told us they don't want to see it again.
+  // Also auto-purge items whose original detection date is > 7 days ago
+  // AND have already been dismissed at least once (giving the user 7 days
+  // of nudges is enough; keeping them forever creates the exact problem
+  // the user reported).
   let dirty=false;
-  pending.forEach(p=>{
-    if(p.status==='dismissed'&&p.lastShownAt&&!_msIsToday(p.lastShownAt)){
+  const purgeCutoff=now-7*86400000;
+  const kept=[];
+  for(const p of pending){
+    // Purge: dismissed items detected > 7 days ago
+    if(p.status==='dismissed'&&p.detectedAt&&new Date(p.detectedAt).getTime()<purgeCutoff){
+      dirty=true;continue;// drop from array
+    }
+    // Revival — snooze only
+    if(p.status==='dismissed'&&p.dismissReason==='snooze'&&p.lastShownAt&&!_msIsToday(p.lastShownAt)){
       p.status='pending_suggestion';p.lastShownAt=null;p.suggestedSlot=null;dirty=true;
     }
-  });
+    kept.push(p);
+  }
+  pending.length=0;pending.push(...kept);
   // Dedup against ANY existing entry for the same source (regardless of status).
   const existingSig=new Set(pending.map(p=>p.sourceType+':'+p.sourceId));
   const winMs=(s.defaultWindowMode==='eod'?null:(s.defaultWindowMinutes*60*1000));
@@ -9408,20 +9437,25 @@ function msBillPaid(pendingId){
 function msNotRelevant(pendingId){
   const tp=_msTestItems.find(x=>x.id===pendingId);
   if(tp){_msTestItems=_msTestItems.filter(x=>x.id!==pendingId);toast('הוסר (בדיקה)');try{render();}catch(_){}return;}
-  // Mark dismissed + stamp lastShownAt so scanner won't revive until a new day.
+  // "לא רלוונטי" is permanent — dismissReason='not_relevant' tells the
+  // scanner's revival pass to leave this alone forever (until the 7-day
+  // purge cutoff removes it entirely).
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);if(!p)return;
-  p.status='dismissed';p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
+  p.status='dismissed';p.dismissReason='not_relevant';
+  p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
+  p.escalationCount=(p.escalationCount||0)+1;
   saveMissedPending(arr);
   _msShownThisSession.delete(pendingId);
   toast('סומן כלא רלוונטי');
   try{render();}catch(_){}
 }
 function msDismiss(pendingId,days){
-  // Mark dismissed + stamp lastShownAt so the once-per-day cap applies naturally.
-  // The `days` arg is legacy — the daily revival logic in scanMissedItems handles re-surfacing tomorrow.
+  // "תזכיר מחר" / "הבנתי" for bills — snooze that resurfaces next day.
   const arr=getMissedPending();const p=arr.find(x=>x.id===pendingId);
   if(!p){try{render();}catch(_){}return;}
-  p.status='dismissed';p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
+  p.status='dismissed';p.dismissReason='snooze';
+  p.dismissedAt=new Date().toISOString();p.lastShownAt=new Date().toISOString();
+  p.escalationCount=(p.escalationCount||0)+1;
   saveMissedPending(arr);
   _msShownThisSession.delete(pendingId);
   try{render();}catch(_){}
@@ -9477,8 +9511,15 @@ function mppCheck(){
   const pending=getMissedPending();
   const eligible=pending.filter(p=>{
     if(p.sourceType!=='task'&&p.sourceType!=='routine')return false;
-    if(p.status!=='pending_suggestion'&&p.status!=='dismissed')return false;
-    if(!_mppIsImportantSource(p))return false;
+    // Only surface fresh items — not already-dismissed. (Dismissed
+    // items should stay dismissed per the user's explicit signal.)
+    if(p.status!=='pending_suggestion')return false;
+    // Two paths qualify:
+    //   1. Source is marked important — always priority-worthy.
+    //   2. Item has been dismissed 2+ times already — repeated
+    //      dismissals earn escalation regardless of importance flag.
+    const qualifies=_mppIsImportantSource(p)||(p.escalationCount||0)>=2;
+    if(!qualifies)return false;
     if(_mppShownThisSession.has(p.id))return false;
     if(p.lastShownAt&&_msIsToday(p.lastShownAt))return false;
     if(!_missedItemDisplayData(p))return false;
@@ -9493,7 +9534,9 @@ async function _mppShowNext(){
   if(_mppActiveId)return;
   const id=_mppQueue.shift();if(!id)return;
   const pending=getMissedPending();const p=pending.find(x=>x.id===id);
-  if(!p||!_mppIsImportantSource(p)){return _mppShowNext();}
+  // Same eligibility as mppCheck — allow important OR escalated (dismissed 2+ times).
+  const qualifies=p&&(_mppIsImportantSource(p)||(p.escalationCount||0)>=2);
+  if(!qualifies){return _mppShowNext();}
   // Ensure a suggested slot exists
   if(!p.suggestedSlot){try{p.suggestedSlot=await suggestNextSlot(p);saveMissedPending(pending);}catch(_){}}
   _mppActiveId=id;
