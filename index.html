@@ -7792,14 +7792,25 @@ function updateFabVisibility(){
 // ── Draggable FAB ────────────────────────────────────────────────────────────
 function initFabDrag(){
   const fab=document.getElementById('asstFab');if(!fab)return;
-  // Restore saved position
+  // Restore saved position — but validate first. If the saved coords are
+  // off-screen (rotated device, iOS zoom, previous drag went behind the
+  // status bar or nav), reset to the CSS default instead of applying an
+  // invisible position.
   try{
     const saved=JSON.parse(localStorage.getItem('vt_fab_pos')||'null');
     if(saved&&saved.x!=null&&saved.y!=null){
-      fab.style.left=saved.x+'px';
-      fab.style.top=saved.y+'px';
-      fab.style.bottom='auto';
-      fab.style.right='auto';
+      const w=window.innerWidth,h=window.innerHeight;
+      const navH=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-h'))||70;
+      const minX=8,maxX=w-64-8,minY=60,maxY=h-64-navH-8;
+      if(saved.x<minX||saved.x>maxX||saved.y<minY||saved.y>maxY){
+        console.log('[fab] saved position out of bounds, resetting',saved);
+        localStorage.removeItem('vt_fab_pos');
+      }else{
+        fab.style.left=saved.x+'px';
+        fab.style.top=saved.y+'px';
+        fab.style.bottom='auto';
+        fab.style.right='auto';
+      }
     }
   }catch(_){}
   let startX=0,startY=0,origX=0,origY=0,moved=false,dragging=false;
@@ -9509,16 +9520,20 @@ function mppCheck(){
   if(!s.enabled||!s.priorityPopupEnabled)return;
   if(_mppActiveId)return;
   const pending=getMissedPending();
+  const now=Date.now();
   const eligible=pending.filter(p=>{
     if(p.sourceType!=='task'&&p.sourceType!=='routine')return false;
-    // Only surface fresh items — not already-dismissed. (Dismissed
-    // items should stay dismissed per the user's explicit signal.)
     if(p.status!=='pending_suggestion')return false;
-    // Two paths qualify:
-    //   1. Source is marked important — always priority-worthy.
-    //   2. Item has been dismissed 2+ times already — repeated
-    //      dismissals earn escalation regardless of importance flag.
-    const qualifies=_mppIsImportantSource(p)||(p.escalationCount||0)>=2;
+    // Three paths qualify for the priority modal:
+    //   1. Source marked important.
+    //   2. Item dismissed 1+ times already (repeated ignoring).
+    //   3. Item has been in the pending list > 24h without action —
+    //      i.e., the card was surfaced yesterday, user didn't touch it,
+    //      time to escalate to a blocking prompt.
+    const dismissed=(p.escalationCount||0)>=1;
+    const ageHours=p.detectedAt?(now-new Date(p.detectedAt).getTime())/3600000:0;
+    const stale=ageHours>=24;
+    const qualifies=_mppIsImportantSource(p)||dismissed||stale;
     if(!qualifies)return false;
     if(_mppShownThisSession.has(p.id))return false;
     if(p.lastShownAt&&_msIsToday(p.lastShownAt))return false;
@@ -9534,8 +9549,10 @@ async function _mppShowNext(){
   if(_mppActiveId)return;
   const id=_mppQueue.shift();if(!id)return;
   const pending=getMissedPending();const p=pending.find(x=>x.id===id);
-  // Same eligibility as mppCheck — allow important OR escalated (dismissed 2+ times).
-  const qualifies=p&&(_mppIsImportantSource(p)||(p.escalationCount||0)>=2);
+  // Same eligibility as mppCheck — important OR dismissed OR stale (>24h old).
+  const nowTs=Date.now();
+  const ageHours=p?.detectedAt?(nowTs-new Date(p.detectedAt).getTime())/3600000:0;
+  const qualifies=p&&(_mppIsImportantSource(p)||(p.escalationCount||0)>=1||ageHours>=24);
   if(!qualifies){return _mppShowNext();}
   // Ensure a suggested slot exists
   if(!p.suggestedSlot){try{p.suggestedSlot=await suggestNextSlot(p);saveMissedPending(pending);}catch(_){}}
