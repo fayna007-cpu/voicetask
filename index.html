@@ -4417,28 +4417,49 @@ function closeRoutineTimeEdit(safeId){
 function saveRoutineInstanceTime(safeId,routineId,oldDateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   const inp=document.getElementById('redt-'+safeId);if(!inp||!inp.value)return;
-  const newDt=new Date(inp.value).toISOString();
-  // Replace in scheduledWeeks
-  let replaced=false;
+  return moveRoutineInstance(routineId,oldDateStr,new Date(inp.value).toISOString()).then(res=>{
+    if(!res.ok){toast('לא נמצא האירוע');return;}
+    toast(res.calendar==='failed'?'⚠️ מועד עודכן — היומן לא עודכן':'✅ מועד עודכן');
+  });
+}
+// ONE place that moves a routine instance (manual time edit). The instance and its tracking move together;
+// when it has a calendar event, that event is replaced exactly once (same purge/create functions as
+// confirmPostpone); when it has none, the calendar is left alone. A calendar failure never blocks the move.
+// Returns {ok, calendar:'none'|'moved'|'failed'}.
+async function moveRoutineInstance(routineId,oldDateStr,newDt){
+  const r=routines.find(x=>x.id==routineId);if(!r)return{ok:false};
+  let oldEv=null,replaced=false;
   Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
-    const arr=r.scheduledWeeks[wk];
-    arr.forEach((item,i)=>{
+    r.scheduledWeeks[wk].forEach((item,i)=>{
       const dt=typeof item==='string'?item:item?.dt;
       if(dt===oldDateStr){
+        if(item&&typeof item==='object'&&item.eventId&&!String(item.eventId).startsWith('local_'))oldEv=item.eventId;
         r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};
         replaced=true;
       }
     });
   });
-  if(!replaced){toast('לא נמצא האירוע');return;}
-  // Update completedDates / skippedDates refs
+  if(!replaced)return{ok:false};
   [r.completedDates,r.skippedDates].forEach(arr=>{
     if(!arr)return;
     const idx=arr.indexOf(oldDateStr);
     if(idx!==-1)arr[idx]=newDt;
   });
   saveRoutines();render();
-  toast('✅ מועד עודכן');
+  let calendar='none';
+  if(oldEv){
+    let ev=null;
+    try{
+      if(!await purgeRoutineInstance(r.id,oldDateStr))await deleteCalendarEvent(oldEv);   // no marker hit -> by id
+      ev=await createCalendarEvent(r,newDt);
+    }catch(_){}
+    const okEv=ev&&ev.id&&!String(ev.id).startsWith('local_');
+    Object.values(r.scheduledWeeks).forEach(arr=>arr.forEach(item=>{if(item&&typeof item==='object'&&item.dt===newDt)item.eventId=okEv?ev.id:null;}));
+    calendar=okEv?'moved':'failed';
+    saveRoutines();
+  }
+  scheduleSmartPushNotifs();
+  return{ok:true,calendar};
 }
 
 // ── Energy System ────────────────────────────────────────
