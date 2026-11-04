@@ -703,7 +703,13 @@
   <div class="rsheet-head">
     <button class="rsheet-close-btn" onclick="QAdd.close()" aria-label="סגור">✕</button>
     <h3>➕ הוספה מהירה</h3>
-    <button class="rsheet-close-btn" onclick="QAdd.voice()" aria-label="הוסף בקול">🎤</button>
+    <button class="rsheet-close-btn" onclick="QAdd.voice()" aria-label="הוסף בקול">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
   </div>
   <div class="rsheet-scroll">
     <div class="rform">
@@ -11738,8 +11744,11 @@ function maybeShowDailyPopup(){
   const Q=window.QAdd=window.QAdd||{};
   const $=id=>document.getElementById(id);
   const TZ='Asia/Jerusalem';
-  const st={open:false,amb:null,manual:{title:false,date:false,time:false}};
+  const st={open:false,amb:null,alt:null,manual:{title:false,date:false,time:false}};
   const todayStr=()=>new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date());
+  const addDay=(ymd,n)=>new Date(Date.parse(ymd+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
+  // Flip-chip text: just the time, prefixed with the day only when it is a different day from the one shown.
+  const altLabel=(a,curDate)=>(a.date!==curDate?(a.date===todayStr()?'היום ':a.date===addDay(todayStr(),1)?'מחר ':a.date+' '):'')+a.time;
   const unresolved=()=>!!st.amb&&!st.manual.date&&!st.manual.time;
   function dayLabel(ymd){
     const diff=Math.round((Date.parse(ymd+'T00:00:00Z')-Date.parse(todayStr()+'T00:00:00Z'))/86400000);
@@ -11756,15 +11765,24 @@ function maybeShowDailyPopup(){
     const d=$('qaddDate').value,t=$('qaddTime').value;
     if(d)box.appendChild(chip('span','routine-badge','📅 '+dayLabel(d)));
     if(t)box.appendChild(chip('span','routine-badge','🕒 '+t));
+    if(st.alt&&!unresolved())box.appendChild(chip('button','quick-btn','⇄ '+altLabel(st.alt,d),flip));
     if(unresolved()){
-      box.appendChild(chip('span','qadd-hint',st.amb.reason==='ampm'?'בוקר או ערב?':'השעה הזו כבר עברה — מתי?'));
+      box.appendChild(chip('span','qadd-hint','השעה הזו כבר עברה — מתי?'));
       st.amb.options.forEach(o=>box.appendChild(chip('button','quick-btn',o.label,()=>pick(o))));
     }
   }
   function pick(o){
     if(o.pick){const tf=$('qaddTime');tf.focus();try{tf.showPicker&&tf.showPicker();}catch(_){}return;}
     $('qaddDate').value=o.date;$('qaddTime').value=o.time;
-    st.manual.date=st.manual.time=true;st.amb=null;render();
+    st.manual.date=st.manual.time=true;st.amb=null;st.alt=null;render();
+    $('qaddText').focus({preventScroll:true});   // back to the typing line, so Enter saves
+  }
+  // One tap swaps the preselected reading of a bare hour ("ב-7": 19:00 <-> 07:00) and keeps the old one as the new flip target.
+  function flip(){
+    const a=st.alt,cur={date:$('qaddDate').value,time:$('qaddTime').value};
+    $('qaddDate').value=a.date;$('qaddTime').value=a.time;
+    st.alt=cur;st.manual.date=st.manual.time=true;render();
+    $('qaddText').focus({preventScroll:true});
   }
   Q.onText=function(){
     const raw=$('qaddText').value,T=Q.time;
@@ -11774,10 +11792,12 @@ function maybeShowDailyPopup(){
     if(!st.manual.date)$('qaddDate').value=(r&&r.date)||'';
     if(!st.manual.time)$('qaddTime').value=(r&&r.time)||'';
     st.amb=(r&&r.ambiguity)||null;
+    if(!st.manual.date&&!st.manual.time)st.alt=(r&&r.alternative)||null;
     render();
   };
   Q.onField=function(k){
     st.manual[k]=$({title:'qaddTitle',date:'qaddDate',time:'qaddTime'}[k]).value!=='';
+    if(k!=='title')st.alt=null;   // the user set the date/time by hand — no flip suggestion any more
     render();
   };
   Q.enter=function(){
@@ -11807,7 +11827,7 @@ function maybeShowDailyPopup(){
   }
   Q.open=function(){
     if(!st.open){
-      st.manual={title:false,date:false,time:false};st.amb=null;
+      st.manual={title:false,date:false,time:false};st.amb=null;st.alt=null;
       ['qaddText','qaddTitle','qaddDate','qaddTime'].forEach(id=>{$(id).value='';});
       render();
       $('qaddOverlay').classList.add('on');$('qaddSheet').classList.add('on');

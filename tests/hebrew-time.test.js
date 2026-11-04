@@ -13,7 +13,10 @@ function check(name, fn) {
 function parseCase(name, text, exp, amb, optList, now) {
   check(name, () => {
     const r = parse(text, { now: new Date(now || NOW) });
-    for (const k of Object.keys(exp)) if (r[k] !== exp[k]) return `${k}: got ${JSON.stringify(r[k])}, want ${JSON.stringify(exp[k])}`;
+    for (const k of Object.keys(exp)) {
+      const got = k === 'alt' ? (r.alternative ? r.alternative.date + ' ' + r.alternative.time : null) : r[k];   // alt = flip chip "date time"
+      if (got !== exp[k]) return `${k}: got ${JSON.stringify(got)}, want ${JSON.stringify(exp[k])}`;
+    }
     const got = r.ambiguity ? r.ambiguity.reason : null;
     if (got !== amb) return `ambiguity: got ${got}, want ${amb}`;
     if (optList) {
@@ -45,9 +48,28 @@ parseCase('ב-7 בערב -> PM', 'מחר ב-7 בערב', { date: '2026-11-05', t
 parseCase('בשעה 6 אחה"צ -> PM', 'מחר בשעה 6 אחה"צ', { date: '2026-11-05', time: '18:00' }, null);
 parseCase('ב-8 בבוקר -> AM', 'מחר ב-8 בבוקר', { date: '2026-11-05', time: '08:00' }, null);
 parseCase('10 בלילה -> 22:00', 'מחר ב-10 בלילה', { date: '2026-11-05', time: '22:00' }, null);
-parseCase('2 בלילה -> 02:00 (not 14:00)', 'מחר ב-2 בלילה', { date: '2026-11-05', time: '02:00' }, null);
-parseCase('bare hour, no window -> ask AM/PM', 'מחר ב-7', { date: '2026-11-05', time: null }, 'ampm', ['2026-11-05 07:00', '2026-11-05 19:00']);
-parseCase('bare hour today: only the future option left', 'היום ב-9', { date: '2026-11-04', time: '21:00' }, null);
+parseCase('typed date + 2 בלילה -> 02:00 of the night AFTER that date', 'מחר ב-2 בלילה', { date: '2026-11-06', time: '02:00' }, null);
+parseCase('typed date + 12 בלילה -> the midnight after that date', 'מחר ב-12 בלילה', { date: '2026-11-06', time: '00:00' }, null);
+parseCase('typed future date, bare 7 -> 07:00 + flip to 19:00', 'מחר ב-7', { date: '2026-11-05', time: '07:00', alt: '2026-11-05 19:00' }, null);
+parseCase('typed היום, bare 9 at 10:00 -> 21:00 (only future reading), no flip', 'היום ב-9', { date: '2026-11-04', time: '21:00', alt: null }, null);
+
+// ── Bare hours: no question, preselect + flip chip (now = Wed 10:00 unless stated) ────────────────
+parseCase('"ב-7" -> 19:00 today, flip = tomorrow 07:00', 'ב-7', { date: '2026-11-04', time: '19:00', alt: '2026-11-05 07:00', ok: true }, null);
+parseCase('"ב-7" at 20:00 -> tomorrow 07:00, flip = tomorrow 19:00', 'ב-7', { date: '2026-11-05', time: '07:00', alt: '2026-11-05 19:00' }, null, null, '2026-11-04T18:00:00Z');
+parseCase('"ב-3" -> 15:00 (hours 1-6 are PM)', 'ב-3', { date: '2026-11-04', time: '15:00' }, null);
+parseCase('"בשעה 3" -> 15:00', 'בשעה 3 פגישה', { date: '2026-11-04', time: '15:00', title: 'פגישה' }, null);
+parseCase('"ב-9" at 08:00 -> 09:00 today, flip = 21:00', 'ב-9', { date: '2026-11-04', time: '09:00', alt: '2026-11-04 21:00' }, null, null, '2026-11-04T06:00:00Z');
+parseCase('"ב-9" at 23:00 -> tomorrow 09:00', 'ב-9', { date: '2026-11-05', time: '09:00', alt: '2026-11-05 21:00' }, null, null, '2026-11-04T21:00:00Z');
+parseCase('"ב-12" -> 12:00, no flip', 'ב-12', { date: '2026-11-04', time: '12:00', alt: null }, null);
+parseCase('"ב-5 ורבע" -> 17:15 + flip 05:15', 'מחר ב-5 ורבע', { date: '2026-11-05', time: '17:15', alt: '2026-11-05 05:15' }, null);
+parseCase('explicit window beats the heuristic: ב-7 בבוקר tomorrow', 'מחר ב-7 בבוקר', { date: '2026-11-05', time: '07:00', alt: null }, null);
+parseCase('typed היום, both readings passed -> past ambiguity (not moved)', 'היום ב-7', { date: '2026-11-04', time: null }, 'past', ['2026-11-05 07:00', '2026-11-05 19:00'], '2026-11-04T18:00:00Z');
+parseCase('number before a window needs no "ב": "מחר 7 בערב"', 'מחר 7 בערב פגישה', { date: '2026-11-05', time: '19:00', title: 'פגישה' }, null);
+parseCase('"3 אחה"צ" -> 15:00', '3 אחה"צ', { date: '2026-11-04', time: '15:00' }, null);
+parseCase('"10 בלילה" -> 22:00', '10 בלילה', { date: '2026-11-04', time: '22:00', alt: null }, null);
+parseCase('"12 בלילה" -> the coming midnight', '12 בלילה', { date: '2026-11-05', time: '00:00' }, null);
+parseCase('"2 בלילה" -> 02:00 of the coming night', '2 בלילה', { date: '2026-11-05', time: '02:00' }, null);
+parseCase('"2 בלילה" at 01:00 -> still ahead tonight', '2 בלילה', { date: '2026-11-04', time: '02:00' }, null, null, '2026-11-03T23:00:00Z');
 parseCase('leading zero = 24h, no question', 'מחר ב-08:30', { date: '2026-11-05', time: '08:30' }, null);
 
 // ── Past time, midnight, weekdays ────────────────────────────────────────────
@@ -65,7 +87,6 @@ parseCase('הערב + title', 'הערב: סידורים', { date: '2026-11-04', 
 parseCase('"2.5 ק"ג" is a quantity, not a date', 'לקנות 2.5 ק"ג עגבניות', { ok: false, date: null, time: null, title: 'לקנות 2.5 ק"ג עגבניות' }, null);
 parseCase('"12.50 ש"ח" is a price, not a time', 'לשלם 12.50 ש"ח', { ok: false, time: null }, null);
 parseCase('ב-7 וחצי בערב = 19:30', 'מחר ב-7 וחצי בערב', { date: '2026-11-05', time: '19:30', title: '' }, null);
-parseCase('ב-5 ורבע, no window -> ask, keeps :15', 'מחר ב-5 ורבע', { time: null }, 'ampm', ['2026-11-05 05:15', '2026-11-05 17:15']);
 parseCase('orphan separators collapse in title', 'תזכורת: מחר בבוקר: סידורים', { date: '2026-11-05', time: '08:00', title: 'תזכורת: סידורים' }, null);
 
 parseCase('"ארוחת ערב" is a meal, not 19:00 — title kept intact', 'להזמין שולחן לארוחת ערב', { ok: false, date: null, time: null, title: 'להזמין שולחן לארוחת ערב' }, null);

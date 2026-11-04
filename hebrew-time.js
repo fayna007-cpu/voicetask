@@ -85,27 +85,18 @@
     },
     timeColon: Nm('(?:ב-?|בשעה\\s*)?(\\d{1,2}):(\\d{2})'),
     timeDot: Nm('(?:ב-?|בשעה\\s*)?(\\d{1,2})\\.(\\d{2})' + NOT_UNIT),
-    timeBare: Nm('(?:ב-?|בשעה\\s*)(\\d{1,2})(?:\\s+(וחצי|ורבע)(?![' + HEB + ']))?')   // "ב-7 וחצי" = 7:30
+    timeBare: Nm('(?:ב-?|בשעה\\s*)(\\d{1,2})(?:\\s+(וחצי|ורבע)(?![' + HEB + ']))?'),  // "ב-7 וחצי" = 7:30
+    // "12 בלילה", "7 בערב", "3 אחה"צ": a number right before a time-of-day word is an hour (no "ב" needed)
+    timeWinNum: Nm('(\\d{1,2})(?=\\s+(?:בבוקר|בצהרי?ים|בערב|בלילה|אחה"צ|אחה\'צ|אחהצ|אחר\\s+הצהרי?ים|אחרי\\s+הצהרי?ים))')
   };
 
   function normalize(s) {   // 1:1 character replacements only, so indexes stay valid for the original text
     return s.replace(/[\u05BE\u2010-\u2015]/g, '-').replace(/[\u201C\u201D\u05F4]/g, '"').replace(/[\u2018\u2019\u05F3]/g, "'");
   }
 
-  // Bare hour 1-11 -> concrete time, using the time-of-day word. Returns {time} or {ampm:[am,pm]}.
-  function resolveHour(h, m, win, leadZero) {
-    var mm = pad(m);
-    if (h === 0 || h >= 13) return { time: pad(h) + ':' + mm };
-    if (h === 12) return { time: (win === 'night' ? '00' : '12') + ':' + mm };
-    if (win === 'afternoon' || win === 'evening') return { time: pad(h + 12) + ':' + mm };
-    if (win === 'noon') return { time: pad(h <= 5 ? h + 12 : h) + ':' + mm };
-    if (win === 'night') return { time: pad(h <= 5 ? h : h + 12) + ':' + mm };   // "2 בלילה" is 02:00, not 14:00
-    if (win === 'morning' || leadZero) return { time: pad(h) + ':' + mm };        // "08:30" is typed as 24h
-    return { ampm: [pad(h) + ':' + mm, pad(h + 12) + ':' + mm] };
-  }
-
   function parseHebrewDateTime(text, opts) {
-    var out = { ok: false, date: null, time: null, title: '', ambiguity: null };
+    // alternative = the other reading of a bare hour ({label,date,time}); the UI offers it as a one-tap flip.
+    var out = { ok: false, date: null, time: null, title: '', ambiguity: null, alternative: null };
     try {
       if (typeof text !== 'string') return out;
       var now = opts && opts.now instanceof Date && !isNaN(opts.now.getTime()) ? opts.now : new Date();
@@ -176,6 +167,7 @@
       }
 
       // 4) Time-of-day word (the earliest one in the text wins)
+      var numWin = take(RE.timeWinNum);   // looked up now, while the time-of-day word is still in the text
       var best = null, key;
       for (key in RE.win) { hit = take(RE.win[key]); if (hit && (!best || hit.start < best.hit.start)) best = { key: key, hit: hit }; }
       if (best) { eat(best.hit); if (!win) win = best.key; }
@@ -185,35 +177,55 @@
       if ((th = take(RE.timeColon)) && +th.m[3] <= 23 && +th.m[4] <= 59) tm = { h: +th.m[3], m: +th.m[4], lz: /^0\d/.test(th.m[3]) };
       else if ((th = take(RE.timeDot)) && +th.m[3] <= 23 && +th.m[4] <= 59) tm = { h: +th.m[3], m: +th.m[4], lz: /^0\d/.test(th.m[3]) };
       else if ((th = take(RE.timeBare)) && +th.m[3] <= 23) tm = { h: +th.m[3], m: th.m[4] === 'וחצי' ? 30 : th.m[4] === 'ורבע' ? 15 : 0, lz: false };
+      else if (numWin && +numWin.m[3] <= 23) { th = numWin; tm = { h: +numWin.m[3], m: 0, lz: false }; }
       if (tm) eat(th);
 
-      var time = null, ampm = null;
-      if (tm) { var r = resolveHour(tm.h, tm.m, win, tm.lz); time = r.time || null; ampm = r.ampm || null; }
-      else if (win) time = WINDOWS[win];
+      // 6) Resolve the time. No question is asked for a bare hour: preselect one reading, offer the other as `alternative`.
+      var time = null, alt = null, implied = !date, pastNone = null;
+      function occ(t) { return t >= nowHM ? today : tomorrow; }   // nearest upcoming occurrence of t when no date was typed
+      function altFor(t, d, rolls) {                               // the other reading; null if it would land in the past
+        var ad = d;
+        if (ad === today && t < nowHM) { if (!rolls) return null; ad = tomorrow; }
+        return { label: (ad !== d ? 'מחר ' : '') + t, date: ad, time: t };
+      }
+      if (tm) {
+        var h = tm.h, mm = pad(tm.m);
+        if (h === 0 || h >= 13) time = pad(h) + ':' + mm;                                   // 24h as typed
+        else if (h === 12 && win !== 'night') time = '12:' + mm;
+        else if (win === 'night' && (h === 12 || h <= 5)) {                                 // "12/1-5 בלילה": the coming night
+          time = pad(h === 12 ? 0 : h) + ':' + mm;
+          date = implied ? occ(time) : addDays(date, 1);                                    // typed date D -> the night after D
+        }
+        else if (win === 'afternoon' || win === 'evening' || win === 'night') time = pad(h + 12) + ':' + mm;
+        else if (win === 'noon') time = pad(h <= 5 ? h + 12 : h) + ':' + mm;
+        else if (win === 'morning' || tm.lz) time = pad(h) + ':' + mm;                      // "08:30" is typed as 24h
+        else {                                                                              // bare hour, no time-of-day word
+          var am = pad(h) + ':' + mm, pm = pad(h + 12) + ':' + mm, first;
+          if (h <= 6) { time = pm; alt = altFor(am, date || today, implied); }              // 1-6 -> PM
+          else if (implied || date === today) {                                             // 7-11 -> nearest upcoming
+            first = am >= nowHM ? am : pm >= nowHM ? pm : null;
+            if (first) { time = first; date = today; alt = altFor(first === am ? pm : am, today, implied); }
+            else if (implied) { time = am; date = tomorrow; alt = altFor(pm, tomorrow, false); }
+            else pastNone = [am, pm];                                                       // typed "היום", both readings passed
+          } else { time = am; alt = altFor(pm, date, false); }                              // typed future date -> morning first
+        }
+      } else if (win) time = WINDOWS[win];
 
-      if (!date && (time || ampm)) date = today;   // a time with no date means today
+      if (!date && time) date = today;   // a time with no date means today
       out.date = date;
       out.time = time;
 
-      // 6) Ambiguity — never guess silently
-      if (ampm) {
-        var opts2 = ampm;
-        if (date === today) opts2 = ampm.filter(function (t) { return t >= nowHM; });
-        if (opts2.length === 1) { out.time = opts2[0]; }
-        else if (opts2.length === 0) {
-          out.time = null;
-          out.ambiguity = { reason: 'past', options: ampm.map(function (t) { return { label: 'מחר ' + t, date: tomorrow, time: t }; }).concat([{ label: 'בחר זמן אחר', pick: true }]) };
-        } else {
-          out.time = null;
-          out.ambiguity = { reason: 'ampm', options: opts2.map(function (t) { return { label: t, date: date, time: t }; }) };
-        }
-      }
-      if (out.time && date === today && out.time < nowHM) {
+      // 7) Past times are never moved silently
+      if (pastNone) {
+        out.date = today;
+        out.ambiguity = { reason: 'past', options: pastNone.map(function (t) { return { label: 'מחר ' + t, date: tomorrow, time: t }; }).concat([{ label: 'בחר זמן אחר', pick: true }]) };
+      } else if (out.time && date === today && out.time < nowHM) {
         out.ambiguity = { reason: 'past', options: pastOptions(out.time) };   // date/time stay as typed
       }
+      out.alternative = out.ambiguity ? null : alt;
       return finish();
     } catch (e) {
-      return { ok: false, date: null, time: null, title: typeof text === 'string' ? text.trim() : '', ambiguity: null };
+      return { ok: false, date: null, time: null, title: typeof text === 'string' ? text.trim() : '', ambiguity: null, alternative: null };
     }
   }
 
