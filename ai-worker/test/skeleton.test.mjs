@@ -23,7 +23,7 @@ await check('localhost refused unless ALLOW_LOCALHOST=1', async () => {
   return a.status === 403 && b.status === 204 ? '' : `${a.status}/${b.status}`;
 });
 await check('/health works and never exposes a key value', async () => {
-  const r = await worker.fetch(req('/health', { headers: { Origin: GH } }), { ...ENV, OPENROUTER_API_KEY: 'sk-or-SECRET-TEST' });
+  const r = await worker.fetch(req('/health', { headers: { Origin: GH } }), { ...ENV, OPENROUTER_API_KEY: 'fake-test-key-SECRET' });
   const t = await r.text();
   return r.status === 200 && !t.includes('SECRET') && JSON.parse(t).keys.openrouter === true ? '' : t;
 });
