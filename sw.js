@@ -1,4 +1,4 @@
-const V = 'alfred-v32';
+const V = 'alfred-v33';
 const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js'];
 
 // ═══════════════════════════════════════════════════════════════════
