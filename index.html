@@ -11809,8 +11809,9 @@ function maybeShowDailyPopup(){
   const $=id=>document.getElementById(id);
   const TIMEOUT_MS=17000;                                       // the Worker itself stops at 15s
   const ADD_VERB=/^\s*(תוסיף|תוסיפי|הוסף|הוסיפי|להוסיף|תרשום|תרשמי|רשום|לרשום|תזכיר|תזכירי|תזכורת|תקבע|תקבעי|קבע|לקבוע|תכניס|תכניסי|צור|תיצור|add|remind)(?=[\s:,.!]|$)/i;
-  const LAYER_NAMES={groq_llama70:'Groq · Llama 3.3 70B',groq_gptoss120:'Groq · GPT-OSS 120B',groq_8b:'Groq · Llama 3.1 8B',workers_ai:'Workers AI · Llama 3.3 70B',or_xing:'OpenRouter · Xing 4.0'};
-  const layerName=l=>LAYER_NAMES[l]||l||'';
+  // Replies that claim to know the user's tasks/day. The model cannot see them, so such a claim is invented.
+  const FABRICATION=/יש לך \d+ (משימות|פגישות|אירועים)|היום יש לך|מחר יש לך|השבוע יש לך|יש לך (יום|שבוע) (עמוס|פנוי|רגוע|מלא)|(היום|השבוע|המחר|היומן) שלך (עמוס|פנוי|נראה|מלא|ריק)|אין לך (משימות|פגישות|כלום)|פספסת (את|\d)|תכננת (ל|את)/;
+  const NO_DATA_REPLY='אני לא רואה את המשימות שלך מכאן — שאל \'מה יש לי היום\' ואבדוק';
   const FAIL_TEXT={stopped:'הופסק. ההודעה שמורה — אפשר לנסות שוב.',offline:'אין חיבור לאינטרנט. ההודעה שמורה.',timeout:'העוזר לא ענה בזמן. ההודעה שמורה.',network:'לא הצלחתי להגיע לעוזר. ההודעה שמורה.',degraded:'העוזר לא זמין כרגע. ההודעה שמורה.',empty:'לא התקבלה תשובה תקינה מהעוזר.',error:'משהו השתבש מול העוזר.'};
   let ctrl=null;
 
@@ -11886,15 +11887,20 @@ function maybeShowDailyPopup(){
       title:unmask(t.title,map).slice(0,120),category:['אישי','מקצועי','כללי'].includes(t.category)?t.category:'',
       date_text:unmask(t.date_text,map).slice(0,40),time_text:unmask(t.time_text,map).slice(0,40),notes:unmask(t.notes,map).slice(0,300),checked:true
     })).filter(t=>t.title.trim());
-    saveStatus({layer:j.layer,model:j.model,ms:j.latencyMs,at:Date.now(),used:j.usage&&j.usage.used,cap:j.usage&&j.usage.cap});
-    const prov=layerName(j.layer);
+    saveStatus({layer:j.layer,label:j.label||j.layer,ms:j.latencyMs,at:Date.now(),used:j.usage&&j.usage.used,cap:j.usage&&j.usage.cap,missing:j.missing||[]});
+    const prov=j.label||j.layer||'';
+    if(res.intent==='query'){                                   // the model never answers about the user's data: the app does
+      chatHistory.push({role:'model',parts:[{text:A.answerQuery(res.filter)}],ts:Date.now(),provider:'נתונים מהמכשיר'});
+      return 'query';
+    }
     if((res.intent==='add_tasks'||res.intent==='add_routine')&&items.length&&!opts.forceChat){
       items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;});
       chatHistory.push({role:'model',kind:'proposal',id:'p'+Date.now(),ts:Date.now(),provider:prov,intent:res.intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending});
       return 'proposal';
     }
-    const msg=reply||items.map(t=>'• '+t.title).join('\n');
+    let msg=reply||items.map(t=>'• '+t.title).join('\n');
     if(!msg.trim())return fail('empty',text);
+    if(FABRICATION.test(msg))msg=NO_DATA_REPLY;                  // cheap guard against invented facts about the user's day
     chatHistory.push({role:'model',parts:[{text:msg}],ts:Date.now(),provider:prov});
     return 'reply';
   }
@@ -11924,6 +11930,24 @@ function maybeShowDailyPopup(){
     return outcome;
   };
   A.stop=function(){if(ctrl)ctrl.abort();};
+
+  // ── 'query': answered from the app's own data (same list style as the morning round) ──
+  A.answerQuery=function(f){
+    const range=(f&&f.range)||'today',cat=(f&&f.category)||'';
+    const sod=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x;};
+    const now=new Date(),today=sod(now),day=864e5;
+    const win={today:[today,new Date(+today+day)],tomorrow:[new Date(+today+day),new Date(+today+2*day)],week:[today,new Date(+today+7*day)],overdue:[new Date(0),now]}[range]||[today,new Date(+today+day)];
+    const inWin=dt=>{const d=new Date(dt);return d>=win[0]&&d<win[1];};
+    let items=tasks.filter(t=>!t.completed&&t.datetime&&inWin(t.datetime)&&(!cat||t.category===cat)).map(t=>({dt:t.datetime,text:t.text,ico:'📌'}));
+    if(range!=='overdue'){try{items=items.concat(getRoutineInstances().filter(r=>!r.completed&&inWin(r.datetime)&&(!cat||r.category===cat)).map(r=>({dt:r.datetime,text:r.text,ico:'🔄'})));}catch(_){}}
+    items.sort((a,b)=>new Date(a.dt)-new Date(b.dt));
+    const title={today:'היום',tomorrow:'מחר',week:'השבוע הקרוב',overdue:'באיחור'}[range]||'היום';
+    const fmt=dt=>{const d=new Date(dt);const t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');return range==='today'||range==='tomorrow'?t:d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'numeric'})+' '+t;};
+    const head=`📋 **${title}**${cat?' · '+cat:''}`;
+    if(!items.length)return head+'\n\n'+(range==='overdue'?'אין משימות באיחור 👌':'אין משימות '+title+' 🎉');
+    const shown=items.slice(0,12).map(i=>`${i.ico} ${fmt(i.dt)} — ${i.text}`).join('\n');
+    return head+'\n\n'+shown+(items.length>12?`\n…ועוד ${items.length-12}`:'');
+  };
 
   // ── Confirmation card ──
   const find=id=>chatHistory.find(m=>m.kind==='proposal'&&m.id===id);
@@ -11974,7 +11998,7 @@ function maybeShowDailyPopup(){
     });
     save();render();
     m.state='done';m.created=ids;saveChatHistory();renderChatMessages();
-    toast(`✓ נוספו ${ids.length} משימות`);
+    setTimeout(()=>toast(`✓ נוספו ${ids.length} משימות — אפשר לבטל בצ'אט`),700);   // after addTask's own sync toasts
   };
   A.undo=async function(id){
     const m=find(id);if(!m||m.state!=='done')return;
@@ -12007,23 +12031,25 @@ function maybeShowDailyPopup(){
     const s=loadStatus();if(!s||!(s.at||s.errAt))return '';
     const down=s.errAt&&(!s.at||s.errAt>s.at);
     const usage=s.cap?` · ~${s.used}/${s.cap} היום`:'';
-    return `<div class="chat-day-sep"><span>${down?'🔴 העוזר לא זמין כרגע':'🟢 '+esc(layerName(s.layer))}${usage}</span></div>`;
+    return `<div class="chat-day-sep"><span>${down?'🔴 העוזר לא זמין כרגע':'🟢 '+esc(s.label||s.layer||'')}${usage}</span></div>`;
   };
   function paintSettings(extra){
     const el=$('aiGatewayStatus');if(!el)return;
     const s=loadStatus();
-    const last=s&&s.at?`ענה לאחרונה: ${esc(layerName(s.layer))} · ${hhmm(s.at)}`:'עוד לא נשלחה הודעה';
+    const last=s&&s.at?`ענה לאחרונה: ${esc(s.label||s.layer||'')} · ${hhmm(s.at)}`:'עוד לא נשלחה הודעה';
     const usage=s&&s.cap?`<br>~${s.used}/${s.cap} בקשות היום`:'';
-    el.innerHTML=(extra?extra+'<br>':'')+last+usage;
+    // Model churn: a model id in the Worker config no longer exists at its provider.
+    const missing=(s&&s.missing||[]).map(m=>`<br><span class="cal-badge pending">⚠️ המודל ${esc(m.label||m.model||'')} לא זמין — צריך לעדכן הגדרות</span>`).join('');
+    el.innerHTML=(extra?extra+'<br>':'')+last+usage+missing;
   }
   A.checkConnection=async function(){
     const el=$('aiGatewayStatus');if(el)el.textContent='⏳ בודק את כל השכבות…';
     try{
       const r=await fetch(AI_GATEWAY+'/health?deep=1',{signal:AbortSignal.timeout(20000)});
       const j=await r.json();
-      if(j.usage)saveStatus({...(loadStatus()||{}),used:j.usage.used,cap:j.usage.cap});
+      if(j.usage||j.missing)saveStatus({...(loadStatus()||{}),...(j.usage?{used:j.usage.used,cap:j.usage.cap}:{}),...(j.missing?{missing:j.missing}:{})});
       if(!r.ok){paintSettings('❌ '+esc(j.message||('HTTP '+r.status)));return;}
-      const lines=(j.layers||[]).map(l=>`${l.ok?'✅':l.skippedUntil?'⏸':'❌'} ${esc(layerName(l.layer))}${l.ok?' · '+(l.ms/1000).toFixed(1)+'s':l.skippedUntil?' · מושהה עד '+hhmm(l.skippedUntil):''}`);
+      const lines=(j.layers||[]).map(l=>`${l.ok?'✅':l.skippedUntil?'⏸':'❌'} ${esc(l.label||l.layer)}${l.ok?' · '+(l.ms/1000).toFixed(1)+'s':l.skippedUntil?' · מושהה עד '+hhmm(l.skippedUntil):''}`);
       paintSettings(lines.join('<br>')||'אין שכבות מוגדרות');
     }catch(e){paintSettings('❌ אין חיבור לשער העוזר');}
   };
