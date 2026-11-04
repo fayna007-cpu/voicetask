@@ -1713,3 +1713,8 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .qadd-chips:empty{display:none}
 .qadd-chips .routine-badge{margin-bottom:0}
 .qadd-hint{flex-basis:100%;font-size:12px;color:var(--muted)}
+
+/* ── Assistant confirmation card (ai-*) — appended only: scroll hint for long cards ── */
+.chat-confirm-body.ai-items{position:relative}
+.chat-confirm-body.ai-items.ai-fade{-webkit-mask-image:linear-gradient(to bottom,#000 72%,transparent);mask-image:linear-gradient(to bottom,#000 72%,transparent)}
+.ai-more-hint{font-size:11px;font-weight:700;color:var(--muted);text-align:center;margin:-4px 0 8px}

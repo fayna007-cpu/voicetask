@@ -11812,6 +11812,9 @@ function maybeShowDailyPopup(){
   // Replies that claim to know the user's tasks/day. The model cannot see them, so such a claim is invented.
   const FABRICATION=/יש לך \d+ (משימות|פגישות|אירועים)|היום יש לך|מחר יש לך|השבוע יש לך|יש לך (יום|שבוע) (עמוס|פנוי|רגוע|מלא)|(היום|השבוע|המחר|היומן) שלך (עמוס|פנוי|נראה|מלא|ריק)|אין לך (משימות|פגישות|כלום)|פספסת (את|\d)|תכננת (ל|את)/;
   const NO_DATA_REPLY='אני לא רואה את המשימות שלך מכאן — שאל \'מה יש לי היום\' ואבדוק';
+  // Until C2, rescheduling is not done from chat: answer with a fixed pointer instead of an unrelated list.
+  const RESCHEDULE=/(^|\s)(תעביר|תעבירי|להעביר|תדחה|תדחי|לדחות|דחה|תזיז|תזיזי|להזיז|תקדים|תקדימי|להקדים)(?=\s|$)/;
+  const RESCHEDULE_REPLY='לדחייה השתמש בכפתור הדחייה';
   const FAIL_TEXT={stopped:'הופסק. ההודעה שמורה — אפשר לנסות שוב.',offline:'אין חיבור לאינטרנט. ההודעה שמורה.',timeout:'העוזר לא ענה בזמן. ההודעה שמורה.',network:'לא הצלחתי להגיע לעוזר. ההודעה שמורה.',degraded:'העוזר לא זמין כרגע. ההודעה שמורה.',empty:'לא התקבלה תשובה תקינה מהעוזר.',error:'משהו השתבש מול העוזר.'};
   let ctrl=null;
 
@@ -11889,6 +11892,10 @@ function maybeShowDailyPopup(){
     })).filter(t=>t.title.trim());
     saveStatus({layer:j.layer,label:j.label||j.layer,ms:j.latencyMs,at:Date.now(),used:j.usage&&j.usage.used,cap:j.usage&&j.usage.cap,missing:j.missing||[]});
     const prov=j.label||j.layer||'';
+    if((res.intent==='query'||res.intent==='other')&&RESCHEDULE.test(text)){
+      chatHistory.push({role:'model',parts:[{text:RESCHEDULE_REPLY}],ts:Date.now(),provider:'Alfred'});
+      return 'canned';
+    }
     if(res.intent==='query'){                                   // the model never answers about the user's data: the app does
       chatHistory.push({role:'model',parts:[{text:A.answerQuery(res.filter)}],ts:Date.now(),provider:'נתונים מהמכשיר'});
       return 'query';
@@ -11967,7 +11974,19 @@ function maybeShowDailyPopup(){
     }).join('');
     const n=m.items.filter(it=>it.checked).length;
     const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':`✓ הוסף (${n})`;
-    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body">${rows}</div><div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
+    setTimeout(A.paintHints,0);                                  // after the chat HTML is in the DOM
+    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div><div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
+  };
+  // Long cards scroll inside their body: show a fade + "עוד N ↓" while items are hidden below.
+  A.paintHints=function(){
+    document.querySelectorAll('#chatScroll .ai-items').forEach(box=>{
+      const hint=document.getElementById('aih-'+box.id.slice(4));if(!hint)return;
+      const below=[...box.children].filter(r=>r.offsetTop+r.offsetHeight>box.scrollTop+box.clientHeight+2).length;
+      const more=box.scrollHeight>box.clientHeight+2&&below>0;
+      box.classList.toggle('ai-fade',more);
+      hint.hidden=!more;
+      if(more)hint.textContent=`עוד ${below} ↓ — גלול לראות הכל`;
+    });
   };
   A.toggle=function(id,i,v){const m=find(id);if(!m||!m.items[i])return;m.items[i].checked=!!v;saveChatHistory();renderChatMessages();};
   A.cancel=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();};
