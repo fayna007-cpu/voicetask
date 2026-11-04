@@ -25,7 +25,7 @@ await check('localhost refused unless ALLOW_LOCALHOST=1', async () => {
 await check('/health works and never exposes a key value', async () => {
   const r = await worker.fetch(req('/health', { headers: { Origin: GH } }), { ...ENV, OPENROUTER_API_KEY: 'sk-or-SECRET-TEST' });
   const t = await r.text();
-  return r.status === 200 && !t.includes('SECRET') && JSON.parse(t).openrouterKey === true ? '' : t;
+  return r.status === 200 && !t.includes('SECRET') && JSON.parse(t).keys.openrouter === true ? '' : t;
 });
 await check('/assist from a foreign origin -> 403', async () => {
   const r = await worker.fetch(req('/assist', { method: 'POST', headers: { Origin: 'https://evil.example' }, body: '{}' }), ENV);
@@ -37,11 +37,11 @@ await check('/assist body > 8 KB -> 413 with a Hebrew message', async () => {
   return r.status === 413 && /8KB/.test(j.message) ? '' : `status ${r.status}`;
 });
 await check('dev routes do not exist in production (no DEV_BAKEOFF)', async () => {
-  const r = await worker.fetch(req('/__dev/models', { headers: { Origin: GH } }), ENV);
+  const r = await worker.fetch(req('/__dev/layer', { method: 'POST', headers: { Origin: GH }, body: '{}' }), ENV);
   return r.status === 404 ? '' : `status ${r.status}`;
 });
 await check('free-only guard refuses a non-:free id before any network call', async () => {
-  const r = await callOpenRouter({ OPENROUTER_API_KEY: 'x' }, [], { models: ['openai/gpt-5'] });
+  const r = await callOpenRouter({ OPENROUTER_API_KEY: 'x' }, [], { model: 'openai/gpt-5' }, 1000);
   return !r.ok && /free-only/.test(r.error) && isFreeId('a/b:free') && !isFreeId('openrouter/free') ? '' : JSON.stringify(r);
 });
 await check('validator accepts a correct reply', () => {
