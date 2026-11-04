@@ -1,0 +1,24 @@
+# alfred-ai — the single AI gateway for the Alfred PWA. Code only: NO secrets in this file.
+# Secret (set by the owner, never committed):  wrangler secret put OPENROUTER_API_KEY
+# Local dev reads it from ai-worker/.dev.vars (gitignored, created by the owner).
+name = "alfred-ai"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+workers_dev = true
+preview_urls = false        # no extra per-version URLs; the one workers.dev URL is the gateway
+
+# Workers AI, used through the binding (no key).
+[ai]
+binding = "AI"
+
+# Circuit breaker + coarse daily counter. Create with:  wrangler kv namespace create STATE
+[[kv_namespaces]]
+binding = "STATE"
+id = "5d9a5e3853de46cc88c51105b150e5cd"
+
+[vars]
+ALLOWED_ORIGINS = "https://fayna007-cpu.github.io"
+DAILY_CAP = "150"
+MAX_BODY = "8192"
+# Dev-only switches, passed on the command line, never set here:
+#   wrangler dev --var ALLOW_LOCALHOST:1 --var DEV_BAKEOFF:1

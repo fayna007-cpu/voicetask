@@ -21,9 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Publish ONLY the app (allow-list in tools/stage-site.mjs), never ai-worker/, tests/, tools/, push-worker/ ...
+      - name: Stage site (allow-list) and check every referenced file exists
+        run: node tools/stage-site.mjs && node tools/check-site.mjs _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

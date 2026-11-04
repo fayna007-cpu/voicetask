@@ -547,67 +547,12 @@
         <label class="rtoggle"><input type="checkbox" id="ns-productivity-weeklyReview" onchange="saveNotifSettings()"><span class="rtoggle-sl"></span></label>
       </div>
     </div>
-    <div class="settings-section">🤖 חיבור AI (Gemini)</div>
+    <div class="settings-section">🤖 חיבור AI</div>
     <div class="settings-cards">
-      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px">
-        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">מפתח API של Gemini</div><div class="settings-row-sub">קבל חינמי ב-aistudio.google.com → Get API Key</div></div>
-        <input type="password" class="bill-form-input" id="aiGeminiKey" placeholder="AIzaSy..." dir="ltr" onchange="saveAiSettings()" style="width:100%">
-        <div style="display:flex;gap:8px">
-          <button class="bill-form-import" onclick="testGeminiConnection()" style="flex:1">בדוק חיבור</button>
-          <a class="bill-form-import" href="https://aistudio.google.com/app/apikey" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל מפתח →</a>
-        </div>
-      </div>
-      <div class="settings-row" style="cursor:default">
-        <div class="settings-row-body"><div class="settings-row-title">מודל Gemini</div><div class="settings-row-sub">Lite = מכסה גבוהה · Flash = איכות</div></div>
-        <select class="settings-select" id="aiModel" onchange="saveAiSettings()">
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash (מומלץ)</option>
-          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (מכסה גבוהה)</option>
-          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
-          <option value="gemini-flash-latest">Gemini Flash Latest (תמיד מעודכן)</option>
-        </select>
-      </div>
-      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid var(--border);padding-top:14px">
-        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">🚀 מפתח Groq (גיבוי 1)</div><div class="settings-row-sub">14,400 בקשות/יום חינם — קבל ב-console.groq.com</div></div>
-        <input type="password" class="bill-form-input" id="aiGroqKey" placeholder="gsk_..." dir="ltr" onchange="saveAiSettings()" style="width:100%">
-        <div style="display:flex;gap:8px">
-          <button class="bill-form-import" onclick="testGroqConnection()" style="flex:1">בדוק Groq</button>
-          <a class="bill-form-import" href="https://console.groq.com/keys" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל מפתח →</a>
-        </div>
-      </div>
-      <div class="settings-row" style="cursor:default">
-        <div class="settings-row-body"><div class="settings-row-title">מודל Groq</div><div class="settings-row-sub">70B = איכות · 8B = מהיר ויציב</div></div>
-        <select class="settings-select" id="aiGroqModel" onchange="saveAiSettings()">
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-          <option value="llama-3.1-70b-versatile">Llama 3.1 70B</option>
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B (מהיר)</option>
-        </select>
-      </div>
-      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid var(--border);padding-top:14px">
-        <div class="settings-row-body" style="width:100%"><div class="settings-row-title">☁️ Cloudflare Workers AI (גיבוי 2 — אופציונלי)</div><div class="settings-row-sub">10,000 בקשות/יום חינם — דורש Account ID + Token</div></div>
-        <input type="password" class="bill-form-input" id="aiCfToken" placeholder="API Token" dir="ltr" onchange="saveAiSettings()" style="width:100%">
-        <input type="text" class="bill-form-input" id="aiCfAccount" placeholder="Account ID" dir="ltr" onchange="saveAiSettings()" style="width:100%">
-        <div style="display:flex;gap:8px">
-          <button class="bill-form-import" onclick="testCfConnection()" style="flex:1">בדוק CF</button>
-          <a class="bill-form-import" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="flex:1;text-align:center;text-decoration:none;line-height:24px">קבל Token →</a>
-        </div>
-      </div>
-      <div class="settings-row" style="cursor:default;border-top:1px solid var(--border);padding-top:14px">
-        <div class="settings-row-body"><div class="settings-row-title">סדר ספקים</div><div class="settings-row-sub">בחר ראשי + גיבוי. ברירת מחדל: Gemini→Groq→CF</div></div>
-        <select class="settings-select" id="aiProviderOrder" onchange="saveAiSettings()">
-          <option value="gemini,groq">Gemini → Groq (מומלץ)</option>
-          <option value="groq,gemini">Groq → Gemini</option>
-          <option value="gemini,groq,cloudflare">Gemini → Groq → CF</option>
-          <option value="groq,gemini,cloudflare">Groq → Gemini → CF</option>
-          <option value="gemini">Gemini בלבד</option>
-          <option value="groq">Groq בלבד</option>
-          <option value="cloudflare">Cloudflare בלבד</option>
-        </select>
-      </div>
       <div class="settings-row" style="cursor:default;align-items:flex-start;background:var(--surface);border-radius:10px">
         <div class="settings-row-ico" style="background:oklch(0.55 0.18 145 / 0.15);color:oklch(0.72 0.2 145)">🛡️</div>
-        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px;color:oklch(0.72 0.2 145)">סטטוס ספקים</div><div class="settings-row-sub" style="font-size:11px" id="aiProviderStatus">לא נבדק</div></div>
-        <button class="bill-form-import" onclick="testAllProviders()" style="font-size:11px">בדוק הכל</button>
+        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px;color:oklch(0.72 0.2 145)">סטטוס חיבור</div><div class="settings-row-sub" style="font-size:11px" id="aiGatewayStatus">לא נבדק</div></div>
+        <button class="bill-form-import" onclick="AlfredAI.checkConnection()" style="font-size:11px">בדוק חיבור</button>
       </div>
       <div class="settings-row" onclick="openAgentPersona()">
         <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.2);color:oklch(0.78 0.18 285)">🎭</div>
@@ -631,7 +576,7 @@
       </div>
       <div class="settings-row" style="cursor:default;align-items:flex-start">
         <div class="settings-row-ico" style="background:oklch(0.55 0.16 285 / 0.15);color:oklch(0.78 0.18 285)">🛡️</div>
-        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px">פרטיות</div><div class="settings-row-sub" style="font-size:11px">המפתח נשמר אצלך בלבד. הנתונים שלך נשלחים ישירות ל-Google בכל שיחה לצורך ההקשר.</div></div>
+        <div class="settings-row-body"><div class="settings-row-title" style="font-size:12px">פרטיות</div><div class="settings-row-sub" style="font-size:11px">אין מפתחות באפליקציה: העוזר עובר דרך שער מאובטח. מספרי טלפון ומספרים ארוכים מוסתרים לפני השליחה, ולא נשלחים נתוני משימות או חשבונות.</div></div>
       </div>
     </div>
     <div class="settings-section">משימות שהוחמצו</div>
@@ -2215,7 +2160,7 @@ function exportData(){
   try{memory=JSON.parse(localStorage.getItem('vt_assistant_memory')||'null');}catch(_){}
   let billVend=null;
   try{billVend=JSON.parse(localStorage.getItem('vt_bill_vendors')||'null');}catch(_){}
-  const data={version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:aiSet,agentPersona:persona,assistantMemory:memory,billVendors:billVend};
+  const data={version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:AlfredAI.stripKeys(aiSet),agentPersona:persona,assistantMemory:memory,billVendors:billVend};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -2253,7 +2198,7 @@ function importData(e){
       // Restore AI settings, persona, memory, vendors — overwrite if local empty
       if(data.aiSettings){
         const cur=localStorage.getItem('vt_ai_settings');
-        if(!cur||cur==='null'||cur==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(data.aiSettings));
+        if(!cur||cur==='null'||cur==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(AlfredAI.stripKeys(data.aiSettings)));
       }
       if(data.agentPersona){
         const cur=localStorage.getItem('vt_agent_persona');
@@ -3269,7 +3214,8 @@ function addTask(text,extras){
   const n=to24hText(text.trim());
   const reminderMins=+(document.getElementById('siriReminderMins')?.value||0);
   const morningAlert=document.getElementById('siriMorningAlert')?.checked!==false;
-  const task={id:Date.now(),text:n,category:detectCat(text),datetime:(extras&&extras.datetime)||detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
+  let id=Date.now();while(tasks.some(x=>x.id===id))id++;   // two tasks in one millisecond must not share an id
+  const task={id,text:n,category:detectCat(text),datetime:(extras&&extras.datetime)||detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
   tasks.unshift(task);save();render();toast('✓ נרשם, אדוני');vibrate([10,30,10]);syncTask(task);
   scheduleSmartPushNotifs();
 }
@@ -6631,7 +6577,7 @@ async function driveBackup(manual=false){
     try{memory=JSON.parse(localStorage.getItem('vt_assistant_memory')||'null');}catch(_){}
     try{billVend=JSON.parse(localStorage.getItem('vt_bill_vendors')||'null');}catch(_){}
     try{notif=JSON.parse(localStorage.getItem('vt_notif_settings')||'null');}catch(_){}
-    const data=JSON.stringify({version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:aiSet,agentPersona:persona,assistantMemory:memory,billVendors:billVend,notifSettings:notif,geProfile:geLoad(),gePipeline:gePipeLoad(),geSkills:geSkillsLoad()});
+    const data=JSON.stringify({version:3,exportedAt:new Date().toISOString(),tasks,routines,customNotifs,bills,backlogLists,backlogItems,aiSettings:AlfredAI.stripKeys(aiSet),agentPersona:persona,assistantMemory:memory,billVendors:billVend,notifSettings:notif,geProfile:geLoad(),gePipeline:gePipeLoad(),geSkills:geSkillsLoad()});
     const existingId=await driveFindFile(token);
     const blob=new Blob([data],{type:'application/json'});
     const form=new FormData();
@@ -6670,7 +6616,7 @@ async function driveRestore(){
     if(data.gePipeline)gePipeSave(data.gePipeline);
     if(data.geSkills)geSkillsSave(data.geSkills);
     // Restore AI/persona/memory/vendors/notif only if local is empty
-    if(data.aiSettings){const c=localStorage.getItem('vt_ai_settings');if(!c||c==='null'||c==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(data.aiSettings));}
+    if(data.aiSettings){const c=localStorage.getItem('vt_ai_settings');if(!c||c==='null'||c==='{}')localStorage.setItem('vt_ai_settings',JSON.stringify(AlfredAI.stripKeys(data.aiSettings)));}
     if(data.agentPersona){const c=localStorage.getItem('vt_agent_persona');if(!c||c==='null')localStorage.setItem('vt_agent_persona',JSON.stringify(data.agentPersona));}
     if(Array.isArray(data.assistantMemory)&&data.assistantMemory.length){try{const ex=JSON.parse(localStorage.getItem('vt_assistant_memory')||'[]');const ids=new Set(ex.map(m=>m.id));localStorage.setItem('vt_assistant_memory',JSON.stringify([...ex,...data.assistantMemory.filter(m=>!ids.has(m.id))]));}catch(_){}}
     if(Array.isArray(data.billVendors)){try{const ex=JSON.parse(localStorage.getItem('vt_bill_vendors')||'[]');const em=new Set(ex.map(v=>v.email));localStorage.setItem('vt_bill_vendors',JSON.stringify([...ex,...data.billVendors.filter(v=>!em.has(v.email))]));}catch(_){}}
@@ -7983,7 +7929,7 @@ async function retryLastChat(){
   // If last message is from user, retry the loop
   const last=chatHistory[chatHistory.length-1];
   if(last&&last.role==='user'){
-    await runChatLoop();
+    await AlfredAI.run((last.parts||[]).map(p=>p.text||'').join(''));
   }else{
     toast('אין הודעה לשלוח שוב — כתוב מחדש');
   }
@@ -8852,11 +8798,10 @@ async function sendChat(){
     return;
   }
 
-  if(!aiSettings.key){toast('⚠️ הגדר מפתח Gemini בהגדרות');return;}
   chatHistory.push({role:'user',parts:[{text}],ts:Date.now()});
   saveChatHistory();
   renderChatMessages();
-  await runChatLoop();
+  await AlfredAI.run(text);
 }
 
 // ── Alfred Morning Round (instant, no API) ──
@@ -10240,6 +10185,7 @@ function renderChatMessages(){
   let lastDate='';
   chatHistory.forEach(m=>{
     if(m.role==='function')return;
+    if(m.kind==='proposal'){html+=AlfredAI.renderProposal(m);return;}
     const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
     const calls=(m.parts||[]).filter(p=>p.functionCall);
     if(!txt&&!calls.length)return;
@@ -10276,6 +10222,8 @@ function renderChatMessages(){
       });
     }
   });
+
+  html+=AlfredAI.statusLine();
 
   // New session suggestions
   if(isNewSession){
@@ -11811,13 +11759,17 @@ function maybeShowDailyPopup(){
     const date=$('qaddDate').value,time=$('qaddTime').value;
     const extras={url:null,image:null};
     if(date||time){
-      const d=date||todayStr();
-      // Same defaults the app already uses for a task with no time: a future day -> 09:00, today -> in an hour.
-      const when=time?Q.time.toDate(d,time):(d>todayStr()?Q.time.toDate(d,'09:00'):new Date(Date.now()+3600000));
+      const when=Q.when(date,time);
       if(when)extras.datetime=when.toISOString();
     }
     addTask(title,extras);
     Q.close();
+  };
+  // date/time strings -> Date. Same defaults the app already uses for a task with no time:
+  // a future day -> 09:00, today -> in an hour. Shared with the assistant's confirmation card.
+  Q.when=function(date,time){
+    const d=date||todayStr();
+    return time?Q.time.toDate(d,time):(d>todayStr()?Q.time.toDate(d,'09:00'):new Date(Date.now()+3600000));
   };
   Q.voice=function(){Q.close();startSiri();};   // the FAB's previous behaviour stays one tap away
   // Keep the sheet above the on-screen keyboard (the app had no keyboard handling).
@@ -11845,6 +11797,283 @@ function maybeShowDailyPopup(){
     $('qaddSheet').style.removeProperty('--qadd-kb');
   };
   $('qaddSheet').addEventListener('keydown',e=>{if(e.key==='Escape')Q.close();});
+})();
+
+// ── AlfredAI — the assistant's ONE gateway client ────────────────────────────
+// Every model call goes through the alfred-ai Worker; the app holds no keys. Never silent: every path
+// ends in a visible bubble, card or status line. Model output is untrusted: capped, escaped, and every
+// write waits for a confirmation card (with Undo). The model never sees app data: only the masked text.
+(function(){
+  const AI_GATEWAY='https://alfred-ai.fayna007.workers.dev';   // the ONE place the Worker URL lives
+  const A=window.AlfredAI=window.AlfredAI||{};
+  const $=id=>document.getElementById(id);
+  const TIMEOUT_MS=17000;                                       // the Worker itself stops at 15s
+  const ADD_VERB=/^\s*(תוסיף|תוסיפי|הוסף|הוסיפי|להוסיף|תרשום|תרשמי|רשום|לרשום|תזכיר|תזכירי|תזכורת|תקבע|תקבעי|קבע|לקבוע|תכניס|תכניסי|צור|תיצור|add|remind)(?=[\s:,.!]|$)/i;
+  // Replies that claim to know the user's tasks/day. The model cannot see them, so such a claim is invented.
+  const FABRICATION=/יש לך \d+ (משימות|פגישות|אירועים)|היום יש לך|מחר יש לך|השבוע יש לך|יש לך (יום|שבוע) (עמוס|פנוי|רגוע|מלא)|(היום|השבוע|המחר|היומן) שלך (עמוס|פנוי|נראה|מלא|ריק)|אין לך (משימות|פגישות|כלום)|פספסת (את|\d)|תכננת (ל|את)/;
+  const NO_DATA_REPLY='אני לא רואה את המשימות שלך מכאן — שאל \'מה יש לי היום\' ואבדוק';
+  // Until C2, rescheduling is not done from chat: answer with a fixed pointer instead of an unrelated list.
+  const RESCHEDULE=/(^|\s)(תעביר|תעבירי|להעביר|תדחה|תדחי|לדחות|דחה|תזיז|תזיזי|להזיז|תקדים|תקדימי|להקדים)(?=\s|$)/;
+  const RESCHEDULE_REPLY='לדחייה השתמש בכפתור הדחייה';
+  const FAIL_TEXT={stopped:'הופסק. ההודעה שמורה — אפשר לנסות שוב.',offline:'אין חיבור לאינטרנט. ההודעה שמורה.',timeout:'העוזר לא ענה בזמן. ההודעה שמורה.',network:'לא הצלחתי להגיע לעוזר. ההודעה שמורה.',degraded:'העוזר לא זמין כרגע. ההודעה שמורה.',empty:'לא התקבלה תשובה תקינה מהעוזר.',error:'משהו השתבש מול העוזר.'};
+  let ctrl=null;
+
+  A.stripKeys=function(s){                                      // backups/imports never carry API keys
+    if(!s||typeof s!=='object')return s;
+    const{key,groqKey,cfToken,cfAccount,...rest}=s;return rest;
+  };
+  const loadStatus=()=>{try{return JSON.parse(localStorage.getItem('vt_ai_status')||'null');}catch(_){return null;}};
+  const saveStatus=s=>{try{localStorage.setItem('vt_ai_status',JSON.stringify(s));}catch(_){}};
+  const isPasted=t=>t.includes('\n')||t.length>80;
+
+  // Privacy: phone numbers and 6+ digit runs never leave the device; placeholders are restored on return.
+  function mask(s,map){return String(s).replace(/(?:\+972[-\s]?|0)\d{1,2}[-\s]?\d{3}[-\s]?\d{4}|\d{6,}/g,m=>{map.push(m);return '⟦'+map.length+'⟧';});}
+  const unmask=(s,map)=>typeof s==='string'?s.replace(/⟦(\d+)⟧/g,(x,n)=>map[+n-1]??x):'';
+
+  // Router: "tasks" only for an add verb or a dated multi-line list; any other paste is "pasted"
+  // (tasks or a summary only); everything else is chat.
+  A.route=function(text){
+    const lines=text.split('\n').filter(l=>l.trim());
+    const T=window.QAdd&&QAdd.time;
+    const dated=lines.length>1&&T&&lines.some(l=>{const r=T.parseHebrewDateTime(l,{now:new Date()});return r.ok&&(r.date||r.time);});
+    if(dated||(!isPasted(text)&&ADD_VERB.test(text)))return 'tasks';
+    return isPasted(text)?'pasted':'chat';
+  };
+
+  async function callGateway(text,mode){
+    const map=[];
+    const history=chatHistory.filter(m=>m.parts&&!isErrorMessage(m)).slice(-7,-1)
+      .map(m=>({r:m.role==='user'?'u':'a',t:mask((m.parts||[]).map(p=>p.text||'').join(' ').slice(0,300),map)}));
+    let hours={start:'08:00',end:'22:00'};try{hours=getMissedSettings().wakingHours||hours;}catch(_){}
+    ctrl=new AbortController();
+    const signal=AbortSignal.any?AbortSignal.any([ctrl.signal,AbortSignal.timeout(TIMEOUT_MS)]):ctrl.signal;
+    const r=await fetch(AI_GATEWAY+'/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(text,map),mode,history,hours}),signal});
+    const j=await r.json().catch(()=>({}));
+    return{status:r.status,j,map};
+  }
+
+  // A raw date/time phrase from the model -> concrete time, via the app's own parsers (the model never computes dates).
+  function resolve(it){
+    const raw=[it.date_text,it.time_text].filter(Boolean).join(' ').trim();
+    if(!raw)return{iso:null,label:'',warn:''};                // no time words -> addTask's existing default
+    const T=window.QAdd&&QAdd.time;
+    const r=T?T.parseHebrewDateTime(raw,{now:new Date()}):null;
+    if(r&&r.ambiguity)return{iso:null,label:raw,warn:'השעה כבר עברה — ערוך לפני הוספה'};
+    const d=r&&(r.date||r.time)?QAdd.when(r.date,r.time):detectTime(raw);
+    if(!d||isNaN(d))return{iso:null,label:raw,warn:'לא הבנתי את הזמן — ערוך לפני הוספה'};
+    return{iso:d.toISOString(),label:d.toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),warn:''};
+  }
+
+  function fail(kind,text,serverMsg){
+    let t='❌ '+(serverMsg||FAIL_TEXT[kind]||FAIL_TEXT.error);
+    if(isPasted(text)&&['offline','timeout','network','degraded'].includes(kind)&&toPending(text))t+='\n📥 הטקסט נשמר ב"ממתינים" ויישלח שוב כשהחיבור יחזור.';
+    chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now()});
+    saveStatus({...(loadStatus()||{}),lastError:kind,errAt:Date.now()});
+    return kind;
+  }
+  function toPending(text){
+    if(pendingItems.some(i=>i.aiText===text))return true;
+    addPendingItem(text,'⏳ ממתין לעוזר');
+    if(pendingItems[0]){pendingItems[0].aiText=text;savePending();}
+    return true;
+  }
+
+  // Gateway answer -> chat message or confirmation card. Returns 'reply' | 'proposal' | failure kind.
+  function handle(status,j,map,text,mode,opts){
+    if(j&&j.usage)saveStatus({...(loadStatus()||{}),used:j.usage.used,cap:j.usage.cap});
+    if(status===429&&j.error==='daily_cap')return fail('cap',text,j.message);
+    if(status===413)return fail('too_large',text,j.message);
+    if(!j||!j.ok)return fail(j&&j.degraded?'degraded':'error',text,j&&j.degraded?null:j&&j.message);
+    const res=j.result||{};
+    const reply=unmask(res.reply,map).slice(0,400);
+    const items=(Array.isArray(res.tasks)?res.tasks:[]).slice(0,20).map(t=>({
+      title:unmask(t.title,map).slice(0,120),category:['אישי','מקצועי','כללי'].includes(t.category)?t.category:'',
+      date_text:unmask(t.date_text,map).slice(0,40),time_text:unmask(t.time_text,map).slice(0,40),notes:unmask(t.notes,map).slice(0,300),checked:true
+    })).filter(t=>t.title.trim());
+    saveStatus({layer:j.layer,label:j.label||j.layer,ms:j.latencyMs,at:Date.now(),used:j.usage&&j.usage.used,cap:j.usage&&j.usage.cap,missing:j.missing||[]});
+    const prov=j.label||j.layer||'';
+    if((res.intent==='query'||res.intent==='other')&&RESCHEDULE.test(text)){
+      chatHistory.push({role:'model',parts:[{text:RESCHEDULE_REPLY}],ts:Date.now(),provider:'Alfred'});
+      return 'canned';
+    }
+    if(res.intent==='query'){                                   // the model never answers about the user's data: the app does
+      chatHistory.push({role:'model',parts:[{text:A.answerQuery(res.filter)}],ts:Date.now(),provider:'נתונים מהמכשיר'});
+      return 'query';
+    }
+    if((res.intent==='add_tasks'||res.intent==='add_routine')&&items.length&&!opts.forceChat){
+      items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;});
+      chatHistory.push({role:'model',kind:'proposal',id:'p'+Date.now(),ts:Date.now(),provider:prov,intent:res.intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending});
+      return 'proposal';
+    }
+    let msg=reply||items.map(t=>'• '+t.title).join('\n');
+    if(!msg.trim())return fail('empty',text);
+    if(FABRICATION.test(msg))msg=NO_DATA_REPLY;                  // cheap guard against invented facts about the user's day
+    chatHistory.push({role:'model',parts:[{text:msg}],ts:Date.now(),provider:prov});
+    return 'reply';
+  }
+
+  A.run=async function(text,opts={}){
+    if(_chatBusy||!String(text||'').trim())return;
+    const mode=opts.forceChat?'chat':A.route(text);
+    _chatBusy=true;
+    const btn=$('asstSendBtn');
+    if(btn){btn.textContent='■';btn.onclick=()=>A.stop();}
+    const typing=document.createElement('div');
+    typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
+    $('chatScroll')?.appendChild(typing);scrollChatBottom();
+    const slow=setTimeout(()=>{const s=document.createElement('div');s.className='chat-day-sep';s.id='aiProgress';s.innerHTML='<span>⏳ עדיין חושב…</span>';$('chatScroll')?.appendChild(s);scrollChatBottom();},2000);
+    let outcome;
+    try{
+      const{status,j,map}=await callGateway(text,mode);
+      outcome=handle(status,j,map,text,mode,opts);
+    }catch(e){
+      outcome=fail(ctrl&&ctrl.signal.aborted?'stopped':navigator.onLine===false?'offline':e&&e.name==='TimeoutError'?'timeout':'network',text);
+    }finally{
+      clearTimeout(slow);typing.remove();$('aiProgress')?.remove();
+      _chatBusy=false;ctrl=null;
+      if(btn){btn.textContent='↑';btn.onclick=()=>sendChat();}
+      saveChatHistory();renderChatMessages();
+    }
+    return outcome;
+  };
+  A.stop=function(){if(ctrl)ctrl.abort();};
+
+  // ── 'query': answered from the app's own data (same list style as the morning round) ──
+  A.answerQuery=function(f){
+    const range=(f&&f.range)||'today',cat=(f&&f.category)||'';
+    const sod=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x;};
+    const now=new Date(),today=sod(now),day=864e5;
+    const win={today:[today,new Date(+today+day)],tomorrow:[new Date(+today+day),new Date(+today+2*day)],week:[today,new Date(+today+7*day)],overdue:[new Date(0),now]}[range]||[today,new Date(+today+day)];
+    const inWin=dt=>{const d=new Date(dt);return d>=win[0]&&d<win[1];};
+    let items=tasks.filter(t=>!t.completed&&t.datetime&&inWin(t.datetime)&&(!cat||t.category===cat)).map(t=>({dt:t.datetime,text:t.text,ico:'📌'}));
+    if(range!=='overdue'){try{items=items.concat(getRoutineInstances().filter(r=>!r.completed&&inWin(r.datetime)&&(!cat||r.category===cat)).map(r=>({dt:r.datetime,text:r.text,ico:'🔄'})));}catch(_){}}
+    items.sort((a,b)=>new Date(a.dt)-new Date(b.dt));
+    const title={today:'היום',tomorrow:'מחר',week:'השבוע הקרוב',overdue:'באיחור'}[range]||'היום';
+    const fmt=dt=>{const d=new Date(dt);const t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');return range==='today'||range==='tomorrow'?t:d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'numeric'})+' '+t;};
+    const head=`📋 **${title}**${cat?' · '+cat:''}`;
+    if(!items.length)return head+'\n\n'+(range==='overdue'?'אין משימות באיחור 👌':'אין משימות '+title+' 🎉');
+    const shown=items.slice(0,12).map(i=>`${i.ico} ${fmt(i.dt)} — ${i.text}`).join('\n');
+    return head+'\n\n'+shown+(items.length>12?`\n…ועוד ${items.length-12}`:'');
+  };
+
+  // ── Confirmation card ──
+  const find=id=>chatHistory.find(m=>m.kind==='proposal'&&m.id===id);
+  const lastDoneId=()=>{for(let i=chatHistory.length-1;i>=0;i--){const m=chatHistory[i];if(m.kind==='proposal'&&(m.state==='done'||m.state==='undone'))return m.id;}return null;};
+  A.renderProposal=function(m){
+    if(m.state==='cancelled')return '<div class="chat-day-sep"><span>✕ ההצעה בוטלה</span></div>';
+    if(m.state==='undone')return '<div class="chat-day-sep"><span>↶ ההוספה בוטלה</span></div>';
+    if(m.state==='done'){
+      const n=(m.created||[]).length;
+      const undo=n&&lastDoneId()===m.id?`<button class="chat-retry-btn" onclick="AlfredAI.undo('${m.id}')">↶ בטל הוספה</button>`:'';
+      return `<div class="chat-bubble bot">${m.intent==='add_routine'?'✓ נפתח טופס שגרה':'✓ נוספו '+n+' משימות'}${undo}</div>`;
+    }
+    const rows=m.items.map((it,i)=>{
+      const when=it.when&&it.when.label?`<span class="routine-badge">🕒 ${esc(it.when.label)}</span>`:'';
+      const warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
+      return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0"><label class="siri-notif-morning"><input type="checkbox"${it.checked?' checked':''} onchange="AlfredAI.toggle('${m.id}',${i},this.checked)"><span style="color:var(--text)">${esc(it.title)}</span></label>${when}${warn}<button class="chat-suggestion" onclick="AlfredAI.edit('${m.id}',${i})" aria-label="ערוך">✏️</button></div>`;
+    }).join('');
+    const n=m.items.filter(it=>it.checked).length;
+    const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':`✓ הוסף (${n})`;
+    setTimeout(A.paintHints,0);                                  // after the chat HTML is in the DOM
+    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div><div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
+  };
+  // Long cards scroll inside their body: show a fade + "עוד N ↓" while items are hidden below.
+  A.paintHints=function(){
+    document.querySelectorAll('#chatScroll .ai-items').forEach(box=>{
+      const hint=document.getElementById('aih-'+box.id.slice(4));if(!hint)return;
+      const below=[...box.children].filter(r=>r.offsetTop+r.offsetHeight>box.scrollTop+box.clientHeight+2).length;
+      const more=box.scrollHeight>box.clientHeight+2&&below>0;
+      box.classList.toggle('ai-fade',more);
+      hint.hidden=!more;
+      if(more)hint.textContent=`עוד ${below} ↓ — גלול לראות הכל`;
+    });
+  };
+  A.toggle=function(id,i,v){const m=find(id);if(!m||!m.items[i])return;m.items[i].checked=!!v;saveChatHistory();renderChatMessages();};
+  A.cancel=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();};
+  A.notTask=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();A.run(m.src,{forceChat:true});};
+  A.edit=function(id,i){
+    const m=find(id);if(!m||!m.items[i])return;
+    const it=m.items[i];it.checked=false;saveChatHistory();renderChatMessages();
+    try{closeAssistantSheet();}catch(_){}
+    QAdd.open('assistant');
+    const inp=$('qaddText');inp.value=[it.title,it.date_text,it.time_text].filter(Boolean).join(' ');QAdd.onText();
+  };
+  A.approve=function(id){
+    const m=find(id);if(!m||m.state!=='open')return;
+    if(m.intent==='add_routine'){
+      const it=m.items[0];m.state='done';m.created=[];saveChatHistory();
+      try{closeAssistantSheet();}catch(_){}
+      openRoutineSheet();
+      setTimeout(()=>openRoutineForm({name:it.title,notes:[it.date_text,it.time_text,it.notes].filter(Boolean).join(' · ')},null),150);
+      return;
+    }
+    const chosen=m.items.filter(it=>it.checked);
+    if(!chosen.length){toast('לא נבחרו משימות');return;}
+    const ids=[];
+    chosen.forEach(it=>{
+      addTask(it.notes?it.title+' — '+it.notes:it.title,{url:null,image:null,...(it.when&&it.when.iso?{datetime:it.when.iso}:{})});
+      const t=tasks[0];
+      if(t){ids.push(t.id);if(it.category&&t.category==='כללי')t.category=it.category;}
+    });
+    save();render();
+    m.state='done';m.created=ids;saveChatHistory();renderChatMessages();
+    setTimeout(()=>toast(`✓ נוספו ${ids.length} משימות — אפשר לבטל בצ'אט`),700);   // after addTask's own sync toasts
+  };
+  A.undo=async function(id){
+    const m=find(id);if(!m||m.state!=='done')return;
+    for(const tid of m.created||[])await del(tid);
+    m.state='undone';saveChatHistory();renderChatMessages();
+    toast('↶ ההוספה בוטלה');
+  };
+
+  // ── Pending inbox: texts that could not be sent are retried when the connection returns ──
+  let flushing=false;
+  A.flushPending=async function(){
+    if(flushing||_chatBusy||navigator.onLine===false)return;
+    const items=pendingItems.filter(i=>i.aiText);if(!items.length)return;
+    flushing=true;let done=0;
+    try{
+      for(const item of items){
+        const{status,j,map}=await callGateway(item.aiText,A.route(item.aiText)).catch(()=>({status:0,j:null,map:[]}));
+        if(!j||!j.ok)break;                                     // still unavailable -> keep it pending
+        handle(status,j,map,item.aiText,A.route(item.aiText),{fromPending:true});
+        pendingItems=pendingItems.filter(i=>i.id!==item.id);savePending();updatePendingBadge();done++;
+      }
+    }finally{flushing=false;ctrl=null;}
+    if(done){saveChatHistory();renderChatMessages();toast(`📥 העוזר עיבד ${done} פריטים ממתינים`);}
+  };
+  window.addEventListener('online',()=>A.flushPending());
+
+  // ── Status (chat line + settings) ──
+  const hhmm=ms=>new Date(ms).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  A.statusLine=function(){
+    const s=loadStatus();if(!s||!(s.at||s.errAt))return '';
+    const down=s.errAt&&(!s.at||s.errAt>s.at);
+    const usage=s.cap?` · ~${s.used}/${s.cap} היום`:'';
+    return `<div class="chat-day-sep"><span>${down?'🔴 העוזר לא זמין כרגע':'🟢 '+esc(s.label||s.layer||'')}${usage}</span></div>`;
+  };
+  function paintSettings(extra){
+    const el=$('aiGatewayStatus');if(!el)return;
+    const s=loadStatus();
+    const last=s&&s.at?`ענה לאחרונה: ${esc(s.label||s.layer||'')} · ${hhmm(s.at)}`:'עוד לא נשלחה הודעה';
+    const usage=s&&s.cap?`<br>~${s.used}/${s.cap} בקשות היום`:'';
+    // Model churn: a model id in the Worker config no longer exists at its provider.
+    const missing=(s&&s.missing||[]).map(m=>`<br><span class="cal-badge pending">⚠️ המודל ${esc(m.label||m.model||'')} לא זמין — צריך לעדכן הגדרות</span>`).join('');
+    el.innerHTML=(extra?extra+'<br>':'')+last+usage+missing;
+  }
+  A.checkConnection=async function(){
+    const el=$('aiGatewayStatus');if(el)el.textContent='⏳ בודק את כל השכבות…';
+    try{
+      const r=await fetch(AI_GATEWAY+'/health?deep=1',{signal:AbortSignal.timeout(20000)});
+      const j=await r.json();
+      if(j.usage||j.missing)saveStatus({...(loadStatus()||{}),...(j.usage?{used:j.usage.used,cap:j.usage.cap}:{}),...(j.missing?{missing:j.missing}:{})});
+      if(!r.ok){paintSettings('❌ '+esc(j.message||('HTTP '+r.status)));return;}
+      const lines=(j.layers||[]).map(l=>`${l.ok?'✅':l.skippedUntil?'⏸':'❌'} ${esc(l.label||l.layer)}${l.ok?' · '+(l.ms/1000).toFixed(1)+'s':l.skippedUntil?' · מושהה עד '+hhmm(l.skippedUntil):''}`);
+      paintSettings(lines.join('<br>')||'אין שכבות מוגדרות');
+    }catch(e){paintSettings('❌ אין חיבור לשער העוזר');}
+  };
+  paintSettings();
+  setTimeout(()=>A.flushPending(),8000);
 })();
 </script>
 </body>
