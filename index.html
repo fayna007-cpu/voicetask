@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Alfred">
 <meta name="description" content="האסיסטנט האישי שלך — משימות, חשבונות, שגרות ויומן במקום אחד">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="hebrew-time.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
@@ -139,6 +140,10 @@
   <div class="greeting-sub" id="greetingSub">טוען...</div>
 </div>
 
+<div class="qadd-home">
+  <input class="rfi" id="qaddHome" type="text" readonly inputmode="none" autocomplete="off" placeholder="＋ הוסף משימה… מחר 18:00 לקנות חלב" aria-label="הוספה מהירה" onclick="QAdd.open('home')">
+</div>
+
 <div class="quick-wrap">
   <button class="quick-btn" onclick="quickSiri('פגישה עכשיו ל-30 דקות')">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>פגישה עכשיו
@@ -208,7 +213,7 @@
     <span>שגרות</span>
   </button>
   <div class="bnav-fab-wrap">
-    <button class="bnav-fab" onclick="startSiri()" aria-label="הוסף משימה">
+    <button class="bnav-fab" onclick="QAdd.open('fab')" aria-label="הוסף משימה">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -690,6 +695,40 @@
 
 <!-- Routine Overlay -->
 <div class="routine-overlay" id="routineOverlay" onclick="closeRoutineSheet()"></div>
+
+<!-- Quick add: one sheet shared by the home input row and the add FAB (QAdd.open) -->
+<div class="routine-overlay" id="qaddOverlay" onclick="QAdd.close()"></div>
+<div class="rsheet qadd-sheet" id="qaddSheet" role="dialog" aria-label="הוספה מהירה">
+  <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
+  <div class="rsheet-head">
+    <button class="rsheet-close-btn" onclick="QAdd.close()" aria-label="סגור">✕</button>
+    <h3>➕ הוספה מהירה</h3>
+    <button class="rsheet-close-btn" onclick="QAdd.voice()" aria-label="הוסף בקול">🎤</button>
+  </div>
+  <div class="rsheet-scroll">
+    <div class="rform">
+      <div class="rfield">
+        <input class="rfi" id="qaddText" type="text" autocomplete="off" enterkeyhint="done" placeholder="מחר 18:00 לקנות חלב" oninput="QAdd.onText()" onkeydown="if(event.key==='Enter'){event.preventDefault();QAdd.enter();}">
+      </div>
+      <div class="qadd-chips" id="qaddChips"></div>
+      <div class="rfield">
+        <div class="rform-lbl">כותרת</div>
+        <input class="rfi" id="qaddTitle" type="text" autocomplete="off" oninput="QAdd.onField('title')">
+      </div>
+      <div class="rfield-2col">
+        <div class="rfield">
+          <div class="rform-lbl">תאריך</div>
+          <input class="rfi" id="qaddDate" type="date" oninput="QAdd.onField('date')">
+        </div>
+        <div class="rfield">
+          <div class="rform-lbl">שעה</div>
+          <input class="rfi" id="qaddTime" type="time" oninput="QAdd.onField('time')">
+        </div>
+      </div>
+      <button class="rform-save" onclick="QAdd.save()">שמור משימה</button>
+    </div>
+  </div>
+</div>
 
 <!-- Sheet: Routine List -->
 <div class="rsheet" id="routineListSheet">
@@ -3224,7 +3263,7 @@ function addTask(text,extras){
   const n=to24hText(text.trim());
   const reminderMins=+(document.getElementById('siriReminderMins')?.value||0);
   const morningAlert=document.getElementById('siriMorningAlert')?.checked!==false;
-  const task={id:Date.now(),text:n,category:detectCat(text),datetime:detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
+  const task={id:Date.now(),text:n,category:detectCat(text),datetime:(extras&&extras.datetime)||detectTime(text).toISOString(),createdAt:new Date().toISOString(),completed:false,reminderMins,morningAlert,url:(extras&&extras.url)||null,image:(extras&&extras.image)||null};
   tasks.unshift(task);save();render();toast('✓ נרשם, אדוני');vibrate([10,30,10]);syncTask(task);
   scheduleSmartPushNotifs();
 }
@@ -11691,6 +11730,102 @@ function maybeShowDailyPopup(){
   localStorage.setItem('vt_dp_shown',today);
   showDailyPopup();
 }
+
+// ── Quick add (QAdd) ─────────────────────────────────────────────────────────
+// ONE bottom sheet shared by the home input row and the add FAB (both call QAdd.open).
+// Parsing lives in hebrew-time.js (QAdd.time); saving goes through the existing addTask().
+(function(){
+  const Q=window.QAdd=window.QAdd||{};
+  const $=id=>document.getElementById(id);
+  const TZ='Asia/Jerusalem';
+  const st={open:false,amb:null,manual:{title:false,date:false,time:false}};
+  const todayStr=()=>new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date());
+  const unresolved=()=>!!st.amb&&!st.manual.date&&!st.manual.time;
+  function dayLabel(ymd){
+    const diff=Math.round((Date.parse(ymd+'T00:00:00Z')-Date.parse(todayStr()+'T00:00:00Z'))/86400000);
+    const base=new Date(ymd+'T12:00:00Z').toLocaleDateString('he-IL',{timeZone:TZ,weekday:'short',day:'numeric',month:'short'});
+    return (diff===0?'היום · ':diff===1?'מחר · ':diff===2?'מחרתיים · ':'')+base;
+  }
+  function chip(tag,cls,text,fn){
+    const e=document.createElement(tag);e.className=cls;e.textContent=text;
+    if(fn){e.type='button';e.onclick=fn;}
+    return e;
+  }
+  function render(){
+    const box=$('qaddChips');box.textContent='';
+    const d=$('qaddDate').value,t=$('qaddTime').value;
+    if(d)box.appendChild(chip('span','routine-badge','📅 '+dayLabel(d)));
+    if(t)box.appendChild(chip('span','routine-badge','🕒 '+t));
+    if(unresolved()){
+      box.appendChild(chip('span','qadd-hint',st.amb.reason==='ampm'?'בוקר או ערב?':'השעה הזו כבר עברה — מתי?'));
+      st.amb.options.forEach(o=>box.appendChild(chip('button','quick-btn',o.label,()=>pick(o))));
+    }
+  }
+  function pick(o){
+    if(o.pick){const tf=$('qaddTime');tf.focus();try{tf.showPicker&&tf.showPicker();}catch(_){}return;}
+    $('qaddDate').value=o.date;$('qaddTime').value=o.time;
+    st.manual.date=st.manual.time=true;st.amb=null;render();
+  }
+  Q.onText=function(){
+    const raw=$('qaddText').value,T=Q.time;
+    if(!raw.trim())st.manual={title:false,date:false,time:false};
+    const r=T?T.parseHebrewDateTime(raw,{now:new Date()}):null;
+    if(!st.manual.title)$('qaddTitle').value=r?r.title:raw.trim();
+    if(!st.manual.date)$('qaddDate').value=(r&&r.date)||'';
+    if(!st.manual.time)$('qaddTime').value=(r&&r.time)||'';
+    st.amb=(r&&r.ambiguity)||null;
+    render();
+  };
+  Q.onField=function(k){
+    st.manual[k]=$({title:'qaddTitle',date:'qaddDate',time:'qaddTime'}[k]).value!=='';
+    render();
+  };
+  Q.enter=function(){
+    if(unresolved()){toast('בחר שעה מהאפשרויות');return;}
+    Q.save();
+  };
+  Q.save=function(){
+    const title=$('qaddTitle').value.trim();
+    if(!title){toast('נא להזין כותרת');$('qaddTitle').focus();return;}
+    if(unresolved()){toast('בחר שעה מהאפשרויות');return;}
+    const date=$('qaddDate').value,time=$('qaddTime').value;
+    const extras={url:null,image:null};
+    if(date||time){
+      const d=date||todayStr();
+      // Same defaults the app already uses for a task with no time: a future day -> 09:00, today -> in an hour.
+      const when=time?Q.time.toDate(d,time):(d>todayStr()?Q.time.toDate(d,'09:00'):new Date(Date.now()+3600000));
+      if(when)extras.datetime=when.toISOString();
+    }
+    addTask(title,extras);
+    Q.close();
+  };
+  Q.voice=function(){Q.close();startSiri();};   // the FAB's previous behaviour stays one tap away
+  // Keep the sheet above the on-screen keyboard (the app had no keyboard handling).
+  function kb(){
+    const vv=window.visualViewport;if(!vv)return;
+    $('qaddSheet').style.setProperty('--qadd-kb',Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop))+'px');
+  }
+  Q.open=function(){
+    if(!st.open){
+      st.manual={title:false,date:false,time:false};st.amb=null;
+      ['qaddText','qaddTitle','qaddDate','qaddTime'].forEach(id=>{$(id).value='';});
+      render();
+      $('qaddOverlay').classList.add('on');$('qaddSheet').classList.add('on');
+      st.open=true;
+      if(window.visualViewport){window.visualViewport.addEventListener('resize',kb);window.visualViewport.addEventListener('scroll',kb);kb();}
+    }
+    $('qaddText').focus({preventScroll:true});
+  };
+  Q.close=function(){
+    if(!st.open)return;
+    st.open=false;
+    $('qaddOverlay').classList.remove('on');$('qaddSheet').classList.remove('on');
+    const a=document.activeElement;if(a&&$('qaddSheet').contains(a))a.blur();
+    if(window.visualViewport){window.visualViewport.removeEventListener('resize',kb);window.visualViewport.removeEventListener('scroll',kb);}
+    $('qaddSheet').style.removeProperty('--qadd-kb');
+  };
+  $('qaddSheet').addEventListener('keydown',e=>{if(e.key==='Escape')Q.close();});
+})();
 </script>
 </body>
 </html>
