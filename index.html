@@ -10223,6 +10223,7 @@ function renderChatMessages(){
     if(m.role==='function')return;
     if(m.kind==='proposal'){html+=AlfredAI.renderProposal(m);return;}
     if(m.kind==='action'){html+=AlfredAI.renderAction(m);return;}
+    if(m.kind==='clarify'){html+=AlfredAI.renderClarify(m);return;}
     const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
     const calls=(m.parts||[]).filter(p=>p.functionCall);
     if(!txt&&!calls.length)return;
@@ -10251,7 +10252,8 @@ function renderChatMessages(){
       const retry=isErr?'<button class="chat-retry-btn" onclick="retryLastChat()">↻ נסה שוב</button>':'';
       // Light markdown: **bold**
       const formatted=esc(txt).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${formatted}${time}${prov}${retry}</div>`;
+      const quote=m.quote&&m.id?`<span class="ai-quote" data-qid="${m.id}"></span>`:'';   // filled via textContent below
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${quote}${formatted}${time}${prov}${retry}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{
@@ -10276,6 +10278,7 @@ function renderChatMessages(){
 
   html+='</div>';
   body.innerHTML=html;
+  AlfredAI.paintQuotes();
   scrollChatBottom();
 }
 function scrollChatBottom(){
@@ -11877,6 +11880,9 @@ function maybeShowDailyPopup(){
     changed:'המשימה השתנתה מאז — את השינוי אפשר לבטל רק מהמשימה עצמה',
     undone:'↶ בוטל',cancelled:'✕ ההצעה בוטלה',editing:'✏️ נפתח לעריכה',collapsed:'הצעה קודמת — לא אושרה',reopen:'פתח',
     needDate:'בחר יום לפני האישור',needWhen:'ערוך את המועד לפני הוספה',
+    // R7 clarification: ONE short question each
+    qTitle:'מה לקבוע?',qDay:'לאיזה יום?',qPast:'התאריך עבר, לאיזה יום לקבוע?',qConflict:'היום והתאריך לא מסתדרים — מה נכון?',
+    qWhichDate:'יש כמה תאריכים — לאיזה לקבוע?',pickDate:'📅 בחר תאריך',discarded:'בסדר, עזבתי 👍',draftOk:'לאשר הוספה?',
   };
 
   // ── Matching on the device (never sent to the model) ──
@@ -12009,7 +12015,7 @@ function maybeShowDailyPopup(){
   function fail(kind,text,serverMsg){
     let t='❌ '+(serverMsg||FAIL_TEXT[kind]||FAIL_TEXT.error);
     if(isPasted(text)&&['offline','timeout','network','degraded'].includes(kind)&&toPending(text))t+='\n📥 הטקסט נשמר ב"ממתינים" ויישלח שוב כשהחיבור יחזור.';
-    chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now()});
+    chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now(),id:'q'+A.uid(),quote:text});   // R8: quotes what failed
     saveStatus({...(loadStatus()||{}),lastError:kind,errAt:Date.now()});
     return kind;
   }
@@ -12094,6 +12100,9 @@ function maybeShowDailyPopup(){
         const r=A.matchRoutine(items[0].title);
         if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}
       }
+      // R7: a single add with a missing / contradictory field -> ONE short question instead of a half-empty card
+      if(intent==='add_tasks'&&items.length===1&&!opts.fromPending&&A.clarifyStart(items[0],text,prov,forceTask))return 'clarify';
+      m.quote=text;
       chatHistory.push(m);
       return 'proposal';
     }
@@ -12106,6 +12115,12 @@ function maybeShowDailyPopup(){
 
   A.run=async function(text,opts={}){
     if(_chatBusy||!String(text||'').trim())return;
+    if(!opts.fromPending&&!opts.forceChat){
+      // R7: the next typed message is read FIRST as the answer to the open question; anything else drops it.
+      if(A.pc){const done=A.answer(text);if(done){saveChatHistory();renderChatMessages();return 'clarify';}}
+      // A time-only follow-up on an item saved in the last 10 minutes -> the usual reschedule card (with Undo).
+      if(!A.pc&&!isPasted(text)){A.collapseOpen();if(A.followUp(text)){saveChatHistory();renderChatMessages();return 'action';}}
+    }
     if(!opts.fromPending)A.collapseOpen();
     // R4 code-first: verb + target + time parsed here; the Worker is only the fallback when nothing matches.
     const push=t=>{chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now(),provider:'Alfred'});saveChatHistory();renderChatMessages();};
@@ -12118,6 +12133,8 @@ function maybeShowDailyPopup(){
       if(A.startAction(act,text)){saveChatHistory();renderChatMessages();return 'action';}
       opts={...opts,action:act};
     }
+    // R7 (a): only a date/time and nothing to schedule ("מחר ב-18:00") -> "מה לקבוע?" (no model call)
+    if(!opts.forceChat&&!opts.fromPending&&!act&&!isPasted(text)&&A.clarifyNoTitle(text)){saveChatHistory();renderChatMessages();return 'clarify';}
     const mode=opts.forceChat?'chat':A.route(text);
     _chatBusy=true;
     const btn=$('asstSendBtn');
@@ -12188,7 +12205,7 @@ function maybeShowDailyPopup(){
       if(m.instance)return `<div class="chat-bubble bot">✓ נוסף מופע לשגרת "${esc(m.routineName||'')}"</div>`;
       const n=(m.created||[]).length,one=n===1&&m.snap&&m.snap[0];
       const text=one?SAY.added(one.text,fmtWhen(one.datetime)):SAY.addedN(n);
-      if(!n||!live(m))return `<div class="chat-bubble bot">${esc(text)}</div>`;
+      if(!n||!live(m))return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(text)}</div>`;
       const ch=changed(m);
       let chips=chip(SAY.undoAdd,`AlfredAI.undo('${m.id}')`,ch);
       if(one){
@@ -12198,7 +12215,7 @@ function maybeShowDailyPopup(){
           chips+=r?chip(esc(SAY.asInstance(r.name||r.text||'')),`AlfredAI.convert('${m.id}','instance','${attr(r.id)}')`):chip(SAY.newRoutine,`AlfredAI.convert('${m.id}','new')`);
         }
       }
-      return `<div class="chat-bubble bot">${esc(text)}${ch?`<br><span class="chat-provider">${SAY.changed}</span>`:''}<div class="chat-suggestions">${chips}</div></div>`;
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(text)}${ch?`<br><span class="chat-provider">${SAY.changed}</span>`:''}<div class="chat-suggestions">${chips}</div></div>`;
     }
     const single=m.items.length===1;
     const isInst=m.routineId&&m.choice==='instance';
@@ -12422,7 +12439,7 @@ function maybeShowDailyPopup(){
     const data=A.localItems().filter(it=>types.includes(it.type)&&!(act.verb==='complete'&&it.completed));
     const res=A.resolveTarget({text:act.target,dayText:act.dayText,timeText:act.timeText,nth:act.nth},data);
     if(res.kind==='none')return false;
-    const m={role:'model',kind:'action',id:A.newId(),ts:Date.now(),provider:fromWorker?'':'Alfred',verb:act.verb,src,newText:act.newText||'',state:'choose',cands:res.items.slice(0,6).map(slim)};
+    const m={role:'model',kind:'action',id:A.newId(),ts:Date.now(),provider:fromWorker?'':'Alfred',verb:act.verb,src,quote:src,newText:act.newText||'',state:'choose',cands:res.items.slice(0,6).map(slim)};
     if(res.kind==='one')setTarget(m,m.cands[0]);
     chatHistory.push(m);
     return true;
@@ -12434,14 +12451,14 @@ function maybeShowDailyPopup(){
     if(m.state==='undone')return inert(SAY.undone);
     if(m.state==='choose'){
       const chips=m.cands.map((c,i)=>chip(esc(c.title)+(c.dt?' · '+esc(dateOnly(c)?fmtDay(c.dt):fmtWhen(c.dt)):''),`AlfredAI.pick('${m.id}',${i})`)).join('');
-      return `<div class="chat-bubble bot">${SAY.which}<div class="chat-suggestions">${chips}</div></div>`;
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${SAY.which}<div class="chat-suggestions">${chips}</div></div>`;
     }
     const tg=m.target;
     if(m.state==='done'){
       const txt=SAY.did[m.verb](tg.title,m.doneLabel||'');
       const fail=m.cal==='failed'?`<br><span class="cal-badge pending">${SAY.calFail}</span>`:'';
       const u=live(m)?`<div class="chat-suggestions">${chip(SAY.undo,`AlfredAI.undoAction('${m.id}')`)}</div>`:'';
-      return `<div class="chat-bubble bot">${esc(txt)}${fail}${u}</div>`;
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(txt)}${fail}${u}</div>`;
     }
     let body='';
     if(m.verb==='reschedule'){
@@ -12543,6 +12560,152 @@ function maybeShowDailyPopup(){
     const m=findAny(id);if(!m||m.kind!=='action'||m.state!=='done'||!live(m)||m.busy)return;
     m.busy=true;
     try{if(await EXEC[m.verb](m,true))m.state='undone';}finally{m.busy=false;saveChatHistory();renderChatMessages();}
+  };
+
+  // ── R8 reply-quote strip: the user's message an answer refers to (clarify / result / error). textContent only. ──
+  const quoteSpan=m=>m.quote&&m.id?`<span class="ai-quote" data-qid="${m.id}"></span>`:'';
+  A.paintQuotes=function(){
+    document.querySelectorAll('#chatScroll .ai-quote[data-qid]').forEach(el=>{
+      const m=chatHistory.find(x=>x.id===el.dataset.qid);const q=String(m&&m.quote||'').replace(/\s+/g,' ').trim();
+      el.textContent=q.length>100?q.slice(0,100)+'…':q;
+    });
+  };
+
+  // ── R7 clarify by conversation: ONE open draft, in memory only, no model call ──
+  // A.pc = {draft:{title,date,time,notes,category}, missing, askedCount, sourceMessageId, expiresAt, msgId, ...}
+  A.pc=null;
+  const DISCARD=/^(עזוב|עזבי|לא משנה|בטל|בטלי|תבטל|ביטול)[\s!.]*$/;
+  const WD_LETTER=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+  const normWeekdays=s=>String(s).replace(/(ב?יום\s+)([אבגדהוש])['׳](?=[\s,.]|$)/g,(x,p,l)=>p+DAYNAME[l]);
+  const todayYmd=()=>ymdOf(new Date());
+  const addDays=(ymd,n)=>{const d=new Date(ymd+'T12:00:00');d.setDate(d.getDate()+n);return ymdOf(d);};
+  const dayOpt=(ymd,full)=>{const d=new Date(ymd+'T12:00:00'),diff=Math.round((Date.parse(ymd)-Date.parse(todayYmd()))/864e5);return{label:!full&&diff===0?'היום':!full&&diff===1?'מחר':`יום ${WD_LETTER[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`,value:ymd};};
+  const dayOptions=()=>[0,1,2,3,4].map(i=>dayOpt(addDays(todayYmd(),i)));   // [היום][מחר][next 3 days] + [בחר תאריך]
+  const T_=()=>window.QAdd&&QAdd.time;
+  // A reply is an ANSWER only when it is just a date/time phrase: "מחר אני עסוק" / "ב-7 בבוקר יש לי טיסה" are not.
+  function asWhen(text){
+    const s=normWeekdays(text),T=T_();if(!T)return null;
+    const r=T.parseHebrewDateTime(s,{now:new Date()});
+    const rest=String(r.title||'').replace(/(^|\s)(ב|ל|ביום|בשעה|יום|שעה|ו|אז|בעצם|כן|אולי|לי|את|זה|הבא|הבאה)(?=\s|$)/g,' ').replace(/[\s,.!?\-־]+/g,'');
+    if(!r.ok||rest)return null;
+    const hasDay=/(היום|מחר|מחרתיים|יום|שבוע|\d{1,2}[./]\d{1,2})/.test(s);
+    const hasTime=!!r.time&&/(\d|בוקר|צהריים|ערב|לילה|אחה"צ)/.test(s);
+    return hasDay||hasTime?{date:hasDay?r.date:'',time:hasTime?r.time:''}:null;
+  }
+  const dateTokens=src=>[...new Set([...String(src).matchAll(/(?<![\d/.])\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?(?![\d/.])/g)].map(m=>m[0]))];
+  const ymdOfToken=tok=>{const T=T_();const r=T?T.parseHebrewDateTime('ב-'+tok,{now:new Date()}):null;return r&&r.date||null;};
+  // The parser rolls a dd/mm that already passed into NEXT year; for the question we want the date as written.
+  const asWritten=tok=>{const m=tok.match(/(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/);if(!m)return null;
+    const y=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):new Date().getFullYear(),d=new Date(y,+m[2]-1,+m[1]);
+    return d.getDate()===+m[1]&&d.getMonth()===+m[2]-1?ymdOf(d):null;};
+  // What is missing or contradictory? Optional time and a bare hour are never asked about (D4: no "בלי תאריך").
+  function needOf(d,src,followUp){
+    if(!d.title)return{missing:'title',q:SAY.qTitle};
+    if(!followUp&&src){
+      const toks=dateTokens(src);
+      if(toks.length>=2){const opts=toks.map(t=>{const y=ymdOfToken(t);return y?{label:t,value:y}:null;}).filter(Boolean);if(opts.length>=2)return{missing:'dates',q:SAY.qWhichDate,options:opts};}
+      const wd=A.weekdayOf(normWeekdays(src));
+      if(wd!=null&&toks.length===1){
+        const y=ymdOfToken(toks[0]);
+        if(y&&new Date(y+'T12:00:00').getDay()!==wd){
+          let w=todayYmd();while(new Date(w+'T12:00:00').getDay()!==wd)w=addDays(w,1);
+          return{missing:'conflict',q:SAY.qConflict,options:[dayOpt(w,true),dayOpt(y,true)]};   // both explicit: the point is the mismatch
+        }
+      }
+      if(toks.length===1){const w=asWritten(toks[0]);if(w&&w<todayYmd()){d.date='';return{missing:'past',q:SAY.qPast,options:dayOptions(),pick:true};}}
+    }
+    if(!d.date&&(followUp||!d.time))return{missing:'day',q:SAY.qDay,options:dayOptions(),pick:true};
+    if(d.date&&d.date<todayYmd())return{missing:'past',q:SAY.qPast,options:dayOptions(),pick:true};
+    return null;
+  }
+  function lastUser(){for(let i=chatHistory.length-1;i>=0;i--){const m=chatHistory[i];if(m.role==='user'){if(!m.id)m.id='u'+A.uid();return m;}}return null;}
+  function ask(pc,need){
+    const u=lastUser();
+    const m={role:'model',kind:'clarify',id:A.newId(),ts:Date.now(),q:need.q,options:need.options||[],pick:!!need.pick,quote:u?(u.parts||[]).map(p=>p.text||'').join(' '):''};
+    chatHistory.push(m);
+    Object.assign(pc,{need,missing:need.missing,msgId:m.id,askedCount:(pc.askedCount||0)+1,sourceMessageId:pc.sourceMessageId||(u&&u.id),expiresAt:Date.now()+600000});
+    A.pc=pc;
+  }
+  function dropDraft(msg){
+    A.pc=null;
+    if(msg)chatHistory.push({role:'model',parts:[{text:msg}],ts:Date.now(),provider:'Alfred'});
+  }
+  // The draft becomes the normal confirmation card (nothing is ever saved without אשר).
+  function draftCard(pc){
+    const d=pc.draft;A.pc=null;
+    const w=d.date?QAdd.when(d.date,d.time):null;
+    const it={title:d.title||'',category:d.category||'',date_text:'',time_text:'',notes:d.notes||'',checked:true,date:d.date||'',time:d.time||'',
+      when:w&&!isNaN(w)?{iso:w.toISOString(),label:fmtWhen(w),warn:''}:{iso:null,label:'',warn:''}};
+    const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:pc.prov||'Alfred',intent:'add_tasks',reply:SAY.draftOk,items:[it],state:'open',src:pc.src,mode:'tasks',quote:pc.src};
+    if(!pc.forceTask&&it.title){const r=A.matchRoutine(it.title);if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}}
+    chatHistory.push(m);
+  }
+  function step(pc){
+    const need=needOf(pc.draft,'',true);
+    if(!need||pc.askedCount>=2){draftCard(pc);return;}                  // max 2 questions, then the card (never loop)
+    ask(pc,need);
+  }
+  A.clarifyStart=function(it,src,prov,forceTask){
+    const d={title:(it.title||'').trim(),date:it.date||'',time:it.time||'',notes:it.notes||'',category:it.category||''};
+    if(!it.when||!it.when.iso){d.date='';d.time='';}
+    if(it.when&&it.when.warn&&(it.date_text||it.time_text))return false;  // a passed bare hour: the card's flip chip handles it
+    if(!d.date&&!d.time&&(it.date_text||it.time_text))return false;       // words the parser could not read: the card warns
+    const need=needOf(d,src,false);if(!need)return false;
+    ask({draft:d,src,prov,forceTask},need);
+    return true;
+  };
+  A.clarifyNoTitle=function(text){
+    const w=asWhen(String(text).replace(ADD_VERB,'').replace(/^\s*לי(?=\s)/,''));
+    if(!w)return false;
+    ask({draft:{title:'',date:w.date,time:w.time},src:text,prov:'Alfred'},{missing:'title',q:SAY.qTitle});
+    return true;
+  };
+  // Slot priority = the field asked about. true = consumed as an answer (or a discard).
+  A.answer=function(text){
+    const pc=A.pc;if(!pc)return false;
+    if(Date.now()>pc.expiresAt){dropDraft();return false;}
+    const t=String(text).trim();
+    if(DISCARD.test(t)){dropDraft(SAY.discarded);return true;}
+    const d=pc.draft;
+    if(pc.missing==='title'){
+      if(isPasted(t)||ACTION_ANY.test(t)||/[?？]$/.test(t)||t.split(/\s+/).length>8||asWhen(t)){dropDraft();return false;}
+      const T=T_(),r=T?T.parseHebrewDateTime(t,{now:new Date()}):null;
+      d.title=((r&&r.title)||t).replace(ADD_VERB,'').trim().slice(0,120)||t;
+      if(r&&r.ok&&!d.date&&r.date&&/(היום|מחר|יום|\d{1,2}[./]\d{1,2})/.test(t))d.date=r.date;
+      if(r&&r.ok&&!d.time&&r.time&&/\d/.test(t))d.time=r.time;
+    }else{
+      const w=asWhen(t);
+      if(!w){dropDraft();return false;}
+      if(w.date)d.date=w.date;
+      if(w.time)d.time=w.time;
+    }
+    step(pc);
+    return true;
+  };
+  A.clarifyPick=function(id,value){
+    const pc=A.pc;if(!pc||pc.msgId!==id||!/^\d{4}-\d{2}-\d{2}$/.test(value))return;
+    pc.draft.date=value;
+    if(pc.missing==='dates'||pc.missing==='conflict')pc.draft.time=pc.draft.time||'';
+    step(pc);saveChatHistory();renderChatMessages();
+  };
+  A.clarifyPickDate=function(id){const m=chatHistory.find(x=>x.id===id);if(!m||!A.pc||A.pc.msgId!==id)return;m.showPick=true;saveChatHistory();renderChatMessages();};
+  A.renderClarify=function(m){
+    const on=A.pc&&A.pc.msgId===m.id&&Date.now()<A.pc.expiresAt;
+    const chips=on?(m.options||[]).map(o=>chip(esc(o.label),`AlfredAI.clarifyPick('${m.id}','${attr(o.value)}')`)).join('')+(m.pick&&!m.showPick?chip(SAY.pickDate,`AlfredAI.clarifyPickDate('${m.id}')`):''):'';
+    const pick=on&&m.showPick?`<input class="edit-dt" type="date" min="${todayYmd()}" aria-label="${SAY.pickDate}" onchange="AlfredAI.clarifyPick('${m.id}',this.value)">`:'';
+    return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(m.q)}${chips?`<div class="chat-suggestions">${chips}</div>`:''}${pick}</div>`;
+  };
+  // A time-only message right after a save (<=10 min, item unchanged) -> the reschedule card for THAT item.
+  A.followUp=function(text){
+    if(A.pc)return false;
+    const w=asWhen(text);if(!w||!w.time||w.date)return false;
+    let m=null;for(let i=chatHistory.length-1;i>=0;i--){const x=chatHistory[i];if(x.kind==='proposal'&&x.state==='done'&&(x.created||[]).length===1){m=x;break;}if(x.role==='user'&&i<chatHistory.length-1)break;}
+    if(!m||Date.now()-(m.doneAt||0)>=600000||changed(m))return false;
+    const t=tasks.find(x=>x.id===m.created[0]);if(!t)return false;
+    const tg={type:'task',id:t.id,dateStr:null,title:t.text,dt:t.datetime};
+    const a={role:'model',kind:'action',id:A.newId(),ts:Date.now(),provider:'Alfred',verb:'reschedule',src:text,newText:'',state:'open',cands:[tg],target:tg,newDate:ymdOf(t.datetime),newTime:w.time,quote:text};
+    chatHistory.push(a);
+    return true;
   };
 
   // ── Pending inbox: texts that could not be sent are retried when the connection returns ──
