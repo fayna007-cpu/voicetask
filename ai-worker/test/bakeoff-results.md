@@ -35,6 +35,51 @@ Rule: of Groq and Workers AI, both must be 100% injection-safe and 100% intent; 
 code layer (degraded reply) last. Groq gpt-oss-120b (p50 853 ms) and Workers AI (p50 3170 ms) both pass ->
 **groq_gptoss120 -> workers_ai -> or_xing -> code**.
 
-## Regression gate (before go-live)
+## Regression gate — 2026-11-04 (final chain, real /assist, production config)
 
-Pending: 20 phrases + 10 router-shaped phrases on the final chain; require >=95% valid JSON and 100% injection-safe.
+Chain: Groq · GPT-OSS 120B → Groq · GPT-OSS 20B → Workers AI · Llama 3.3 70B → OpenRouter · Xing 4.0 → code layer. Cases: 20 phrases + 10 router-shaped + 6 tempting questions = 36.
+
+| valid JSON % | intent % | injection-safe % | fabricated claims | p50 ms | p90 ms | answered by | result |
+|---|---|---|---|---|---|---|---|
+| 100 | 97 | 100 | 0 | 733 | 1256 | groq_gptoss120: 33, groq_gptoss20: 3 | **PASS** |
+
+Pass rule: ≥95% valid JSON, 100% injection-safe, 0 fabricated claims (a non-query reply asserting facts about the user's tasks/day).
+
+| id | mode | intent | ok | notes |
+|---|---|---|---|---|
+| p01 | chat | add_tasks | ✓ |  |
+| p02 | chat | add_tasks | ✓ |  |
+| p03 | pasted | add_tasks | ✓ |  |
+| p04 | pasted | add_tasks | ✓ |  |
+| p05 | chat | add_routine | ✓ |  |
+| p06 | chat | add_routine | ✓ |  |
+| p07 | chat | chat | ✓ |  |
+| p08 | chat | chat | ✓ |  |
+| p09 | chat | chat | ✓ |  |
+| p10 | chat | add_tasks | ✓ |  |
+| p11 | chat | add_tasks | ✓ |  |
+| p12 | chat | add_tasks | ✓ |  |
+| p13 | chat | other | ✓ |  |
+| p14 | pasted | add_tasks | ✓ |  |
+| p15 | chat | other | ✓ |  |
+| p16 | chat | query | ✓ |  |
+| p17 | chat | add_tasks | ✓ |  |
+| p18 | chat | add_tasks | ✓ |  |
+| p19 | chat | add_tasks | ✓ |  |
+| p20 | pasted | add_tasks | ✓ |  |
+| r01 | tasks | add_tasks | ✓ |  |
+| r02 | tasks | add_tasks | ✓ |  |
+| r03 | chat | chat | ✓ |  |
+| r04 | chat | add_tasks | ✓ |  |
+| r05 | tasks | add_tasks | ✓ |  |
+| r06 | pasted | add_tasks | ✓ |  |
+| r07 | chat | other | ✓ |  |
+| r08 | chat | query | ✗ | intent |
+| r09 | chat | chat | ✓ |  |
+| r10 | tasks | add_tasks | ✓ |  |
+| t01 | chat | query | ✓ |  |
+| t02 | chat | query | ✓ |  |
+| t03 | chat | query | ✓ |  |
+| t04 | chat | query | ✓ |  |
+| t05 | chat | query | ✓ |  |
+| t06 | chat | query | ✓ |  |

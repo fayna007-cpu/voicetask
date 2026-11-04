@@ -4,21 +4,41 @@
 // KV writes happen only on failure, trip, quota and reset-from-nonzero (free plan: 1,000 writes/day).
 import { parseModelJson, validateReply, normalise } from './contract.js';
 
-export async function loadStates(env, ids) {
-  const out = {};
-  await Promise.all(ids.map(async (id) => { out[id] = (env.STATE && (await env.STATE.get('L:' + id, 'json'))) || { f: 0 }; }));
+// KV state (writes only on change — free plan allows 1,000 writes/day):
+//   Q:<layer>    daily-quota skip, per MODEL            {until}
+//   M:<layer>    model missing at the provider (404)    {model, since, until}   -> yellow line in settings
+//   L:<layer>    invalid-output breaker, per MODEL      {f, until}
+//   P:<provider> network/timeout/5xx breaker, per PROVIDER {f, until}           -> a Groq outage skips both Groq layers
+export const stateKeys = (L) => ['Q:' + L.id, 'M:' + L.id, 'L:' + L.id, 'P:' + L.provider];
+export async function loadStates(env, layers) {
+  const keys = [...new Set(layers.flatMap(stateKeys))], out = {};
+  await Promise.all(keys.map(async (k) => { out[k] = (env.STATE && (await env.STATE.get(k, 'json'))) || null; }));
   return out;
 }
-export const isSkipped = (s, now) => !!(s && s.until && s.until > now);
-
-// Returns the new state or null when nothing needs to be written.
-export function nextState(s, attempt, now, B) {
-  s = s || { f: 0 };
-  if (attempt.valid) return s.f || s.until ? { f: 0 } : null;
-  if (attempt.cancelled) return null;                                  // lost a hedge race: not a failure
-  if (attempt.quotaUntil) return { f: 0, until: attempt.quotaUntil, why: 'quota' };
-  const f = (s.f || 0) + 1;
-  return f >= B.breakerFails ? { f: 0, until: now + B.breakerSkipMs, why: 'breaker' } : { f };
+export function skipInfo(L, st, now) {
+  for (const k of stateKeys(L)) {
+    const s = st[k];
+    if (s && s.until && s.until > now) return { layer: L.id, key: k, until: s.until, why: k[0] === 'Q' ? 'quota' : k[0] === 'M' ? 'missing' : 'breaker' };
+  }
+  return null;
+}
+// One finished attempt -> list of [key, value|null] writes (null = delete). Mutate-free; caller applies in order.
+export function planWrites(a, L, st, now, B) {
+  const w = [], P = 'P:' + L.provider, LL = 'L:' + L.id, M = 'M:' + L.id;
+  if (a.cancelled) return w;                                           // lost a hedge race: not a failure
+  if (a.valid) {
+    if (st[P] && (st[P].f || st[P].until)) w.push([P, { f: 0 }]);
+    if (st[LL] && (st[LL].f || st[LL].until)) w.push([LL, { f: 0 }]);
+    if (st[M]) w.push([M, null]);                                      // the model is back: clear the flag
+    return w;
+  }
+  if (a.quotaUntil) return [['Q:' + L.id, { until: a.quotaUntil }]];
+  if (a.missing) return st[M] && st[M].until > now ? w : [[M, { model: L.model, since: now, until: now + B.missingSkipMs }]];
+  const key = a.retryable ? P : LL;
+  if (st[key] && st[key].until > now) return w;                        // already tripped (e.g. by the other Groq layer): keep it
+  const f = ((st[key] && st[key].f) || 0) + 1;
+  w.push([key, f >= B.breakerFails ? { f: 0, until: now + B.breakerSkipMs } : { f }]);
+  return w;
 }
 
 async function attemptOnce(call, L, timeoutMs, signal) {
@@ -42,7 +62,7 @@ export async function runLayer(call, L, deadline, signal, B) {
     a = await attemptOnce(call, L, Math.max(1, Math.min(L.timeoutMs, deadline - Date.now())), signal);
   }
   return { layer: L.id, model: a.model || L.model, status: a.status, valid: a.valid, result: a.result, error: a.valid ? null : a.error || (a.errors || []).join(', ') || 'invalid output',
-    quotaUntil: a.quotaUntil || null, cancelled: a.error === 'cancelled', retried, latencyMs: Date.now() - t0 };
+    quotaUntil: a.quotaUntil || null, missing: !!a.missing, retryable: !!a.retryable, cancelled: a.error === 'cancelled', retried, latencyMs: Date.now() - t0 };
 }
 
 // layers: [{id, ...LAYER}] already filtered (skipped layers removed). call(L, timeoutMs, signal) -> adapter result.

@@ -6,6 +6,9 @@
 import { CONTRACT_SCHEMA } from './contract.js';
 
 export const isFreeId = (id) => typeof id === 'string' && id.endsWith(':free');
+// Model churn: the id in config/models.js no longer exists at the provider.
+const MISSING = /does not exist|model[^.]{0,40}not found|no endpoints|not a valid model|decommissioned|no such model|\b5007\b/i;
+const markMissing = (r) => { if (r.status === 404 || MISSING.test(r.error || '')) { r.missing = true; r.retryable = false; } return r; };
 const clip = (s, n = 200) => (typeof s === 'string' ? s.slice(0, n) : s);
 export const nextUtcMidnight = (now = Date.now()) => { const d = new Date(now); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1); };
 
@@ -50,7 +53,7 @@ export async function callGroq(env, messages, L, timeoutMs, outer) {
     r.quotaUntil = Date.now() + (ra > 0 ? ra * 1000 : 60 * 60 * 1000);
   }
   delete r.headers;
-  return r;
+  return markMissing(r);
 }
 
 export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
@@ -70,7 +73,7 @@ export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
     r.quotaUntil = reset > Date.now() ? reset : nextUtcMidnight();
   }
   delete r.headers;
-  return r;
+  return markMissing(r);
 }
 
 export async function callWorkersAI(env, messages, L, timeoutMs) {
@@ -90,7 +93,7 @@ export async function callWorkersAI(env, messages, L, timeoutMs) {
     const msg = clip(e.message || String(e));
     const r = { ok: false, status: 0, model: L.model, content: null, error: e.name === 'TimeoutError' ? 'timeout' : msg, latencyMs: Date.now() - t0, retryable: e.name === 'TimeoutError' || /\b5\d\d\b|internal/i.test(msg) };
     if (/daily free allocation|neurons/i.test(msg)) { r.quotaUntil = nextUtcMidnight(); r.retryable = false; }   // free neurons reset 00:00 UTC
-    return r;
+    return markMissing(r);
   } finally { clearTimeout(timer); }
 }
 

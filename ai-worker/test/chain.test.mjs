@@ -1,6 +1,6 @@
 // node ai-worker/test/chain.test.mjs — chain / breaker / quota / cap logic with stub providers (no network).
-import { runChain, nextState, capCheck, _resetCapForTests } from '../src/chain.js';
-import { enforceMode, validateReply } from '../src/contract.js';
+import { runChain, planWrites, skipInfo, capCheck, _resetCapForTests } from '../src/chain.js';
+import { enforceMode, validateReply, normalise, FABRICATION } from '../src/contract.js';
 import { BUDGET } from '../config/models.js';
 
 const B = { totalMs: 1500, hedgeAfterMs: 400, minRetryLeftMs: 200, breakerFails: 3, breakerSkipMs: 300000 };
@@ -80,19 +80,45 @@ await check('no layers available (all skipped) -> degraded no_layers, immediatel
   const r = await runChain([], stub({}).call, B);
   return !r.ok && r.error === 'no_layers' && r.totalMs < 50 ? '' : JSON.stringify(r);
 });
-await check('breaker: 3 consecutive failures -> skip 5 min; success resets; no write when nothing changes', () => {
-  const now = 1e12; let s = { f: 0 };
-  s = nextState(s, { valid: false }, now, B); const w1 = s.f === 1;
-  s = nextState(s, { valid: false }, now, B); s = nextState(s, { valid: false }, now, B);
-  const tripped = s.until === now + B.breakerSkipMs && s.why === 'breaker';
-  const reset = nextState({ f: 2 }, { valid: true }, now, B);
-  const noWrite = nextState({ f: 0 }, { valid: true }, now, B) === null && nextState({ f: 1 }, { cancelled: true }, now, B) === null;
-  return w1 && tripped && reset.f === 0 && noWrite ? '' : JSON.stringify({ w1, tripped, reset, noWrite });
+const G120 = { id: 'groq_gptoss120', provider: 'groq', model: 'm120' }, G20 = { id: 'groq_gptoss20', provider: 'groq', model: 'm20' };
+const apply = (st, w) => { for (const [k, v] of w) st[k] = v; return st; };
+await check('provider breaker: 3 network/5xx failures on Groq -> BOTH Groq layers skipped 5 min', () => {
+  const now = 1e12, st = {};
+  apply(st, planWrites({ valid: false, retryable: true }, G120, st, now, B));
+  apply(st, planWrites({ valid: false, retryable: true }, G20, st, now, B));
+  apply(st, planWrites({ valid: false, retryable: true }, G120, st, now, B));
+  const s120 = skipInfo(G120, st, now), s20 = skipInfo(G20, st, now);
+  return s120 && s20 && s120.key === 'P:groq' && s20.why === 'breaker' && st['P:groq'].until === now + B.breakerSkipMs ? '' : JSON.stringify(st);
 });
-await check('quota: a daily-quota failure skips until the reset (not the 5-min breaker)', () => {
-  const reset = Date.UTC(2026, 10, 5);
-  const s = nextState({ f: 1 }, { valid: false, quotaUntil: reset }, Date.UTC(2026, 10, 4, 12), B);
-  return s.until === reset && s.why === 'quota' ? '' : JSON.stringify(s);
+await check('invalid output counts per MODEL (L:), not per provider; success resets; no write when nothing changes', () => {
+  const now = 1e12, st = {};
+  for (let i = 0; i < 3; i++) apply(st, planWrites({ valid: false, retryable: false }, G120, st, now, B));
+  const tripped = skipInfo(G120, st, now) && !skipInfo(G20, st, now);
+  const reset = planWrites({ valid: true }, G120, st, now, B);
+  const none = planWrites({ valid: true }, G20, {}, now, B).length === 0 && planWrites({ valid: false, cancelled: true }, G20, {}, now, B).length === 0;
+  return tripped && reset.some(([k, v]) => k === 'L:groq_gptoss120' && v.f === 0) && none ? '' : JSON.stringify({ st, reset });
+});
+await check('quota is per MODEL: 120b out of daily quota does not skip 20b', () => {
+  const now = Date.UTC(2026, 10, 4, 12), reset = Date.UTC(2026, 10, 5), st = apply({}, planWrites({ valid: false, quotaUntil: reset }, G120, {}, now, B));
+  const s = skipInfo(G120, st, now);
+  return s && s.why === 'quota' && s.until === reset && !skipInfo(G20, st, now) ? '' : JSON.stringify(st);
+});
+await check('missing model (404): flagged with model + date, skipped a day, flag cleared when it answers again', () => {
+  const now = 1e12, st = apply({}, planWrites({ valid: false, missing: true }, G20, {}, now, { ...B, missingSkipMs: 86400000 }));
+  const m = st['M:groq_gptoss20'], skip = skipInfo(G20, st, now);
+  const cleared = planWrites({ valid: true }, G20, st, now + 9e7, B).some(([k, v]) => k === 'M:groq_gptoss20' && v === null);
+  return m && m.model === 'm20' && m.since === now && skip.why === 'missing' && cleared ? '' : JSON.stringify({ m, skip, cleared });
+});
+await check('contract: query needs a valid filter.range; tasks dropped; reply may be empty', () => {
+  const ok = validateReply({ intent: 'query', filter: { range: 'today' } });
+  const n = normalise({ intent: 'query', reply: '', filter: { range: 'week', category: 'מקצועי' }, tasks: [{ title: 'x' }] });
+  const bad = [{ intent: 'query', reply: '' }, { intent: 'query', reply: '', filter: { range: 'yesterday' } }, { intent: 'query', reply: '', filter: { range: 'today', sql: 'x' } }].filter((o) => validateReply(o).ok);
+  return ok.ok && n.tasks.length === 0 && n.filter.range === 'week' && n.filter.category === 'מקצועי' && !bad.length ? '' : JSON.stringify({ ok, n, bad });
+});
+await check('fabrication pattern catches invented claims, not normal chat', () => {
+  const claims = ['היום יש לך 3 משימות', 'יש לך יום עמוס', 'השבוע שלך עמוס', 'אין לך פגישות מחר', 'יש לך 2 פגישות'];
+  const fine = ['היי! איך אפשר לעזור?', 'הוספתי את המשימה', 'בשמחה, תמיד כאן'];
+  return claims.every((t) => FABRICATION.test(t)) && !fine.some((t) => FABRICATION.test(t)) ? '' : 'mismatch';
 });
 await check('daily cap: refuses at the cap; KV written once per 5 requests', async () => {
   _resetCapForTests();
