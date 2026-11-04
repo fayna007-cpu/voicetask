@@ -5,6 +5,7 @@ name = "alfred-ai"
 main = "src/index.js"
 compatibility_date = "2026-06-01"
 workers_dev = true
+preview_urls = false        # no extra per-version URLs; the one workers.dev URL is the gateway
 
 # Workers AI, used through the binding (no key).
 [ai]
