@@ -18,6 +18,12 @@ node_modules/
 client_secret*
 .env*
 
+# AI gateway (Cloudflare Worker) — local state, dev secrets, bake-off output
+ai-worker/node_modules/
+ai-worker/.wrangler/
+ai-worker/.dev.vars
+ai-worker/.bakeoff/
+
 # Editor / OS
 .DS_Store
 Thumbs.db
