@@ -24,6 +24,9 @@ ai-worker/.wrangler/
 ai-worker/.dev.vars
 ai-worker/.bakeoff/
 
+# Staged GitHub Pages site (built by tools/stage-site.mjs)
+_site/
+
 # Editor / OS
 .DS_Store
 Thumbs.db
