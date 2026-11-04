@@ -6,8 +6,17 @@
 agents/
 misc/
 
+# Dependencies / local tooling
+node_modules/
+.claude/
+
+# Archives
+*.zip
+
 # Secrets — never commit
 **/client_secret_*.json
+client_secret*
+.env*
 
 # Editor / OS
 .DS_Store
