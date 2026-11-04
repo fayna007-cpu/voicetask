@@ -6668,8 +6668,11 @@ function renderPendingList(){
     const urlHtml=item.url?`<a class="pend-url" href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`:'';
     const d=new Date(item.receivedAt);
     const when=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    // Each card says what it is; recent items get a "חדש" label (existing items are only labelled, never rewritten).
+    const isNew=Date.now()-d.getTime()<24*3600000;
+    const kind=item.aiBatch?`📋 הצעת העוזר · ${item.aiBatch.items.length} משימות`:item.aiText?'⏳ ממתין לעוזר':item.url?'🔗 קישור ששותף':'📥 טקסט ששותף';
     return`<div class="pend-card" id="pc${item.id}">
-<div class="pend-meta">${when}</div>
+<div class="pend-meta">${isNew?'<span class="routine-badge">חדש</span> ':''}${kind} · ${when}</div>
 <div class="pend-text">${esc(item.text)}</div>
 ${urlHtml}
 <div class="pend-actions">
@@ -11815,9 +11818,83 @@ function maybeShowDailyPopup(){
   // Until C2, rescheduling is not done from chat: answer with a fixed pointer instead of an unrelated list.
   const RESCHEDULE=/(^|\s)(תעביר|תעבירי|להעביר|תדחה|תדחי|לדחות|דחה|תזיז|תזיזי|להזיז|תקדים|תקדימי|להקדים)(?=\s|$)/;
   const RESCHEDULE_REPLY='לדחייה השתמש בכפתור הדחייה';
+
+  // ── Matching on the device (never sent to the model) ──
+  // Hebrew key-noun matching: strip prefixes (ו/ה/ב/ל/מ/ש), plural/construct endings and final letters.
+  const FINALS={'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'};
+  const STOP=new Set(['של','את','עם','על','לי','אני','זה','הוא','היא','אותו','אותה','שלי','גם','רק','עוד','כל','יום','השבוע','שבוע','תעביר','תזיז','תדחה','תוסיף','הוסף','תזכיר','תקבע','קבע','בטעות','צריך','רוצה']);
+  function norm(w){
+    w=String(w).toLowerCase().replace(/[^א-תa-z0-9]/g,'');
+    let k=0;while(w.length>3&&/^[והבלמש]/.test(w)&&k<2){w=w.slice(1);k++;}
+    if(w.length>4)w=w.replace(/(ים|ות|יות)$/,'');
+    if(w.length>4)w=w.replace(/י$/,'');
+    return w.replace(/[ךםןףץ]/g,c=>FINALS[c]);
+  }
+  const tokens=s=>String(s||'').split(/[\s,.:;!?()\-–—"'׳״]+/).map(norm).filter(w=>w.length>=2&&!STOP.has(w));
+  function overlap(a,b){let n=0;for(const x of a)if(b.some(y=>y===x||(x.length>=3&&y.length>=3&&(y.startsWith(x)||x.startsWith(y)))))n++;return n;}
+  const ymdOf=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');};
+  const hmOf=d=>{const x=new Date(d);return String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');};
+  const ORDINAL={'הראשון':1,'הראשונה':1,'השני':2,'השנייה':2,'השניה':2,'השלישי':3,'השלישית':3,'הרביעי':4,'האחרון':-1,'האחרונה':-1};
+
+  // Open items the user could mean: open tasks, this week's routine instances, pending bills, open CRM items.
+  A.localItems=function(){
+    const out=[];const now=new Date();const wk=new Date(now);wk.setDate(wk.getDate()-((wk.getDay()+7)%7));wk.setHours(0,0,0,0);const wkEnd=new Date(+wk+7*864e5);
+    tasks.filter(t=>!t.completed).forEach(t=>out.push({type:'task',id:t.id,title:t.text,dt:t.datetime||null}));
+    // This week's routine instances straight from scheduledWeeks (getRoutineInstances drops anything >24h old,
+    // and ordinals like "השני השבוע" must count the whole week). Skipped instances are not targets.
+    routines.filter(r=>r.enabled!==false).forEach(r=>Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item&&item.dt;if(!dt)return;
+      const d=new Date(dt);if(d<wk||d>=wkEnd||(r.skippedDates||[]).includes(dt))return;
+      out.push({type:'routine',id:r.id,dateStr:dt,title:r.name||r.text||'',dt,completed:(r.completedDates||[]).includes(dt)});
+    }));
+    (typeof bills!=='undefined'?bills:[]).filter(b=>b.status==='pending').forEach(b=>out.push({type:'bill',id:b.id,title:b.name,dt:b.payDate||b.deadline||null}));
+    (typeof backlogItems!=='undefined'?backlogItems:[]).filter(i=>i.status!=='done').forEach(i=>out.push({type:'crm',id:i.id,title:i.text,dt:i.dueDate||null}));
+    return out;
+  };
+  // R1: which existing item does the user mean? Returns {kind:'one'|'many'|'none', items}. Never invents a match.
+  A.resolveTarget=function({text='',dayText='',timeText='',nth=null}={},data=A.localItems()){
+    const T=window.QAdd&&QAdd.time;
+    const words=tokens(text).filter(w=>!/^\d+$/.test(w));
+    if(!words.length)return{kind:'none',items:[]};
+    let cand=data.map(it=>({...it,score:overlap(words,tokens(it.title))})).filter(it=>it.score>0);
+    const best=Math.max(0,...cand.map(c=>c.score));cand=cand.filter(c=>c.score===best);
+    const hint=T&&(dayText||timeText)?T.parseHebrewDateTime([dayText,timeText].filter(Boolean).join(' '),{now:new Date()}):null;
+    if(hint&&hint.ok){
+      const n=cand.filter(c=>c.dt&&(!hint.date||ymdOf(c.dt)===hint.date)&&(!timeText||!hint.time||hmOf(c.dt)===hint.time));
+      if(n.length)cand=n;
+    }
+    cand.sort((a,b)=>(a.dt?new Date(a.dt):Infinity)-(b.dt?new Date(b.dt):Infinity));
+    if(nth&&cand.length>1){const k=nth===-1?cand.length-1:nth-1;cand=cand[k]?[cand[k]]:cand;}
+    return{kind:cand.length===1?'one':cand.length?'many':'none',items:cand};
+  };
+  A.ordinalOf=t=>{const m=String(t).match(/(?:^|\s)(הראשון|הראשונה|השני|השנייה|השניה|השלישי|השלישית|הרביעי|האחרון|האחרונה)(?=\s|$)/);return m?ORDINAL[m[1]]:null;};
+  // R3: does a new task's title name an existing routine?
+  A.matchRoutine=function(title){
+    const w=tokens(title);if(!w.length)return null;
+    let best=null,score=0;
+    for(const r of routines){const s=overlap(w,tokens(r.name||r.text));if(s>score){score=s;best=r;}}
+    return score?best:null;
+  };
+  // R3: explicit recurrence only (never invented): count per week, explicit weekdays, time-of-day.
+  A.parseRecurrence=function(text){
+    const t=String(text);const DAYS={'ראשון':0,'שני':1,'שלישי':2,'רביעי':3,'חמישי':4,'שישי':5,'שבת':6};
+    const days=[...t.matchAll(/(?:^|\s)(?:כל\s+(?:יום\s+)?|ב?ימי\s+|ו-?)(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?=[\s,.]|$)/g)].map(m=>DAYS[m[1]]);
+    const WORD={'פעם':1,'פעמיים':2,'שלוש':3,'שלושה':3,'ארבע':4,'חמש':5,'שש':6};
+    let n=null,m;
+    if((m=t.match(/(\d+)\s*פעמים\s+(?:ב|ל)שבוע/)))n=+m[1];
+    else if((m=t.match(/(פעמיים|שלוש|שלושה|ארבע|חמש|שש)\s*(?:פעמים\s+)?(?:ב|ל)שבוע/)))n=WORD[m[1]];
+    else if(/פעם\s+(?:ב|ל)שבוע/.test(t))n=1;
+    else if(/כל\s+(יום|בוקר|ערב)(?!\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת))/.test(t))n=7;
+    const win=/בבוקר|כל בוקר/.test(t)?'morning':/בערב|כל ערב/.test(t)?'evening':/בצהריים|אחה"צ|אחר הצהריים/.test(t)?'afternoon':null;
+    const T=window.QAdd&&QAdd.time;const p=T?T.parseHebrewDateTime(t,{now:new Date()}):null;
+    const specificTime=p&&p.time&&/\d/.test(t)?p.time:null;
+    const uniqDays=[...new Set(days)];
+    return{recurring:!!(n||uniqDays.length),timesPerWeek:n||(uniqDays.length||null),preferredDays:uniqDays,timeWindow:specificTime?'specific':win,specificTime};
+  };
   const FAIL_TEXT={stopped:'הופסק. ההודעה שמורה — אפשר לנסות שוב.',offline:'אין חיבור לאינטרנט. ההודעה שמורה.',timeout:'העוזר לא ענה בזמן. ההודעה שמורה.',network:'לא הצלחתי להגיע לעוזר. ההודעה שמורה.',degraded:'העוזר לא זמין כרגע. ההודעה שמורה.',empty:'לא התקבלה תשובה תקינה מהעוזר.',error:'משהו השתבש מול העוזר.'};
   let ctrl=null;
 
+  let _seq=0;A.newId=()=>'p'+Date.now()+'_'+(++_seq);           // unique even for several cards in one millisecond
   A.stripKeys=function(s){                                      // backups/imports never carry API keys
     if(!s||typeof s!=='object')return s;
     const{key,groqKey,cfToken,cfAccount,...rest}=s;return rest;
@@ -11873,7 +11950,7 @@ function maybeShowDailyPopup(){
   }
   function toPending(text){
     if(pendingItems.some(i=>i.aiText===text))return true;
-    addPendingItem(text,'⏳ ממתין לעוזר');
+    addPendingItem(text,'');                                     // the sheet labels it "⏳ ממתין לעוזר"
     if(pendingItems[0]){pendingItems[0].aiText=text;savePending();}
     return true;
   }
@@ -11901,8 +11978,19 @@ function maybeShowDailyPopup(){
       return 'query';
     }
     if((res.intent==='add_tasks'||res.intent==='add_routine')&&items.length&&!opts.forceChat){
+      const forceTask=/^\s*משימה\s*:/.test(text);                // "משימה:" always means a regular task
+      const rec=A.parseRecurrence(text);
+      let intent=res.intent;
+      if(forceTask&&intent==='add_routine')intent='add_tasks';
+      if(!forceTask&&intent==='add_tasks'&&items.length===1&&rec.recurring)intent='add_routine';
       items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;});
-      chatHistory.push({role:'model',kind:'proposal',id:'p'+Date.now(),ts:Date.now(),provider:prov,intent:res.intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending});
+      const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:prov,intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending};
+      if(intent==='add_routine')m.recurrence=rec;
+      else if(!forceTask&&items.length===1){                     // a new item that names an existing routine
+        const r=A.matchRoutine(items[0].title);
+        if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}
+      }
+      chatHistory.push(m);
       return 'proposal';
     }
     let msg=reply||items.map(t=>'• '+t.title).join('\n');
@@ -11965,7 +12053,8 @@ function maybeShowDailyPopup(){
     if(m.state==='done'){
       const n=(m.created||[]).length;
       const undo=n&&lastDoneId()===m.id?`<button class="chat-retry-btn" onclick="AlfredAI.undo('${m.id}')">↶ בטל הוספה</button>`:'';
-      return `<div class="chat-bubble bot">${m.intent==='add_routine'?'✓ נפתח טופס שגרה':'✓ נוספו '+n+' משימות'}${undo}</div>`;
+      const what=m.intent==='add_routine'?'✓ נפתח טופס שגרה':m.instance?`✓ נוסף מופע לשגרת "${esc(m.routineName||'')}"`:'✓ נוספו '+n+' משימות';
+      return `<div class="chat-bubble bot">${what}${undo}</div>`;
     }
     const rows=m.items.map((it,i)=>{
       const when=it.when&&it.when.label?`<span class="routine-badge">🕒 ${esc(it.when.label)}</span>`:'';
@@ -11973,9 +12062,11 @@ function maybeShowDailyPopup(){
       return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0"><label class="siri-notif-morning"><input type="checkbox"${it.checked?' checked':''} onchange="AlfredAI.toggle('${m.id}',${i},this.checked)"><span style="color:var(--text)">${esc(it.title)}</span></label>${when}${warn}<button class="chat-suggestion" onclick="AlfredAI.edit('${m.id}',${i})" aria-label="ערוך">✏️</button></div>`;
     }).join('');
     const n=m.items.filter(it=>it.checked).length;
-    const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':`✓ הוסף (${n})`;
+    const isInst=m.routineId&&m.choice==='instance';
+    const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':isInst?'✓ הוסף מופע':`✓ הוסף (${n})`;
+    const kindChips=m.routineId?`<div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','instance')">${isInst?'✓ ':''}מופע של שגרת "${esc(m.routineName||'')}"</button><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','task')">${isInst?'':'✓ '}משימה רגילה</button></div>`:'';
     setTimeout(A.paintHints,0);                                  // after the chat HTML is in the DOM
-    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div><div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
+    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div>${kindChips}<div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
   };
   // Long cards scroll inside their body: show a fade + "עוד N ↓" while items are hidden below.
   A.paintHints=function(){
@@ -11987,6 +12078,14 @@ function maybeShowDailyPopup(){
       hint.hidden=!more;
       if(more)hint.textContent=`עוד ${below} ↓ — גלול לראות הכל`;
     });
+  };
+  A.choose=function(id,c){const m=find(id);if(!m||m.state!=='open')return;m.choice=c;saveChatHistory();renderChatMessages();};
+  // A routine instance through the existing quick-add-instance flow (same calendar event + scheduledWeeks entry).
+  A.addInstance=async function(routineId,iso){
+    quickAddInstance(routineId);
+    const inp=$('qaDate');
+    if(inp&&iso){const d=new Date(iso),p=x=>String(x).padStart(2,'0');inp.value=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
+    await confirmQuickAdd(routineId);
   };
   A.toggle=function(id,i,v){const m=find(id);if(!m||!m.items[i])return;m.items[i].checked=!!v;saveChatHistory();renderChatMessages();};
   A.cancel=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();};
@@ -12001,10 +12100,22 @@ function maybeShowDailyPopup(){
   A.approve=function(id){
     const m=find(id);if(!m||m.state!=='open')return;
     if(m.intent==='add_routine'){
-      const it=m.items[0];m.state='done';m.created=[];saveChatHistory();
+      const it=m.items[0],rc=m.recurrence||{};m.state='done';m.created=[];saveChatHistory();
       try{closeAssistantSheet();}catch(_){}
       openRoutineSheet();
-      setTimeout(()=>openRoutineForm({name:it.title,notes:[it.date_text,it.time_text,it.notes].filter(Boolean).join(' · ')},null),150);
+      // Only what was said: explicit days become pre-selected (editable) day chips; nothing is invented.
+      const pre={name:it.title,notes:it.notes||''};
+      if(rc.timesPerWeek)pre.timesPerWeek=Math.min(7,rc.timesPerWeek);
+      if(rc.preferredDays&&rc.preferredDays.length)pre.preferredDays=rc.preferredDays;
+      if(rc.timeWindow)pre.timeWindow=rc.timeWindow;
+      if(rc.specificTime)pre.specificTime=rc.specificTime;
+      setTimeout(()=>openRoutineForm(pre,null),150);
+      return;
+    }
+    if(m.routineId&&m.choice==='instance'){
+      const it=m.items[0];m.state='done';m.created=[];m.instance=true;saveChatHistory();
+      A.addInstance(m.routineId,it.when&&it.when.iso).then(()=>{saveChatHistory();renderChatMessages();});
+      renderChatMessages();
       return;
     }
     const chosen=m.items.filter(it=>it.checked);
@@ -12073,7 +12184,8 @@ function maybeShowDailyPopup(){
     }catch(e){paintSettings('❌ אין חיבור לשער העוזר');}
   };
   paintSettings();
-  setTimeout(()=>A.flushPending(),8000);
+  // (F4) No flush on app start: old failed texts were turning into a pile of approval cards on every launch.
+  // They are retried only when the connection comes back ("online"), or from the ממתינים sheet.
 })();
 </script>
 </body>
