@@ -6,7 +6,8 @@ export const CATEGORIES = ['אישי', 'מקצועי', 'כללי'];
 // on the device and always asks for confirmation. An old client ignores `action` and shows `reply` as chat,
 // so every action reply is non-empty (normalise() fills a default).
 export const ACTIONS = ['reschedule', 'complete', 'delete', 'skip_routine'];
-export const INTENTS = ['chat', 'add_tasks', 'add_routine', 'query', 'other', ...ACTIONS];
+export const INTENTS = ['chat', 'add_tasks', 'add_routine', 'query', 'other', ...ACTIONS, 'summarize'];
+const SUM_LIMITS = { title: 60, bullet: 120, bullets: 6, date_text: 40, time_text: 40, end_time_text: 40 };
 export const RANGES = ['today', 'tomorrow', 'week', 'overdue'];   // 'query': the CLIENT answers from local data
 export const MAX_TASKS = 20;
 const LIMITS = { reply: 400, title: 120, date_text: 40, time_text: 40, notes: 300 };
@@ -26,6 +27,12 @@ export const CONTRACT_SCHEMA = {
       additionalProperties: false,
       required: ['range'],
       properties: { range: { type: 'string', enum: RANGES }, category: { type: 'string', enum: CATEGORIES } },
+    },
+    summary: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['title'],
+      properties: { title: str(SUM_LIMITS.title), bullets: { type: 'array', maxItems: SUM_LIMITS.bullets, items: str(SUM_LIMITS.bullet) }, date_text: str(40), time_text: str(40), end_time_text: str(40) },
     },
     action: {
       type: 'object',
@@ -78,8 +85,19 @@ export function validateReply(o) {
   const isStr = (v) => typeof v === 'string';
   const optStr = (v, max) => v === undefined || v === null || (isStr(v) && v.length <= max);
   if (!o || typeof o !== 'object' || Array.isArray(o)) return { ok: false, errors: ['not an object'] };
-  for (const k of Object.keys(o)) if (!['intent', 'reply', 'tasks', 'filter', 'action'].includes(k)) errors.push('extra key ' + k);
+  for (const k of Object.keys(o)) if (!['intent', 'reply', 'tasks', 'filter', 'action', 'summary'].includes(k)) errors.push('extra key ' + k);
   if (!INTENTS.includes(o.intent)) errors.push('bad intent');
+  const isSum = o.intent === 'summarize';
+  if (isSum) {
+    const m = o.summary;
+    if (!m || typeof m !== 'object' || Array.isArray(m) || !isStr(m.title) || !m.title.trim() || m.title.length > SUM_LIMITS.title) errors.push('summarize without a valid summary.title');
+    else {
+      for (const k of Object.keys(m)) if (!['title', 'bullets', 'date_text', 'time_text', 'end_time_text'].includes(k)) errors.push('extra summary key ' + k);
+      if (!(m.bullets === undefined || m.bullets === null || (Array.isArray(m.bullets) && m.bullets.length <= SUM_LIMITS.bullets && m.bullets.every((b) => isStr(b) && b.length <= SUM_LIMITS.bullet)))) errors.push('bad summary.bullets');
+      for (const k of ['date_text', 'time_text', 'end_time_text']) if (!optStr(m[k], 40)) errors.push('bad summary.' + k);
+    }
+    if (o.reply === undefined || o.reply === null) o.reply = '';
+  } else if (o.summary !== undefined && o.summary !== null) errors.push('summary on a non-summarize intent');
   const isAction = ACTIONS.includes(o.intent);
   if (isAction) {
     const a = o.action, t = a && a.target;
@@ -112,7 +130,7 @@ export function validateReply(o) {
     for (const k of ['date_text', 'time_text', 'notes']) if (!optStr(t[k], LIMITS[k])) errors.push(`task ${i} bad ${k}`);
     if (!(t.category === undefined || t.category === null || t.category === '' || CATEGORIES.includes(t.category))) errors.push(`task ${i} bad category`);
   });
-  if (!errors.length && o.intent !== 'query' && !isAction && !o.reply.trim() && !tasks.length) errors.push('empty reply');      // never an empty answer
+  if (!errors.length && o.intent !== 'query' && !isAction && !isSum && !o.reply.trim() && !tasks.length) errors.push('empty reply');      // never an empty answer
   if (!errors.length && (o.intent === 'add_tasks' || o.intent === 'add_routine') && !tasks.length) errors.push('task intent without tasks');
   return { ok: !errors.length, errors };
 }
@@ -123,9 +141,13 @@ export function normalise(o) {
   const out = {
     intent: o.intent,
     reply: s(o.reply),
-    tasks: o.intent === 'query' || ACTIONS.includes(o.intent) ? [] : (o.tasks || []).map((t) => ({ title: s(t.title), category: CATEGORIES.includes(t.category) ? t.category : '', date_text: s(t.date_text), time_text: s(t.time_text), notes: s(t.notes) })),
+    tasks: o.intent === 'query' || o.intent === 'summarize' || ACTIONS.includes(o.intent) ? [] : (o.tasks || []).map((t) => ({ title: s(t.title), category: CATEGORIES.includes(t.category) ? t.category : '', date_text: s(t.date_text), time_text: s(t.time_text), notes: s(t.notes) })),
   };
   if (o.intent === 'query') out.filter = { range: o.filter.range, category: CATEGORIES.includes(o.filter.category) ? o.filter.category : '' };
+  if (o.intent === 'summarize') {
+    const m = o.summary;
+    out.summary = { title: s(m.title), bullets: (m.bullets || []).map(s).filter(Boolean), date_text: s(m.date_text), time_text: s(m.time_text), end_time_text: s(m.end_time_text) };
+  }
   if (ACTIONS.includes(o.intent)) {
     const t = o.action.target;
     out.reply = out.reply || ACTION_REPLY;
@@ -140,6 +162,7 @@ export const FABRICATION = /יש לך \d+ (משימות|פגישות|אירוע�
 
 // Pasted text may only produce tasks or a chat answer (defence in depth; the client checks too).
 export function enforceMode(r, mode) {
+  if (r.intent === 'summarize' && mode !== 'summarize') { const { summary, ...rest } = r; return { ...rest, intent: 'chat', reply: r.reply || summary.title, tasks: [] }; }
   if (mode !== 'pasted') return r;
   if (ACTIONS.includes(r.intent)) { const { action, ...rest } = r; return { ...rest, intent: 'chat', tasks: [] }; }   // pasted text never acts
   if (r.intent === 'add_routine') return { ...r, intent: 'add_tasks' };

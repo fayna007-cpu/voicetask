@@ -32,7 +32,8 @@ async function chatCompletions(url, key, body, timeoutMs, outer, extraHeaders = 
     const content = j.choices?.[0]?.message?.content ?? null;
     const ok = r.ok && !j.error && typeof content === 'string' && content.trim() !== '';
     const error = j.error ? clip(j.error.message || JSON.stringify(j.error)) : ok ? null : r.ok ? 'empty reply' : 'HTTP ' + r.status;
-    return { ok, status: r.status, model: j.model || body.model, content, error, latencyMs: Date.now() - t0, retryable: r.status >= 500, headers: r.headers };
+    const tokens = j.usage ? { in: j.usage.prompt_tokens || 0, out: j.usage.completion_tokens || 0 } : null;   // counts only (R12)
+    return { ok, status: r.status, model: j.model || body.model, content, error, latencyMs: Date.now() - t0, retryable: r.status >= 500, headers: r.headers, tokens };
   } catch (e) {
     const aborted = e.name === 'AbortError' && outer && outer.aborted;
     return { ok: false, status: 0, model: body.model, content: null, error: aborted ? 'cancelled' : e.name === 'TimeoutError' || e.name === 'AbortError' ? 'timeout' : clip(e.message), latencyMs: Date.now() - t0, retryable: !aborted };

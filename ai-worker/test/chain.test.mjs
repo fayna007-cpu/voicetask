@@ -152,6 +152,13 @@ await check('pasted mode: an action intent becomes plain chat (pasted text never
   const r = enforceMode(normalise({ intent: 'delete', action: { target: { text: 'הכל' } } }), 'pasted');
   return r.intent === 'chat' && !('action' in r) && r.tasks.length === 0 && r.reply ? '' : JSON.stringify(r);
 });
+await check('R9 summarize: valid shape normalised (<=6 bullets); bad shapes refused; outside summarize mode it is plain chat', () => {
+  const ok = { intent: 'summarize', summary: { title: 'תור לבדיקת עיניים', bullets: ['להביא תעודת זהות'], date_text: '2026-12-01', time_text: '07:30', end_time_text: '11:00' } };
+  const v = validateReply(structuredClone(ok)), n = normalise(structuredClone(ok));
+  const bad = [{ intent: 'summarize', summary: { title: '' } }, { intent: 'summarize', summary: { title: 'x', bullets: Array(7).fill('a') } }, { intent: 'summarize', summary: { title: 'x', phone: '1' } }, { intent: 'chat', reply: 'x', summary: { title: 'x' } }].filter((o) => validateReply(o).ok);
+  const chat = enforceMode(n, 'chat');
+  return v.ok && n.summary.end_time_text === '11:00' && n.summary.bullets.length === 1 && n.tasks.length === 0 && !bad.length && chat.intent === 'chat' && !('summary' in chat) && enforceMode(n, 'summarize').summary ? '' : JSON.stringify({ v, n, bad, chat });
+});
 await check('production budget constants are the agreed ones', () => (BUDGET.totalMs === 15000 && BUDGET.hedgeAfterMs === 4000 ? '' : JSON.stringify(BUDGET)));
 
 rows.forEach((r, i) => console.log(`${String(i + 1).padStart(2)}. ${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.ok ? '' : '  <- ' + r.err}`));

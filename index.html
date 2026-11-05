@@ -3335,6 +3335,8 @@ async function saveEdit(id){
   if(dt)t.datetime=new Date(dt).toISOString();
   const urlEl=document.getElementById('eurl-'+id);
   if(urlEl)t.url=urlEl.value.trim()||null;
+  const notesEl=document.getElementById('enotes-'+id);             // optional field: only exists when the task has notes
+  if(notesEl){const v=notesEl.value.trim().slice(0,4000);if(v)t.notes=v;else delete t.notes;}
   t.calendarEventId=null;save();render();await syncTask(t);toast('משימה עודכנה');
 }
 function cancelEdit(id){const el=document.getElementById('edit-'+id);if(el)el.classList.remove('on')}
@@ -3683,6 +3685,7 @@ function renderTaskCard(task){
       ${task.image?`<button class="edit-img-remove" onclick="removeTaskImage(${task.id})">הסר</button>`:''}
     </div>
     ${task.image?`<img class="task-img-preview" src="${task.image}" alt="תמונה" onclick="openTaskImgFull(${task.id})">`:''}
+    ${task.notes?`<textarea class="edit-txt" id="enotes-${task.id}" rows="5" aria-label="הערות">${esc(task.notes)}</textarea>`:''}
     <div class="edit-actions">
       <button class="edit-save" onclick="saveEdit(${task.id})">שמור שינויים</button>
       <button class="edit-cancel" onclick="cancelEdit(${task.id})">בטל</button>
@@ -11883,6 +11886,9 @@ function maybeShowDailyPopup(){
     // R7 clarification: ONE short question each
     qTitle:'מה לקבוע?',qDay:'לאיזה יום?',qPast:'התאריך עבר, לאיזה יום לקבוע?',qConflict:'היום והתאריך לא מסתדרים — מה נכון?',
     qWhichDate:'יש כמה תאריכים — לאיזה לקבוע?',pickDate:'📅 בחר תאריך',discarded:'בסדר, עזבתי 👍',draftOk:'לאשר הוספה?',
+    // R9 detail card
+    detailReply:'הודעה ארוכה — ריכזתי למשימה אחת',summarizing:'מסכם…',until:t=>`⏰ עד ${t}`,
+    pastWarn:'⚠️ התאריך עבר — בחר תאריך חדש',pastPick:'התאריך עבר — בחר תאריך חדש לפני האישור',
   };
 
   // ── Matching on the device (never sent to the model) ──
@@ -12127,6 +12133,8 @@ function maybeShowDailyPopup(){
     // Pasted text never acts: a pasted line that starts with a command gets the fixed answer; any other
     // paste goes on as tasks/summary (the Worker and handle() refuse actions for it as well).
     if(!opts.forceChat&&isPasted(text)&&text.split('\n').some(l=>VERBS.some(([,re])=>{const m=l.trim().replace(/^[-•*–\d.)\s]+/,'').match(re);return m&&m.index===0;}))){push(SAY.pastedAction);return 'canned';}
+    // R9: a long detailed message -> ONE card right away (code); the summary refines it in the background
+    if(!opts.forceChat&&!opts.fromPending&&A.isDetail(text)){const m=A.startDetail(text);saveChatHistory();renderChatMessages();A.summarize(m);return 'detail';}
     const act=opts.forceChat||isPasted(text)?null:A.parseAction(text);
     if(act){
       if(act.all){push(SAY.oneAtATime);return 'canned';}
@@ -12222,7 +12230,12 @@ function maybeShowDailyPopup(){
     let body;
     if(single){                                                 // R6: one item -> editable fields, NO checkbox
       const it=m.items[0];
-      const warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
+      let warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
+      const dt=m.detail;
+      if(dt)warn+=(dt.end?`<span class="routine-badge">${esc(SAY.until(dt.end))}</span>`:'')+(it.date&&it.date<todayYmd()?`<span class="cal-badge pending">${SAY.pastWarn}</span>`:'')
+        +(dt.bullets&&dt.bullets.length?`<div style="margin-top:6px">${dt.bullets.map(b=>'• '+esc(b)).join('<br>')}</div>`:'')
+        +(dt.phones&&dt.phones.length?`<div class="ai-phones" data-pid="${m.id}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>`:'')
+        +(dt.summarizing?`<div class="ai-more-hint" style="margin:6px 0 0">${SAY.summarizing}</div>`:'');
       body=m.intent==='add_routine'
         ?`<div class="chat-confirm-body">${esc(it.title)}</div>`
         :`<div class="chat-confirm-body"><input class="edit-dt" value="${attr(it.title)}" aria-label="כותרת" onchange="AlfredAI.field('${m.id}','title',this.value)"><div style="display:flex;gap:6px;margin-top:6px"><input class="edit-dt" type="date" value="${attr(it.date||'')}" aria-label="תאריך" onchange="AlfredAI.field('${m.id}','date',this.value)"><input class="edit-dt" type="time" value="${attr(it.time||'')}" aria-label="שעה" onchange="AlfredAI.field('${m.id}','time',this.value)"></div>${warn}</div>`;
@@ -12264,9 +12277,10 @@ function maybeShowDailyPopup(){
   // Single card fields: title / date / time edited in place (no re-render, so typing keeps focus).
   A.field=function(id,k,v){
     const m=find(id);if(!m||m.state!=='open'||!m.items[0])return;const it=m.items[0];
-    if(k==='title')it.title=String(v).trim().slice(0,120)||it.title;
+    if(k==='title'){it.title=String(v).trim().slice(0,120)||it.title;it.titleEdited=true;}
     else{
-      it[k]=v;
+      it[k]=v;it.dateEdited=true;
+      if(m.detail&&k==='date'){m.detail.past=!!v&&v<todayYmd();setTimeout(renderChatMessages,0);}   // the past-date chip goes away
       if(it.date||it.time){const d=QAdd.when(it.date,it.time);if(d&&!isNaN(d))it.when={iso:d.toISOString(),label:fmtWhen(d),warn:''};}
     }
     saveChatHistory();
@@ -12306,11 +12320,14 @@ function maybeShowDailyPopup(){
     const chosen=single?m.items:m.items.filter(it=>it.checked);
     if(!chosen.length){toast('לא נבחרו משימות');return;}
     if(single&&chosen[0].when&&chosen[0].when.warn){toast(SAY.needWhen);return;}
+    if(m.detail&&chosen[0].date&&chosen[0].date<todayYmd()){toast(SAY.pastPick);return;}   // no calendar event for a past date
     const ids=[];
     chosen.forEach(it=>{
       addTask(it.notes?it.title+' — '+it.notes:it.title,{url:null,image:null,...(it.when&&it.when.iso?{datetime:it.when.iso}:{})});
       const t=tasks[0];
       if(t){ids.push(t.id);if(it.category&&t.category==='כללי')t.category=it.category;}
+      // R9: the FULL original text goes to the optional notes field (the range end, which the calendar cannot hold, on top)
+      if(t&&m.detail)t.notes=((m.detail.end?SAY.until(m.detail.end)+'\n':'')+m.src).slice(0,4000);
     });
     save();render();
     m.state='done';m.created=ids;m.doneAt=Date.now();
@@ -12569,6 +12586,7 @@ function maybeShowDailyPopup(){
       const m=chatHistory.find(x=>x.id===el.dataset.qid);const q=String(m&&m.quote||'').replace(/\s+/g,' ').trim();
       el.textContent=q.length>100?q.slice(0,100)+'…':q;
     });
+    paintPhones();
   };
 
   // ── R7 clarify by conversation: ONE open draft, in memory only, no model call ──
@@ -12707,6 +12725,75 @@ function maybeShowDailyPopup(){
     chatHistory.push(a);
     return true;
   };
+
+  // ── R9 DETAIL: one long message -> ONE card at once (code, no model); the Worker's summary may only refine it ──
+  const OPENING=/(שעות\s+(?:ה?פעילות|ה?פתיחה|ה?מענה|ה?קבלה)|מוקד|(?:^|\s)[א-ו]['׳]?\s*[-–]\s*[א-ו]['׳](?=[\s:,]|$))/;
+  const LABEL_LINE=/^\s*[^:\n\d]{2,24}:\s*\S/;
+  const GREETING=/^\s*(שלום|היי|הי|בוקר טוב|ערב טוב|צהריים טובים|לקוח(?:ה)? יקר(?:ה)?|[^\s]{1,3})[\s,!.:]*(?:רב|לך|לכם)?[\s,!.]*$/;
+  const PHONE=/(?:\+972[-\s]?|0)\d{1,2}[-\s]?\d{3}[-\s]?\d{4}|\*\d{3,5}/g;
+  const DATE_G=/(\d{4})-(\d{2})-(\d{2})|(?<![\d:])(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?(?![\d:])/g;
+  const dateOfMatch=m=>{let y,mo,d;if(m[1]){y=+m[1];mo=+m[2];d=+m[3];}else{d=+m[4];mo=+m[5];y=m[6]?(m[6].length===2?2000+ +m[6]:+m[6]):new Date().getFullYear();}
+    const x=new Date(y,mo-1,d);return x.getDate()===d&&x.getMonth()===mo-1?ymdOf(x):null;};
+  const contentLines=text=>text.split('\n').filter(l=>l.trim()&&!OPENING.test(l));   // opening-hours lines never count
+  function detailDates(text){const out=new Set();for(const l of contentLines(text))for(const m of l.matchAll(DATE_G)){const y=dateOfMatch(m);if(y)out.add(y);}return[...out];}
+  A.isDetail=function(text){
+    const lines=text.split('\n').filter(l=>l.trim());
+    if(!(text.length>400||lines.length>=8))return false;
+    return detailDates(text).length<=1||lines.filter(l=>LABEL_LINE.test(l)).length>=2;
+  };
+  // Code-only reading of the message: a labelled date line wins (תאריך: / מועד: / בתאריך), then the first date;
+  // a time range "07:30-11:00" = start + end (the end cannot go to the calendar: it is kept in the notes).
+  A.readDetail=function(text){
+    const lines=contentLines(text);
+    const lab=lines.find(l=>/(תאריך|מועד|בתאריך)/.test(l)&&new RegExp(DATE_G.source).test(l));
+    let date='';for(const l of lab?[lab,...lines]:lines){const m=[...l.matchAll(DATE_G)][0];if(m){date=dateOfMatch(m)||'';if(date)break;}}
+    let time='',end='';
+    const tl=lines.find(l=>/\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}/.test(l))||lines.find(l=>/(שעה|בשעה|מועד)/.test(l)&&/\d{1,2}:\d{2}/.test(l))||lines.find(l=>/\d{1,2}:\d{2}/.test(l));
+    if(tl){const r=tl.match(/(\d{1,2}):(\d{2})(?:\s*[-–]\s*(\d{1,2}):(\d{2}))?/);if(r){time=r[1].padStart(2,'0')+':'+r[2];if(r[3])end=r[3].padStart(2,'0')+':'+r[4];}}
+    const first=text.split('\n').map(l=>l.trim()).find(l=>l&&!GREETING.test(l)&&!OPENING.test(l)&&!/^[\d\s:./\-–]+$/.test(l))||text.trim();
+    const title=first.replace(/^[^:\n]{2,14}:\s*/,'').replace(PHONE,'').replace(/\s+/g,' ').trim().slice(0,40)||first.slice(0,40);
+    const phones=[...new Set((text.match(PHONE)||[]).map(p=>p.trim()))].slice(0,3);
+    return{title,date,time,end,phones,past:!!date&&date<todayYmd()};
+  };
+  A.startDetail=function(text){
+    const d=A.readDetail(text);
+    const w=d.date?QAdd.when(d.date,d.time):null;
+    const it={title:d.title,category:'',date_text:'',time_text:'',notes:'',checked:true,date:d.date,time:d.time,when:w&&!isNaN(w)?{iso:w.toISOString(),label:fmtWhen(w),warn:''}:{iso:null,label:'',warn:''}};
+    const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:'Alfred',intent:'add_tasks',reply:SAY.detailReply,items:[it],state:'open',src:text,mode:'detail',quote:text,
+      detail:{end:d.end,phones:d.phones,past:d.past,bullets:[],summarizing:true}};
+    chatHistory.push(m);
+    return m;
+  };
+  // A summary is used ONLY if every number (2+ digits) in it appears in the original text (separators ignored).
+  const joinNums=s=>String(s||'').replace(/(\d)[\s.\-\/:]+(?=\d)/g,'$1');
+  A.trustSummary=function(sum,orig){
+    const runs=new Set(String(orig).match(/\d+/g)||[]),pool=joinNums(orig);
+    const txt=[sum.title,...(sum.bullets||[]),sum.date_text,sum.time_text,sum.end_time_text].join(' | ');   // fields never glue together
+    return[...(txt.match(/\d{2,}/g)||[]),...(joinNums(txt).match(/\d{2,}/g)||[])].every(r=>runs.has(r)||pool.includes(r));
+  };
+  A.summarize=async function(m){
+    const finish=()=>{if(m.detail)m.detail.summarizing=false;saveChatHistory();renderChatMessages();};
+    try{
+      const map=[],src=m.src.slice(0,3000);
+      const r=await fetch(AI_GATEWAY+'/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(src,map),mode:'summarize',history:[],hours:{start:'08:00',end:'22:00'}}),signal:AbortSignal.timeout(TIMEOUT_MS)});
+      const j=await r.json().catch(()=>null);
+      const s=j&&j.ok&&j.result&&j.result.intent==='summarize'&&j.result.summary;   // an old Worker answers "chat" -> ignored
+      if(!s||m.state!=='open')return finish();
+      const sum={title:unmask(s.title,map).slice(0,60),bullets:(s.bullets||[]).slice(0,6).map(b=>unmask(b,map).slice(0,120)).filter(Boolean),date_text:unmask(s.date_text,map),time_text:unmask(s.time_text,map),end_time_text:unmask(s.end_time_text,map)};
+      if(!A.trustSummary(sum,m.src)){m.detail.rejected=true;return finish();}
+      const it=m.items[0];
+      if(!it.titleEdited&&sum.title)it.title=sum.title.slice(0,40);
+      m.detail.bullets=sum.bullets;
+      if(!it.date&&sum.date_text){const x=A.readDetail(sum.date_text+(sum.time_text?' '+sum.time_text:''));if(x.date){it.date=x.date;it.time=it.time||x.time;m.detail.past=x.past;}}
+      if(it.date&&!it.dateEdited){const w=QAdd.when(it.date,it.time);if(w&&!isNaN(w))it.when={iso:w.toISOString(),label:fmtWhen(w),warn:''};}
+      if(!m.detail.end&&sum.end_time_text&&/^\d{1,2}:\d{2}$/.test(sum.end_time_text))m.detail.end=sum.end_time_text;
+    }catch(_){}
+    finish();
+  };
+  const paintPhones=()=>document.querySelectorAll('#chatScroll .ai-phones[data-pid]').forEach(box=>{
+    const m=findAny(box.dataset.pid);if(!m||!m.detail||box.childElementCount)return;
+    (m.detail.phones||[]).forEach(p=>{const a=document.createElement('a');a.className='card-link-chip';a.href='tel:'+p.replace(/[^\d+*#]/g,'');a.textContent='📞 '+p;box.appendChild(a);});
+  });
 
   // ── Pending inbox: texts that could not be sent are retried when the connection returns ──
   let flushing=false;
