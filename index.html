@@ -1120,6 +1120,7 @@
   </div>
   <div style="padding:12px 16px 0;direction:rtl">
     <button class="pend-paste-btn" onclick="pasteFromClipboard()">📋 הדבק מהלוח (העתק מוואטסאפ ← לחץ כאן)</button>
+    <button class="pend-btn del" id="pendClearAll" onclick="pendClearAll()" style="width:100%;margin-top:8px;display:none">🗑 נקה הכל</button>
   </div>
   <div class="rsheet-scroll" id="pendingList" style="padding:12px 16px calc(32px + var(--sab))"></div>
 </div>
@@ -3334,6 +3335,8 @@ async function saveEdit(id){
   if(dt)t.datetime=new Date(dt).toISOString();
   const urlEl=document.getElementById('eurl-'+id);
   if(urlEl)t.url=urlEl.value.trim()||null;
+  const notesEl=document.getElementById('enotes-'+id);             // optional field: only exists when the task has notes
+  if(notesEl){const v=notesEl.value.trim().slice(0,4000);if(v)t.notes=v;else delete t.notes;}
   t.calendarEventId=null;save();render();await syncTask(t);toast('משימה עודכנה');
 }
 function cancelEdit(id){const el=document.getElementById('edit-'+id);if(el)el.classList.remove('on')}
@@ -3480,9 +3483,11 @@ function closePostpone(){
   if(ov){ov.classList.remove('on');ov.style.display='';}
   if(popup){popup.classList.remove('on');popup.style.display='';}
 }
-async function confirmPostpone(){
+async function confirmPostpone(opts){
   const inp=document.getElementById('postponeDtInput');
-  if(!inp||!inp.value){toast('בחר תאריך');return;}
+  if(!inp||!inp.value){window.toast('בחר תאריך');return;}
+  // opts.quiet (assistant only): the chat result bubble says it, so the progress/done toasts are skipped.
+  const toast=opts&&opts.quiet===true?()=>{}:window.toast;
   const {type,taskId,routineId,dateStr,bpItemId}=_postponeCtx;
   if(type==='task'){
     const t=tasks.find(x=>x.id===taskId);if(!t)return;
@@ -3680,6 +3685,7 @@ function renderTaskCard(task){
       ${task.image?`<button class="edit-img-remove" onclick="removeTaskImage(${task.id})">הסר</button>`:''}
     </div>
     ${task.image?`<img class="task-img-preview" src="${task.image}" alt="תמונה" onclick="openTaskImgFull(${task.id})">`:''}
+    ${task.notes?`<textarea class="edit-txt" id="enotes-${task.id}" rows="5" aria-label="הערות">${esc(task.notes)}</textarea>`:''}
     <div class="edit-actions">
       <button class="edit-save" onclick="saveEdit(${task.id})">שמור שינויים</button>
       <button class="edit-cancel" onclick="cancelEdit(${task.id})">בטל</button>
@@ -4358,6 +4364,7 @@ function saveRoutine(){
   else routines.unshift(routine);
   editingRoutineId=null;
   saveRoutines();scheduleWeeklyReminderNotifs();render();
+  try{window.dispatchEvent(new CustomEvent('vt-routine-saved',{detail:{id:routine.id,isNew:!existing}}));}catch(_){}
   if(rScheduleMode==='verbal'){
     setTimeout(()=>openScheduleSheet(routine.id),80);
     toast(existing?'שגרה עודכנה — בחר מועדים 📅':'שגרה נוספה — בחר מועדים 📅');
@@ -4417,28 +4424,51 @@ function closeRoutineTimeEdit(safeId){
 function saveRoutineInstanceTime(safeId,routineId,oldDateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   const inp=document.getElementById('redt-'+safeId);if(!inp||!inp.value)return;
-  const newDt=new Date(inp.value).toISOString();
-  // Replace in scheduledWeeks
-  let replaced=false;
+  return moveRoutineInstance(routineId,oldDateStr,new Date(inp.value).toISOString()).then(res=>{
+    if(!res.ok){toast('לא נמצא האירוע');return;}
+    toast(res.calendar==='failed'?'⚠️ מועד עודכן — היומן לא עודכן':'✅ מועד עודכן');
+  });
+}
+// ONE place that moves a routine instance (manual time edit). The instance and its tracking move together;
+// when it has a calendar event, that event is replaced exactly once (same purge/create functions as
+// confirmPostpone); when it has none, the calendar is left alone. A calendar failure never blocks the move.
+// Returns {ok, calendar:'none'|'moved'|'failed'}.
+async function moveRoutineInstance(routineId,oldDateStr,newDt){
+  const r=routines.find(x=>x.id==routineId);if(!r)return{ok:false};
+  let oldEv=null,replaced=false;
   Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
-    const arr=r.scheduledWeeks[wk];
-    arr.forEach((item,i)=>{
+    r.scheduledWeeks[wk].forEach((item,i)=>{
       const dt=typeof item==='string'?item:item?.dt;
       if(dt===oldDateStr){
+        if(item&&typeof item==='object'&&item.eventId&&!String(item.eventId).startsWith('local_'))oldEv=item.eventId;
         r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};
         replaced=true;
       }
     });
   });
-  if(!replaced){toast('לא נמצא האירוע');return;}
-  // Update completedDates / skippedDates refs
+  if(!replaced)return{ok:false};
   [r.completedDates,r.skippedDates].forEach(arr=>{
     if(!arr)return;
     const idx=arr.indexOf(oldDateStr);
     if(idx!==-1)arr[idx]=newDt;
   });
   saveRoutines();render();
-  toast('✅ מועד עודכן');
+  let calendar='none';
+  if(oldEv){
+    let ev=null;
+    try{
+      // Only this instance's own start minute: a whole-day purge would also delete a sibling instance's event that day.
+      const s0=new Date(oldDateStr);
+      if(!await purgeCalendarEventsByMarker('vt_routine_id:'+r.id,s0,new Date(+s0+60000)))await deleteCalendarEvent(oldEv);   // no marker hit -> by id
+      ev=await createCalendarEvent(r,newDt);
+    }catch(_){}
+    const okEv=ev&&ev.id&&!String(ev.id).startsWith('local_');
+    Object.values(r.scheduledWeeks).forEach(arr=>arr.forEach(item=>{if(item&&typeof item==='object'&&item.dt===newDt)item.eventId=okEv?ev.id:null;}));
+    calendar=okEv?'moved':'failed';
+    saveRoutines();
+  }
+  scheduleSmartPushNotifs();
+  return{ok:true,calendar};
 }
 
 // ── Energy System ────────────────────────────────────────
@@ -6663,13 +6693,17 @@ function closePendingSheet(){
 }
 function renderPendingList(){
   const el=document.getElementById('pendingList');if(!el)return;
+  const clr=document.getElementById('pendClearAll');if(clr)clr.style.display=pendingItems.length?'':'none';
   if(!pendingItems.length){el.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--muted);font-size:14px">אין פריטים ממתינים</div>';return;}
   el.innerHTML=pendingItems.map(item=>{
     const urlHtml=item.url?`<a class="pend-url" href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`:'';
     const d=new Date(item.receivedAt);
     const when=d.toLocaleDateString('he-IL',{day:'numeric',month:'short'})+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    // Each card says what it is; recent items get a "חדש" label (existing items are only labelled, never rewritten).
+    const isNew=Date.now()-d.getTime()<24*3600000;
+    const kind=item.aiBatch?`📋 הצעת העוזר · ${item.aiBatch.items.length} משימות`:item.aiText?'⏳ ממתין לעוזר':item.url?'🔗 קישור ששותף':'📥 טקסט ששותף';
     return`<div class="pend-card" id="pc${item.id}">
-<div class="pend-meta">${when}</div>
+<div class="pend-meta">${isNew?'<span class="routine-badge">חדש</span> ':''}${kind} · ${when}</div>
 <div class="pend-text">${esc(item.text)}</div>
 ${urlHtml}
 <div class="pend-actions">
@@ -6682,6 +6716,11 @@ ${urlHtml}
 function pendDelete(id){
   pendingItems=pendingItems.filter(i=>i.id!==id);
   savePending();updatePendingBadge();renderPendingList();
+}
+// Only on an explicit tap + confirmation: pending items are never deleted automatically.
+function pendClearAll(){
+  if(!pendingItems.length||!confirm(`למחוק את כל הממתינים (${pendingItems.length})?`))return;
+  pendingItems=[];savePending();updatePendingBadge();renderPendingList();toast('הממתינים נוקו');
 }
 function pendToTask(id){
   const item=pendingItems.find(i=>i.id===id);if(!item)return;
@@ -10186,6 +10225,8 @@ function renderChatMessages(){
   chatHistory.forEach(m=>{
     if(m.role==='function')return;
     if(m.kind==='proposal'){html+=AlfredAI.renderProposal(m);return;}
+    if(m.kind==='action'){html+=AlfredAI.renderAction(m);return;}
+    if(m.kind==='clarify'){html+=AlfredAI.renderClarify(m);return;}
     const txt=(m.parts||[]).filter(p=>p.text).map(p=>p.text).join('').trim();
     const calls=(m.parts||[]).filter(p=>p.functionCall);
     if(!txt&&!calls.length)return;
@@ -10214,7 +10255,8 @@ function renderChatMessages(){
       const retry=isErr?'<button class="chat-retry-btn" onclick="retryLastChat()">↻ נסה שוב</button>':'';
       // Light markdown: **bold**
       const formatted=esc(txt).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${formatted}${time}${prov}${retry}</div>`;
+      const quote=m.quote&&m.id?`<span class="ai-quote" data-qid="${m.id}"></span>`:'';   // filled via textContent below
+      html+=`<div class="chat-bubble ${m.role==='user'?'user':'bot'}${isErr?' error':''}">${quote}${formatted}${time}${prov}${retry}</div>`;
     }
     if(calls.length&&m.role==='model'){
       calls.forEach(c=>{
@@ -10239,6 +10281,7 @@ function renderChatMessages(){
 
   html+='</div>';
   body.innerHTML=html;
+  AlfredAI.paintQuotes();
   scrollChatBottom();
 }
 function scrollChatBottom(){
@@ -11715,12 +11758,12 @@ function maybeShowDailyPopup(){
     if(t)box.appendChild(chip('span','routine-badge','🕒 '+t));
     if(st.alt&&!unresolved())box.appendChild(chip('button','quick-btn','⇄ '+altLabel(st.alt,d),flip));
     if(unresolved()){
-      box.appendChild(chip('span','qadd-hint','השעה הזו כבר עברה — מתי?'));
+      box.appendChild(chip('span','qadd-hint',st.amb.hint||'השעה הזו כבר עברה — מתי?'));
       st.amb.options.forEach(o=>box.appendChild(chip('button','quick-btn',o.label,()=>pick(o))));
     }
   }
   function pick(o){
-    if(o.pick){const tf=$('qaddTime');tf.focus();try{tf.showPicker&&tf.showPicker();}catch(_){}return;}
+    if(o.pick||o.pickDate){const tf=$(o.pickDate?'qaddDate':'qaddTime');tf.focus();try{tf.showPicker&&tf.showPicker();}catch(_){}return;}
     $('qaddDate').value=o.date;$('qaddTime').value=o.time;
     st.manual.date=st.manual.time=true;st.amb=null;st.alt=null;render();
     $('qaddText').focus({preventScroll:true});   // back to the typing line, so Enter saves
@@ -11739,10 +11782,21 @@ function maybeShowDailyPopup(){
     if(!st.manual.title)$('qaddTitle').value=r?r.title:raw.trim();
     if(!st.manual.date)$('qaddDate').value=(r&&r.date)||'';
     if(!st.manual.time)$('qaddTime').value=(r&&r.time)||'';
-    st.amb=(r&&r.ambiguity)||null;
+    st.amb=(r&&r.ambiguity)||pastDate(raw,r);
     if(!st.manual.date&&!st.manual.time)st.alt=(r&&r.alternative)||null;
     render();
   };
+  // A dd/mm (no year) that already passed this year: the parser moves it to NEXT year. Never silently: ask,
+  // with the next-year reading as one option and the date picker as the other (save waits for a choice).
+  function pastDate(raw,r){
+    const m=String(raw).match(/(?<![\d/.])(\d{1,2})[./](\d{1,2})(?![\d/.])/);
+    if(!m||!r||!r.date)return null;
+    const y=+todayStr().slice(0,4),d=new Date(Date.UTC(y,+m[2]-1,+m[1]));
+    if(d.getUTCDate()!==+m[1]||d.getUTCMonth()!==+m[2]-1)return null;
+    const asWritten=d.toISOString().slice(0,10);
+    if(asWritten>=todayStr()||r.date===asWritten)return null;
+    return{hint:'התאריך הזה כבר עבר — מתי?',options:[{label:`${+m[1]}/${+m[2]}/${r.date.slice(0,4)}`,date:r.date,time:r.time||''},{label:'📅 בחר תאריך',pickDate:true}]};
+  }
   Q.onField=function(k){
     st.manual[k]=$({title:'qaddTitle',date:'qaddDate',time:'qaddTime'}[k]).value!=='';
     if(k!=='title')st.alt=null;   // the user set the date/time by hand — no flip suggestion any more
@@ -11812,12 +11866,123 @@ function maybeShowDailyPopup(){
   // Replies that claim to know the user's tasks/day. The model cannot see them, so such a claim is invented.
   const FABRICATION=/יש לך \d+ (משימות|פגישות|אירועים)|היום יש לך|מחר יש לך|השבוע יש לך|יש לך (יום|שבוע) (עמוס|פנוי|רגוע|מלא)|(היום|השבוע|המחר|היומן) שלך (עמוס|פנוי|נראה|מלא|ריק)|אין לך (משימות|פגישות|כלום)|פספסת (את|\d)|תכננת (ל|את)/;
   const NO_DATA_REPLY='אני לא רואה את המשימות שלך מכאן — שאל \'מה יש לי היום\' ואבדוק';
-  // Until C2, rescheduling is not done from chat: answer with a fixed pointer instead of an unrelated list.
-  const RESCHEDULE=/(^|\s)(תעביר|תעבירי|להעביר|תדחה|תדחי|לדחות|דחה|תזיז|תזיזי|להזיז|תקדים|תקדימי|להקדים)(?=\s|$)/;
-  const RESCHEDULE_REPLY='לדחייה השתמש בכפתור הדחייה';
+  // R4: action verbs, found in code (the Worker is only the fallback). Imperatives only: a pasted list's
+  // infinitives ("לדחות את...") are tasks, not commands.
+  const VERBS=[
+    ['reschedule',/(?:^|[\s,])(תזיז|תזיזי|הזז|תעביר|תעבירי|העבר|תדחה|תדחי|דחה|תקדים|תקדימי|הקדם)(?=\s|$)/],
+    ['complete',/(?:^|[\s,])(סיימתי|עשיתי|ביצעתי|תסמן|תסמני|סמן)(?=\s|$)/],
+    ['delete',/(?:^|[\s,])(תמחק|תמחקי|מחק|תסיר|תסירי|הסר)(?=\s|$)/],
+    ['skip_routine',/(?:^|[\s,])(תדלג|תדלגי|דלג)(?=\s|$)/],
+  ];
+  const ACTIONS=VERBS.map(v=>v[0]);
+  const ACTION_ANY=/(^|[\s,])(תזיז|תזיזי|הזז|תעביר|תעבירי|העבר|תדחה|תדחי|דחה|תקדים|תקדימי|הקדם|להעביר|לדחות|להזיז|להקדים|תמחק|תמחקי|מחק|למחוק|תסמן|סמן|תדלג|דלג|לדלג)(?=\s|$)/;
+  const TYPES={reschedule:['task','routine','bill','crm'],complete:['task','routine'],delete:['task'],skip_routine:['routine']};
+  // Every new assistant line lives in this ONE table (house voice: short and warm, like "✓ נרשם, אדוני").
+  const SAY={
+    pastedAction:'פעולות כאלה זמינות רק בהודעה מוקלדת',
+    oneAtATime:'בוא נעשה את זה אחד-אחד — על איזה פריט מדובר?',
+    notFound:q=>`לא מצאתי "${q}" — נסה לכתוב את השם כמו ברשימה`,
+    which:'למה התכוונת?',
+    ask:{reschedule:t=>`להזיז את "${t}"?`,complete:t=>`לסמן את "${t}" כבוצע?`,delete:t=>`למחוק את "${t}"?`,skip_routine:t=>`לדלג על "${t}" הפעם?`},
+    did:{reschedule:(t,w)=>`הוזז: ${t} · ${w}`,complete:t=>`סומן כבוצע: ${t} 🎉`,delete:t=>`נמחק: ${t}`,skip_routine:t=>`דילגתי: ${t}`},
+    from:'כרגע',to:'מועד חדש',pickDay:'לאיזה יום?',
+    added:(t,w)=>`נוספה: ${t}${w?' · '+w:''}`,addedN:n=>`נוספו ${n} משימות`,
+    calFail:'⚠️ היומן לא עודכן — אפשר לסנכרן מהמשימה',
+    approve:'✓ אשר',edit:'✏️ ערוך',cancel:'✕ בטל',undo:'↶ בטל',undoAdd:'↶ בטל הוספה',addN:n=>`✓ הוסף ${n}`,
+    toRoutine:'🔄 הפוך לשגרה',asInstance:n=>`הוסף כמופע של "${n}"`,newRoutine:'צור שגרה חדשה',
+    converted:n=>`✓ עכשיו זה מופע של "${n}"`,convertedNew:n=>`✓ נוצרה שגרה "${n}"`,convFail:'לא הצלחתי להפוך לשגרה — המשימה נשארה כמו שהייתה',
+    changed:'המשימה השתנתה מאז — את השינוי אפשר לבטל רק מהמשימה עצמה',
+    undone:'↶ בוטל',cancelled:'✕ ההצעה בוטלה',editing:'✏️ נפתח לעריכה',collapsed:'הצעה קודמת — לא אושרה',reopen:'פתח',
+    needDate:'בחר יום לפני האישור',needWhen:'ערוך את המועד לפני הוספה',
+    // R7 clarification: ONE short question each
+    qTitle:'מה לקבוע?',qDay:'לאיזה יום?',qPast:'התאריך עבר, לאיזה יום לקבוע?',qConflict:'היום והתאריך לא מסתדרים — מה נכון?',
+    qWhichDate:'יש כמה תאריכים — לאיזה לקבוע?',pickDate:'📅 בחר תאריך',discarded:'בסדר, עזבתי 👍',draftOk:'לאשר הוספה?',
+    // R9 detail card
+    detailReply:'הודעה ארוכה — ריכזתי למשימה אחת',summarizing:'מסכם…',until:t=>`⏰ עד ${t}`,
+    pastWarn:'⚠️ התאריך עבר — בחר תאריך חדש',pastPick:'התאריך עבר — בחר תאריך חדש לפני האישור',
+  };
+
+  // ── Matching on the device (never sent to the model) ──
+  // Hebrew key-noun matching: strip prefixes (ו/ה/ב/ל/מ/ש), plural/construct endings and final letters.
+  const FINALS={'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'};
+  const STOP=new Set(['של','את','עם','על','לי','אני','זה','הוא','היא','אותו','אותה','שלי','גם','רק','עוד','כל','יום','השבוע','שבוע','תעביר','תזיז','תדחה','תוסיף','הוסף','תזכיר','תקבע','קבע','בטעות','צריך','רוצה']);
+  function norm(w){
+    w=String(w).toLowerCase().replace(/[^א-תa-z0-9]/g,'');
+    let k=0;while(w.length>3&&/^[והבלמש]/.test(w)&&k<2){w=w.slice(1);k++;}
+    if(w.length>4)w=w.replace(/(ים|ות|יות)$/,'');
+    if(w.length>4)w=w.replace(/י$/,'');
+    return w.replace(/[ךםןףץ]/g,c=>FINALS[c]);
+  }
+  const tokens=s=>String(s||'').split(/[\s,.:;!?()\-–—"'׳״]+/).map(norm).filter(w=>w.length>=2&&!STOP.has(w));
+  function overlap(a,b){let n=0;for(const x of a)if(b.some(y=>y===x||(x.length>=3&&y.length>=3&&(y.startsWith(x)||x.startsWith(y)))))n++;return n;}
+  const ymdOf=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');};
+  const hmOf=d=>{const x=new Date(d);return String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');};
+  const ORDINAL={'הראשון':1,'הראשונה':1,'השני':2,'השנייה':2,'השניה':2,'השלישי':3,'השלישית':3,'הרביעי':4,'האחרון':-1,'האחרונה':-1};
+
+  // Open items the user could mean: open tasks, this week's routine instances, pending bills, open CRM items.
+  A.localItems=function(){
+    const out=[];const now=new Date();const wk=new Date(now);wk.setDate(wk.getDate()-((wk.getDay()+7)%7));wk.setHours(0,0,0,0);const wkEnd=new Date(+wk+7*864e5);
+    tasks.filter(t=>!t.completed).forEach(t=>out.push({type:'task',id:t.id,title:t.text,dt:t.datetime||null}));
+    // This week's routine instances straight from scheduledWeeks (getRoutineInstances drops anything >24h old,
+    // and ordinals like "השני השבוע" must count the whole week). Skipped instances are not targets.
+    routines.filter(r=>r.enabled!==false).forEach(r=>Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
+      const dt=typeof item==='string'?item:item&&item.dt;if(!dt)return;
+      const d=new Date(dt);if(d<wk||d>=wkEnd||(r.skippedDates||[]).includes(dt))return;
+      out.push({type:'routine',id:r.id,dateStr:dt,title:r.name||r.text||'',dt,completed:(r.completedDates||[]).includes(dt)});
+    }));
+    (typeof bills!=='undefined'?bills:[]).filter(b=>b.status==='pending').forEach(b=>out.push({type:'bill',id:b.id,title:b.name,dt:b.payDate||b.deadline||null}));
+    (typeof backlogItems!=='undefined'?backlogItems:[]).filter(i=>i.status!=='done').forEach(i=>out.push({type:'crm',id:i.id,title:i.text,dt:i.dueDate||null}));
+    return out;
+  };
+  // R1: which existing item does the user mean? Returns {kind:'one'|'many'|'none', items}. Never invents a match.
+  A.resolveTarget=function({text='',dayText='',timeText='',nth=null}={},data=A.localItems()){
+    const T=window.QAdd&&QAdd.time;
+    const words=tokens(text).filter(w=>!/^\d+$/.test(w));
+    if(!words.length)return{kind:'none',items:[]};
+    let cand=data.map(it=>({...it,score:overlap(words,tokens(it.title))})).filter(it=>it.score>0);
+    const best=Math.max(0,...cand.map(c=>c.score));cand=cand.filter(c=>c.score===best);
+    const hint=T&&(dayText||timeText)?T.parseHebrewDateTime([dayText,timeText].filter(Boolean).join(' '),{now:new Date()}):null;
+    const wd=A.weekdayOf(dayText);                             // "ביום ד׳" = that weekday of the items' own week
+    if(hint&&(hint.ok||wd!=null)){
+      const n=cand.filter(c=>c.dt&&(wd!=null?new Date(c.dt).getDay()===wd:!hint.date||ymdOf(c.dt)===hint.date)&&(!timeText||!hint.time||hmOf(c.dt)===hint.time));
+      if(n.length)cand=n;
+    }
+    cand.sort((a,b)=>(a.dt?new Date(a.dt):Infinity)-(b.dt?new Date(b.dt):Infinity));
+    if(nth&&cand.length>1){const k=nth===-1?cand.length-1:nth-1;cand=cand[k]?[cand[k]]:cand;}
+    return{kind:cand.length===1?'one':cand.length?'many':'none',items:cand};
+  };
+  A.ordinalOf=t=>{const m=String(t).match(/(?:^|\s)(הראשון|הראשונה|השני|השנייה|השניה|השלישי|השלישית|הרביעי|האחרון|האחרונה)(?=\s|$)/);return m?ORDINAL[m[1]]:null;};
+  // R3: does a new task's title name an existing routine?
+  A.matchRoutine=function(title){
+    const w=tokens(title);if(!w.length)return null;
+    let best=null,score=0;
+    for(const r of routines){const s=overlap(w,tokens(r.name||r.text));if(s>score){score=s;best=r;}}
+    return score?best:null;
+  };
+  // R3: explicit recurrence only (never invented): count per week, explicit weekdays, time-of-day.
+  A.parseRecurrence=function(text){
+    const t=String(text);const DAYS={'ראשון':0,'שני':1,'שלישי':2,'רביעי':3,'חמישי':4,'שישי':5,'שבת':6};
+    const days=[...t.matchAll(/(?:^|\s)(?:כל\s+(?:יום\s+)?|ב?ימי\s+|ו-?)(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?=[\s,.]|$)/g)].map(m=>DAYS[m[1]]);
+    const WORD={'פעם':1,'פעמיים':2,'שלוש':3,'שלושה':3,'ארבע':4,'חמש':5,'שש':6};
+    let n=null,m;
+    if((m=t.match(/(\d+)\s*פעמים\s+(?:ב|ל)שבוע/)))n=+m[1];
+    else if((m=t.match(/(פעמיים|שלוש|שלושה|ארבע|חמש|שש)\s*(?:פעמים\s+)?(?:ב|ל)שבוע/)))n=WORD[m[1]];
+    else if(/פעם\s+(?:ב|ל)שבוע/.test(t))n=1;
+    else if(/כל\s+(יום|בוקר|ערב)(?!\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת))/.test(t))n=7;
+    const win=/בבוקר|כל בוקר/.test(t)?'morning':/בערב|כל ערב/.test(t)?'evening':/בצהריים|אחה"צ|אחר הצהריים/.test(t)?'afternoon':null;
+    const T=window.QAdd&&QAdd.time;const p=T?T.parseHebrewDateTime(t,{now:new Date()}):null;
+    const specificTime=p&&p.time&&/\d/.test(t)?p.time:null;
+    const uniqDays=[...new Set(days)];
+    return{recurring:!!(n||uniqDays.length),timesPerWeek:n||(uniqDays.length||null),preferredDays:uniqDays,timeWindow:specificTime?'specific':win,specificTime};
+  };
   const FAIL_TEXT={stopped:'הופסק. ההודעה שמורה — אפשר לנסות שוב.',offline:'אין חיבור לאינטרנט. ההודעה שמורה.',timeout:'העוזר לא ענה בזמן. ההודעה שמורה.',network:'לא הצלחתי להגיע לעוזר. ההודעה שמורה.',degraded:'העוזר לא זמין כרגע. ההודעה שמורה.',empty:'לא התקבלה תשובה תקינה מהעוזר.',error:'משהו השתבש מול העוזר.'};
   let ctrl=null;
 
+  // D3: ONE id source for everything the assistant creates. Monotonic (never repeats, even in one millisecond
+  // or with a frozen clock) and it skips ids already taken. Numeric, so pending-sheet onclick handlers keep working.
+  let _lastId=0;
+  A.uid=function(taken){let t=Math.max(Date.now(),_lastId+1);while(taken&&taken(t))t++;return _lastId=t;};
+  A.newId=()=>'p'+A.uid(n=>chatHistory.some(m=>m.id==='p'+n));
   A.stripKeys=function(s){                                      // backups/imports never carry API keys
     if(!s||typeof s!=='object')return s;
     const{key,groqKey,cfToken,cfAccount,...rest}=s;return rest;
@@ -11867,16 +12032,48 @@ function maybeShowDailyPopup(){
   function fail(kind,text,serverMsg){
     let t='❌ '+(serverMsg||FAIL_TEXT[kind]||FAIL_TEXT.error);
     if(isPasted(text)&&['offline','timeout','network','degraded'].includes(kind)&&toPending(text))t+='\n📥 הטקסט נשמר ב"ממתינים" ויישלח שוב כשהחיבור יחזור.';
-    chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now()});
+    chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now(),id:'q'+A.uid(),quote:text});   // R8: quotes what failed
     saveStatus({...(loadStatus()||{}),lastError:kind,errAt:Date.now()});
     return kind;
   }
   function toPending(text){
     if(pendingItems.some(i=>i.aiText===text))return true;
-    addPendingItem(text,'⏳ ממתין לעוזר');
-    if(pendingItems[0]){pendingItems[0].aiText=text;savePending();}
+    addPendingItem(text,'');                                     // the sheet labels it "⏳ ממתין לעוזר"
+    if(pendingItems[0]){pendingItems[0].aiText=text;pendingItems[0].id=A.uid(n=>pendingItems.some(i=>i.id===n));savePending();}
     return true;
   }
+  // R2b: an unresolved multi-item batch is kept in ממתינים (once) when its card collapses or the app closes;
+  // approving or cancelling it removes that entry at once. A single add never touches vt_pending.
+  function stashBatch(m){
+    if(m.pendingId&&pendingItems.some(i=>i.id===m.pendingId))return;
+    const items=m.items.map(it=>({title:it.title,date_text:it.date_text||'',time_text:it.time_text||'',iso:(it.when&&it.when.iso)||null}));
+    m.pendingId=A.uid(n=>pendingItems.some(i=>i.id===n));
+    pendingItems.unshift({id:m.pendingId,text:items.map(i=>'• '+i.title).join('\n'),url:'',receivedAt:new Date().toISOString(),aiBatch:{msgId:m.id,items}});
+    savePending();updatePendingBadge();
+  }
+  function unstash(m){
+    if(!m.pendingId)return;
+    pendingItems=pendingItems.filter(i=>i.id!==m.pendingId);m.pendingId=null;savePending();updatePendingBadge();
+  }
+  const isBatch=m=>m.kind==='proposal'&&m.intent!=='add_routine'&&m.items.length>1;
+  const unresolved=m=>(m.kind==='proposal'||m.kind==='action')&&(m.state==='open'||m.state==='choose');
+  // R6: a new typed message retires every unresolved card into an inert, re-openable line (never merged,
+  // never auto-saved) and switches off the chips of earlier result bubbles.
+  A.collapseOpen=function(){
+    chatHistory.forEach(m=>{
+      if(unresolved(m)){m.prev=m.state;m.state='collapsed';if(isBatch(m))stashBatch(m);}
+      else if(m.state==='done')m.chipsOff=true;
+    });
+  };
+  A.reopen=function(id){                                        // the card comes back at the bottom, next to the input
+    const m=findAny(id);if(!m||m.state!=='collapsed')return;
+    A.collapseOpen();m.state=m.prev||'open';
+    chatHistory.splice(chatHistory.indexOf(m),1);chatHistory.push(m);
+    saveChatHistory();renderChatMessages();
+  };
+  const stashAll=()=>{let n=0;chatHistory.forEach(m=>{if(unresolved(m)&&isBatch(m)){stashBatch(m);n++;}});if(n)saveChatHistory();};
+  window.addEventListener('pagehide',stashAll);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')stashAll();});
 
   // Gateway answer -> chat message or confirmation card. Returns 'reply' | 'proposal' | failure kind.
   function handle(status,j,map,text,mode,opts){
@@ -11892,17 +12089,38 @@ function maybeShowDailyPopup(){
     })).filter(t=>t.title.trim());
     saveStatus({layer:j.layer,label:j.label||j.layer,ms:j.latencyMs,at:Date.now(),used:j.usage&&j.usage.used,cap:j.usage&&j.usage.cap,missing:j.missing||[]});
     const prov=j.label||j.layer||'';
-    if((res.intent==='query'||res.intent==='other')&&RESCHEDULE.test(text)){
-      chatHistory.push({role:'model',parts:[{text:RESCHEDULE_REPLY}],ts:Date.now(),provider:'Alfred'});
-      return 'canned';
+    const say=t=>{chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now(),provider:'Alfred'});return 'canned';};
+    // Pasted text never acts (the Worker also turns pasted actions into chat): one fixed answer.
+    if(isPasted(text)&&(ACTIONS.includes(res.intent)||((res.intent==='query'||res.intent==='other')&&ACTION_ANY.test(text))))return say(SAY.pastedAction);
+    // Worker fallback for an action the code could not resolve: raw phrases -> the same on-device matching.
+    if(ACTIONS.includes(res.intent)&&res.action&&res.action.target){
+      const a=res.action,tg=a.target;
+      return A.startAction({verb:res.intent,target:unmask(tg.text,map),dayText:unmask(tg.day_text,map),timeText:unmask(tg.time_text,map),nth:Number.isInteger(tg.nth)?tg.nth:null,newText:[unmask(a.new_day_text,map),unmask(a.new_time_text,map)].filter(Boolean).join(' ')},text,true)?'action':say(SAY.notFound(unmask(tg.text,map)));
     }
+    // An old Worker answers an action phrase with "other"/"query": say plainly that nothing matched.
+    if(opts.action&&(res.intent==='other'||res.intent==='query'))return say(SAY.notFound(opts.action.target));
     if(res.intent==='query'){                                   // the model never answers about the user's data: the app does
       chatHistory.push({role:'model',parts:[{text:A.answerQuery(res.filter)}],ts:Date.now(),provider:'נתונים מהמכשיר'});
       return 'query';
     }
     if((res.intent==='add_tasks'||res.intent==='add_routine')&&items.length&&!opts.forceChat){
-      items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;});
-      chatHistory.push({role:'model',kind:'proposal',id:'p'+Date.now(),ts:Date.now(),provider:prov,intent:res.intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending});
+      const forceTask=/^\s*משימה\s*:/.test(text);                // "משימה:" always means a regular task
+      const rec=A.parseRecurrence(text);
+      let intent=res.intent;
+      if(forceTask&&intent==='add_routine')intent='add_tasks';
+      if(!forceTask&&intent==='add_tasks'&&items.length===1&&rec.recurring)intent='add_routine';
+      items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;if(it.when.iso){it.date=ymdOf(it.when.iso);it.time=hmOf(it.when.iso);}});
+      const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:prov,intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending};
+      if(items.length>1)m.batchId=m.id;                          // R6: checkboxes only for a batch from ONE message
+      if(intent==='add_routine')m.recurrence=rec;
+      else if(!forceTask&&items.length===1){                     // a new item that names an existing routine
+        const r=A.matchRoutine(items[0].title);
+        if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}
+      }
+      // R7: a single add with a missing / contradictory field -> ONE short question instead of a half-empty card
+      if(intent==='add_tasks'&&items.length===1&&!opts.fromPending&&A.clarifyStart(items[0],text,prov,forceTask))return 'clarify';
+      m.quote=text;
+      chatHistory.push(m);
       return 'proposal';
     }
     let msg=reply||items.map(t=>'• '+t.title).join('\n');
@@ -11914,6 +12132,28 @@ function maybeShowDailyPopup(){
 
   A.run=async function(text,opts={}){
     if(_chatBusy||!String(text||'').trim())return;
+    if(!opts.fromPending&&!opts.forceChat){
+      // R7: the next typed message is read FIRST as the answer to the open question; anything else drops it.
+      if(A.pc){const done=A.answer(text);if(done){saveChatHistory();renderChatMessages();return 'clarify';}}
+      // A time-only follow-up on an item saved in the last 10 minutes -> the usual reschedule card (with Undo).
+      if(!A.pc&&!isPasted(text)){A.collapseOpen();if(A.followUp(text)){saveChatHistory();renderChatMessages();return 'action';}}
+    }
+    if(!opts.fromPending)A.collapseOpen();
+    // R4 code-first: verb + target + time parsed here; the Worker is only the fallback when nothing matches.
+    const push=t=>{chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now(),provider:'Alfred'});saveChatHistory();renderChatMessages();};
+    // Pasted text never acts: a pasted line that starts with a command gets the fixed answer; any other
+    // paste goes on as tasks/summary (the Worker and handle() refuse actions for it as well).
+    if(!opts.forceChat&&isPasted(text)&&text.split('\n').some(l=>VERBS.some(([,re])=>{const m=l.trim().replace(/^[-•*–\d.)\s]+/,'').match(re);return m&&m.index===0;}))){push(SAY.pastedAction);return 'canned';}
+    // R9: a long detailed message -> ONE card right away (code); the summary refines it in the background
+    if(!opts.forceChat&&!opts.fromPending&&A.isDetail(text)){const m=A.startDetail(text);saveChatHistory();renderChatMessages();A.summarize(m);return 'detail';}
+    const act=opts.forceChat||isPasted(text)?null:A.parseAction(text);
+    if(act){
+      if(act.all){push(SAY.oneAtATime);return 'canned';}
+      if(A.startAction(act,text)){saveChatHistory();renderChatMessages();return 'action';}
+      opts={...opts,action:act};
+    }
+    // R7 (a): only a date/time and nothing to schedule ("מחר ב-18:00") -> "מה לקבוע?" (no model call)
+    if(!opts.forceChat&&!opts.fromPending&&!act&&!isPasted(text)&&A.clarifyNoTitle(text)){saveChatHistory();renderChatMessages();return 'clarify';}
     const mode=opts.forceChat?'chat':A.route(text);
     _chatBusy=true;
     const btn=$('asstSendBtn');
@@ -11956,26 +12196,74 @@ function maybeShowDailyPopup(){
     return head+'\n\n'+shown+(items.length>12?`\n…ועוד ${items.length-12}`:'');
   };
 
-  // ── Confirmation card ──
+  // ── Confirmation card (R6) + result bubble (R5) ──
   const find=id=>chatHistory.find(m=>m.kind==='proposal'&&m.id===id);
-  const lastDoneId=()=>{for(let i=chatHistory.length-1;i>=0;i--){const m=chatHistory[i];if(m.kind==='proposal'&&(m.state==='done'||m.state==='undone'))return m.id;}return null;};
+  const findAny=id=>chatHistory.find(m=>(m.kind==='proposal'||m.kind==='action')&&m.id===id);
+  const attr=s=>esc(String(s==null?'':s)).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const fmtWhen=d=>new Date(d).toLocaleString('he-IL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const fmtDay=d=>new Date(d).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'});
+  const localDT=d=>ymdOf(d)+'T'+hmOf(d);
+  const live=m=>!m.chipsOff&&Date.now()-(m.doneAt||0)<600000;   // result chips: until the next typed message or 10 min
+  const chip=(label,call,dis)=>`<button class="chat-suggestion" onclick="${call}"${dis?' disabled':''}>${label}</button>`;
+  const inert=t=>`<div class="chat-day-sep"><span>${t}</span></div>`;
+  const collapsedLine=m=>`<div class="chat-day-sep"><span>${SAY.collapsed} <button class="chat-suggestion" onclick="AlfredAI.reopen('${m.id}')">${SAY.reopen}</button></span></div>`;
+  // "Changed since it was added" = gone, renamed, moved or done: then Undo/convert from the chat are disabled.
+  const changed=m=>(m.snap||[]).some(s=>{const t=tasks.find(x=>x.id===s.id);return !t||t.text!==s.text||t.datetime!==s.datetime||t.completed;});
+  const synced=id=>{const t=tasks.find(x=>x.id===id);return !t||'calendarEventId' in t;};
+  // Undo must not race addTask's async calendar sync (that would orphan the event): wait until it settled.
+  async function waitSynced(ids){for(let k=0;k<50&&!ids.every(synced);k++)await new Promise(r=>setTimeout(r,100));}
+
   A.renderProposal=function(m){
-    if(m.state==='cancelled')return '<div class="chat-day-sep"><span>✕ ההצעה בוטלה</span></div>';
-    if(m.state==='undone')return '<div class="chat-day-sep"><span>↶ ההוספה בוטלה</span></div>';
+    if(m.state==='cancelled')return inert(SAY.cancelled);
+    if(m.state==='undone')return inert('↶ ההוספה בוטלה');
+    if(m.state==='edited')return inert(SAY.editing);
+    if(m.state==='collapsed')return collapsedLine(m);
+    if(m.state==='converted')return `<div class="chat-bubble bot">${esc(m.convertedText||'')}${live(m)&&m.convUndo?`<div class="chat-suggestions">${chip(SAY.undo,`AlfredAI.unconvert('${m.id}')`)}</div>`:''}</div>`;
     if(m.state==='done'){
-      const n=(m.created||[]).length;
-      const undo=n&&lastDoneId()===m.id?`<button class="chat-retry-btn" onclick="AlfredAI.undo('${m.id}')">↶ בטל הוספה</button>`:'';
-      return `<div class="chat-bubble bot">${m.intent==='add_routine'?'✓ נפתח טופס שגרה':'✓ נוספו '+n+' משימות'}${undo}</div>`;
+      if(m.intent==='add_routine')return '<div class="chat-bubble bot">✓ נפתח טופס שגרה</div>';
+      if(m.instance)return `<div class="chat-bubble bot">✓ נוסף מופע לשגרת "${esc(m.routineName||'')}"</div>`;
+      const n=(m.created||[]).length,one=n===1&&m.snap&&m.snap[0];
+      const text=one?SAY.added(one.text,fmtWhen(one.datetime)):SAY.addedN(n);
+      if(!n||!live(m))return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(text)}</div>`;
+      const ch=changed(m);
+      let chips=chip(SAY.undoAdd,`AlfredAI.undo('${m.id}')`,ch);
+      if(one){
+        chips+=chip(SAY.toRoutine,`AlfredAI.convertMenu('${m.id}')`,ch)+chip(SAY.edit,`AlfredAI.editCreated('${m.id}')`,ch);
+        if(m.convertMenu&&!ch){
+          const r=A.matchRoutine(one.text);            // an existing routine -> its instance; else a NEW routine via the form
+          chips+=r?chip(esc(SAY.asInstance(r.name||r.text||'')),`AlfredAI.convert('${m.id}','instance','${attr(r.id)}')`):chip(SAY.newRoutine,`AlfredAI.convert('${m.id}','new')`);
+        }
+      }
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(text)}${ch?`<br><span class="chat-provider">${SAY.changed}</span>`:''}<div class="chat-suggestions">${chips}</div></div>`;
     }
-    const rows=m.items.map((it,i)=>{
-      const when=it.when&&it.when.label?`<span class="routine-badge">🕒 ${esc(it.when.label)}</span>`:'';
-      const warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
-      return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0"><label class="siri-notif-morning"><input type="checkbox"${it.checked?' checked':''} onchange="AlfredAI.toggle('${m.id}',${i},this.checked)"><span style="color:var(--text)">${esc(it.title)}</span></label>${when}${warn}<button class="chat-suggestion" onclick="AlfredAI.edit('${m.id}',${i})" aria-label="ערוך">✏️</button></div>`;
-    }).join('');
+    const single=m.items.length===1;
+    const isInst=m.routineId&&m.choice==='instance';
+    let body;
+    if(single){                                                 // R6: one item -> editable fields, NO checkbox
+      const it=m.items[0];
+      let warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
+      const dt=m.detail;
+      if(dt)warn+=(dt.end?`<span class="routine-badge">${esc(SAY.until(dt.end))}</span>`:'')+(it.date&&it.date<todayYmd()?`<span class="cal-badge pending">${SAY.pastWarn}</span>`:'')
+        +(dt.bullets&&dt.bullets.length?`<div style="margin-top:6px">${dt.bullets.map(b=>'• '+esc(b)).join('<br>')}</div>`:'')
+        +(dt.phones&&dt.phones.length?`<div class="ai-phones" data-pid="${m.id}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>`:'')
+        +(dt.summarizing?`<div class="ai-more-hint" style="margin:6px 0 0">${SAY.summarizing}</div>`:'');
+      body=m.intent==='add_routine'
+        ?`<div class="chat-confirm-body">${esc(it.title)}</div>`
+        :`<div class="chat-confirm-body"><input class="edit-dt" value="${attr(it.title)}" aria-label="כותרת" onchange="AlfredAI.field('${m.id}','title',this.value)"><div style="display:flex;gap:6px;margin-top:6px"><input class="edit-dt" type="date" value="${attr(it.date||'')}" aria-label="תאריך" onchange="AlfredAI.field('${m.id}','date',this.value)"><input class="edit-dt" type="time" value="${attr(it.time||'')}" aria-label="שעה" onchange="AlfredAI.field('${m.id}','time',this.value)"></div>${warn}</div>`;
+    }else{                                                      // a batch from ONE message -> checkboxes, default on
+      const rows=m.items.map((it,i)=>{
+        const when=it.when&&it.when.label?`<span class="routine-badge">🕒 ${esc(it.when.label)}</span>`:'';
+        const warn=it.when&&it.when.warn?`<span class="cal-badge pending">⚠️ ${esc(it.when.warn)}</span>`:'';
+        return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0"><label class="siri-notif-morning"><input type="checkbox"${it.checked?' checked':''} onchange="AlfredAI.toggle('${m.id}',${i},this.checked)"><span style="color:var(--text)">${esc(it.title)}</span></label>${when}${warn}<button class="chat-suggestion" onclick="AlfredAI.edit('${m.id}',${i})" aria-label="ערוך">✏️</button></div>`;
+      }).join('');
+      body=`<div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div>`;
+      setTimeout(A.paintHints,0);                                // after the chat HTML is in the DOM
+    }
     const n=m.items.filter(it=>it.checked).length;
-    const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':`✓ הוסף (${n})`;
-    setTimeout(A.paintHints,0);                                  // after the chat HTML is in the DOM
-    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div><div class="chat-confirm-body ai-items" id="aib-${m.id}" onscroll="AlfredAI.paintHints()">${rows}</div><div class="ai-more-hint" id="aih-${m.id}" hidden></div><div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button><button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">✕ בטל</button></div><div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.notTask('${m.id}')">זו שאלה, לא משימה</button><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
+    const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':isInst?'✓ הוסף מופע':single?SAY.approve:SAY.addN(n);
+    const kindChips=m.routineId?`<div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','instance')">${isInst?'✓ ':''}מופע של שגרת "${esc(m.routineName||'')}"</button><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','task')">${isInst?'':'✓ '}משימה רגילה</button></div>`:'';
+    const editBtn=single&&m.intent!=='add_routine'?`<button class="chat-confirm-no" onclick="AlfredAI.edit('${m.id}',0)">${SAY.edit}</button>`:'';
+    return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div>${body}${kindChips}<div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button>${editBtn}<button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">${SAY.cancel}</button></div><div class="chat-suggestions"><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
   };
   // Long cards scroll inside their body: show a fade + "עוד N ↓" while items are hidden below.
   A.paintHints=function(){
@@ -11988,12 +12276,32 @@ function maybeShowDailyPopup(){
       if(more)hint.textContent=`עוד ${below} ↓ — גלול לראות הכל`;
     });
   };
+  A.choose=function(id,c){const m=find(id);if(!m||m.state!=='open')return;m.choice=c;saveChatHistory();renderChatMessages();};
+  // A routine instance through the existing quick-add-instance flow (same calendar event + scheduledWeeks entry).
+  A.addInstance=async function(routineId,iso){
+    quickAddInstance(routineId);
+    const inp=$('qaDate');
+    if(inp&&iso)inp.value=localDT(iso);
+    await confirmQuickAdd(routineId);
+  };
   A.toggle=function(id,i,v){const m=find(id);if(!m||!m.items[i])return;m.items[i].checked=!!v;saveChatHistory();renderChatMessages();};
-  A.cancel=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();};
-  A.notTask=function(id){const m=find(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();A.run(m.src,{forceChat:true});};
+  // Single card fields: title / date / time edited in place (no re-render, so typing keeps focus).
+  A.field=function(id,k,v){
+    const m=find(id);if(!m||m.state!=='open'||!m.items[0])return;const it=m.items[0];
+    if(k==='title'){it.title=String(v).trim().slice(0,120)||it.title;it.titleEdited=true;}
+    else{
+      it[k]=v;it.dateEdited=true;
+      if(m.detail&&k==='date'){m.detail.past=!!v&&v<todayYmd();setTimeout(renderChatMessages,0);}   // the past-date chip goes away
+      if(it.date||it.time){const d=QAdd.when(it.date,it.time);if(d&&!isNaN(d))it.when={iso:d.toISOString(),label:fmtWhen(d),warn:''};}
+    }
+    saveChatHistory();
+  };
+  A.cancel=function(id){const m=find(id);if(!m)return;m.state='cancelled';unstash(m);saveChatHistory();renderChatMessages();};
   A.edit=function(id,i){
     const m=find(id);if(!m||!m.items[i])return;
-    const it=m.items[i];it.checked=false;saveChatHistory();renderChatMessages();
+    const it=m.items[i];
+    if(m.items.length===1){m.state='edited';unstash(m);}else it.checked=false;   // the quick-add sheet takes over
+    saveChatHistory();renderChatMessages();
     try{closeAssistantSheet();}catch(_){}
     QAdd.open('assistant');
     const inp=$('qaddText');inp.value=[it.title,it.date_text,it.time_text].filter(Boolean).join(' ');QAdd.onText();
@@ -12001,30 +12309,512 @@ function maybeShowDailyPopup(){
   A.approve=function(id){
     const m=find(id);if(!m||m.state!=='open')return;
     if(m.intent==='add_routine'){
-      const it=m.items[0];m.state='done';m.created=[];saveChatHistory();
+      const it=m.items[0],rc=m.recurrence||{};m.state='done';m.created=[];unstash(m);saveChatHistory();
       try{closeAssistantSheet();}catch(_){}
       openRoutineSheet();
-      setTimeout(()=>openRoutineForm({name:it.title,notes:[it.date_text,it.time_text,it.notes].filter(Boolean).join(' · ')},null),150);
+      // Only what was said: explicit days become pre-selected (editable) day chips; nothing is invented.
+      const pre={name:it.title,notes:it.notes||''};
+      if(rc.timesPerWeek)pre.timesPerWeek=Math.min(7,rc.timesPerWeek);
+      if(rc.preferredDays&&rc.preferredDays.length)pre.preferredDays=rc.preferredDays;
+      if(rc.timeWindow)pre.timeWindow=rc.timeWindow;
+      if(rc.specificTime)pre.specificTime=rc.specificTime;
+      setTimeout(()=>openRoutineForm(pre,null),150);
       return;
     }
-    const chosen=m.items.filter(it=>it.checked);
+    if(m.routineId&&m.choice==='instance'){
+      const it=m.items[0];m.state='done';m.created=[];m.instance=true;saveChatHistory();
+      A.addInstance(m.routineId,it.when&&it.when.iso).then(()=>{saveChatHistory();renderChatMessages();});
+      renderChatMessages();
+      return;
+    }
+    const single=m.items.length===1;
+    const chosen=single?m.items:m.items.filter(it=>it.checked);
     if(!chosen.length){toast('לא נבחרו משימות');return;}
+    if(single&&chosen[0].when&&chosen[0].when.warn){toast(SAY.needWhen);return;}
+    if(m.detail&&chosen[0].date&&chosen[0].date<todayYmd()){toast(SAY.pastPick);return;}   // no calendar event for a past date
     const ids=[];
     chosen.forEach(it=>{
       addTask(it.notes?it.title+' — '+it.notes:it.title,{url:null,image:null,...(it.when&&it.when.iso?{datetime:it.when.iso}:{})});
       const t=tasks[0];
       if(t){ids.push(t.id);if(it.category&&t.category==='כללי')t.category=it.category;}
+      // R9: the FULL original text goes to the optional notes field (the range end, which the calendar cannot hold, on top)
+      if(t&&m.detail)t.notes=((m.detail.end?SAY.until(m.detail.end)+'\n':'')+m.src).slice(0,4000);
     });
     save();render();
-    m.state='done';m.created=ids;saveChatHistory();renderChatMessages();
-    setTimeout(()=>toast(`✓ נוספו ${ids.length} משימות — אפשר לבטל בצ'אט`),700);   // after addTask's own sync toasts
+    m.state='done';m.created=ids;m.doneAt=Date.now();
+    m.snap=ids.map(i=>{const t=tasks.find(x=>x.id===i);return{id:i,text:t.text,datetime:t.datetime};});
+    unstash(m);saveChatHistory();renderChatMessages();
   };
+  // בטל הוספה: exactly what this action created (task + its calendar event + its reminders, via del), by id.
   A.undo=async function(id){
-    const m=find(id);if(!m||m.state!=='done')return;
+    const m=find(id);if(!m||m.state!=='done'||!live(m))return;
+    if(changed(m)){toast(SAY.changed);renderChatMessages();return;}
+    await waitSynced(m.created||[]);
     for(const tid of m.created||[])await del(tid);
     m.state='undone';saveChatHistory();renderChatMessages();
-    toast('↶ ההוספה בוטלה');
   };
+  A.editCreated=function(id){
+    const m=find(id);const tid=m&&m.created&&m.created[0];if(!tid)return;
+    try{closeAssistantSheet();}catch(_){}
+    render();
+    setTimeout(()=>{const el=document.getElementById('edit-'+tid);if(el){el.classList.add('on');el.scrollIntoView({block:'center'});}else openPostpone('task',tid);},80);
+  };
+  A.convertMenu=function(id){const m=find(id);if(!m||m.state!=='done')return;m.convertMenu=!m.convertMenu;saveChatHistory();renderChatMessages();};
+  function convertFailed(){chatHistory.push({role:'model',parts:[{text:'⚠️ '+SAY.convFail}],ts:Date.now(),provider:'Alfred'});saveChatHistory();renderChatMessages();}
+  // הפוך לשגרה, TRANSACTIONAL: the routine/instance is created first; the original task (and its event and
+  // reminders, via del) is removed only after that succeeded. On failure the original stays as it was.
+  let convWait=null;
+  A.convert=async function(id,how,routineId){
+    const m=find(id);if(!m||m.state!=='done'||!live(m))return;
+    if(changed(m)){toast(SAY.changed);renderChatMessages();return;}
+    const t=tasks.find(x=>x.id===m.created[0]);if(!t)return;
+    const orig=JSON.parse(JSON.stringify(t));
+    if(how==='instance'){
+      const r=routines.find(x=>String(x.id)===String(routineId));if(!r){convertFailed();return;}
+      const count=()=>Object.values(r.scheduledWeeks||{}).flat().filter(it=>(typeof it==='string'?it:it&&it.dt)===t.datetime).length;
+      const before=count();
+      try{await A.addInstance(r.id,t.datetime);}catch(_){}
+      if(count()<=before){convertFailed();return;}
+      await waitSynced([t.id]);await del(t.id);
+      Object.assign(m,{state:'converted',convertedText:SAY.converted(r.name||r.text||''),conv:{type:'instance',routineId:r.id,dt:t.datetime,orig},convUndo:true,doneAt:Date.now(),chipsOff:false});
+      saveChatHistory();renderChatMessages();
+      return;
+    }
+    // A new routine: the existing form, prefilled with the title only (recurrence is never invented). The task is
+    // removed only when the form is really saved; closing the form without saving keeps it.
+    convWait={msgId:m.id,taskId:t.id,orig};
+    try{closeAssistantSheet();}catch(_){}
+    openRoutineSheet();setTimeout(()=>openRoutineForm({name:t.text,notes:''},null),150);
+  };
+  window.addEventListener('vt-routine-saved',async e=>{
+    const w=convWait;convWait=null;if(!w||!e.detail||!e.detail.isNew)return;
+    const m=find(w.msgId);if(!m)return;
+    const r=routines.find(x=>x.id===e.detail.id);
+    await waitSynced([w.taskId]);await del(w.taskId);
+    Object.assign(m,{state:'converted',convertedText:SAY.convertedNew(r&&(r.name||r.text)||''),conv:{type:'routine',routineId:e.detail.id,orig:w.orig},convUndo:true,doneAt:Date.now(),chipsOff:false});
+    saveChatHistory();renderChatMessages();
+  });
+  // The form was closed without saving -> the pending conversion is dropped (the task was never touched).
+  (()=>{const f=$('routineFormSheet');if(f&&window.MutationObserver)new MutationObserver(recs=>{
+    const closed=recs.some(r=>/(^|\s)on(\s|$)/.test(r.oldValue||''))&&!f.classList.contains('on');   // a real on -> off
+    if(convWait&&closed)setTimeout(()=>{if(convWait&&!f.classList.contains('on'))convWait=null;},0);
+  }).observe(f,{attributes:true,attributeFilter:['class'],attributeOldValue:true});})();
+  // Undo of a conversion restores the original task (same id and fields; ONE new calendar event via syncTask)
+  // and removes exactly what the conversion created.
+  A.unconvert=async function(id){
+    const m=find(id);if(!m||m.state!=='converted'||!live(m)||!m.conv)return;
+    const c=m.conv,r=routines.find(x=>String(x.id)===String(c.routineId));
+    if(c.type==='instance'&&r){
+      let ev=null;
+      Object.values(r.scheduledWeeks||{}).forEach(arr=>{const k=arr.findIndex(it=>(typeof it==='string'?it:it&&it.dt)===c.dt);if(k>-1&&ev===null){ev=(arr[k]&&arr[k].eventId)||'';arr.splice(k,1);}});
+      saveRoutines();
+      if(ev&&!String(ev).startsWith('local_')){const s0=new Date(c.dt);if(!await purgeCalendarEventsByMarker('vt_routine_id:'+r.id,s0,new Date(+s0+60000)))await deleteCalendarEvent(ev);}
+    }else if(c.type==='routine'&&r){
+      await purgeCalendarEventsByMarker('vt_routine_id:'+r.id).catch(()=>0);
+      routines=routines.filter(x=>x.id!==r.id);saveRoutines();try{renderRoutineList();}catch(_){}
+    }
+    const t={...c.orig};delete t.calendarEventId;
+    if(!tasks.some(x=>x.id===t.id))tasks.unshift(t);
+    save();render();syncTask(t);scheduleSmartPushNotifs();
+    Object.assign(m,{state:'done',convUndo:false,convertMenu:false,created:[t.id],snap:[{id:t.id,text:t.text,datetime:t.datetime}],doneAt:Date.now()});
+    saveChatHistory();renderChatMessages();
+  };
+
+  // ── R4 actions: reschedule / complete / skip / delete ONE existing item, always via a card with Undo ──
+  const DAYNAME={'א':'ראשון','ב':'שני','ג':'שלישי','ד':'רביעי','ה':'חמישי','ו':'שישי','ש':'שבת'};
+  const WEEKDAYS=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  A.weekdayOf=s=>{const m=String(s||'').match(/יום\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?=[\s,.]|$)/);return m?WEEKDAYS.indexOf(m[1]):null;};
+  const DAY_RE=/(?:^|\s)((?:של\s+|ב)?(?:היום|מחר|מחרתיים)|ב?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|ב-?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)(?=[\s,.]|$)/;
+  const TIME_RE=/(?:^|\s)((?:ב-?|בשעה\s+|של\s+)?\d{1,2}:\d{2}|(?:ב-|בשעה\s+)\d{1,2})(?=[\s,.]|$)/;
+  const NEW_RE=/(?:^|\s)(?:ל-?(?=\d)|ליום\s|לשעה\s|ל(?=מחר|מחרתיים|היום|שבוע|ערב|בוקר|צהריים))/;
+  const ORD_RE=/(?:^|\s)(הראשון|הראשונה|השני|השנייה|השניה|השלישי|השלישית|הרביעי|האחרון|האחרונה)(?=\s|$)/;
+  const FILLER=/(^|\s)(את|אותו|אותה|על|לי|בבקשה|בטעות|הוא|היא|זה|השבוע|הזה|המשימה|השגרה|כבוצע|כבוצעה|שבוצע|שסיימתי)(?=[\s,.]|$)/g;
+  // Verb + target + optional "which one" hints + the NEW day/time (raw words; resolved below with the app's parser).
+  A.parseAction=function(raw){
+    if(ADD_VERB.test(raw))return null;
+    const text=String(raw).replace(/(ב?יום\s+)([אבגדהוש])['׳](?=[\s,.]|$)/g,(x,p,l)=>p+DAYNAME[l]);
+    let verb=null,hit=null;
+    for(const [v,re] of VERBS){const m=text.match(re);if(m&&(!hit||m.index<hit.index)){verb=v;hit=m;}}
+    if(!verb)return null;
+    let rest=(text.slice(0,hit.index)+' '+text.slice(hit.index+hit[0].length)).replace(/[?!]/g,' ');
+    let newText='';
+    if(verb==='reschedule'){const k=rest.search(NEW_RE);if(k>-1){newText=rest.slice(k).trim().replace(/^ל-?/,'').replace(/^שעה\s+/,'').trim();rest=rest.slice(0,k);}}
+    const nth=A.ordinalOf(rest);
+    const d=rest.match(DAY_RE),t=rest.match(TIME_RE);
+    let target=rest;[d&&d[1],t&&t[1]].forEach(x=>{if(x)target=target.replace(x,' ');});
+    target=target.replace(ORD_RE,' ').replace(FILLER,' ').replace(FILLER,' ').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim();
+    return{verb,target,dayText:d?d[1]:'',timeText:t?t[1]:'',nth,newText,all:/^(ה?כל|ה?כול|כולם|כל המשימות)$/.test(target)};
+  };
+  const slim=it=>({type:it.type,id:it.id,dateStr:it.dateStr||null,title:it.title,dt:it.dt});
+  const dateOnly=tg=>tg.type==='bill'||tg.type==='crm';
+  // The NEW moment: a time alone keeps the item's day, a day alone keeps its time; nothing parsed -> day chips.
+  function newWhen(s,tg){
+    const cur=tg.dt?new Date(tg.dt):null;
+    if(!s)return{date:'',time:cur&&!dateOnly(tg)?hmOf(cur):''};
+    const T=window.QAdd&&QAdd.time;const r=T?T.parseHebrewDateTime(s,{now:new Date()}):null;
+    const hasDay=/(היום|מחר|מחרתיים|יום\s|שבוע|\d{1,2}[./]\d{1,2})/.test(s);
+    const hasTime=!!(r&&r.time)&&/(\d|בוקר|צהריים|ערב|לילה|אחה"צ)/.test(s);
+    return{date:hasDay&&r&&r.date?r.date:(cur&&hasTime?ymdOf(cur):''),time:hasTime?r.time:(cur&&!dateOnly(tg)?hmOf(cur):'')};
+  }
+  function setTarget(m,tg){
+    m.target=tg;m.state='open';
+    if(m.verb==='reschedule'){const w=newWhen(m.newText,tg);m.newDate=w.date;m.newTime=w.time;}
+  }
+  // true = a card (or candidate chips) was added; false = nothing on the device matches (-> Worker / "not found").
+  A.startAction=function(act,src,fromWorker){
+    if(!act||!act.target)return false;
+    const types=TYPES[act.verb]||[];
+    const data=A.localItems().filter(it=>types.includes(it.type)&&!(act.verb==='complete'&&it.completed));
+    const res=A.resolveTarget({text:act.target,dayText:act.dayText,timeText:act.timeText,nth:act.nth},data);
+    if(res.kind==='none')return false;
+    const m={role:'model',kind:'action',id:A.newId(),ts:Date.now(),provider:fromWorker?'':'Alfred',verb:act.verb,src,quote:src,newText:act.newText||'',state:'choose',cands:res.items.slice(0,6).map(slim)};
+    if(res.kind==='one')setTarget(m,m.cands[0]);
+    chatHistory.push(m);
+    return true;
+  };
+  const dayChips=()=>{const out=[],d=new Date();for(let i=0;i<4;i++){const x=new Date(+d+i*864e5);out.push({ymd:ymdOf(x),label:i===0?'היום':i===1?'מחר':x.toLocaleDateString('he-IL',{weekday:'short',day:'numeric'})});}return out;};
+  A.renderAction=function(m){
+    if(m.state==='collapsed')return collapsedLine(m);
+    if(m.state==='cancelled')return inert(SAY.cancelled);
+    if(m.state==='undone')return inert(SAY.undone);
+    if(m.state==='choose'){
+      const chips=m.cands.map((c,i)=>chip(esc(c.title)+(c.dt?' · '+esc(dateOnly(c)?fmtDay(c.dt):fmtWhen(c.dt)):''),`AlfredAI.pick('${m.id}',${i})`)).join('');
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${SAY.which}<div class="chat-suggestions">${chips}</div></div>`;
+    }
+    const tg=m.target;
+    if(m.state==='done'){
+      const txt=SAY.did[m.verb](tg.title,m.doneLabel||'');
+      const fail=m.cal==='failed'?`<br><span class="cal-badge pending">${SAY.calFail}</span>`:'';
+      const u=live(m)?`<div class="chat-suggestions">${chip(SAY.undo,`AlfredAI.undoAction('${m.id}')`)}</div>`:'';
+      return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(txt)}${fail}${u}</div>`;
+    }
+    let body='';
+    if(m.verb==='reschedule'){
+      const only=dateOnly(tg),cur=tg.dt?(only?fmtDay(tg.dt):fmtWhen(tg.dt)):'';
+      const days=!m.newDate?`<div class="chat-suggestions">${dayChips().map(d=>chip(d.label,`AlfredAI.actField('${m.id}','date','${d.ymd}',true)`)).join('')}</div>`:'';
+      body=`<div class="chat-confirm-body">${cur?`<span class="routine-badge">${SAY.from}: ${esc(cur)}</span>`:''}<div style="display:flex;gap:6px"><input class="edit-dt" type="date" value="${attr(m.newDate||'')}" aria-label="${SAY.to}" onchange="AlfredAI.actField('${m.id}','date',this.value)">${only?'':`<input class="edit-dt" type="time" value="${attr(m.newTime||'')}" aria-label="שעה" onchange="AlfredAI.actField('${m.id}','time',this.value)">`}</div>${!m.newDate?`<div class="ai-more-hint" style="margin:6px 0 0">${SAY.pickDay}</div>`:''}</div>${days}`;
+    }
+    return `<div class="chat-confirm"><div class="chat-confirm-title">${esc(SAY.ask[m.verb](tg.title))}</div>${body}<div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.doAction('${m.id}')">${SAY.approve}</button><button class="chat-confirm-no" onclick="AlfredAI.cancelAction('${m.id}')">${SAY.cancel}</button></div></div>`;
+  };
+  A.pick=function(id,i){const m=findAny(id);if(!m||m.state!=='choose'||!m.cands[i])return;setTarget(m,m.cands[i]);saveChatHistory();renderChatMessages();};
+  A.actField=function(id,k,v,repaint){const m=findAny(id);if(!m||m.state!=='open')return;if(k==='date')m.newDate=v;else m.newTime=v;saveChatHistory();if(repaint)renderChatMessages();};
+  A.cancelAction=function(id){const m=findAny(id);if(!m)return;m.state='cancelled';saveChatHistory();renderChatMessages();};
+
+  // Execution goes ONLY through the app's existing functions. Reschedule: tasks / bills / CRM drive the existing
+  // confirmPostpone (quiet: the result bubble replaces its toasts); a routine instance goes through
+  // moveRoutineInstance (D2) — confirmPostpone's whole-day purge would delete a sibling instance's event.
+  async function postpone(type,id,value){
+    const inp=$('postponeDtInput');inp.type=dateOnly({type})?'date':'datetime-local';inp.value=value;
+    _postponeCtx={type,taskId:type==='task'||type==='bill'?id:null,routineId:null,dateStr:null,bpItemId:type==='crm'?id:null};
+    await confirmPostpone({quiet:true});
+  }
+  const calState=async ok=>ok?'moved':(await getToken().catch(()=>null))?'failed':'none';
+  const billOf=id=>bills.find(x=>x.id===id),crmOf=id=>backlogItems.find(x=>String(x.id)===String(id));
+  const routineOf=id=>routines.find(x=>String(x.id)===String(id));
+  const EXEC={
+    async reschedule(m,back){
+      const tg=m.target;
+      if(tg.type==='routine'){
+        if(!back)m.snap={from:tg.dateStr,to:QAdd.when(m.newDate,m.newTime).toISOString()};
+        const[a,b]=back?[m.snap.to,m.snap.from]:[m.snap.from,m.snap.to];
+        const r=await moveRoutineInstance(tg.id,a,b);if(!r.ok)return false;
+        m.cal=r.calendar;m.doneLabel=fmtWhen(b);return true;
+      }
+      if(tg.type==='task'){
+        const t=tasks.find(x=>x.id===tg.id);if(!t)return false;
+        if(!back)m.snap={from:t.datetime,completed:!!t.completed,to:QAdd.when(m.newDate,m.newTime).toISOString()};
+        await postpone('task',t.id,localDT(back?m.snap.from:m.snap.to));
+        if(back){const x=tasks.find(y=>y.id===tg.id);if(x&&x.completed!==m.snap.completed){x.completed=m.snap.completed;save();render();}}
+        const x=tasks.find(y=>y.id===tg.id);m.cal=await calState(!!(x&&x.calendarEventId));m.doneLabel=fmtWhen(back?m.snap.from:m.snap.to);return true;
+      }
+      if(tg.type==='bill'){
+        const b=billOf(tg.id);if(!b)return false;
+        if(!back)m.snap={from:b.payDate||null,to:m.newDate};
+        if(back&&!m.snap.from){                                  // there was no pay date: restore that, ONE sync
+          await purgeCalendarEventsByMarker('vt_bill_id:'+b.id).catch(()=>0);
+          b.payDate=null;b.calendarEventId=null;b.deadlineEventId=null;saveBills();renderBillsList();render();await syncBillToCalendar(b);scheduleSmartPushNotifs();
+        }else await postpone('bill',b.id,back?m.snap.from:m.snap.to);
+        m.cal='none';m.doneLabel=back&&!m.snap.from?'':fmtDay(back?m.snap.from:m.snap.to);return true;
+      }
+      if(tg.type==='crm'){
+        const it=crmOf(tg.id);if(!it)return false;
+        if(!back)m.snap={from:it.dueDate||null,to:m.newDate};
+        if(back&&!m.snap.from){it.dueDate=null;saveBpItems();renderBpItems();}
+        else await postpone('crm',it.id,back?m.snap.from:m.snap.to);
+        m.cal='none';m.doneLabel=m.snap.to?fmtDay(back?(m.snap.from||m.snap.to):m.snap.to):'';return true;
+      }
+      return false;
+    },
+    async complete(m,back){
+      const tg=m.target;
+      if(tg.type==='task'){const t=tasks.find(x=>x.id===tg.id);if(!t)return false;if(!back)m.snap={completed:!!t.completed};if(t.completed!==(back?m.snap.completed:true))toggleDone(t.id);return true;}
+      const r=routineOf(tg.id);if(!r)return false;
+      const isDone=()=>(r.completedDates||[]).includes(tg.dateStr);
+      if(!back)m.snap={completed:isDone()};
+      if(isDone()!==(back?m.snap.completed:true))toggleRoutineComplete(r.id,tg.dateStr);
+      return true;
+    },
+    async skip_routine(m,back){
+      const r=routineOf(m.target.id);if(!r)return false;
+      if(!back){m.snap={skipped:[...(r.skippedDates||[])]};skipRoutineInstance(r.id,m.target.dateStr);}
+      else{r.skippedDates=[...m.snap.skipped];saveRoutines();render();}
+      return true;
+    },
+    async delete(m,back){
+      if(!back){
+        const t=tasks.find(x=>x.id===m.target.id);if(!t)return false;
+        m.snap={task:JSON.parse(JSON.stringify(t))};
+        await waitSynced([t.id]);await del(t.id);              // task + its calendar event + its reminders
+        return true;
+      }
+      if(tasks.some(x=>x.id===m.snap.task.id))return true;
+      const t={...m.snap.task};delete t.calendarEventId;        // restored as it was; ONE new event via syncTask
+      tasks.unshift(t);save();render();syncTask(t);scheduleSmartPushNotifs();
+      return true;
+    },
+  };
+  A.doAction=async function(id){
+    const m=findAny(id);if(!m||m.kind!=='action'||m.state!=='open'||m.busy)return;
+    if(m.verb==='reschedule'&&(!m.newDate||(!dateOnly(m.target)&&!m.newTime))){toast(SAY.needDate);return;}
+    m.busy=true;
+    try{
+      const ok=await EXEC[m.verb](m,false);
+      if(ok){m.state='done';m.doneAt=Date.now();}
+      else{m.state='cancelled';chatHistory.push({role:'model',parts:[{text:SAY.notFound(m.target.title)}],ts:Date.now(),provider:'Alfred'});}
+    }finally{m.busy=false;saveChatHistory();renderChatMessages();}
+  };
+  // Undo = the snapshot restored through the same function (end state: again exactly one event).
+  A.undoAction=async function(id){
+    const m=findAny(id);if(!m||m.kind!=='action'||m.state!=='done'||!live(m)||m.busy)return;
+    m.busy=true;
+    try{if(await EXEC[m.verb](m,true))m.state='undone';}finally{m.busy=false;saveChatHistory();renderChatMessages();}
+  };
+
+  // ── R8 reply-quote strip: the user's message an answer refers to (clarify / result / error). textContent only. ──
+  const quoteSpan=m=>m.quote&&m.id?`<span class="ai-quote" data-qid="${m.id}"></span>`:'';
+  A.paintQuotes=function(){
+    document.querySelectorAll('#chatScroll .ai-quote[data-qid]').forEach(el=>{
+      const m=chatHistory.find(x=>x.id===el.dataset.qid);const q=String(m&&m.quote||'').replace(/\s+/g,' ').trim();
+      el.textContent=q.length>100?q.slice(0,100)+'…':q;
+    });
+    paintPhones();
+  };
+
+  // ── R7 clarify by conversation: ONE open draft, in memory only, no model call ──
+  // A.pc = {draft:{title,date,time,notes,category}, missing, askedCount, sourceMessageId, expiresAt, msgId, ...}
+  A.pc=null;
+  const DISCARD=/^(עזוב|עזבי|לא משנה|בטל|בטלי|תבטל|ביטול)[\s!.]*$/;
+  const WD_LETTER=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+  const normWeekdays=s=>String(s).replace(/(ב?יום\s+)([אבגדהוש])['׳](?=[\s,.]|$)/g,(x,p,l)=>p+DAYNAME[l]);
+  const todayYmd=()=>ymdOf(new Date());
+  const addDays=(ymd,n)=>{const d=new Date(ymd+'T12:00:00');d.setDate(d.getDate()+n);return ymdOf(d);};
+  const dayOpt=(ymd,full)=>{const d=new Date(ymd+'T12:00:00'),diff=Math.round((Date.parse(ymd)-Date.parse(todayYmd()))/864e5);return{label:!full&&diff===0?'היום':!full&&diff===1?'מחר':`יום ${WD_LETTER[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`,value:ymd};};
+  const dayOptions=()=>[0,1,2,3,4].map(i=>dayOpt(addDays(todayYmd(),i)));   // [היום][מחר][next 3 days] + [בחר תאריך]
+  const T_=()=>window.QAdd&&QAdd.time;
+  // A reply is an ANSWER only when it is just a date/time phrase: "מחר אני עסוק" / "ב-7 בבוקר יש לי טיסה" are not.
+  function asWhen(text){
+    const s=normWeekdays(text),T=T_();if(!T)return null;
+    const r=T.parseHebrewDateTime(s,{now:new Date()});
+    const rest=String(r.title||'').replace(/(^|\s)(ב|ל|ביום|בשעה|יום|שעה|ו|אז|בעצם|כן|אולי|לי|את|זה|הבא|הבאה)(?=\s|$)/g,' ').replace(/[\s,.!?\-־]+/g,'');
+    if(!r.ok||rest)return null;
+    const hasDay=/(היום|מחר|מחרתיים|יום|שבוע|\d{1,2}[./]\d{1,2})/.test(s);
+    const hasTime=!!r.time&&/(\d|בוקר|צהריים|ערב|לילה|אחה"צ)/.test(s);
+    return hasDay||hasTime?{date:hasDay?r.date:'',time:hasTime?r.time:''}:null;
+  }
+  const dateTokens=src=>[...new Set([...String(src).matchAll(/(?<![\d/.])\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?(?![\d/.])/g)].map(m=>m[0]))];
+  const ymdOfToken=tok=>{const T=T_();const r=T?T.parseHebrewDateTime('ב-'+tok,{now:new Date()}):null;return r&&r.date||null;};
+  // The parser rolls a dd/mm that already passed into NEXT year; for the question we want the date as written.
+  const asWritten=tok=>{const m=tok.match(/(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/);if(!m)return null;
+    const y=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):new Date().getFullYear(),d=new Date(y,+m[2]-1,+m[1]);
+    return d.getDate()===+m[1]&&d.getMonth()===+m[2]-1?ymdOf(d):null;};
+  // What is missing or contradictory? Optional time and a bare hour are never asked about (D4: no "בלי תאריך").
+  function needOf(d,src,followUp){
+    if(!d.title)return{missing:'title',q:SAY.qTitle};
+    if(!followUp&&src){
+      const toks=dateTokens(src);
+      if(toks.length>=2){const opts=toks.map(t=>{const y=ymdOfToken(t);return y?{label:t,value:y}:null;}).filter(Boolean);if(opts.length>=2)return{missing:'dates',q:SAY.qWhichDate,options:opts};}
+      const wd=A.weekdayOf(normWeekdays(src));
+      if(wd!=null&&toks.length===1){
+        const y=ymdOfToken(toks[0]);
+        if(y&&new Date(y+'T12:00:00').getDay()!==wd){
+          let w=todayYmd();while(new Date(w+'T12:00:00').getDay()!==wd)w=addDays(w,1);
+          return{missing:'conflict',q:SAY.qConflict,options:[dayOpt(w,true),dayOpt(y,true)]};   // both explicit: the point is the mismatch
+        }
+      }
+      if(toks.length===1){const w=asWritten(toks[0]);if(w&&w<todayYmd()){d.date='';return{missing:'past',q:SAY.qPast,options:dayOptions(),pick:true};}}
+    }
+    if(!d.date&&(followUp||!d.time))return{missing:'day',q:SAY.qDay,options:dayOptions(),pick:true};
+    if(d.date&&d.date<todayYmd())return{missing:'past',q:SAY.qPast,options:dayOptions(),pick:true};
+    return null;
+  }
+  function lastUser(){for(let i=chatHistory.length-1;i>=0;i--){const m=chatHistory[i];if(m.role==='user'){if(!m.id)m.id='u'+A.uid();return m;}}return null;}
+  function ask(pc,need){
+    const u=lastUser();
+    const m={role:'model',kind:'clarify',id:A.newId(),ts:Date.now(),q:need.q,options:need.options||[],pick:!!need.pick,quote:u?(u.parts||[]).map(p=>p.text||'').join(' '):''};
+    chatHistory.push(m);
+    Object.assign(pc,{need,missing:need.missing,msgId:m.id,askedCount:(pc.askedCount||0)+1,sourceMessageId:pc.sourceMessageId||(u&&u.id),expiresAt:Date.now()+600000});
+    A.pc=pc;
+  }
+  function dropDraft(msg){
+    A.pc=null;
+    if(msg)chatHistory.push({role:'model',parts:[{text:msg}],ts:Date.now(),provider:'Alfred'});
+  }
+  // The draft becomes the normal confirmation card (nothing is ever saved without אשר).
+  function draftCard(pc){
+    const d=pc.draft;A.pc=null;
+    const w=d.date?QAdd.when(d.date,d.time):null;
+    const it={title:d.title||'',category:d.category||'',date_text:'',time_text:'',notes:d.notes||'',checked:true,date:d.date||'',time:d.time||'',
+      when:w&&!isNaN(w)?{iso:w.toISOString(),label:fmtWhen(w),warn:''}:{iso:null,label:'',warn:''}};
+    const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:pc.prov||'Alfred',intent:'add_tasks',reply:SAY.draftOk,items:[it],state:'open',src:pc.src,mode:'tasks',quote:pc.src};
+    if(!pc.forceTask&&it.title){const r=A.matchRoutine(it.title);if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}}
+    chatHistory.push(m);
+  }
+  function step(pc){
+    const need=needOf(pc.draft,'',true);
+    if(!need||pc.askedCount>=2){draftCard(pc);return;}                  // max 2 questions, then the card (never loop)
+    ask(pc,need);
+  }
+  A.clarifyStart=function(it,src,prov,forceTask){
+    const d={title:(it.title||'').trim(),date:it.date||'',time:it.time||'',notes:it.notes||'',category:it.category||''};
+    if(!it.when||!it.when.iso){d.date='';d.time='';}
+    if(it.when&&it.when.warn&&(it.date_text||it.time_text))return false;  // a passed bare hour: the card's flip chip handles it
+    if(!d.date&&!d.time&&(it.date_text||it.time_text))return false;       // words the parser could not read: the card warns
+    if(!d.date&&!d.time){
+      // The model sometimes leaves the time words in the title ("להתקשר לאמא בערב"): the app's own parser reads
+      // them from the user's text before anything is asked, and they leave the title.
+      const T=T_(),r=T?T.parseHebrewDateTime(String(src).replace(ADD_VERB,''),{now:new Date()}):null;
+      if(r&&r.ok&&!r.ambiguity&&(r.date||r.time)&&/(היום|מחר|מחרתיים|יום|שבוע|שבת|\d|בוקר|צהריים|ערב|לילה|אחה"צ|בעוד)/.test(src)){
+        d.date=r.date||'';d.time=r.time&&/(\d|בוקר|צהריים|ערב|לילה|אחה"צ|בעוד)/.test(src)?r.time:'';
+        const tt=T.parseHebrewDateTime(d.title,{now:new Date()});if(tt&&tt.ok&&tt.title&&tt.title.trim())d.title=tt.title.trim();
+        if(it.when&&!it.when.iso&&d.date){const w=QAdd.when(d.date,d.time);if(w&&!isNaN(w)){it.when={iso:w.toISOString(),label:fmtWhen(w),warn:''};it.date=d.date;it.time=d.time;it.title=d.title;}}
+      }
+    }
+    const need=needOf(d,src,false);if(!need)return false;
+    ask({draft:d,src,prov,forceTask},need);
+    return true;
+  };
+  A.clarifyNoTitle=function(text){
+    const w=asWhen(String(text).replace(ADD_VERB,'').replace(/^\s*לי(?=\s)/,''));
+    if(!w)return false;
+    ask({draft:{title:'',date:w.date,time:w.time},src:text,prov:'Alfred'},{missing:'title',q:SAY.qTitle});
+    return true;
+  };
+  // Slot priority = the field asked about. true = consumed as an answer (or a discard).
+  A.answer=function(text){
+    const pc=A.pc;if(!pc)return false;
+    if(Date.now()>pc.expiresAt){dropDraft();return false;}
+    const t=String(text).trim();
+    if(DISCARD.test(t)){dropDraft(SAY.discarded);return true;}
+    const d=pc.draft;
+    if(pc.missing==='title'){
+      if(isPasted(t)||ACTION_ANY.test(t)||/[?？]$/.test(t)||t.split(/\s+/).length>8||asWhen(t)){dropDraft();return false;}
+      const T=T_(),r=T?T.parseHebrewDateTime(t,{now:new Date()}):null;
+      d.title=((r&&r.title)||t).replace(ADD_VERB,'').trim().slice(0,120)||t;
+      if(r&&r.ok&&!d.date&&r.date&&/(היום|מחר|יום|\d{1,2}[./]\d{1,2})/.test(t))d.date=r.date;
+      if(r&&r.ok&&!d.time&&r.time&&/\d/.test(t))d.time=r.time;
+    }else{
+      const w=asWhen(t);
+      if(!w){dropDraft();return false;}
+      if(w.date)d.date=w.date;
+      if(w.time)d.time=w.time;
+    }
+    step(pc);
+    return true;
+  };
+  A.clarifyPick=function(id,value){
+    const pc=A.pc;if(!pc||pc.msgId!==id||!/^\d{4}-\d{2}-\d{2}$/.test(value))return;
+    pc.draft.date=value;
+    if(pc.missing==='dates'||pc.missing==='conflict')pc.draft.time=pc.draft.time||'';
+    step(pc);saveChatHistory();renderChatMessages();
+  };
+  A.clarifyPickDate=function(id){const m=chatHistory.find(x=>x.id===id);if(!m||!A.pc||A.pc.msgId!==id)return;m.showPick=true;saveChatHistory();renderChatMessages();};
+  A.renderClarify=function(m){
+    const on=A.pc&&A.pc.msgId===m.id&&Date.now()<A.pc.expiresAt;
+    const chips=on?(m.options||[]).map(o=>chip(esc(o.label),`AlfredAI.clarifyPick('${m.id}','${attr(o.value)}')`)).join('')+(m.pick&&!m.showPick?chip(SAY.pickDate,`AlfredAI.clarifyPickDate('${m.id}')`):''):'';
+    const pick=on&&m.showPick?`<input class="edit-dt" type="date" min="${todayYmd()}" aria-label="${SAY.pickDate}" onchange="AlfredAI.clarifyPick('${m.id}',this.value)">`:'';
+    return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(m.q)}${chips?`<div class="chat-suggestions">${chips}</div>`:''}${pick}</div>`;
+  };
+  // A time-only message right after a save (<=10 min, item unchanged) -> the reschedule card for THAT item.
+  A.followUp=function(text){
+    if(A.pc)return false;
+    const w=asWhen(text);if(!w||!w.time||w.date)return false;
+    let m=null;for(let i=chatHistory.length-1;i>=0;i--){const x=chatHistory[i];if(x.kind==='proposal'&&x.state==='done'&&(x.created||[]).length===1){m=x;break;}if(x.role==='user'&&i<chatHistory.length-1)break;}
+    if(!m||Date.now()-(m.doneAt||0)>=600000||changed(m))return false;
+    const t=tasks.find(x=>x.id===m.created[0]);if(!t)return false;
+    const tg={type:'task',id:t.id,dateStr:null,title:t.text,dt:t.datetime};
+    const a={role:'model',kind:'action',id:A.newId(),ts:Date.now(),provider:'Alfred',verb:'reschedule',src:text,newText:'',state:'open',cands:[tg],target:tg,newDate:ymdOf(t.datetime),newTime:w.time,quote:text};
+    chatHistory.push(a);
+    return true;
+  };
+
+  // ── R9 DETAIL: one long message -> ONE card at once (code, no model); the Worker's summary may only refine it ──
+  const OPENING=/(שעות\s+(?:ה?פעילות|ה?פתיחה|ה?מענה|ה?קבלה)|מוקד|(?:^|\s)[א-ו]['׳]?\s*[-–]\s*[א-ו]['׳](?=[\s:,]|$))/;
+  const LABEL_LINE=/^\s*[^:\n\d]{2,24}:\s*\S/;
+  const GREETING=/^\s*(שלום|היי|הי|בוקר טוב|ערב טוב|צהריים טובים|לקוח(?:ה)? יקר(?:ה)?|[^\s]{1,3})[\s,!.:]*(?:רב|לך|לכם)?[\s,!.]*$/;
+  const PHONE=/(?:\+972[-\s]?|0)\d{1,2}[-\s]?\d{3}[-\s]?\d{4}|\*\d{3,5}/g;
+  const DATE_G=/(\d{4})-(\d{2})-(\d{2})|(?<![\d:])(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?(?![\d:])/g;
+  const dateOfMatch=m=>{let y,mo,d;if(m[1]){y=+m[1];mo=+m[2];d=+m[3];}else{d=+m[4];mo=+m[5];y=m[6]?(m[6].length===2?2000+ +m[6]:+m[6]):new Date().getFullYear();}
+    const x=new Date(y,mo-1,d);return x.getDate()===d&&x.getMonth()===mo-1?ymdOf(x):null;};
+  const contentLines=text=>text.split('\n').filter(l=>l.trim()&&!OPENING.test(l));   // opening-hours lines never count
+  function detailDates(text){const out=new Set();for(const l of contentLines(text))for(const m of l.matchAll(DATE_G)){const y=dateOfMatch(m);if(y)out.add(y);}return[...out];}
+  A.isDetail=function(text){
+    const lines=text.split('\n').filter(l=>l.trim());
+    if(!(text.length>400||lines.length>=8))return false;
+    return detailDates(text).length<=1||lines.filter(l=>LABEL_LINE.test(l)).length>=2;
+  };
+  // Code-only reading of the message: a labelled date line wins (תאריך: / מועד: / בתאריך), then the first date;
+  // a time range "07:30-11:00" = start + end (the end cannot go to the calendar: it is kept in the notes).
+  A.readDetail=function(text){
+    const lines=contentLines(text);
+    const lab=lines.find(l=>/(תאריך|מועד|בתאריך)/.test(l)&&new RegExp(DATE_G.source).test(l));
+    let date='';for(const l of lab?[lab,...lines]:lines){const m=[...l.matchAll(DATE_G)][0];if(m){date=dateOfMatch(m)||'';if(date)break;}}
+    let time='',end='';
+    const tl=lines.find(l=>/\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}/.test(l))||lines.find(l=>/(שעה|בשעה|מועד)/.test(l)&&/\d{1,2}:\d{2}/.test(l))||lines.find(l=>/\d{1,2}:\d{2}/.test(l));
+    if(tl){const r=tl.match(/(\d{1,2}):(\d{2})(?:\s*[-–]\s*(\d{1,2}):(\d{2}))?/);if(r){time=r[1].padStart(2,'0')+':'+r[2];if(r[3])end=r[3].padStart(2,'0')+':'+r[4];}}
+    const first=text.split('\n').map(l=>l.trim()).find(l=>l&&!GREETING.test(l)&&!OPENING.test(l)&&!/^[\d\s:./\-–]+$/.test(l))||text.trim();
+    const title=first.replace(/^[^:\n]{2,14}:\s*/,'').replace(PHONE,'').replace(/\s+/g,' ').trim().slice(0,40)||first.slice(0,40);
+    const phones=[...new Set((text.match(PHONE)||[]).map(p=>p.trim()))].slice(0,3);
+    return{title,date,time,end,phones,past:!!date&&date<todayYmd()};
+  };
+  A.startDetail=function(text){
+    const d=A.readDetail(text);
+    const w=d.date?QAdd.when(d.date,d.time):null;
+    const it={title:d.title,category:'',date_text:'',time_text:'',notes:'',checked:true,date:d.date,time:d.time,when:w&&!isNaN(w)?{iso:w.toISOString(),label:fmtWhen(w),warn:''}:{iso:null,label:'',warn:''}};
+    const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:'Alfred',intent:'add_tasks',reply:SAY.detailReply,items:[it],state:'open',src:text,mode:'detail',quote:text,
+      detail:{end:d.end,phones:d.phones,past:d.past,bullets:[],summarizing:true}};
+    chatHistory.push(m);
+    return m;
+  };
+  // A summary is used ONLY if every number (2+ digits) in it appears in the original text (separators ignored).
+  const joinNums=s=>String(s||'').replace(/(\d)[\s.\-\/:]+(?=\d)/g,'$1');
+  A.trustSummary=function(sum,orig){
+    const runs=new Set(String(orig).match(/\d+/g)||[]),pool=joinNums(orig);
+    const txt=[sum.title,...(sum.bullets||[]),sum.date_text,sum.time_text,sum.end_time_text].join(' | ');   // fields never glue together
+    return[...(txt.match(/\d{2,}/g)||[]),...(joinNums(txt).match(/\d{2,}/g)||[])].every(r=>runs.has(r)||pool.includes(r));
+  };
+  A.summarize=async function(m){
+    const finish=()=>{if(m.detail)m.detail.summarizing=false;saveChatHistory();renderChatMessages();};
+    try{
+      const map=[],src=m.src.slice(0,3000);
+      const r=await fetch(AI_GATEWAY+'/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(src,map),mode:'summarize',history:[],hours:{start:'08:00',end:'22:00'}}),signal:AbortSignal.timeout(TIMEOUT_MS)});
+      const j=await r.json().catch(()=>null);
+      const s=j&&j.ok&&j.result&&j.result.intent==='summarize'&&j.result.summary;   // an old Worker answers "chat" -> ignored
+      if(!s||m.state!=='open')return finish();
+      const sum={title:unmask(s.title,map).slice(0,60),bullets:(s.bullets||[]).slice(0,6).map(b=>unmask(b,map).slice(0,120)).filter(Boolean),date_text:unmask(s.date_text,map),time_text:unmask(s.time_text,map),end_time_text:unmask(s.end_time_text,map)};
+      if(!A.trustSummary(sum,m.src)){m.detail.rejected=true;return finish();}
+      const it=m.items[0];
+      if(!it.titleEdited&&sum.title)it.title=sum.title.slice(0,40);
+      m.detail.bullets=sum.bullets;
+      if(!it.date&&sum.date_text){const x=A.readDetail(sum.date_text+(sum.time_text?' '+sum.time_text:''));if(x.date){it.date=x.date;it.time=it.time||x.time;m.detail.past=x.past;}}
+      if(it.date&&!it.dateEdited){const w=QAdd.when(it.date,it.time);if(w&&!isNaN(w))it.when={iso:w.toISOString(),label:fmtWhen(w),warn:''};}
+      if(!m.detail.end&&sum.end_time_text&&/^\d{1,2}:\d{2}$/.test(sum.end_time_text))m.detail.end=sum.end_time_text;
+    }catch(_){}
+    finish();
+  };
+  const paintPhones=()=>document.querySelectorAll('#chatScroll .ai-phones[data-pid]').forEach(box=>{
+    const m=findAny(box.dataset.pid);if(!m||!m.detail||box.childElementCount)return;
+    (m.detail.phones||[]).forEach(p=>{const a=document.createElement('a');a.className='card-link-chip';a.href='tel:'+p.replace(/[^\d+*#]/g,'');a.textContent='📞 '+p;box.appendChild(a);});
+  });
 
   // ── Pending inbox: texts that could not be sent are retried when the connection returns ──
   let flushing=false;
@@ -12073,7 +12863,8 @@ function maybeShowDailyPopup(){
     }catch(e){paintSettings('❌ אין חיבור לשער העוזר');}
   };
   paintSettings();
-  setTimeout(()=>A.flushPending(),8000);
+  // (F4) No flush on app start: old failed texts were turning into a pile of approval cards on every launch.
+  // They are retried only when the connection comes back ("online"), or from the ממתינים sheet.
 })();
 </script>
 </body>

@@ -62,7 +62,7 @@ export async function runLayer(call, L, deadline, signal, B) {
     a = await attemptOnce(call, L, Math.max(1, Math.min(L.timeoutMs, deadline - Date.now())), signal);
   }
   return { layer: L.id, model: a.model || L.model, status: a.status, valid: a.valid, result: a.result, error: a.valid ? null : a.error || (a.errors || []).join(', ') || 'invalid output',
-    quotaUntil: a.quotaUntil || null, missing: !!a.missing, retryable: !!a.retryable, cancelled: a.error === 'cancelled', retried, latencyMs: Date.now() - t0 };
+    quotaUntil: a.quotaUntil || null, missing: !!a.missing, retryable: !!a.retryable, cancelled: a.error === 'cancelled', retried, latencyMs: Date.now() - t0, tokens: a.tokens || null };
 }
 
 // layers: [{id, ...LAYER}] already filtered (skipped layers removed). call(L, timeoutMs, signal) -> adapter result.
