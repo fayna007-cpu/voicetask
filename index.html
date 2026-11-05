@@ -12679,6 +12679,16 @@ function maybeShowDailyPopup(){
     if(!it.when||!it.when.iso){d.date='';d.time='';}
     if(it.when&&it.when.warn&&(it.date_text||it.time_text))return false;  // a passed bare hour: the card's flip chip handles it
     if(!d.date&&!d.time&&(it.date_text||it.time_text))return false;       // words the parser could not read: the card warns
+    if(!d.date&&!d.time){
+      // The model sometimes leaves the time words in the title ("להתקשר לאמא בערב"): the app's own parser reads
+      // them from the user's text before anything is asked, and they leave the title.
+      const T=T_(),r=T?T.parseHebrewDateTime(String(src).replace(ADD_VERB,''),{now:new Date()}):null;
+      if(r&&r.ok&&!r.ambiguity&&(r.date||r.time)&&/(היום|מחר|מחרתיים|יום|שבוע|שבת|\d|בוקר|צהריים|ערב|לילה|אחה"צ|בעוד)/.test(src)){
+        d.date=r.date||'';d.time=r.time&&/(\d|בוקר|צהריים|ערב|לילה|אחה"צ|בעוד)/.test(src)?r.time:'';
+        const tt=T.parseHebrewDateTime(d.title,{now:new Date()});if(tt&&tt.ok&&tt.title&&tt.title.trim())d.title=tt.title.trim();
+        if(it.when&&!it.when.iso&&d.date){const w=QAdd.when(d.date,d.time);if(w&&!isNaN(w)){it.when={iso:w.toISOString(),label:fmtWhen(w),warn:''};it.date=d.date;it.time=d.time;it.title=d.title;}}
+      }
+    }
     const need=needOf(d,src,false);if(!need)return false;
     ask({draft:d,src,prov,forceTask},need);
     return true;

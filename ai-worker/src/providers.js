@@ -16,7 +16,8 @@ function timeoutSignal(ms, outer) {
   const t = AbortSignal.timeout(ms);
   return outer && AbortSignal.any ? AbortSignal.any([t, outer]) : t;
 }
-const schemaFormat = (strict) => ({ type: 'json_schema', json_schema: { name: 'alfred_reply', strict, schema: CONTRACT_SCHEMA } });
+// L.schema: the per-mode schema chosen in index.js (smaller = fewer input tokens); the full contract otherwise.
+const schemaFormat = (strict, L) => ({ type: 'json_schema', json_schema: { name: 'alfred_reply', strict, schema: (L && L.schema) || CONTRACT_SCHEMA } });
 
 // OpenAI-compatible chat completions (Groq, OpenRouter).
 async function chatCompletions(url, key, body, timeoutMs, outer, extraHeaders = {}) {
@@ -44,7 +45,7 @@ export async function callGroq(env, messages, L, timeoutMs, outer) {
   if (!env.GROQ_API_KEY) return { ok: false, status: 0, model: L.model, error: 'missing GROQ_API_KEY', latencyMs: 0, retryable: false };
   const body = {
     model: L.model, messages, temperature: 0.2, max_completion_tokens: L.maxTokens,
-    response_format: L.mode === 'json_schema' ? schemaFormat(false) : { type: 'json_object' },
+    response_format: L.mode === 'json_schema' ? schemaFormat(false, L) : { type: 'json_object' },
     ...(L.extra || {}),
   };
   const r = await chatCompletions('https://api.groq.com/openai/v1/chat/completions', env.GROQ_API_KEY, body, timeoutMs, outer);
@@ -62,7 +63,7 @@ export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
   if (!env.OPENROUTER_API_KEY) return { ok: false, status: 0, model: L.model, error: 'missing OPENROUTER_API_KEY', latencyMs: 0, retryable: false };
   const body = {
     model: L.model, messages, temperature: 0.2, max_tokens: L.maxTokens,      // ONE model per call, no `models` array
-    response_format: L.mode === 'json_schema' ? schemaFormat(false) : { type: 'json_object' },
+    response_format: L.mode === 'json_schema' ? schemaFormat(false, L) : { type: 'json_object' },
     provider: { data_collection: 'deny', require_parameters: true },
     ...(L.extra || {}),
   };
@@ -79,7 +80,7 @@ export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
 
 export async function callWorkersAI(env, messages, L, timeoutMs) {
   const t0 = Date.now();
-  const response_format = L.mode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: CONTRACT_SCHEMA };
+  const response_format = L.mode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: L.schema || CONTRACT_SCHEMA };
   let timer;
   try {
     const out = await Promise.race([

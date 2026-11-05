@@ -68,6 +68,13 @@ export const CONTRACT_SCHEMA = {
   },
 };
 
+// The schema sent with each call costs input tokens: an assist call never needs `summary`, a summarize call
+// needs only `summary` (R12). Validation still uses the full contract above.
+const { summary: _sum, ...assistProps } = CONTRACT_SCHEMA.properties;
+export const ASSIST_SCHEMA = { ...CONTRACT_SCHEMA, properties: assistProps };
+export const SUMMARY_SCHEMA = { type: 'object', additionalProperties: false, required: ['intent', 'summary'],
+  properties: { intent: { type: 'string', enum: ['summarize'] }, reply: str(LIMITS.reply), summary: CONTRACT_SCHEMA.properties.summary } };
+
 // Model text -> object. Tolerates ```json fences and leading prose (json_object-mode models),
 // but the result must still pass validateReply().
 export function parseModelJson(text) {

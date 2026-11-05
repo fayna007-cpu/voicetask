@@ -2,7 +2,7 @@
 // Logs: status / layer / model / latency only. Never message content, never keys.
 import { LAYERS, CHAIN, BUDGET } from '../config/models.js';
 import { buildMessages } from './prompt.js';
-import { enforceMode } from './contract.js';
+import { enforceMode, ASSIST_SCHEMA, SUMMARY_SCHEMA } from './contract.js';
 import { callLayer } from './providers.js';
 import { runChain, runLayer, loadStates, skipInfo, planWrites, capCheck } from './chain.js';
 
@@ -80,7 +80,7 @@ async function assist(request, env, ctx, h) {
   const layers = all.filter((L) => !skipInfo(L, states, now));
   const messages = buildMessages({ ...input, now: new Date() });
   // summarize (R9): a short structured summary, so a smaller output cap per layer
-  const run = input.mode === 'summarize' ? layers.map((L) => ({ ...L, maxTokens: Math.min(L.maxTokens, SUMMARY_MAX_TOKENS) })) : layers;
+  const run = input.mode === 'summarize' ? layers.map((L) => ({ ...L, maxTokens: Math.min(L.maxTokens, SUMMARY_MAX_TOKENS), schema: SUMMARY_SCHEMA })) : layers.map((L) => ({ ...L, schema: ASSIST_SCHEMA }));
   const out = await runChain(run, (L, t, sig) => callLayer(env, messages, L, t, sig), BUDGET);
   persistStates(env, ctx, states, out.attempts);
   const attempts = out.attempts.map((a) => ({ layer: a.layer, model: a.model, status: a.status, ms: a.latencyMs, valid: a.valid, retried: a.retried, error: a.valid ? undefined : a.error, tokens: a.tokens || undefined }));
