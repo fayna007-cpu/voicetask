@@ -16,8 +16,7 @@ function timeoutSignal(ms, outer) {
   const t = AbortSignal.timeout(ms);
   return outer && AbortSignal.any ? AbortSignal.any([t, outer]) : t;
 }
-// L.schema: the per-mode schema chosen in index.js (smaller = fewer input tokens); the full contract otherwise.
-const schemaFormat = (strict, L) => ({ type: 'json_schema', json_schema: { name: 'alfred_reply', strict, schema: (L && L.schema) || CONTRACT_SCHEMA } });
+const schemaFormat = (strict) => ({ type: 'json_schema', json_schema: { name: 'alfred_reply', strict, schema: CONTRACT_SCHEMA } });
 
 // OpenAI-compatible chat completions (Groq, OpenRouter).
 async function chatCompletions(url, key, body, timeoutMs, outer, extraHeaders = {}) {
@@ -33,8 +32,7 @@ async function chatCompletions(url, key, body, timeoutMs, outer, extraHeaders = 
     const content = j.choices?.[0]?.message?.content ?? null;
     const ok = r.ok && !j.error && typeof content === 'string' && content.trim() !== '';
     const error = j.error ? clip(j.error.message || JSON.stringify(j.error)) : ok ? null : r.ok ? 'empty reply' : 'HTTP ' + r.status;
-    const tokens = j.usage ? { in: j.usage.prompt_tokens || 0, out: j.usage.completion_tokens || 0 } : null;   // counts only (R12)
-    return { ok, status: r.status, model: j.model || body.model, content, error, latencyMs: Date.now() - t0, retryable: r.status >= 500, headers: r.headers, tokens };
+    return { ok, status: r.status, model: j.model || body.model, content, error, latencyMs: Date.now() - t0, retryable: r.status >= 500, headers: r.headers };
   } catch (e) {
     const aborted = e.name === 'AbortError' && outer && outer.aborted;
     return { ok: false, status: 0, model: body.model, content: null, error: aborted ? 'cancelled' : e.name === 'TimeoutError' || e.name === 'AbortError' ? 'timeout' : clip(e.message), latencyMs: Date.now() - t0, retryable: !aborted };
@@ -45,7 +43,7 @@ export async function callGroq(env, messages, L, timeoutMs, outer) {
   if (!env.GROQ_API_KEY) return { ok: false, status: 0, model: L.model, error: 'missing GROQ_API_KEY', latencyMs: 0, retryable: false };
   const body = {
     model: L.model, messages, temperature: 0.2, max_completion_tokens: L.maxTokens,
-    response_format: L.mode === 'json_schema' ? schemaFormat(false, L) : { type: 'json_object' },
+    response_format: L.mode === 'json_schema' ? schemaFormat(false) : { type: 'json_object' },
     ...(L.extra || {}),
   };
   const r = await chatCompletions('https://api.groq.com/openai/v1/chat/completions', env.GROQ_API_KEY, body, timeoutMs, outer);
@@ -63,7 +61,7 @@ export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
   if (!env.OPENROUTER_API_KEY) return { ok: false, status: 0, model: L.model, error: 'missing OPENROUTER_API_KEY', latencyMs: 0, retryable: false };
   const body = {
     model: L.model, messages, temperature: 0.2, max_tokens: L.maxTokens,      // ONE model per call, no `models` array
-    response_format: L.mode === 'json_schema' ? schemaFormat(false, L) : { type: 'json_object' },
+    response_format: L.mode === 'json_schema' ? schemaFormat(false) : { type: 'json_object' },
     provider: { data_collection: 'deny', require_parameters: true },
     ...(L.extra || {}),
   };
@@ -80,7 +78,7 @@ export async function callOpenRouter(env, messages, L, timeoutMs, outer) {
 
 export async function callWorkersAI(env, messages, L, timeoutMs) {
   const t0 = Date.now();
-  const response_format = L.mode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: L.schema || CONTRACT_SCHEMA };
+  const response_format = L.mode === 'json_object' ? { type: 'json_object' } : { type: 'json_schema', json_schema: CONTRACT_SCHEMA };
   let timer;
   try {
     const out = await Promise.race([

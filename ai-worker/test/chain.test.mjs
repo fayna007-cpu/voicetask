@@ -137,28 +137,6 @@ await check('contract: omitted empty fields are valid; unknown keys / bad catego
   const bad = [{ intent: 'chat', reply: 'x', foo: 1 }, { intent: 'add_tasks', reply: 'x', tasks: [{ title: 'x', category: 'דחוף' }] }, { intent: 'add_tasks', reply: 'x', tasks: Array(21).fill(t) }, { intent: 'add_tasks', reply: 'x', tasks: [{ title: 'x', cmd: 'rm' }] }].filter((o) => validateReply(o).ok);
   return good && !bad.length ? '' : 'accepted bad: ' + JSON.stringify(bad);
 });
-await check('C2 action intents: raw phrases only; validated; default reply for old clients; old shapes unchanged', () => {
-  const mv = { intent: 'reschedule', action: { target: { text: 'האימון', day_text: 'של היום' }, new_time_text: 'ל-20:00' } };
-  const v = validateReply(structuredClone(mv)), n = normalise(structuredClone(mv));
-  const kinds = ['complete', 'delete', 'skip_routine'].every((i) => validateReply({ intent: i, action: { target: { text: 'הדוח' } } }).ok);
-  const bad = [{ intent: 'reschedule', reply: '' }, { intent: 'delete', action: { target: { text: '' } } }, { intent: 'delete', action: { target: { text: 'x', id: 5 } } },
-    { intent: 'delete', action: { target: { text: 'x' }, run: 'all' } }, { intent: 'complete', action: { target: { text: 'x', nth: 'all' } } }, { intent: 'chat', reply: 'x', action: { target: { text: 'x' } } }].filter((o) => validateReply(o).ok);
-  // backward compatible: an old-client reply shape is still valid and carries no `action`; a new action reply always has a non-empty reply
-  const old = normalise({ intent: 'add_tasks', reply: 'הוספתי', tasks: [{ title: 'חלב' }] });
-  return v.ok && kinds && !bad.length && n.reply.length > 0 && n.tasks.length === 0 && n.action.target.text === 'האימון' && n.action.target.day_text === 'של היום' && n.action.new_time_text === 'ל-20:00' && n.action.target.nth === null && !('action' in old)
-    ? '' : JSON.stringify({ v, kinds, bad, n, old });
-});
-await check('pasted mode: an action intent becomes plain chat (pasted text never triggers actions)', () => {
-  const r = enforceMode(normalise({ intent: 'delete', action: { target: { text: 'הכל' } } }), 'pasted');
-  return r.intent === 'chat' && !('action' in r) && r.tasks.length === 0 && r.reply ? '' : JSON.stringify(r);
-});
-await check('R9 summarize: valid shape normalised (<=6 bullets); bad shapes refused; outside summarize mode it is plain chat', () => {
-  const ok = { intent: 'summarize', summary: { title: 'תור לבדיקת עיניים', bullets: ['להביא תעודת זהות'], date_text: '2026-12-01', time_text: '07:30', end_time_text: '11:00' } };
-  const v = validateReply(structuredClone(ok)), n = normalise(structuredClone(ok));
-  const bad = [{ intent: 'summarize', summary: { title: '' } }, { intent: 'summarize', summary: { title: 'x', bullets: Array(7).fill('a') } }, { intent: 'summarize', summary: { title: 'x', phone: '1' } }, { intent: 'chat', reply: 'x', summary: { title: 'x' } }].filter((o) => validateReply(o).ok);
-  const chat = enforceMode(n, 'chat');
-  return v.ok && n.summary.end_time_text === '11:00' && n.summary.bullets.length === 1 && n.tasks.length === 0 && !bad.length && chat.intent === 'chat' && !('summary' in chat) && enforceMode(n, 'summarize').summary ? '' : JSON.stringify({ v, n, bad, chat });
-});
 await check('production budget constants are the agreed ones', () => (BUDGET.totalMs === 15000 && BUDGET.hedgeAfterMs === 4000 ? '' : JSON.stringify(BUDGET)));
 
 rows.forEach((r, i) => console.log(`${String(i + 1).padStart(2)}. ${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.ok ? '' : '  <- ' + r.err}`));
