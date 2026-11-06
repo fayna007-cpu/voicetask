@@ -769,8 +769,9 @@
 
       <div class="rfield" id="rVerbalField" style="display:none">
         <div class="rform-lbl">תאר את השגרה</div>
-        <textarea class="rfi-verbal" id="rVerbal" placeholder="למשל: 3 פעמים בשבוע, ב׳ ג׳ ד׳ בערב ושישי בבוקר, יום מנוחה בינהם..."></textarea>
+        <textarea class="rfi-verbal" id="rVerbal" oninput="rVerbalLive()" placeholder="למשל: 3 פעמים בשבוע, ב׳ ג׳ ד׳ בערב ושישי בבוקר, יום מנוחה בינהם..."></textarea>
         <div class="rform-hint">תיאור חופשי — המערכת תייצר את הסלוטים אוטומטית</div>
+        <div class="rform-hint" id="rVerbalNote" hidden></div>
       </div>
 
       <div id="rManualFields" style="display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box">
@@ -4176,20 +4177,24 @@ function renderRoutineList(){
   const wk=getWeekKey();
   el.innerHTML=routines.map(r=>{
     const name=r.name||r.text||'';
-    const prefText=r.preferredDays?.length?r.preferredDays.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES[d]).join('+'):'כל יום';
+    // D2: count and days are DERIVED from the routine's spec (read-only: nothing is written here).
+    // No chosen days = any day ("ימים גמישים"), not every day.
+    const dv=RSchedule.derive(RSchedule.normalizeRoutine(r));
+    const prefText=dv.daysLabel||'ימים גמישים';
     const win=WIN_LABEL[r.timeWindow]||'בוקר';
-    const scheduled=r.scheduledWeeks?.[wk]||[];
-    const schedCount=scheduled.length;
+    // "מתוזמן X" = the real number of upcoming, not-skipped instances (all weeks, not only this week's key)
+    const today0=new Date();today0.setHours(0,0,0,0);
+    const schedCount=Object.values(r.scheduledWeeks||{}).flat().map(it=>typeof it==='string'?it:it&&it.dt).filter(dt=>dt&&new Date(dt)>=today0&&!(r.skippedDates||[]).includes(dt)).length;
     const prevWk=getPrevWeekKey();
     const hasPrevWeek=(r.scheduledWeeks?.[prevWk]||[]).length>0;
     const schedBtn=schedCount
-      ?`<span class="routine-sched-done">✓ מתוזמן ${schedCount} פגישות</span><button class="routine-clear-btn" onclick="clearRoutineEvents(${r.id})">🗑 נקה</button>`
+      ?`<span class="routine-sched-done">✓ מתוזמן ${RSchedule.plural(schedCount,'meeting')}</span><button class="routine-clear-btn" onclick="clearRoutineEvents(${r.id})">🗑 נקה</button>`
       :(r.enabled?`<button class="routine-sched-btn" onclick="openScheduleSheet(${r.id})">⚡ תזמן</button>${hasPrevWeek?`<button class="routine-copy-btn" onclick="copyLastWeek(${r.id})">⟳ שבוע שעבר</button>`:''}`:``);
     return`<div class="routine-item">
   <label class="rtoggle"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRoutineEnabled(${r.id},this.checked)"><span class="rtoggle-sl"></span></label>
   <div class="routine-item-body" onclick="editRoutine(${r.id})">
     <div class="routine-item-name">${esc(name)}</div>
-    <div class="routine-item-meta">${r.timesPerWeek||3}×/שבוע · ${durLabel(r.duration||60)} · ${win} · ${prefText}</div>
+    <div class="routine-item-meta">${dv.perWeek}×/שבוע · ${durLabel(r.duration||60)} · ${win} · ${prefText}</div>
     ${r.notes?`<div class="routine-item-meta">📝 ${esc(r.notes)}</div>`:''}
   </div>
   <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;align-items:center">
@@ -4204,38 +4209,62 @@ function renderRoutineList(){
 function refreshScheduleSlots(){
   const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
   const pickerVal=document.getElementById('schedStartDate').value;
-  let startDate=null;
-  if(pickerVal){const[y,m,d]=pickerVal.split('-').map(Number);startDate=new Date(y,m-1,d);}
-  const slots=generateWeekSlots(r,0,startDate);
+  // D2: "התחל מ" = the next N occurrences of the routine's pattern from that day (passed slots skipped)
+  const slots=generateWeekSlots(r,0,pickerVal||calYMD(new Date()));
   schedulingSlots=slots.map(dt=>({dt,selected:true}));
+  renderScheduleSlots();
+}
+function renderScheduleSlots(){
+  const r=routines.find(x=>x.id===schedulingRoutineId);if(!r)return;
+  schedulingSlots.sort((a,b)=>new Date(a.dt)-new Date(b.dt));
   const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
   const MONTH_NAMES=['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
+  const fmt=x=>`${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`;
   const list=document.getElementById('scheduleSlotsList');
-  list.innerHTML=slots.map((dt,i)=>{
-    const d=new Date(dt);
+  list.innerHTML=schedulingSlots.map((s,i)=>{
+    const d=new Date(s.dt);
     const endD=new Date(d.getTime()+(r.duration||60)*60000);
-    const fmt=x=>`${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`;
     const dateLabel=`${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
-    return`<div class="slot-card on" id="slot_${i}" data-idx="${i}" onclick="toggleSlot(${i})">
+    return`<div class="slot-card${s.selected?' on':''}" id="slot_${i}" data-idx="${i}" onclick="toggleSlot(${i})">
   <div class="slot-check">✓</div>
   <div class="slot-info">
     <div class="slot-day">${dateLabel}</div>
     <div class="slot-time-row">
       <span class="slot-time" id="slot_time_lbl_${i}">${fmt(d)} – ${fmt(endD)} (${durLabel(r.duration||60)})</span>
-      <input type="time" class="slot-time-input" id="slot_time_input_${i}" value="${fmt(d)}" onclick="event.stopPropagation()" oninput="changeSlotTime(${i},this.value)"/>
     </div>
-    <div class="slot-long-hint">לחיצה ארוכה לשינוי שעה</div>
+    <div class="slot-long-hint">לחיצה ארוכה לעריכה</div>
+    <div class="card-edit" id="slot_edit_${i}" onclick="event.stopPropagation()">
+      <input class="edit-dt" id="slot_dt_${i}" type="datetime-local" value="${calYMD(d)}T${fmt(d)}">
+      <div class="edit-actions">
+        <button class="edit-save" onclick="saveSlotEdit(${i})">שמור</button>
+        <button class="edit-cancel" onclick="removeSlot(${i})">הסר מופע</button>
+        <button class="edit-cancel" onclick="closeSlotEdit(${i})">בטל</button>
+      </div>
+    </div>
   </div>
 </div>`;
-  }).join('');
-  if(!slots.length)list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים.<br>בחר תאריך עתידי.</div>`;
+  }).join('')+`<button class="pend-paste-btn" onclick="addSlot()">＋ הוסף מופע</button>`;
+  if(!schedulingSlots.length)list.innerHTML=`<div style="text-align:center;padding:32px;color:var(--muted)">אין ימים פנויים.<br>בחר תאריך עתידי.</div><button class="pend-paste-btn" onclick="addSlot()">＋ הוסף מופע</button>`;
   initSlotLongPress();
+}
+// D2 instance editor (long-press): date AND time, remove, add — on the proposals, before anything is saved
+function closeSlotEdit(i){document.getElementById('slot_edit_'+i)?.classList.remove('on');}
+function saveSlotEdit(i){
+  const v=document.getElementById('slot_dt_'+i)?.value;if(!v||!schedulingSlots[i])return;
+  schedulingSlots[i].dt=new Date(v).toISOString();schedulingSlots[i].selected=true;renderScheduleSlots();
+}
+function removeSlot(i){schedulingSlots.splice(i,1);renderScheduleSlots();}
+function addSlot(){
+  const last=schedulingSlots[schedulingSlots.length-1];
+  const d=last?new Date(last.dt):new Date();d.setDate(d.getDate()+1);if(!last)d.setHours(18,0,0,0);
+  schedulingSlots.push({dt:d.toISOString(),selected:true});renderScheduleSlots();
+  const i=schedulingSlots.findIndex(s=>s.dt===d.toISOString());if(i>-1)showSlotTimeEdit(i);
 }
 function openScheduleSheet(routineId){
   const r=routines.find(x=>x.id===routineId);if(!r)return;
   schedulingRoutineId=routineId;
   document.getElementById('scheduleSheetTitle').textContent=`תזמן: ${esc(r.name||r.text||'')}`;
-  document.getElementById('schedStartDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('schedStartDate').value=calYMD(new Date());   // local day (toISOString gave the UTC day)
   refreshScheduleSlots();
   ['routineListSheet','routineFormSheet'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
   document.getElementById('routineOverlay').classList.add('on');
@@ -4251,15 +4280,34 @@ async function confirmScheduling(){
   if(!chosen.length){toast('לא נבחרו פגישות');return;}
   document.getElementById('scheduleConfirmBtn').textContent='מוסיף...';
   document.getElementById('scheduleConfirmBtn').disabled=true;
+  // D2 idempotent: adding the same period again replaces ONLY this routine's own instances in that period (and the
+  // events the app created for them: by stored id, then by this routine's vt_routine_id marker). Never another
+  // event. Completed instances are kept. Instances outside the period are untouched.
+  if(!r.scheduledWeeks)r.scheduledWeeks={};
+  chosen.sort((a,b)=>new Date(a.dt)-new Date(b.dt));
+  const p0=new Date(chosen[0].dt);p0.setHours(0,0,0,0);
+  const p1=new Date(chosen[chosen.length-1].dt);p1.setHours(23,59,59,999);
+  const done=new Set(r.completedDates||[]);
+  const dtOf=it=>typeof it==='string'?it:it&&it.dt;
+  const replaced=[];let keptInPeriod=0;
+  Object.keys(r.scheduledWeeks).forEach(wk=>{
+    r.scheduledWeeks[wk]=(r.scheduledWeeks[wk]||[]).filter(it=>{
+      const dt=dtOf(it),d=dt&&new Date(dt);
+      if(!d||d<p0||d>p1)return true;
+      if(done.has(dt)){keptInPeriod++;return true;}
+      replaced.push(it);return false;
+    });
+  });
+  for(const it of replaced)if(it&&it.eventId)await deleteCalendarEvent(it.eventId);
+  if(!keptInPeriod)await purgeCalendarEventsByMarker('vt_routine_id:'+r.id,p0,p1).catch(()=>0);   // strays of THIS routine only
   const created=[];
   for(const s of chosen){
+    if(done.has(s.dt))continue;                                  // a completed instance already sits there
     const ev=await createCalendarEvent(r,s.dt);
-    created.push({dt:s.dt,eventId:ev?.id||null});
+    const it={dt:s.dt,eventId:ev?.id||null};created.push(it);
+    const wk=getWeekKey(new Date(s.dt));(r.scheduledWeeks[wk]=r.scheduledWeeks[wk]||[]).push(it);
   }
-  const wk=getWeekKey();
-  if(!r.scheduledWeeks)r.scheduledWeeks={};
-  r.scheduledWeeks[wk]=created;
-  saveRoutines();render();
+  saveRoutines();render();scheduleSmartPushNotifs();
   // Send email notification via n8n
   if(gAuth?.email&&created.length){
     const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -4272,7 +4320,7 @@ async function confirmScheduling(){
   }
   document.getElementById('scheduleConfirmBtn').textContent='הוסף לגוגל קאלנדר ✓';
   document.getElementById('scheduleConfirmBtn').disabled=false;
-  toast(`✓ ${created.length} אירועים תוזמנו`);
+  toast(`✓ ${RSchedule.plural(created.length,'event')} ${created.length===1?'תוזמן':'תוזמנו'}`);
   setTimeout(()=>closeScheduleSheet(),800);
 }
 
@@ -4322,13 +4370,22 @@ function openRoutineForm(prefill,editId){
   document.querySelectorAll('.rwindow-btn').forEach(b=>b.classList.toggle('on',b.dataset.window===tw));
   document.getElementById('rSpecificTimeField').style.display=tw==='specific'?'':'none';
   // schedule mode
+  document.getElementById('rVerbal').value=prefill?.verbCondition||'';   // before the mode: the live parse reads it
   rScheduleMode=prefill?.scheduleMode||'manual';
-  selectSchedMode(rScheduleMode);
-  document.getElementById('rVerbal').value=prefill?.verbCondition||'';
+  selectSchedMode(rScheduleMode);                                  // a verbal routine opens with ITS derived count
   document.getElementById('routineListSheet').classList.remove('on');
   document.getElementById('routineFormSheet').classList.add('on');
 }
 
+// D2: in verbal mode the description is the source of truth: the stepper shows ITS count, live, and is the value
+// only when the description cannot be read. The note (text only) appears for a total/parts conflict or unreadable text.
+function rVerbalLive(){
+  const t=(document.getElementById('rVerbal')?.value||'').trim();
+  const p=t&&rScheduleMode==='verbal'?RSchedule.parseRoutineDescription(t):null;
+  if(p&&p.ok){rFreqCount=RSchedule.perWeek(p);document.getElementById('rFreqDisplay').textContent=rFreqCount;}
+  const msg=!p?'':p.ok?p.note:'לא הצלחתי להבין את התיאור — יישמר לפי "כמה פעמים בשבוע"';
+  const n=document.getElementById('rVerbalNote');if(n){n.textContent=msg;n.hidden=!msg;}
+}
 function adjFreq(delta){rFreqCount=Math.max(1,Math.min(7,rFreqCount+delta));document.getElementById('rFreqDisplay').textContent=rFreqCount;}
 function toggleDay(btn){btn.classList.toggle('on');}
 function selectWindow(btn){
@@ -5090,10 +5147,11 @@ function scheduleCustomNotifs(){
 // ── Slot long-press for time edit ──────────────────────────────────────────────
 function initSlotLongPress(){
   const list=document.getElementById('scheduleSlotsList');
+  if(list._lp)return;list._lp=true;                               // the list re-renders: attach the listeners once
   let pressTimer=null;
   list.addEventListener('touchstart',e=>{
     const card=e.target.closest('.slot-card');if(!card)return;
-    if(e.target.closest('.slot-time-input'))return;
+    if(e.target.closest('.slot-time-input,.card-edit'))return;
     const idx=+card.dataset.idx;
     pressTimer=setTimeout(()=>{showSlotTimeEdit(idx);vibrate&&vibrate([30,10,30]);},500);
   },{passive:true});
@@ -5102,14 +5160,14 @@ function initSlotLongPress(){
   // Desktop long-click fallback
   list.addEventListener('mousedown',e=>{
     const card=e.target.closest('.slot-card');if(!card)return;
-    if(e.target.closest('.slot-time-input'))return;
+    if(e.target.closest('.slot-time-input,.card-edit'))return;
     pressTimer=setTimeout(()=>showSlotTimeEdit(+card.dataset.idx),600);
   });
   list.addEventListener('mouseup',()=>clearTimeout(pressTimer));
 }
 function showSlotTimeEdit(i){
-  document.querySelectorAll('.slot-time-input').forEach((inp,j)=>{inp.style.display=j===i?'inline-block':'none';});
-  const inp=document.getElementById('slot_time_input_'+i);if(inp)inp.focus();
+  // D2: long-press opens the instance editor (date AND time, remove), not only a time field
+  document.querySelectorAll('#scheduleSlotsList .card-edit').forEach((el,j)=>el.classList.toggle('on',j===i));
 }
 function changeSlotTime(i,val){
   if(!val)return;
@@ -5156,6 +5214,7 @@ function selectSchedMode(mode){
   const mf=document.getElementById('rManualFields');
   if(vf)vf.style.display=mode==='verbal'?'':'none';
   if(mf)mf.style.display=mode==='manual'?'':'none';
+  if(typeof rVerbalLive==='function')rVerbalLive();
 }
 
 // ── Verbal schedule parser ─────────────────────────────────────────────────────
