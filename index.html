@@ -13,6 +13,7 @@
 <meta name="description" content="האסיסטנט האישי שלך — משימות, חשבונות, שגרות ויומן במקום אחד">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="hebrew-time.js"></script>
+<script src="routine-schedule.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
@@ -4074,6 +4075,14 @@ function windowStartHour(r){
 }
 
 function generateWeekSlots(routine,weekOffset=0,startDate=null){
+  // D2: ONE generator (routine-schedule.js). The proposals are the NEXT N occurrences of the routine's weekly
+  // pattern from the start day (today, or the "התחל מ" date; week offset 1 = from next Sunday).
+  if(window.RSchedule){
+    const now=new Date();let start;
+    if(startDate)start=typeof startDate==='string'?startDate:calYMD(startDate);
+    else{const d=new Date(now);if(weekOffset)d.setDate(d.getDate()-d.getDay()+7*weekOffset);start=calYMD(d);}
+    return RSchedule.generateProposals(RSchedule.normalizeRoutine(routine),start,now).map(p=>p.iso);
+  }
   const now=new Date();
   // Parse date picker value as local midnight (avoid UTC shift)
   let ref;
@@ -4336,12 +4345,20 @@ function saveRoutine(){
   const existing=editingRoutineId?routines.find(r=>r.id===editingRoutineId):null;
   const verbCondition=rScheduleMode==='verbal'?document.getElementById('rVerbal').value.trim():'';
   const verbParsed=rScheduleMode==='verbal'&&verbCondition?parseVerbSchedule(verbCondition):null;
+  // D2 single source of truth: the spec. Verbal = the description's slots; manual = the form's days + stepper.
+  // Days come ONLY from this form's day grid (the notification form has .day-btn too -> duplicated days).
+  const formDays=RSchedule.uniqDays([...document.querySelectorAll('#rManualFields .day-btn.on')].map(b=>+b.dataset.day));
+  const parsedSpec=verbCondition?RSchedule.parseRoutineDescription(verbCondition):null;
+  const spec=parsedSpec&&parsedSpec.ok?parsedSpec:null;
+  const manualSpec=RSchedule.specFromManual({timesPerWeek:rFreqCount,preferredDays:formDays,timeWindow:document.querySelector('.rwindow-btn.on')?.dataset.window||'morning',specificTime:document.getElementById('rSpecificTime').value});
+  const derived=RSchedule.derive(spec||manualSpec);
   const routine={
     id:editingRoutineId||Date.now(),
     name,
-    timesPerWeek:verbParsed?.timesPerWeek||rFreqCount,
+    timesPerWeek:derived.perWeek,                                   // derived from the spec, never typed twice
     duration:verbParsed?.duration||+document.getElementById('rDuration').value,
-    preferredDays:[...document.querySelectorAll('.day-btn.on')].map(b=>+b.dataset.day),
+    preferredDays:spec?derived.days:formDays,
+    spec:spec||undefined,
     timeWindow:document.querySelector('.rwindow-btn.on')?.dataset.window||'morning',
     specificTime:document.getElementById('rSpecificTime').value,
     weeklyReminderDay:+document.getElementById('rWeekReminderDay').value,
@@ -4365,6 +4382,11 @@ function saveRoutine(){
   editingRoutineId=null;
   saveRoutines();scheduleWeeklyReminderNotifs();render();
   try{window.dispatchEvent(new CustomEvent('vt-routine-saved',{detail:{id:routine.id,isNew:!existing}}));}catch(_){}
+  if(verbCondition&&!spec&&window.AlfredAI&&AlfredAI.routineFallback)AlfredAI.routineFallback(verbCondition).then(p=>{
+    const r=routines.find(x=>x.id===routine.id);if(!p||!r||r.verbCondition!==verbCondition||r.spec)return;
+    const d=RSchedule.derive(p);r.spec=p;r.timesPerWeek=d.perWeek;r.preferredDays=d.days;
+    saveRoutines();render();try{renderRoutineList();}catch(_){}
+  });
   if(rScheduleMode==='verbal'){
     setTimeout(()=>openScheduleSheet(routine.id),80);
     toast(existing?'שגרה עודכנה — בחר מועדים 📅':'שגרה נוספה — בחר מועדים 📅');
@@ -12588,6 +12610,20 @@ function maybeShowDailyPopup(){
     const m=findAny(id);if(!m||m.kind!=='action'||m.state!=='done'||!live(m)||m.busy)return;
     m.busy=true;
     try{if(await EXEC[m.verb](m,true))m.state='undone';}finally{m.busy=false;saveChatHistory();renderChatMessages();}
+  };
+
+  // ── D2: a routine description the code could not read -> the Worker's add_routine intent (raw phrases only,
+  // schema-validated by the Worker); its phrase goes through the SAME parser. The model never picks days. ──
+  A.routineFallback=async function(text){
+    try{
+      const map=[];
+      const r=await fetch(AI_GATEWAY+'/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask('תוסיף שגרה: '+String(text).slice(0,300),map),mode:'tasks',history:[],hours:{start:'08:00',end:'22:00'}}),signal:AbortSignal.timeout(TIMEOUT_MS)});
+      const j=await r.json().catch(()=>null);
+      const it=j&&j.ok&&j.result&&j.result.intent==='add_routine'&&Array.isArray(j.result.tasks)&&j.result.tasks[0];
+      if(!it)return null;
+      const p=RSchedule.parseRoutineDescription(unmask([it.date_text,it.time_text].filter(Boolean).join(' '),map));
+      return p.ok?p:null;
+    }catch(_){return null;}
   };
 
   // ── R8 reply-quote strip: the user's message an answer refers to (clarify / result / error). textContent only. ──
