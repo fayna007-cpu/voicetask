@@ -2,12 +2,13 @@
 // Logs: status / layer / model / latency only. Never message content, never keys.
 import { LAYERS, CHAIN, BUDGET } from '../config/models.js';
 import { buildMessages } from './prompt.js';
-import { enforceMode } from './contract.js';
+import { enforceMode, ASSIST_SCHEMA, SUMMARY_SCHEMA } from './contract.js';
 import { callLayer } from './providers.js';
 import { runChain, runLayer, loadStates, skipInfo, planWrites, capCheck } from './chain.js';
 
 const VERSION = 'c1.1';
-const MODES = ['chat', 'tasks', 'pasted'];
+const MODES = ['chat', 'tasks', 'pasted', 'summarize'];
+const SUMMARY_MAX_TOKENS = 400;
 
 function originAllowed(origin, env) {
   if (!origin) return false;
@@ -78,9 +79,11 @@ async function assist(request, env, ctx, h) {
   const skipped = all.map((L) => skipInfo(L, states, now)).filter(Boolean);
   const layers = all.filter((L) => !skipInfo(L, states, now));
   const messages = buildMessages({ ...input, now: new Date() });
-  const out = await runChain(layers, (L, t, sig) => callLayer(env, messages, L, t, sig), BUDGET);
+  // summarize (R9): a short structured summary, so a smaller output cap per layer
+  const run = input.mode === 'summarize' ? layers.map((L) => ({ ...L, maxTokens: Math.min(L.maxTokens, SUMMARY_MAX_TOKENS), schema: SUMMARY_SCHEMA })) : layers.map((L) => ({ ...L, schema: ASSIST_SCHEMA }));
+  const out = await runChain(run, (L, t, sig) => callLayer(env, messages, L, t, sig), BUDGET);
   persistStates(env, ctx, states, out.attempts);
-  const attempts = out.attempts.map((a) => ({ layer: a.layer, model: a.model, status: a.status, ms: a.latencyMs, valid: a.valid, retried: a.retried, error: a.valid ? undefined : a.error }));
+  const attempts = out.attempts.map((a) => ({ layer: a.layer, model: a.model, status: a.status, ms: a.latencyMs, valid: a.valid, retried: a.retried, error: a.valid ? undefined : a.error, tokens: a.tokens || undefined }));
   logLine({ t: 'assist', ok: out.ok, layer: out.layer || null, ms: out.totalMs, attempts: attempts.map((a) => `${a.layer}:${a.valid ? 'ok' : a.status || a.error}`) });
   const usage = { used: cap.used, cap: cap.cap }, missing = missingList(all, states);
   if (!out.ok) return json({ ok: false, degraded: true, error: out.error, message: 'העוזר לא זמין כרגע. ההודעה שלך נשמרה.', usage, attempts, skipped, missing }, 200, h);
