@@ -72,6 +72,27 @@ for (const q of ['"', '״', '“', '”', '″']) {
 for (const a of ["'", '’', '׳']) {
   check(`apostrophes: "ב${a} ו-ד${a} בערב" (U+${a.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) -> Mon + Wed 18:00`, () => { const p = R.parseRoutineDescription(`ב${a} ו-ד${a} בערב`); return pat(p) === '1@18:00,3@18:00' ? '' : JSON.stringify(p); });
 }
+// D3: dates that already have an instance of THIS routine are skipped; N NEW proposals; never two on one day.
+const LEGACY = R.normalizeRoutine({ timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 } });   // legacy-shaped corrupted record
+const FRI9 = at('2026-11-06T09:00:00+02:00'), SAT9 = at('2026-11-07T09:00:00+02:00');
+const D3 = [
+  ['(a) Fri 6 09:00, existing Fri 6 10:00, start today', '2026-11-06', FRI9, ['2026-11-06T08:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(b) the same, start Sun 8', '2026-11-08', FRI9, ['2026-11-06T08:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(c) Sat 7 09:00, existing manual Sat 7 14:00', '2026-11-07', SAT9, ['2026-11-07T12:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(d) existing Mon 9 + Wed 11', '2026-11-07', SAT9, ['2026-11-09T16:00:00.000Z', '2026-11-11T16:00:00.000Z'], 'Fri 13 13:00, Mon 16 18:00, Wed 18 18:00'],
+  ['(e) start Tue 10', '2026-11-10', SAT9, [], 'Wed 11 18:00, Fri 13 13:00, Mon 16 18:00'],
+  ['(f) no existing instance (as before)', '2026-11-06', FRI9, [], 'Fri 06 13:00, Mon 09 18:00, Wed 11 18:00'],
+  ['(g) an existing COMPLETED/passed instance on a pattern day also blocks that day', '2026-11-08', SAT9, ['2026-11-09T05:00:00.000Z'], 'Wed 11 18:00, Fri 13 13:00, Mon 16 18:00'],
+];
+for (const [name, start, now, existing, want] of D3) {
+  for (const [kind, spec] of [['clean', S2], ['legacy', LEGACY]]) {
+    check(`D3 ${name} [${kind}] -> ${want}`, () => {
+      const g = R.generateProposals(spec, start, now, { existing });
+      const days = g.map((p) => ymd(p.iso)), taken = existing.map(ymd);
+      return show(g) === want && new Set(days).size === days.length && !days.some((d) => taken.includes(d)) ? '' : show(g);
+    });
+  }
+}
 check('garbage -> ok:false with a short note', () => { const p = R.parseRoutineDescription('בלה בלה בלה'); return !p.ok && p.note ? '' : JSON.stringify(p); });
 check('corrupted routine (×4, duplicate days, verbal): normalizeRoutine derives 3 from the description and does NOT mutate it', () => {
   const r = { id: 7, timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 }, scheduledWeeks: { '2026-11-01': [{ dt: '2026-11-02T16:00:00.000Z', eventId: 'e1' }] } };
