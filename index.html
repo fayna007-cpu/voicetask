@@ -884,6 +884,7 @@
       <input class="rfi" id="schedStartDate" type="date" style="flex:1" oninput="schedFromChanged()" onchange="schedFromChanged()" onblur="schedFromChanged()"/>
     </div>
     <div class="rform-hint" id="schedFromLabel" style="padding:4px 16px 0"></div>
+    <div class="rform-hint" id="schedSkipNote" style="padding:2px 16px 0;white-space:pre-line" hidden></div>
     <div id="scheduleSlotsList" style="padding:16px;display:flex;flex-direction:column;gap:10px"></div>
     <div style="padding:0 16px 16px">
       <button class="sched-confirm-btn" id="scheduleConfirmBtn" onclick="confirmScheduling()">הוסף לגוגל קאלנדר ✓</button>
@@ -3615,6 +3616,20 @@ function playNotifSound(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
+// D6: THE one list of a routine's instances, used by HOME, the list label and the schedule generator.
+// Ownership = this routine's own record only; every week key is read (old Monday-based or Sunday-based keys alike);
+// deduped by datetime; each entry says whether it is completed / skipped. Nothing here writes.
+function listRoutineInstances(r){
+  const seen=new Map(),done=new Set(r&&r.completedDates||[]),skip=new Set(r&&r.skippedDates||[]);
+  Object.entries((r&&r.scheduledWeeks)||{}).forEach(([key,arr])=>(Array.isArray(arr)?arr:[]).forEach(item=>{
+    const dt=typeof item==='string'?item:item&&item.dt;
+    if(!dt||isNaN(new Date(dt))||seen.has(dt))return;
+    seen.set(dt,{dt,key,eventId:typeof item==='object'&&item?item.eventId||null:null,completed:done.has(dt),skipped:skip.has(dt)});
+  }));
+  return [...seen.values()].sort((a,b)=>new Date(a.dt)-new Date(b.dt));
+}
+// A LIVE instance = stored and not skipped (a skipped one is hidden everywhere and never blocks a proposal).
+const liveRoutineInstances=r=>listRoutineInstances(r).filter(i=>!i.skipped);
 function getRoutineInstances(){
   const now=new Date();
   const cutoff=new Date(now.getTime()-24*3600000);
@@ -3622,12 +3637,9 @@ function getRoutineInstances(){
   const instances=[];
   routines.filter(r=>r.enabled).forEach(r=>{
     const name=r.name||r.text||'';
-    Object.values(r.scheduledWeeks||{}).flat().forEach(item=>{
-      const dt=typeof item==='string'?item:item?.dt;
-      if(!dt)return;
+    liveRoutineInstances(r).map(i=>i.dt).forEach(dt=>{
       const d=new Date(dt);
       if(d<cutoff||d>future)return;
-      if((r.skippedDates||[]).includes(dt))return;
       instances.push({id:`routine_${r.id}_${dt}`,routineId:r.id,isRoutine:true,
         text:name,category:r.category,datetime:dt,duration:+(r.duration||60),
         reminder:+(r.reminder||0),notes:r.notes||'',
@@ -4087,7 +4099,7 @@ function windowStartHour(r){
 }
 
 // Every stored instance datetime of a routine (any week key, any state): the generator skips those dates.
-function routineInstanceDts(r){return Object.values(r.scheduledWeeks||{}).flat().map(it=>typeof it==='string'?it:it&&it.dt).filter(Boolean);}
+function routineInstanceDts(r){return liveRoutineInstances(r).map(i=>i.dt);}   // D6: the same list HOME and the label use
 function generateWeekSlots(routine,weekOffset=0,startDate=null,opts=null){
   // D2: ONE generator (routine-schedule.js). The proposals are the NEXT N occurrences of the routine's weekly
   // pattern from the start day (today, or the "התחל מ" date; week offset 1 = from next Sunday).
@@ -4096,7 +4108,8 @@ function generateWeekSlots(routine,weekOffset=0,startDate=null,opts=null){
     const now=new Date();let start;
     if(startDate)start=typeof startDate==='string'?startDate:calYMD(startDate);
     else{const d=new Date(now);if(weekOffset)d.setDate(d.getDate()-d.getDay()+7*weekOffset);start=calYMD(d);}
-    return RSchedule.generateProposals(RSchedule.normalizeRoutine(routine),start,now,opts&&opts.skipExisting?{existing:routineInstanceDts(routine)}:null).map(p=>p.iso);
+    const g=RSchedule.generateProposals(RSchedule.normalizeRoutine(routine),start,now,opts&&opts.skipExisting?{existing:routineInstanceDts(routine)}:null);
+    const res=g.map(p=>p.iso);res.skipped=g.skipped||[];return res;
   }
   const now=new Date();
   // Parse date picker value as local midnight (avoid UTC shift)
@@ -4198,7 +4211,7 @@ function renderRoutineList(){
     const win=WIN_LABEL[r.timeWindow]||'בוקר';
     // "מתוזמן X" = the real number of upcoming, not-skipped instances (all weeks, not only this week's key)
     const today0=new Date();today0.setHours(0,0,0,0);
-    const schedCount=Object.values(r.scheduledWeeks||{}).flat().map(it=>typeof it==='string'?it:it&&it.dt).filter(dt=>dt&&new Date(dt)>=today0&&!(r.skippedDates||[]).includes(dt)).length;
+    const schedCount=liveRoutineInstances(r).filter(i=>new Date(i.dt)>=today0).length;   // D6: same list as HOME / generator
     const prevWk=getPrevWeekKey();
     const hasPrevWeek=(r.scheduledWeeks?.[prevWk]||[]).length>0;
     const schedBtn=schedCount
@@ -4231,6 +4244,13 @@ function refreshScheduleSlots(){
   schedulingFrom=from;
   const lbl=document.getElementById('schedFromLabel');                 // the date ACTUALLY used, shown under the picker
   if(lbl){const d=new Date(from+'T12:00:00');lbl.textContent='הצעות מ-'+d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'short'}).replace(/^יום /,'').replace(',','');}
+  // D6: one small line per date passed over because THIS routine already has a live instance there
+  const note=document.getElementById('schedSkipNote');
+  if(note){
+    const DN=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'],hm=x=>String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');
+    note.textContent=(slots.skipped||[]).map(s=>{const t=new Date(s.iso);return `דילגתי על ${DN[t.getDay()]} ${t.getDate()} — כבר מתוזמן ב-${hm(t)}`;}).join('\n');
+    note.hidden=!note.textContent;
+  }
   schedulingPicker=pickerVal;
   renderScheduleSlots();
 }
@@ -4315,10 +4335,14 @@ async function confirmScheduling(){
   const created=[];
   for(const s of chosen){
     const day=calYMD(new Date(s.dt));
-    let hit=null;
+    // D6: only a LIVE instance (the same list HOME and the label use) counts; a skipped entry is hidden and never blocks.
+    const skipped=new Set(r.skippedDates||[]);
+    let hit=null,same=null;
     Object.keys(r.scheduledWeeks).forEach(wk=>(r.scheduledWeeks[wk]||[]).forEach((it,i)=>{
       const dt=typeof it==='string'?it:it&&it.dt;
-      if(!hit&&dt&&calYMD(new Date(dt))===day)hit={wk,i,it,dt};
+      if(!dt)return;
+      if(!hit&&!skipped.has(dt)&&calYMD(new Date(dt))===day)hit={wk,i,it,dt};
+      if(!same&&dt===s.dt)same={wk,i,it,dt};
     }));
     if(hit){
       if(hit.dt===s.dt||day<=today||done.has(hit.dt))continue;   // same instance / today or earlier / completed: untouched
@@ -4327,7 +4351,13 @@ async function confirmScheduling(){
       const ev=await createCalendarEvent(r,s.dt);
       const upd={...old,dt:s.dt,eventId:ev?.id||null};
       r.scheduledWeeks[hit.wk][hit.i]=upd;created.push(upd);
-      const k=(r.skippedDates||[]).indexOf(hit.dt);if(k>-1)r.skippedDates[k]=s.dt;
+      continue;
+    }
+    if(same&&skipped.has(s.dt)){                                // the user asks for exactly a skipped slot again: un-skip it
+      r.skippedDates=r.skippedDates.filter(d=>d!==s.dt);
+      const it=typeof same.it==='object'&&same.it?same.it:{dt:s.dt,eventId:null};
+      if(!it.eventId||String(it.eventId).startsWith('local_')){const ev=await createCalendarEvent(r,s.dt);it.eventId=ev?.id||null;}
+      r.scheduledWeeks[same.wk][same.i]=it;created.push(it);
       continue;
     }
     const ev=await createCalendarEvent(r,s.dt);

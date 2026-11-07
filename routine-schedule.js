@@ -166,15 +166,17 @@
   var WALK_DAYS = 28;
   function generateProposals(spec, startYmd, now, opts) {
     now = now || new Date();
-    var N = perWeek(spec), pat = weeklyPattern(spec, opts), out = [], taken = {};
-    ((opts && opts.existing) || []).forEach(function (iso) { if (iso) taken[ymdIn(new Date(iso))] = true; });
+    var N = perWeek(spec), pat = weeklyPattern(spec, opts), out = [], taken = {}, held = {};
+    // existing = the routine's LIVE instances (listRoutineInstances: deduped, not skipped). Only those exact dates block.
+    ((opts && opts.existing) || []).forEach(function (iso) { if (iso) { var y = ymdIn(new Date(iso)); taken[y] = true; held[y] = iso; } });
+    out.skipped = [];                                            // pattern days passed over because an instance is there
     var early = spec.slots.filter(function (s) { return s.pick === 'earliest'; });
     var need = early.map(function (s) { return s.count; });
     var start = startYmd < ymdIn(now) ? ymdIn(now) : startYmd;
     var put = function (ymd, hm, dow, slot) { var d = toDate(ymd, hm); if (d > now && !taken[ymd] && out.length < N) { out.push({ iso: d.toISOString(), dow: dow, slot: slot }); taken[ymd] = true; return true; } return false; };
     for (var k = 0; k < WALK_DAYS && out.length < N; k++) {
       var ymd = addDays(start, k), dow = dowOf(ymd);
-      if (taken[ymd]) continue;
+      if (taken[ymd]) { if (held[ymd] && pat.some(function (p) { return p.dow === dow; }) && new Date(held[ymd]) > now) out.skipped.push({ ymd: ymd, dow: dow, iso: held[ymd] }); continue; }
       pat.forEach(function (p) { if (p.dow === dow) put(ymd, p.time, dow, p.slot); });
       early.forEach(function (s, j) {
         if (need[j] <= 0 || (s.days && s.days.indexOf(dow) < 0)) return;
@@ -187,7 +189,8 @@
       var y2 = addDays(start, k2), s2 = early[e];
       if (put(y2, s2.time || ({ morning: '07:00', afternoon: '14:00', evening: '18:00' })[s2.window] || '07:00', dowOf(y2), spec.slots.indexOf(s2))) need[e]--;
     }
-    return out.sort(function (a, b) { return a.iso < b.iso ? -1 : 1; });
+    var sk = out.skipped; out.sort(function (a, b) { return a.iso < b.iso ? -1 : 1; }); out.skipped = sk;
+    return out;
   }
 
   // ── HOME routines window: from today through the SATURDAY OF NEXT WEEK (weeks Sun-Sat; at most 14 days, in
