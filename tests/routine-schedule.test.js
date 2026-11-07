@@ -62,6 +62,16 @@ check('"סופ״ש" = Friday; Saturday only when written', () => {
   const a = R.parseRoutineDescription('פעם בסופש בבוקר'), b = R.parseRoutineDescription('פעם אחת בשבת בבוקר');
   return pat(a) === '5@07:00' && pat(b) === '6@07:00' ? '' : pat(a) + ' | ' + pat(b);
 });
+for (const q of ['"', '״', '“', '”', '″']) {
+  check(`quotes: "בסה${q}כ" (U+${q.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) parses to the same 3 slots (Mon+Wed evening, one free day, Fri noon)`, () => {
+    const p = R.parseRoutineDescription(`3 אימונים בשבוע בסה${q}כ, מתוכם פעמיים באמצע שבוע בערב עם הפרש של יום ביניהם, ועוד פעם אחת ביום שישי בצהריים`);
+    return p.ok && R.perWeek(p) === 3 && pat(p) === '1@18:00,3@18:00,5@13:00' && !p.note ? '' : JSON.stringify({ pat: p.ok && pat(p), note: p.note });
+  });
+  check(`quotes: "אחה${q}צ" -> the afternoon window (13:00)`, () => { const p = R.parseRoutineDescription(`פעם אחת ביום שישי אחה${q}צ`); return pat(p) === '5@13:00' ? '' : JSON.stringify(p); });
+}
+for (const a of ["'", '’', '׳']) {
+  check(`apostrophes: "ב${a} ו-ד${a} בערב" (U+${a.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) -> Mon + Wed 18:00`, () => { const p = R.parseRoutineDescription(`ב${a} ו-ד${a} בערב`); return pat(p) === '1@18:00,3@18:00' ? '' : JSON.stringify(p); });
+}
 check('garbage -> ok:false with a short note', () => { const p = R.parseRoutineDescription('בלה בלה בלה'); return !p.ok && p.note ? '' : JSON.stringify(p); });
 check('corrupted routine (×4, duplicate days, verbal): normalizeRoutine derives 3 from the description and does NOT mutate it', () => {
   const r = { id: 7, timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 }, scheduledWeeks: { '2026-11-01': [{ dt: '2026-11-02T16:00:00.000Z', eventId: 'e1' }] } };

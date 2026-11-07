@@ -72,8 +72,10 @@
   // "3 פעמים בשבוע" / "3 אימונים בשבוע בסה״כ" at the start = the stated TOTAL.
   var TOTAL_RE = new RegExp('^\\s*(\\d+|פעמיים|אחת|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\\s*' + NOUN + '?\\s*(?:ב|ל)שבוע(\\s*(?:בסה["״\']?כ|בסך הכל|סך הכל))?');
 
+  // Every quotation-mark variant -> ASCII " (בסה"כ, אחה"צ, סופ"ש); every apostrophe variant -> ׳ (ב׳, ד׳).
+  var normQuotes = function (s) { return String(s || '').replace(/["״“”″]/g, '"').replace(/['’]/g, '׳'); };
   function parseRoutineDescription(text) {
-    var t = String(text || '').replace(/\s+/g, ' ').trim();
+    var t = normQuotes(text).replace(/\s+/g, ' ').trim();
     if (!t) return { ok: false, slots: [], total: null, note: 'אין תיאור' };
     var total = null, rest = t, m = t.match(TOTAL_RE);
     if (m) { total = m[1] === 'פעמיים' ? 2 : (NUM[m[1]] || +m[1]); rest = t.slice(m[0].length); }
