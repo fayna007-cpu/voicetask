@@ -62,6 +62,58 @@ check('"סופ״ש" = Friday; Saturday only when written', () => {
   const a = R.parseRoutineDescription('פעם בסופש בבוקר'), b = R.parseRoutineDescription('פעם אחת בשבת בבוקר');
   return pat(a) === '5@07:00' && pat(b) === '6@07:00' ? '' : pat(a) + ' | ' + pat(b);
 });
+for (const q of ['"', '״', '“', '”', '″']) {
+  check(`quotes: "בסה${q}כ" (U+${q.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) parses to the same 3 slots (Mon+Wed evening, one free day, Fri noon)`, () => {
+    const p = R.parseRoutineDescription(`3 אימונים בשבוע בסה${q}כ, מתוכם פעמיים באמצע שבוע בערב עם הפרש של יום ביניהם, ועוד פעם אחת ביום שישי בצהריים`);
+    return p.ok && R.perWeek(p) === 3 && pat(p) === '1@18:00,3@18:00,5@13:00' && !p.note ? '' : JSON.stringify({ pat: p.ok && pat(p), note: p.note });
+  });
+  check(`quotes: "אחה${q}צ" -> the afternoon window (13:00)`, () => { const p = R.parseRoutineDescription(`פעם אחת ביום שישי אחה${q}צ`); return pat(p) === '5@13:00' ? '' : JSON.stringify(p); });
+}
+for (const a of ["'", '’', '׳']) {
+  check(`apostrophes: "ב${a} ו-ד${a} בערב" (U+${a.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) -> Mon + Wed 18:00`, () => { const p = R.parseRoutineDescription(`ב${a} ו-ד${a} בערב`); return pat(p) === '1@18:00,3@18:00' ? '' : JSON.stringify(p); });
+}
+// D3: dates that already have an instance of THIS routine are skipped; N NEW proposals; never two on one day.
+const LEGACY = R.normalizeRoutine({ timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 } });   // legacy-shaped corrupted record
+const FRI9 = at('2026-11-06T09:00:00+02:00'), SAT9 = at('2026-11-07T09:00:00+02:00');
+const D3 = [
+  ['(a) Fri 6 09:00, existing Fri 6 10:00, start today', '2026-11-06', FRI9, ['2026-11-06T08:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(b) the same, start Sun 8', '2026-11-08', FRI9, ['2026-11-06T08:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(c) Sat 7 09:00, existing manual Sat 7 14:00', '2026-11-07', SAT9, ['2026-11-07T12:00:00.000Z'], 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00'],
+  ['(d) existing Mon 9 + Wed 11', '2026-11-07', SAT9, ['2026-11-09T16:00:00.000Z', '2026-11-11T16:00:00.000Z'], 'Fri 13 13:00, Mon 16 18:00, Wed 18 18:00'],
+  ['(e) start Tue 10', '2026-11-10', SAT9, [], 'Wed 11 18:00, Fri 13 13:00, Mon 16 18:00'],
+  ['(f) no existing instance (as before)', '2026-11-06', FRI9, [], 'Fri 06 13:00, Mon 09 18:00, Wed 11 18:00'],
+  ['(g) an existing COMPLETED/passed instance on a pattern day also blocks that day', '2026-11-08', SAT9, ['2026-11-09T05:00:00.000Z'], 'Wed 11 18:00, Fri 13 13:00, Mon 16 18:00'],
+];
+for (const [name, start, now, existing, want] of D3) {
+  for (const [kind, spec] of [['clean', S2], ['legacy', LEGACY]]) {
+    check(`D3 ${name} [${kind}] -> ${want}`, () => {
+      const g = R.generateProposals(spec, start, now, { existing });
+      const days = g.map((p) => ymd(p.iso)), taken = existing.map(ymd);
+      return show(g) === want && new Set(days).size === days.length && !days.some((d) => taken.includes(d)) ? '' : show(g);
+    });
+  }
+}
+// HOME window: from today through the SATURDAY OF NEXT WEEK (Sun-Sat weeks; at most 14 days)
+const J = (d, h, m = 0) => new Date(Date.UTC(2026, 10, d, h - 2, m)).toISOString();     // Jerusalem winter = UTC+2
+const shown = (now, list) => list.filter(([iso, done]) => R.inHomeWindow(iso, 90, !!done, now)).map(([iso]) => iso);
+check('HOME (a) Wed 11/11 09:00: existing Wed 11 + Fri 13 + new Mon 16, Wed 18, Fri 20 -> exactly 5 (window ends Sat 21)', () => {
+  const now = at('2026-11-11T09:00:00+02:00'), list = [[J(11, 18)], [J(13, 13)], [J(16, 18)], [J(18, 18)], [J(20, 13)], [J(22, 18)]];
+  const w = R.homeWindow(now), s = shown(now, list);
+  return w.to === '2026-11-21' && s.length === 5 && !s.includes(J(22, 18)) ? '' : JSON.stringify({ w, s });
+});
+check('HOME (b) Fri 6/11 -> window ends Sat 14: Fri 13 shown, Sun 15 not', () => {
+  const now = at('2026-11-06T09:00:00+02:00'), w = R.homeWindow(now), s = shown(now, [[J(13, 13)], [J(15, 18)]]);
+  return w.to === '2026-11-14' && s.join() === J(13, 13) ? '' : JSON.stringify({ w, s });
+});
+check('HOME (c) Sat 7/11 09:00 -> ends Sat 14; a manual Saturday instance (Sat 7 14:00) shows; Sat 14 shows, Sun 15 not', () => {
+  const now = at('2026-11-07T09:00:00+02:00'), w = R.homeWindow(now), s = shown(now, [[J(7, 14)], [J(14, 18)], [J(15, 18)]]);
+  return w.to === '2026-11-14' && s.join() === [J(7, 14), J(14, 18)].join() ? '' : JSON.stringify({ w, s });
+});
+check('HOME (d) Sun 8/11 -> ends Sat 21 (14 days, the maximum)', () => { const w = R.homeWindow(at('2026-11-08T09:00:00+02:00')); return w.from === '2026-11-08' && w.to === '2026-11-21' ? '' : JSON.stringify(w); });
+check('HOME: today\'s instance stays until its END time (Fri 6 10:00-11:30: shown at 11:29, gone at 11:31 unless completed)', () => {
+  const a = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:29:00+02:00')), b = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:31:00+02:00')), c = R.inHomeWindow(J(6, 10), 90, true, at('2026-11-06T11:31:00+02:00'));
+  return a && !b && c ? '' : JSON.stringify({ a, b, c });
+});
 check('garbage -> ok:false with a short note', () => { const p = R.parseRoutineDescription('בלה בלה בלה'); return !p.ok && p.note ? '' : JSON.stringify(p); });
 check('corrupted routine (×4, duplicate days, verbal): normalizeRoutine derives 3 from the description and does NOT mutate it', () => {
   const r = { id: 7, timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 }, scheduledWeeks: { '2026-11-01': [{ dt: '2026-11-02T16:00:00.000Z', eventId: 'e1' }] } };

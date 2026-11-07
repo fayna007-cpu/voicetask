@@ -72,8 +72,10 @@
   // "3 פעמים בשבוע" / "3 אימונים בשבוע בסה״כ" at the start = the stated TOTAL.
   var TOTAL_RE = new RegExp('^\\s*(\\d+|פעמיים|אחת|שתיים|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע)\\s*' + NOUN + '?\\s*(?:ב|ל)שבוע(\\s*(?:בסה["״\']?כ|בסך הכל|סך הכל))?');
 
+  // Every quotation-mark variant -> ASCII " (בסה"כ, אחה"צ, סופ"ש); every apostrophe variant -> ׳ (ב׳, ד׳).
+  var normQuotes = function (s) { return String(s || '').replace(/["״“”″]/g, '"').replace(/['’]/g, '׳'); };
   function parseRoutineDescription(text) {
-    var t = String(text || '').replace(/\s+/g, ' ').trim();
+    var t = normQuotes(text).replace(/\s+/g, ' ').trim();
     if (!t) return { ok: false, slots: [], total: null, note: 'אין תיאור' };
     var total = null, rest = t, m = t.match(TOTAL_RE);
     if (m) { total = m[1] === 'פעמיים' ? 2 : (NUM[m[1]] || +m[1]); rest = t.slice(m[0].length); }
@@ -157,29 +159,45 @@
     return out.sort(function (a, b) { return a.dow - b.dow || a.time.localeCompare(b.time); });
   }
 
-  // ── proposals: the NEXT N occurrences of the weekly pattern from `startYmd`; slots already passed are skipped ──
+  // ── proposals: N NEW occurrences of the weekly pattern from `startYmd` (D3) ──
+  // A date on which THIS routine already has an instance (opts.existing: ISO list; completed or not, passed or
+  // not) is skipped and the walk goes on (max 4 weeks), so "one left + N new" whatever the start date.
+  // Slots already passed are skipped; never two proposals on one day.
+  var WALK_DAYS = 28;
   function generateProposals(spec, startYmd, now, opts) {
     now = now || new Date();
-    var N = perWeek(spec), pat = weeklyPattern(spec, opts), out = [];
+    var N = perWeek(spec), pat = weeklyPattern(spec, opts), out = [], taken = {};
+    ((opts && opts.existing) || []).forEach(function (iso) { if (iso) taken[ymdIn(new Date(iso))] = true; });
     var early = spec.slots.filter(function (s) { return s.pick === 'earliest'; });
     var need = early.map(function (s) { return s.count; });
     var start = startYmd < ymdIn(now) ? ymdIn(now) : startYmd;
-    for (var k = 0; k < 28 && out.length < N; k++) {
+    var put = function (ymd, hm, dow, slot) { var d = toDate(ymd, hm); if (d > now && !taken[ymd] && out.length < N) { out.push({ iso: d.toISOString(), dow: dow, slot: slot }); taken[ymd] = true; return true; } return false; };
+    for (var k = 0; k < WALK_DAYS && out.length < N; k++) {
       var ymd = addDays(start, k), dow = dowOf(ymd);
-      pat.forEach(function (p) { if (p.dow === dow) { var d = toDate(ymd, p.time); if (d > now) out.push({ iso: d.toISOString(), dow: dow, slot: p.slot }); } });
+      if (taken[ymd]) continue;
+      pat.forEach(function (p) { if (p.dow === dow) put(ymd, p.time, dow, p.slot); });
       early.forEach(function (s, j) {
-        if (need[j] <= 0) return;
-        if (s.days && s.days.indexOf(dow) < 0) return;
+        if (need[j] <= 0 || (s.days && s.days.indexOf(dow) < 0)) return;
         var hm = s.time || (s.manualWin ? ({ morning: '07:00', afternoon: '14:00', evening: '18:00' })[s.window] : slotTime(s)) || '07:00';
-        var d = toDate(ymd, hm); if (d > now) { out.push({ iso: d.toISOString(), dow: dow, slot: spec.slots.indexOf(s) }); need[j]--; }
+        if (put(ymd, hm, dow, spec.slots.indexOf(s))) need[j]--;
       });
     }
     // manual mode with too few chosen days: fill from any day (the old "pass 2" behaviour)
-    for (var e = 0; e < early.length; e++) for (var k2 = 0; k2 < 14 && need[e] > 0; k2++) {
-      var y2 = addDays(start, k2), s2 = early[e], d2 = toDate(y2, s2.time || ({ morning: '07:00', afternoon: '14:00', evening: '18:00' })[s2.window] || '07:00');
-      if (d2 > now && !out.some(function (o) { return o.iso === d2.toISOString(); })) { out.push({ iso: d2.toISOString(), dow: dowOf(y2), slot: spec.slots.indexOf(s2) }); need[e]--; }
+    for (var e = 0; e < early.length; e++) for (var k2 = 0; k2 < WALK_DAYS && need[e] > 0; k2++) {
+      var y2 = addDays(start, k2), s2 = early[e];
+      if (put(y2, s2.time || ({ morning: '07:00', afternoon: '14:00', evening: '18:00' })[s2.window] || '07:00', dowOf(y2), spec.slots.indexOf(s2))) need[e]--;
     }
-    return out.sort(function (a, b) { return a.iso < b.iso ? -1 : 1; }).slice(0, N);
+    return out.sort(function (a, b) { return a.iso < b.iso ? -1 : 1; });
+  }
+
+  // ── HOME routines window: from today through the SATURDAY OF NEXT WEEK (weeks Sun-Sat; at most 14 days, in
+  // Asia/Jerusalem). An instance stays until its END time has passed; a completed one stays (marked). ──
+  function homeWindow(now) { var t = ymdIn(now || new Date()); return { from: t, to: addDays(t, 6 - dowOf(t) + 7) }; }
+  function inHomeWindow(iso, durationMin, completed, now) {
+    now = now || new Date();
+    var w = homeWindow(now), day = ymdIn(new Date(iso));
+    if (day < w.from || day > w.to) return false;
+    return !!completed || new Date(+new Date(iso) + (durationMin || 60) * 60000) > now;
   }
 
   // ── derived values for the UI and the legacy fields ──
@@ -197,5 +215,5 @@
   function plural(n, noun) { var w = NOUNS[noun] || [noun, noun]; return n === 1 ? w[0] + (w[0].endsWith('ה') ? ' אחת' : ' אחד') : n + ' ' + w[1]; }
 
   return { parseRoutineDescription: parseRoutineDescription, normalizeRoutine: normalizeRoutine, specFromManual: specFromManual, weeklyPattern: weeklyPattern,
-    generateProposals: generateProposals, derive: derive, perWeek: perWeek, plural: plural, uniqDays: uniq, WIN_TIME: WIN_TIME, TZ: TZ };
+    generateProposals: generateProposals, derive: derive, homeWindow: homeWindow, inHomeWindow: inHomeWindow, perWeek: perWeek, plural: plural, uniqDays: uniq, WIN_TIME: WIN_TIME, TZ: TZ };
 });
