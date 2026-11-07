@@ -2844,6 +2844,55 @@ async function deleteCalendarEvent(eventId){
   const token=await getToken();if(!token)return;
   try{await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});}catch(e){}
 }
+// ── D7: the calendar mirrors the app. An event the app created carries "נוצר מ-VoiceTask" + vt_task_id / vt_routine_id /
+// vt_bill_id:<id> in its description; that marker (not the title, not the time) is its identity. ──
+// Delete ONE event and REPORT the result (404/410 = already gone = done). deleteCalendarEvent above stays silent.
+async function deleteEventChecked(eventId){
+  if(!eventId||String(eventId).startsWith('local_'))return true;
+  const token=await getToken().catch(()=>null);if(!token)return false;
+  try{const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});return r.ok||r.status===404||r.status===410;}
+  catch(_){return false;}
+}
+// A delete that failed is remembered and offered again at the next calendar sync (never retried silently).
+const CAL_ORPHANS_KEY='vt_cal_orphans';
+function calOrphans(){try{return JSON.parse(localStorage.getItem(CAL_ORPHANS_KEY)||'[]');}catch(_){return[];}}
+function saveCalOrphans(l){try{localStorage.setItem(CAL_ORPHANS_KEY,JSON.stringify(l));}catch(_){}}
+function addCalOrphan(o){const l=calOrphans();if(!l.some(x=>(o.eventId&&x.eventId===o.eventId)||(!o.eventId&&x.marker===o.marker&&x.dt===o.dt)))l.push(o);saveCalOrphans(l);}
+async function delEventOrOrphan(eventId,marker,dt){
+  if(!eventId||String(eventId).startsWith('local_'))return true;
+  const ok=await deleteEventChecked(eventId);
+  if(!ok)addCalOrphan({eventId,marker,dt:dt||null});
+  return ok;
+}
+// The app-marked events in a window (all pages). {ok:false} on any failure: callers then delete NOTHING.
+async function listMarkedEvents(from,to){
+  const token=await getToken().catch(()=>null);if(!token)return{ok:false,error:'לא מחובר ל-Google Calendar'};
+  const items=[];let page='';
+  try{
+    for(let n=0;n<20;n++){
+      const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?q=VoiceTask&timeMin=${from.toISOString()}&timeMax=${to.toISOString()}&singleEvents=true&maxResults=250${page?'&pageToken='+encodeURIComponent(page):''}`,{headers:{Authorization:'Bearer '+token}});
+      if(!r.ok)return{ok:false,error:'שגיאה בקריאת היומן ('+r.status+')'};
+      const j=await r.json();items.push(...(j.items||[]));
+      if(!j.nextPageToken)break;page=j.nextPageToken;
+    }
+  }catch(_){return{ok:false,error:'אין חיבור ליומן'};}
+  return{ok:true,items:items.filter(ev=>/נוצר מ-VoiceTask/.test(ev.description||'')&&/vt_(task|routine|bill)_id:\d+/.test(ev.description||''))};
+}
+// Deleting / skipping a routine instance removes ITS event now: by stored id, else by marker + routine id + that date.
+async function removeRoutineInstanceEvent(r,dt){
+  let hold=null;
+  Object.values(r.scheduledWeeks||{}).forEach(a=>(a||[]).forEach(it=>{if(!hold&&it&&typeof it==='object'&&it.dt===dt)hold=it;}));
+  const marker='vt_routine_id:'+r.id;
+  if(hold&&hold.eventId&&!String(hold.eventId).startsWith('local_')){
+    if(await delEventOrOrphan(hold.eventId,marker,dt)){hold.eventId=null;saveRoutines();}
+    return;
+  }
+  if(!await getToken().catch(()=>null))return;                     // not connected: nothing the app can remove now
+  const d0=new Date(dt);d0.setHours(0,0,0,0);const d1=new Date(d0);d1.setDate(d1.getDate()+1);
+  const L=await listMarkedEvents(d0,d1);
+  if(!L.ok){addCalOrphan({eventId:null,marker,dt});return;}
+  for(const ev of L.items.filter(e=>(e.description||'').includes(marker+'\n')||(e.description||'').endsWith(marker)))await delEventOrOrphan(ev.id,marker,dt);
+}
 
 // ── Siri UI ───────────────────────────────────────────────────────────────────
 // Build waveform bars
@@ -3238,7 +3287,7 @@ async function syncTask(task){
   if(evId)toast('✓ נוסף ליומן, אדוני');else toast('⚠️ שמור — ממתין לסנכרון עם קאלנדר');
   sendEmailNotification(task); // always send email regardless of calendar result
 }
-async function deleteFromCalendar(task){if(!task.calendarEventId)return;await deleteCalendarEvent(task.calendarEventId);}
+async function deleteFromCalendar(task){if(!task.calendarEventId)return;await delEventOrOrphan(task.calendarEventId,'vt_task_id:'+task.id,task.datetime);}   // D7: a failed delete becomes an orphan
 async function syncOneTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   // If not connected to Google, prompt to connect first
@@ -4515,8 +4564,11 @@ function editRoutine(id){
 }
 function deleteRoutine(id){
   if(!confirm('למחוק את השגרה?'))return;
+  const gone=routines.find(r=>r.id===id);
   routines=routines.filter(r=>r.id!==id);saveRoutines();renderRoutineList();render();toast('שגרה נמחקה');
   scheduleSmartPushNotifs();
+  // D7: its stored events from 30 days back go too (by stored id; a failure becomes an orphan for the next sync)
+  if(gone){const from=Date.now()-30*864e5;return Promise.all(listRoutineInstances(gone).filter(i=>i.eventId&&new Date(i.dt)>=from).map(i=>delEventOrOrphan(i.eventId,'vt_routine_id:'+gone.id,i.dt)));}
 }
 function toggleRoutineEnabled(id,enabled){
   const r=routines.find(x=>x.id===id);if(r){r.enabled=enabled;saveRoutines();render();scheduleSmartPushNotifs();}
@@ -4547,6 +4599,7 @@ function skipRoutineInstance(routineId,dateStr){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   if(!r.skippedDates)r.skippedDates=[];
   r.skippedDates.push(dateStr);saveRoutines();render();toast('דולג');
+  return removeRoutineInstanceEvent(r,dateStr);                    // D7: the calendar follows the app at once
 }
 function openRoutineTimeEdit(safeId){
   document.querySelectorAll('.card-edit').forEach(el=>el.classList.remove('on'));
@@ -9989,6 +10042,74 @@ function buildAlfredHelpText(){
 • *מה הלאה* — הפריט הבא ביומן`;
 }
 
+// D7 RECONCILE: the app is the source of truth. Lists the app-marked events (today-30d .. +90d) and matches each to an
+// ACTIVE or completed item: a task / bill by its id; a routine event by routine id AND date (never by time alone) to a
+// live or completed instance (one event per routine per date). Unmatched events + remembered orphans are only
+// PROPOSED for deletion. Live future instances / open future tasks with no event get one. Nothing is deleted here.
+async function reconcileCalendar(){
+  const now=new Date(),from=new Date(now);from.setHours(0,0,0,0);from.setDate(from.getDate()-30);
+  const to=new Date(now);to.setDate(to.getDate()+90);
+  const res={added:0,updated:0,failed:0,pending:[],fatal:null};
+  const L=await listMarkedEvents(from,to);
+  if(!L.ok){res.fatal=L.error;return res;}
+  if(!Array.isArray(tasks)||!Array.isArray(routines)||!Array.isArray(bills)||(!tasks.length&&!routines.length&&!bills.length&&L.items.length)){
+    res.fatal='נתוני האפליקציה נראים ריקים';return res;               // the app's own scan looks wrong: touch nothing
+  }
+  const day=d=>calYMD(new Date(d));
+  const taskIds=new Set(tasks.map(t=>String(t.id))),billIds=new Set(bills.map(b=>String(b.id)));
+  const inst=new Map();                                               // routineId -> Map(ymd -> instance) live or completed
+  routines.forEach(r=>{const m=new Map();listRoutineInstances(r).forEach(i=>{if(!i.skipped||i.completed)if(!m.has(day(i.dt)))m.set(day(i.dt),i);});inst.set(String(r.id),m);});
+  const stored=new Set();
+  routines.forEach(r=>listRoutineInstances(r).forEach(i=>{if(i.eventId)stored.add(i.eventId);}));
+  const items=L.items.slice().sort((a,b)=>(stored.has(b.id)?1:0)-(stored.has(a.id)?1:0));   // a stored id wins a date
+  const kept=new Map(),evStart=ev=>ev.start&&(ev.start.dateTime||ev.start.date);
+  for(const ev of items){
+    const d=ev.description||'',t=d.match(/vt_task_id:(\d+)/),b=d.match(/vt_bill_id:(\d+)/),r=d.match(/vt_routine_id:(\d+)/);
+    if(t){if(!taskIds.has(t[1]))res.pending.push(ev);continue;}
+    if(b){if(!billIds.has(b[1]))res.pending.push(ev);continue;}
+    if(!r)continue;
+    const dd=day(evStart(ev)),i=inst.get(r[1])&&inst.get(r[1]).get(dd),key=r[1]+'|'+dd;
+    if(!i||kept.has(key)){res.pending.push(ev);continue;}
+    kept.set(key,ev);
+    if(i.eventId!==ev.id){                                            // relink the instance to its real event
+      const rr=routines.find(x=>String(x.id)===r[1]);
+      Object.values(rr.scheduledWeeks||{}).forEach(a=>(a||[]).forEach((it,k)=>{
+        if(typeof it==='string'&&it===i.dt)a[k]={dt:it,eventId:ev.id};
+        else if(it&&typeof it==='object'&&it.dt===i.dt)it.eventId=ev.id;
+      }));
+      res.updated++;
+    }
+  }
+  // remembered orphans (failed deletes): offered again if the event is still there; dropped from the list if it is gone
+  const listedIds=new Set(L.items.map(e=>e.id)),pend=new Set(res.pending.map(e=>e.id));
+  const orph=calOrphans().filter(o=>o.eventId&&listedIds.has(o.eventId));
+  const keptIds=new Set([...kept.values()].map(v=>v.id));
+  orph.forEach(o=>{const ev=L.items.find(e=>e.id===o.eventId);if(ev&&!pend.has(ev.id)&&!keptIds.has(ev.id)){res.pending.push(ev);pend.add(ev.id);}});   // never an active item's event
+  saveCalOrphans(orph);
+  // adds: live future routine instances and open future tasks that have no event (real ids only count)
+  for(const r of routines){
+    if(r.enabled===false)continue;
+    for(const i of listRoutineInstances(r)){
+      const t=new Date(i.dt);
+      if(i.skipped||i.completed||t<=now||t>to||kept.has(r.id+'|'+day(i.dt)))continue;
+      const ev=await createCalendarEvent(r,i.dt);
+      if(ev&&ev.id&&!String(ev.id).startsWith('local_')){
+        Object.values(r.scheduledWeeks||{}).forEach(a=>(a||[]).forEach((it,k)=>{if(typeof it==='string'&&it===i.dt)a[k]={dt:it,eventId:ev.id};else if(it&&typeof it==='object'&&it.dt===i.dt)it.eventId=ev.id;}));
+        res.added++;
+      }else res.failed++;
+    }
+  }
+  const taskEv=new Set(L.items.map(e=>((e.description||'').match(/vt_task_id:(\d+)/)||[])[1]).filter(Boolean));
+  for(const t of tasks){
+    const d=t.datetime&&new Date(t.datetime);
+    if(t.completed||!d||d<=now||d>to||taskEv.has(String(t.id)))continue;
+    let id=null;try{id=await createTaskCalendarEvent(t);}catch(_){}
+    if(id){t.calendarEventId=id;res.added++;}else res.failed++;
+  }
+  saveRoutines();save();
+  return res;
+}
+// "סנכרן יומן": runs the reconcile and reports the TRUTH from real counts; deletion only after the user confirms.
 async function runCalendarSync(){
   const typing=document.createElement('div');
   typing.className='chat-bubble bot typing';typing.innerHTML='<span></span><span></span><span></span>';
@@ -9997,139 +10118,31 @@ async function runCalendarSync(){
   _chatBusy=true;
   const sendBtn=document.getElementById('asstSendBtn');
   if(sendBtn)sendBtn.textContent='…';
+  const say=t=>{chatHistory.push({role:'model',parts:[{text:t}],ts:Date.now()});saveChatHistory();};
+  let res=null;
   try{
-    const token=await getToken();
-    if(!token)throw new Error('לא מחובר ל-Google Calendar');
-    const past=new Date();past.setDate(past.getDate()-7);
-    const future=new Date();future.setDate(future.getDate()+90);
-    const url=`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${past.toISOString()}&timeMax=${future.toISOString()}&singleEvents=true&maxResults=500`;
-    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
-    if(!r.ok)throw new Error('שגיאה בקריאת יומן');
-    const{items=[]}=await r.json();
-
-    const taskIds=new Set(tasks.map(t=>String(t.id)));
-    const billIds=new Set(bills.map(b=>String(b.id)));
-    const routineIds=new Set(routines.map(rr=>String(rr.id)));
-    const validEventIds=new Set();
-    tasks.forEach(t=>{if(t.calendarEventId)validEventIds.add(t.calendarEventId);});
-    bills.forEach(b=>{if(b.calendarEventId)validEventIds.add(b.calendarEventId);if(b.deadlineEventId)validEventIds.add(b.deadlineEventId);});
-    routines.forEach(rr=>{Object.values(rr.scheduledWeeks||{}).flat().forEach(it=>{const ev=typeof it==='object'?it.eventId:null;if(ev)validEventIds.add(ev);});});
-
-    // Build routine name set for fuzzy matching (events without vt marker)
-    const routineNames=new Set(routines.map(rr=>(rr.name||rr.text||'').trim()).filter(Boolean));
-    // Helper: normalize summary (strip emoji, whitespace)
-    const normSum=s=>(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').replace(/\s+/g,' ').trim();
-    // Helper: normalize start to "YYYY-MM-DDTHH:MM"
-    const normSlot=ev=>{const s=ev.start?.dateTime||ev.start?.date||'';const d=new Date(s);return isNaN(d)?s:d.toISOString().slice(0,16);};
-
-    // Pass 1: classify each event
-    const classified=items.map(ev=>{
-      const desc=ev.description||'';
-      const summary=ev.summary||'';
-      const taskMatch=desc.match(/vt_task_id:(\d+)/);
-      const billMatch=desc.match(/vt_bill_id:(\d+)/);
-      const routineMatch=desc.match(/vt_routine_id:(\d+)/);
-      const hasMarker=!!(taskMatch||billMatch||routineMatch||/VoiceTask/.test(desc));
-      // Loose routine match by summary (for old events without marker)
-      const looseRoutineMatch=!hasMarker&&routineNames.has(normSum(summary));
-      const isVtEvent=hasMarker||looseRoutineMatch;
-      const isOrphan=
-        (taskMatch&&!taskIds.has(taskMatch[1]))||
-        (billMatch&&!billIds.has(billMatch[1]))||
-        (routineMatch&&!routineIds.has(routineMatch[1]));
-      return{ev,sig:normSum(summary)+'|'+normSlot(ev),hasMarker,isVtEvent,isOrphan};
-    });
-
-    // Pass 2: pick keepers — for each signature, prefer marker-bearing event,
-    // then prefer non-orphan, then earliest in list.
-    const groups={};
-    for(const c of classified){
-      if(!c.isVtEvent)continue;
-      if(!groups[c.sig])groups[c.sig]=[];
-      groups[c.sig].push(c);
+    res=await reconcileCalendar();
+    if(res.fatal){say('❌ סנכרון יומן לא בוצע: '+res.fatal+'. לא נמחק ולא נוסף דבר.');return res;}
+    let deleted=0,delFailed=0,declined=0;
+    if(res.pending.length){
+      const fmt=ev=>{const s=ev.start&&(ev.start.dateTime||ev.start.date),d=new Date(s);return `• ${d.toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'numeric'})}${ev.start&&ev.start.dateTime?' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):''} — ${(ev.summary||'').slice(0,40)}`;};
+      const n=res.pending.length;
+      const ok=confirm(`נמצאו ${n} אירועים ביומן שאין להם פריט פעיל באפליקציה:\n${res.pending.slice(0,12).map(fmt).join('\n')}${n>12?`\n…ועוד ${n-12}`:''}\n\nלמחוק אותם מהיומן?`)
+        &&(n<=20||confirm(`זה ${n} אירועים. בטוח למחוק את כולם?`));
+      if(ok){
+        const gone=new Set();
+        for(const ev of res.pending){if(await deleteEventChecked(ev.id)){deleted++;gone.add(ev.id);}else{delFailed++;addCalOrphan({eventId:ev.id,marker:((ev.description||'').match(/vt_\w+_id:\d+/)||[''])[0],dt:ev.start&&(ev.start.dateTime||ev.start.date)});}}
+        saveCalOrphans(calOrphans().filter(o=>!gone.has(o.eventId)));
+      }else declined=n;
     }
-    const keepIds=new Set();
-    Object.values(groups).forEach(group=>{
-      const eligible=group.filter(c=>!c.isOrphan);
-      const candidates=eligible.length?eligible:group;
-      // Prefer marker-bearing
-      const marked=candidates.filter(c=>c.hasMarker);
-      const winner=(marked.length?marked:candidates)[0];
-      if(winner)keepIds.add(winner.ev.id);
-    });
-
-    // Pass 3: delete everything that isn't a keeper but is a VT event
-    let deleted=0;
-    for(const c of classified){
-      if(!c.isVtEvent)continue;
-      if(keepIds.has(c.ev.id))continue;
-      try{
-        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${c.ev.id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
-        deleted++;
-      }catch(_){}
-    }
-
-    // Update routine.scheduledWeeks to point to surviving event IDs
-    routines.forEach(rr=>{
-      Object.keys(rr.scheduledWeeks||{}).forEach(wk=>{
-        rr.scheduledWeeks[wk]=(rr.scheduledWeeks[wk]||[]).map(it=>{
-          const dt=typeof it==='string'?it:it?.dt;if(!dt)return it;
-          const sig=normSum(rr.name||rr.text||'')+'|'+(new Date(dt).toISOString().slice(0,16));
-          const winner=groups[sig]?.find(c=>keepIds.has(c.ev.id));
-          if(winner)return{dt,eventId:winner.ev.id};
-          return typeof it==='object'?it:{dt,eventId:null};
-        });
-      });
-    });
-    saveRoutines();
-
-    let added=0;
-    // Tasks missing event
-    for(const t of tasks){
-      if(t.completed||!t.datetime)continue;
-      const evExists=t.calendarEventId&&items.some(ev=>ev.id===t.calendarEventId);
-      if(evExists)continue;
-      try{const evId=await createTaskCalendarEvent(t);if(evId){t.calendarEventId=evId;added++;}}catch(_){}
-    }
-    save();
-    // Bills missing events
-    for(const b of bills){
-      if(b.status==='paid')continue;
-      if(!b.payDate&&!b.deadline)continue;
-      const payOk=!b.payDate||(b.calendarEventId&&items.some(ev=>ev.id===b.calendarEventId));
-      const dlOk=!b.deadline||(b.deadlineEventId&&items.some(ev=>ev.id===b.deadlineEventId));
-      if(!payOk||!dlOk){
-        try{await syncBillToCalendar(b);added++;}catch(_){}
-      }
-    }
-    // Routines missing events for this week
-    for(const rt of routines){
-      if(!rt.enabled)continue;
-      const wk=getWeekKey();
-      const wkSlots=rt.scheduledWeeks?.[wk]||[];
-      for(const it of wkSlots){
-        const dt=typeof it==='string'?it:it?.dt;
-        const oldEv=typeof it==='object'?it.eventId:null;
-        if(!dt)continue;
-        const evExists=oldEv&&items.some(ev=>ev.id===oldEv);
-        if(evExists)continue;
-        try{
-          const ev=await createCalendarEvent(rt,dt);
-          if(ev?.id){
-            const idx=rt.scheduledWeeks[wk].indexOf(it);
-            if(idx>=0)rt.scheduledWeeks[wk][idx]={dt,eventId:ev.id};
-            added++;
-          }
-        }catch(_){}
-      }
-    }
-    saveRoutines();render();
-
-    chatHistory.push({role:'model',parts:[{text:`✅ *סנכרון יומן הושלם*\n\n• 🗑️ ${deleted} אירועים מיותרים/כפולים נמחקו\n• ➕ ${added} אירועים חדשים נוצרו\n• 🔄 היומן עכשיו תואם בדיוק למה שיש באפליקציה`}],ts:Date.now()});
-    saveChatHistory();
+    res.deleted=deleted;res.delFailed=delFailed;res.declined=declined;
+    const fails=res.failed+delFailed;
+    if(!res.added&&!res.updated&&!deleted&&!declined&&!fails)say('✓ סנכרון יומן: אין שינויים — היומן תואם לאפליקציה');
+    else say(`${fails?'❌':'✓'} סנכרון יומן: נוספו ${res.added}, עודכנו ${res.updated}, נמחקו ${deleted}${declined?`, ממתינים למחיקה ${declined} (לא אושר)`:''}${fails?`, נכשלו ${fails}`:''}`);
+    return res;
   }catch(e){
-    chatHistory.push({role:'model',parts:[{text:'❌ שגיאת סנכרון: '+e.message}],ts:Date.now()});
-    saveChatHistory();
+    say('❌ סנכרון יומן נכשל: '+(e&&e.message||e)+'. לא נמחק דבר.');
+    return res;
   }finally{
     typing.remove();
     _chatBusy=false;
@@ -11290,8 +11303,8 @@ function deleteBill(){
   if(!confirm('למחוק את החשבון?'))return;
   const b=bills.find(x=>x.id===_billEditId);
   if(b){
-    if(b.calendarEventId)deleteCalendarEvent(b.calendarEventId);
-    if(b.deadlineEventId)deleteCalendarEvent(b.deadlineEventId);
+    if(b.calendarEventId)delEventOrOrphan(b.calendarEventId,'vt_bill_id:'+b.id,b.payDate);     // D7: failure -> orphan
+    if(b.deadlineEventId)delEventOrOrphan(b.deadlineEventId,'vt_bill_id:'+b.id,b.deadline);
   }
   bills=bills.filter(x=>x.id!==_billEditId);
   saveBills();
@@ -12694,8 +12707,13 @@ function maybeShowDailyPopup(){
     },
     async skip_routine(m,back){
       const r=routineOf(m.target.id);if(!r)return false;
-      if(!back){m.snap={skipped:[...(r.skippedDates||[])]};skipRoutineInstance(r.id,m.target.dateStr);}
-      else{r.skippedDates=[...m.snap.skipped];saveRoutines();render();}
+      if(!back){m.snap={skipped:[...(r.skippedDates||[])]};await skipRoutineInstance(r.id,m.target.dateStr);}
+      else{
+        r.skippedDates=[...m.snap.skipped];saveRoutines();render();
+        // D7: skipping removed its event; Undo puts ONE event back
+        const it=Object.values(r.scheduledWeeks||{}).flat().find(x=>x&&typeof x==='object'&&x.dt===m.target.dateStr);
+        if(it&&(!it.eventId||String(it.eventId).startsWith('local_'))){const ev=await createCalendarEvent(r,it.dt);it.eventId=ev&&ev.id||null;saveRoutines();}
+      }
       return true;
     },
     async delete(m,back){
