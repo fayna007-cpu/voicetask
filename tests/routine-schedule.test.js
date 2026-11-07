@@ -114,6 +114,10 @@ check('HOME: today\'s instance stays until its END time (Fri 6 10:00-11:30: show
   const a = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:29:00+02:00')), b = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:31:00+02:00')), c = R.inHomeWindow(J(6, 10), 90, true, at('2026-11-06T11:31:00+02:00'));
   return a && !b && c ? '' : JSON.stringify({ a, b, c });
 });
+check('D6: a date passed over because of a live instance is reported (for the "דילגתי על…" line); no instance -> nothing reported', () => {
+  const g = R.generateProposals(S2, '2026-11-08', SAT9, { existing: [J(9, 18)] }), g0 = R.generateProposals(S2, '2026-11-08', SAT9, { existing: [] });
+  return show(g) === 'Wed 11 18:00, Fri 13 13:00, Mon 16 18:00' && g.skipped.length === 1 && g.skipped[0].ymd === '2026-11-09' && g.skipped[0].iso === J(9, 18) && g0.skipped.length === 0 && show(g0) === 'Mon 09 18:00, Wed 11 18:00, Fri 13 13:00' ? '' : JSON.stringify({ g: show(g), sk: g.skipped, g0: show(g0) });
+});
 check('garbage -> ok:false with a short note', () => { const p = R.parseRoutineDescription('בלה בלה בלה'); return !p.ok && p.note ? '' : JSON.stringify(p); });
 check('corrupted routine (×4, duplicate days, verbal): normalizeRoutine derives 3 from the description and does NOT mutate it', () => {
   const r = { id: 7, timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 }, scheduledWeeks: { '2026-11-01': [{ dt: '2026-11-02T16:00:00.000Z', eventId: 'e1' }] } };
