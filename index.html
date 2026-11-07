@@ -3637,11 +3637,10 @@ function getRoutineInstances(){
   return instances;
 }
 
-const HOME_ROUTINE_WINDOW_DAYS=8;
+// HOME routines: today through the Saturday of next week (RSchedule.homeWindow), until each instance's end time.
 function homeRoutineInstances(all=getRoutineInstances()){
-  const now=new Date(),from=new Date(now);from.setHours(0,0,0,0);
-  const to=new Date(from);to.setDate(to.getDate()+HOME_ROUTINE_WINDOW_DAYS+1);      // exclusive: the end of day +8
-  return all.filter(i=>{const s=new Date(i.datetime),e=new Date(+s+(i.duration||60)*60000);return s>=from&&s<to&&(i.completed||e>now);})
+  const now=new Date();
+  return all.filter(i=>RSchedule.inHomeWindow(i.datetime,i.duration,i.completed,now))
     .sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
 }
 
@@ -3764,8 +3763,8 @@ function render(){
   renderTodayPlan();
   const el=document.getElementById('list');if(!el)return;
   const routineInstances=getRoutineInstances();
-  // D3 HOME routines window: today through today + HOME_ROUTINE_WINDOW_DAYS (inclusive); an instance stays until
-  // its END time has passed; completed ones stay, marked; no per-routine cap, no weekday filter.
+  // D3 HOME routines window: today through the Saturday of next week; an instance stays until its END time has
+  // passed; completed ones stay, marked; no per-routine cap, no weekday filter.
   const homeRoutines=homeRoutineInstances(routineInstances);
   let taskList=filter==='done'
     ?tasks.filter(t=>t.completed).sort((a,b)=>new Date(a.datetime)-new Date(b.datetime))

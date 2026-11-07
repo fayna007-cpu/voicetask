@@ -93,6 +93,27 @@ for (const [name, start, now, existing, want] of D3) {
     });
   }
 }
+// HOME window: from today through the SATURDAY OF NEXT WEEK (Sun-Sat weeks; at most 14 days)
+const J = (d, h, m = 0) => new Date(Date.UTC(2026, 10, d, h - 2, m)).toISOString();     // Jerusalem winter = UTC+2
+const shown = (now, list) => list.filter(([iso, done]) => R.inHomeWindow(iso, 90, !!done, now)).map(([iso]) => iso);
+check('HOME (a) Wed 11/11 09:00: existing Wed 11 + Fri 13 + new Mon 16, Wed 18, Fri 20 -> exactly 5 (window ends Sat 21)', () => {
+  const now = at('2026-11-11T09:00:00+02:00'), list = [[J(11, 18)], [J(13, 13)], [J(16, 18)], [J(18, 18)], [J(20, 13)], [J(22, 18)]];
+  const w = R.homeWindow(now), s = shown(now, list);
+  return w.to === '2026-11-21' && s.length === 5 && !s.includes(J(22, 18)) ? '' : JSON.stringify({ w, s });
+});
+check('HOME (b) Fri 6/11 -> window ends Sat 14: Fri 13 shown, Sun 15 not', () => {
+  const now = at('2026-11-06T09:00:00+02:00'), w = R.homeWindow(now), s = shown(now, [[J(13, 13)], [J(15, 18)]]);
+  return w.to === '2026-11-14' && s.join() === J(13, 13) ? '' : JSON.stringify({ w, s });
+});
+check('HOME (c) Sat 7/11 09:00 -> ends Sat 14; a manual Saturday instance (Sat 7 14:00) shows; Sat 14 shows, Sun 15 not', () => {
+  const now = at('2026-11-07T09:00:00+02:00'), w = R.homeWindow(now), s = shown(now, [[J(7, 14)], [J(14, 18)], [J(15, 18)]]);
+  return w.to === '2026-11-14' && s.join() === [J(7, 14), J(14, 18)].join() ? '' : JSON.stringify({ w, s });
+});
+check('HOME (d) Sun 8/11 -> ends Sat 21 (14 days, the maximum)', () => { const w = R.homeWindow(at('2026-11-08T09:00:00+02:00')); return w.from === '2026-11-08' && w.to === '2026-11-21' ? '' : JSON.stringify(w); });
+check('HOME: today\'s instance stays until its END time (Fri 6 10:00-11:30: shown at 11:29, gone at 11:31 unless completed)', () => {
+  const a = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:29:00+02:00')), b = R.inHomeWindow(J(6, 10), 90, false, at('2026-11-06T11:31:00+02:00')), c = R.inHomeWindow(J(6, 10), 90, true, at('2026-11-06T11:31:00+02:00'));
+  return a && !b && c ? '' : JSON.stringify({ a, b, c });
+});
 check('garbage -> ok:false with a short note', () => { const p = R.parseRoutineDescription('בלה בלה בלה'); return !p.ok && p.note ? '' : JSON.stringify(p); });
 check('corrupted routine (×4, duplicate days, verbal): normalizeRoutine derives 3 from the description and does NOT mutate it', () => {
   const r = { id: 7, timesPerWeek: 4, preferredDays: [1, 1, 3, 3, 5, 5], scheduleMode: 'verbal', verbCondition: T1, verbParsed: { timesPerWeek: 4 }, scheduledWeeks: { '2026-11-01': [{ dt: '2026-11-02T16:00:00.000Z', eventId: 'e1' }] } };

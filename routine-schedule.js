@@ -190,6 +190,16 @@
     return out.sort(function (a, b) { return a.iso < b.iso ? -1 : 1; });
   }
 
+  // ── HOME routines window: from today through the SATURDAY OF NEXT WEEK (weeks Sun-Sat; at most 14 days, in
+  // Asia/Jerusalem). An instance stays until its END time has passed; a completed one stays (marked). ──
+  function homeWindow(now) { var t = ymdIn(now || new Date()); return { from: t, to: addDays(t, 6 - dowOf(t) + 7) }; }
+  function inHomeWindow(iso, durationMin, completed, now) {
+    now = now || new Date();
+    var w = homeWindow(now), day = ymdIn(new Date(iso));
+    if (day < w.from || day > w.to) return false;
+    return !!completed || new Date(+new Date(iso) + (durationMin || 60) * 60000) > now;
+  }
+
   // ── derived values for the UI and the legacy fields ──
   var LETTER = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שב׳'];
   function derive(spec) {
@@ -205,5 +215,5 @@
   function plural(n, noun) { var w = NOUNS[noun] || [noun, noun]; return n === 1 ? w[0] + (w[0].endsWith('ה') ? ' אחת' : ' אחד') : n + ' ' + w[1]; }
 
   return { parseRoutineDescription: parseRoutineDescription, normalizeRoutine: normalizeRoutine, specFromManual: specFromManual, weeklyPattern: weeklyPattern,
-    generateProposals: generateProposals, derive: derive, perWeek: perWeek, plural: plural, uniqDays: uniq, WIN_TIME: WIN_TIME, TZ: TZ };
+    generateProposals: generateProposals, derive: derive, homeWindow: homeWindow, inHomeWindow: inHomeWindow, perWeek: perWeek, plural: plural, uniqDays: uniq, WIN_TIME: WIN_TIME, TZ: TZ };
 });
