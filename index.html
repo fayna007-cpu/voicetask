@@ -12047,6 +12047,7 @@ function maybeShowDailyPopup(){
     needDate:'בחר יום לפני האישור',needWhen:'ערוך את המועד לפני הוספה',
     // R7 clarification: ONE short question each
     qTitle:'מה לקבוע?',qDay:'לאיזה יום?',qPast:'התאריך עבר, לאיזה יום לקבוע?',qConflict:'היום והתאריך לא מסתדרים — מה נכון?',
+    qRoutine:w=>w?`לאיזה ${w}?`:'לאיזו שגרה?',regularTask:'משימה רגילה',
     qWhichDate:'יש כמה תאריכים — לאיזה לקבוע?',pickDate:'📅 בחר תאריך',discarded:'בסדר, עזבתי 👍',draftOk:'לאשר הוספה?',
     // R9 detail card
     detailReply:'הודעה ארוכה — ריכזתי למשימה אחת',summarizing:'מסכם…',until:t=>`⏰ עד ${t}`,
@@ -12104,12 +12105,43 @@ function maybeShowDailyPopup(){
   };
   A.ordinalOf=t=>{const m=String(t).match(/(?:^|\s)(הראשון|הראשונה|השני|השנייה|השניה|השלישי|השלישית|הרביעי|האחרון|האחרונה)(?=\s|$)/);return m?ORDINAL[m[1]]:null;};
   // R3: does a new task's title name an existing routine?
-  A.matchRoutine=function(title){
-    const w=tokens(title);if(!w.length)return null;
-    let best=null,score=0;
-    for(const r of routines){const s=overlap(w,tokens(r.name||r.text));if(s>score){score=s;best=r;}}
-    return score?best:null;
+  // D4: ALL routines a title may name (never a silent pick among several). Whole words first (exact match, no prefix
+  // stripping); the prefix-stripped overlap is only the fallback. Ties are all returned.
+  const rawWords=s=>String(s||'').split(/[\s,.:;!?()\-–—"'׳״]+/).filter(w=>w.length>=2).map(w=>w.toLowerCase());
+  A.matchRoutines=function(title){
+    const w=tokens(title);if(!w.length)return[];
+    const rw=rawWords(title).filter(x=>!STOP.has(x));
+    const top=f=>{const sc=routines.map(f),best=Math.max(0,...sc);return best?routines.filter((r,i)=>sc[i]===best):[];};
+    const whole=top(r=>{const nm=new Set(rawWords(r.name||r.text));return rw.filter(x=>nm.has(x)).length;});
+    return whole.length?whole:top(r=>overlap(w,tokens(r.name||r.text)));
   };
+  A.matchRoutine=t=>A.matchRoutines(t)[0]||null;                // single-routine callers keep working
+  // The words that tell the candidates apart ("השלמה" / "שגרה"): a candidate's own words = its words minus those all share.
+  const ownWords=cands=>{const sets=cands.map(r=>tokens(r.name||r.text));return sets.map(s=>s.filter(t=>!sets.every(x=>x.includes(t))));};
+  // The ONE candidate whose own words appear in the text, or null (none, or a tie -> the user has to say which).
+  A.distinguish=function(cands,text){
+    const own=ownWords(cands),tt=tokens(text),hits=own.map(o=>overlap(o,tt)),mx=Math.max(0,...hits);
+    if(!mx)return null;
+    const at=hits.map((h,i)=>h===mx?i:-1).filter(i=>i>=0);
+    return at.length===1?cands[at[0]]:null;
+  };
+  const plainCands=rs=>rs.map(r=>({id:r.id,name:r.name||r.text||''}));
+  // {cands:[{id,name}], pick:id|null}: one candidate -> it; several -> the distinguished one, else null (ask).
+  A.routineFor=function(title,text){
+    const rs=A.matchRoutines(title);
+    if(!rs.length)return{cands:[],pick:null};
+    if(rs.length===1)return{cands:plainCands(rs),pick:rs[0].id};
+    const d=A.distinguish(rs,text);
+    return{cands:plainCands(rs),pick:d?d.id:null};
+  };
+  // Put the routine choice on a confirmation card. Several candidates: they all stay as switch chips; with no
+  // pick the card defaults to a regular task (never a silent routine).
+  function setRoutineOn(m,cands,pickId){
+    if(!cands||!cands.length)return;
+    if(cands.length>1)m.routineCands=cands;
+    const c=pickId&&pickId!=='task'?cands.find(x=>String(x.id)===String(pickId)):(cands.length===1?cands[0]:null);
+    if(c){m.routineId=c.id;m.routineName=c.name;m.choice='instance';}else m.choice='task';
+  }
   // R3: explicit recurrence only (never invented): count per week, explicit weekdays, time-of-day.
   A.parseRecurrence=function(text){
     const t=String(text);const DAYS={'ראשון':0,'שני':1,'שלישי':2,'רביעי':3,'חמישי':4,'שישי':5,'שבת':6};
@@ -12263,13 +12295,16 @@ function maybeShowDailyPopup(){
       items.forEach(it=>{it.when=resolve(it);if(it.when.warn)it.checked=false;if(it.when.iso){it.date=ymdOf(it.when.iso);it.time=hmOf(it.when.iso);}});
       const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:prov,intent,reply,items,state:'open',src:text,mode,fromPending:!!opts.fromPending};
       if(items.length>1)m.batchId=m.id;                          // R6: checkboxes only for a batch from ONE message
+      let sel={cands:[],pick:null};
       if(intent==='add_routine')m.recurrence=rec;
-      else if(!forceTask&&items.length===1){                     // a new item that names an existing routine
-        const r=A.matchRoutine(items[0].title);
-        if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}
+      else if(!forceTask&&items.length===1){                     // a new item that names existing routine(s)
+        sel=A.routineFor(items[0].title,text);
+        setRoutineOn(m,sel.cands,sel.pick);
       }
-      // R7: a single add with a missing / contradictory field -> ONE short question instead of a half-empty card
-      if(intent==='add_tasks'&&items.length===1&&!opts.fromPending&&A.clarifyStart(items[0],text,prov,forceTask))return 'clarify';
+      // R7 / D4: a single add with a missing / contradictory field, or naming SEVERAL routines with no telling
+      // word, -> ONE short question instead of a half-empty card or a silent pick
+      const askRoutine=sel.cands.length>1&&!sel.pick?sel.cands:null;
+      if(intent==='add_tasks'&&items.length===1&&!opts.fromPending&&A.clarifyStart(items[0],text,prov,forceTask,askRoutine))return 'clarify';
       m.quote=text;
       chatHistory.push(m);
       return 'proposal';
@@ -12381,8 +12416,8 @@ function maybeShowDailyPopup(){
       if(one){
         chips+=chip(SAY.toRoutine,`AlfredAI.convertMenu('${m.id}')`,ch)+chip(SAY.edit,`AlfredAI.editCreated('${m.id}')`,ch);
         if(m.convertMenu&&!ch){
-          const r=A.matchRoutine(one.text);            // an existing routine -> its instance; else a NEW routine via the form
-          chips+=r?chip(esc(SAY.asInstance(r.name||r.text||'')),`AlfredAI.convert('${m.id}','instance','${attr(r.id)}')`):chip(SAY.newRoutine,`AlfredAI.convert('${m.id}','new')`);
+          const rs=A.matchRoutines(one.text);          // existing routine(s) -> an instance of each (all offered); else a NEW routine via the form
+          chips+=rs.length?rs.map(r=>chip(esc(SAY.asInstance(r.name||r.text||'')),`AlfredAI.convert('${m.id}','instance','${attr(r.id)}')`)).join(''):chip(SAY.newRoutine,`AlfredAI.convert('${m.id}','new')`);
         }
       }
       return `<div class="chat-bubble bot">${quoteSpan(m)}${esc(text)}${ch?`<br><span class="chat-provider">${SAY.changed}</span>`:''}<div class="chat-suggestions">${chips}</div></div>`;
@@ -12412,7 +12447,11 @@ function maybeShowDailyPopup(){
     }
     const n=m.items.filter(it=>it.checked).length;
     const yes=m.intent==='add_routine'?'✓ פתח טופס שגרה':isInst?'✓ הוסף מופע':single?SAY.approve:SAY.addN(n);
-    const kindChips=m.routineId?`<div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','instance')">${isInst?'✓ ':''}מופע של שגרת "${esc(m.routineName||'')}"</button><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','task')">${isInst?'':'✓ '}משימה רגילה</button></div>`:'';
+    const cands=m.routineCands&&m.routineCands.length>1?m.routineCands:null;
+    // D4: several candidate routines -> one chip per REAL routine name + a regular task; the chosen one is ticked
+    const kindChips=cands
+      ?`<div class="chat-suggestions">${cands.map(c=>chip((isInst&&String(m.routineId)===String(c.id)?'✓ ':'')+'מופע של שגרת "'+esc(c.name)+'"',`AlfredAI.choose('${m.id}','r:${attr(c.id)}')`)).join('')}${chip((isInst?'':'✓ ')+SAY.regularTask,`AlfredAI.choose('${m.id}','task')`)}</div>`
+      :m.routineId?`<div class="chat-suggestions"><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','instance')">${isInst?'✓ ':''}מופע של שגרת "${esc(m.routineName||'')}"</button><button class="chat-suggestion" onclick="AlfredAI.choose('${m.id}','task')">${isInst?'':'✓ '}משימה רגילה</button></div>`:'';
     const editBtn=single&&m.intent!=='add_routine'?`<button class="chat-confirm-no" onclick="AlfredAI.edit('${m.id}',0)">${SAY.edit}</button>`:'';
     return `<div class="chat-confirm"><div class="chat-confirm-title">${m.fromPending?'📥 ':'📝 '}${esc(m.reply||'לאשר הוספה?')}</div>${body}${kindChips}<div class="chat-confirm-actions"><button class="chat-confirm-yes" onclick="AlfredAI.approve('${m.id}')">${yes}</button>${editBtn}<button class="chat-confirm-no" onclick="AlfredAI.cancel('${m.id}')">${SAY.cancel}</button></div><div class="chat-suggestions"><span class="chat-provider">via ${esc(m.provider||'')}</span></div></div>`;
   };
@@ -12427,7 +12466,14 @@ function maybeShowDailyPopup(){
       if(more)hint.textContent=`עוד ${below} ↓ — גלול לראות הכל`;
     });
   };
-  A.choose=function(id,c){const m=find(id);if(!m||m.state!=='open')return;m.choice=c;saveChatHistory();renderChatMessages();};
+  A.choose=function(id,c){
+    const m=find(id);if(!m||m.state!=='open')return;
+    if(String(c).startsWith('r:')){                                     // D4: switch to one of the candidate routines (own id only)
+      const r=(m.routineCands||[]).find(x=>String(x.id)===String(c).slice(2));if(!r)return;
+      m.routineId=r.id;m.routineName=r.name;m.choice='instance';
+    }else m.choice=c;
+    saveChatHistory();renderChatMessages();
+  };
   // A routine instance through the existing quick-add-instance flow (same calendar event + scheduledWeeks entry).
   A.addInstance=async function(routineId,iso){
     quickAddInstance(routineId);
@@ -12815,6 +12861,11 @@ function maybeShowDailyPopup(){
     }
     if(!d.date&&(followUp||!d.time))return{missing:'day',q:SAY.qDay,options:dayOptions(),pick:true};
     if(d.date&&d.date<todayYmd())return{missing:'past',q:SAY.qPast,options:dayOptions(),pick:true};
+    // D4: several routines carry this name and nothing in the message tells them apart -> ask which (real names + a regular task)
+    if(d.cands&&d.cands.length>1&&d.pick===undefined){
+      const common=rawWords(d.title).find(w=>d.cands.every(c=>rawWords(c.name).includes(w)));
+      return{missing:'routine',q:SAY.qRoutine(common),options:[...d.cands.map(c=>({label:c.name,value:String(c.id)})),{label:SAY.regularTask,value:'task'}]};
+    }
     return null;
   }
   function lastUser(){for(let i=chatHistory.length-1;i>=0;i--){const m=chatHistory[i];if(m.role==='user'){if(!m.id)m.id='u'+A.uid();return m;}}return null;}
@@ -12836,7 +12887,11 @@ function maybeShowDailyPopup(){
     const it={title:d.title||'',category:d.category||'',date_text:'',time_text:'',notes:d.notes||'',checked:true,date:d.date||'',time:d.time||'',
       when:w&&!isNaN(w)?{iso:w.toISOString(),label:fmtWhen(w),warn:''}:{iso:null,label:'',warn:''}};
     const m={role:'model',kind:'proposal',id:A.newId(),ts:Date.now(),provider:pc.prov||'Alfred',intent:'add_tasks',reply:SAY.draftOk,items:[it],state:'open',src:pc.src,mode:'tasks',quote:pc.src};
-    if(!pc.forceTask&&it.title){const r=A.matchRoutine(it.title);if(r){m.routineId=r.id;m.routineName=r.name||r.text||'';m.choice='instance';}}
+    if(!pc.forceTask&&it.title){
+      // the choice made in the clarification wins; otherwise match the (possibly new) title now
+      if(d.cands&&d.cands.length>1)setRoutineOn(m,d.cands,d.pick);
+      else{const sel=A.routineFor(it.title,pc.src);setRoutineOn(m,sel.cands,sel.pick);}
+    }
     chatHistory.push(m);
   }
   function step(pc){
@@ -12844,8 +12899,9 @@ function maybeShowDailyPopup(){
     if(!need||pc.askedCount>=2){draftCard(pc);return;}                  // max 2 questions, then the card (never loop)
     ask(pc,need);
   }
-  A.clarifyStart=function(it,src,prov,forceTask){
+  A.clarifyStart=function(it,src,prov,forceTask,routineCands){
     const d={title:(it.title||'').trim(),date:it.date||'',time:it.time||'',notes:it.notes||'',category:it.category||''};
+    if(routineCands&&routineCands.length>1)d.cands=routineCands;          // D4: pick stays undefined until the user answers
     if(!it.when||!it.when.iso){d.date='';d.time='';}
     if(it.when&&it.when.warn&&(it.date_text||it.time_text))return false;  // a passed bare hour: the card's flip chip handles it
     if(!d.date&&!d.time&&(it.date_text||it.time_text))return false;       // words the parser could not read: the card warns
@@ -12876,7 +12932,13 @@ function maybeShowDailyPopup(){
     const t=String(text).trim();
     if(DISCARD.test(t)){dropDraft(SAY.discarded);return true;}
     const d=pc.draft;
-    if(pc.missing==='title'){
+    if(pc.missing==='routine'){                                           // D4: a typed word that tells them apart answers it
+      const cs=(d.cands||[]).map(c=>routines.find(r=>String(r.id)===String(c.id))).filter(Boolean);
+      const hit=cs.length>1?A.distinguish(cs,t):null;
+      if(hit)d.pick=hit.id;
+      else if(/^(משימה(\s+רגילה)?|רגילה|בלי שגרה|לא שגרה)[\s.!]*$/.test(t))d.pick='task';
+      else{dropDraft();return false;}                                     // anything else: route normally, the draft collapses
+    }else if(pc.missing==='title'){
       if(isPasted(t)||ACTION_ANY.test(t)||/[?？]$/.test(t)||t.split(/\s+/).length>8||asWhen(t)){dropDraft();return false;}
       const T=T_(),r=T?T.parseHebrewDateTime(t,{now:new Date()}):null;
       d.title=((r&&r.title)||t).replace(ADD_VERB,'').trim().slice(0,120)||t;
@@ -12892,7 +12954,12 @@ function maybeShowDailyPopup(){
     return true;
   };
   A.clarifyPick=function(id,value){
-    const pc=A.pc;if(!pc||pc.msgId!==id||!/^\d{4}-\d{2}-\d{2}$/.test(value))return;
+    const pc=A.pc;if(!pc||pc.msgId!==id)return;
+    if(pc.missing==='routine'){                                           // D4: a tapped routine name (or the regular-task chip)
+      if(value!=='task'&&!(pc.draft.cands||[]).some(c=>String(c.id)===String(value)))return;
+      pc.draft.pick=value;step(pc);saveChatHistory();renderChatMessages();return;
+    }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return;
     pc.draft.date=value;
     if(pc.missing==='dates'||pc.missing==='conflict')pc.draft.time=pc.draft.time||'';
     step(pc);saveChatHistory();renderChatMessages();
