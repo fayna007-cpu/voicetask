@@ -14,6 +14,8 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="hebrew-time.js"></script>
 <script src="routine-schedule.js"></script>
+<script src="workout-core.js"></script>
+<script src="workout.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
@@ -266,6 +268,10 @@
     <button class="side-item" onclick="closeSideMenu();openRoutineSheet()">
       <div class="side-item-ico purple">🔄</div>
       שגרות
+    </button>
+    <button class="side-item" onclick="closeSideMenu();Workout.open()">
+      <div class="side-item-ico green">🏋️</div>
+      אימונים
     </button>
     <button class="side-item" onclick="closeSideMenu();openNotifManager()">
       <div class="side-item-ico yellow">🔔</div>
@@ -4219,7 +4225,7 @@ function openRoutineSheet(){
 }
 function closeRoutineSheet(){
   const ov=document.getElementById('routineOverlay');
-  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet','assistantSheet','agentPersonaSheet'];
+  const sheetIds=['routineListSheet','routineFormSheet','scheduleSheet','settingsSheet','notifManagerSheet','notifFormSheet','calGcalEditSheet','pendingSheet','otSheet','smartSuggestSheet','billsListSheet','billFormSheet','assistantSheet','agentPersonaSheet','wkSheet'];
   ov.style.opacity='';ov.style.transition='';
   sheetIds.forEach(id=>{const s=document.getElementById(id);if(!s)return;s.style.transform='';s.style.transition='';void s.offsetHeight;s.classList.remove('on');});
   ov.classList.remove('on');
@@ -5435,7 +5441,7 @@ function initSheetSwipe(sheetEl,overlayEl){
       setTimeout(()=>{
         sheetEl.style.transform='';sheetEl.style.transition='';
         overlayEl.style.opacity='';overlayEl.style.transition='';
-        ['routineListSheet','routineFormSheet','scheduleSheet','notifManagerSheet','notifFormSheet'].forEach(id=>{
+        ['routineListSheet','routineFormSheet','scheduleSheet','notifManagerSheet','notifFormSheet','wkSheet'].forEach(id=>{
           const el=document.getElementById(id);if(el)el.classList.remove('on');
         });
         overlayEl.classList.remove('on');
