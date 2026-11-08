@@ -2888,10 +2888,11 @@ async function removeRoutineInstanceEvent(r,dt){
     return;
   }
   if(!await getToken().catch(()=>null))return;                     // not connected: nothing the app can remove now
-  const d0=new Date(dt);d0.setHours(0,0,0,0);const d1=new Date(d0);d1.setDate(d1.getDate()+1);
-  const L=await listMarkedEvents(d0,d1);
+  // marker + routine id + that exact start minute (D8: never a sibling instance's event the same day)
+  const d0=new Date(dt);
+  const L=await listMarkedEvents(new Date(+d0-60000),new Date(+d0+120000));
   if(!L.ok){addCalOrphan({eventId:null,marker,dt});return;}
-  for(const ev of L.items.filter(e=>(e.description||'').includes(marker+'\n')||(e.description||'').endsWith(marker)))await delEventOrOrphan(ev.id,marker,dt);
+  for(const ev of markedAtMinute(L.items,r,dt))await delEventOrOrphan(ev.id,marker,dt);
 }
 
 // ── Siri UI ───────────────────────────────────────────────────────────────────
@@ -3556,36 +3557,26 @@ async function confirmPostpone(opts){
   } else if(type==='routine'){
     const r=routines.find(x=>x.id==routineId);if(!r)return;
     const newDt=new Date(inp.value).toISOString();
-    const newWk=getWeekKey(new Date(newDt));
-    let oldEventId=null;let oldWk=null;let oldIndex=-1;
-    Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
-      (r.scheduledWeeks[wk]||[]).forEach((item,i)=>{
-        const dt=typeof item==='string'?item:item?.dt;
-        if(dt===dateStr){
-          oldEventId=typeof item==='object'?item.eventId:null;
-          oldWk=wk;oldIndex=i;
-        }
-      });
-    });
-    // If the old instance is missing from scheduledWeeks (already purged
-    // by a previous reschedule or week cleanup), don't bail — proceed to
-    // create the new event. Old-instance calendar purge is best-effort
-    // via purgeRoutineInstance which handles missing gracefully.
     closePostpone();toast('⏳ דוחה ומנקה יומן...');
-    // Purge ALL events for this routine on the old date (handles duplicates)
-    await purgeRoutineInstance(r.id,dateStr).catch(()=>{});
-    // Remove from old week if it was found
-    if(oldIndex!==-1&&oldWk){r.scheduledWeeks[oldWk].splice(oldIndex,1);}
-    // Create new calendar event
-    let newEventId=null;
-    try{const ev=await createCalendarEvent(r,newDt);newEventId=ev?.id||null;}catch(_){}
-    if(!r.scheduledWeeks[newWk])r.scheduledWeeks[newWk]=[];
-    r.scheduledWeeks[newWk].push({dt:newDt,eventId:newEventId});
-    [r.completedDates,r.skippedDates].forEach(arr=>{
-      if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
-    });
-    saveRoutines();render();
-    scheduleSmartPushNotifs();
+    // D8: THIS instance moves through the shared helper (the assistant uses it too): only its own event is replaced
+    // (stored id, else marker + routine id + exact start); the routine's other instances that day keep theirs.
+    const res=await moveRoutineInstance(r.id,dateStr,newDt);
+    let newEventId=res.ok&&res.calendar==='moved'?'moved':null;
+    if(!res.ok){
+      // The old instance is missing from scheduledWeeks (purged by an earlier reschedule / cleanup): keep going and
+      // create the new instance with its event; nothing else in the calendar is touched.
+      let ev=null;try{ev=await createCalendarEvent(r,newDt);}catch(_){}
+      newEventId=ev?.id||null;
+      const nw=getWeekKey(new Date(newDt));
+      if(!r.scheduledWeeks)r.scheduledWeeks={};
+      if(!r.scheduledWeeks[nw])r.scheduledWeeks[nw]=[];
+      r.scheduledWeeks[nw].push({dt:newDt,eventId:newEventId});
+      [r.completedDates,r.skippedDates].forEach(arr=>{
+        if(!arr)return;const idx=arr.indexOf(dateStr);if(idx!==-1)arr[idx]=newDt;
+      });
+      saveRoutines();render();
+      scheduleSmartPushNotifs();
+    }
     toast(newEventId?'📅 שגרה נדחתה — היומן עודכן':'📅 שגרה נדחתה');
   } else if(type==='bill'){
     const b=bills.find(x=>x.id===taskId);if(!b)return;
@@ -4622,20 +4613,34 @@ function saveRoutineInstanceTime(safeId,routineId,oldDateStr){
 // when it has a calendar event, that event is replaced exactly once (same purge/create functions as
 // confirmPostpone); when it has none, the calendar is left alone. A calendar failure never blocks the move.
 // Returns {ok, calendar:'none'|'moved'|'failed'}.
+// D8: ONLY this instance's event is replaced: by its stored id, else by this routine's app marker at EXACTLY that
+// start minute (never a sibling instance's event on the same day). A delete that fails becomes an orphan offered at
+// the next calendar sync; the instance moves either way.
+const markedAtMinute=(items,r,dt)=>{const marker='vt_routine_id:'+r.id,min=x=>new Date(x).toISOString().slice(0,16);
+  return items.filter(e=>{const d=e.description||'';return (d.includes(marker+'\n')||d.endsWith(marker))&&e.start&&(e.start.dateTime||e.start.date)&&min(e.start.dateTime||e.start.date)===min(dt);});};
+async function routineEventsAt(r,dt){
+  if(!await getToken().catch(()=>null))return[];
+  const s0=new Date(dt),L=await listMarkedEvents(new Date(+s0-60000),new Date(+s0+120000));
+  return L.ok?markedAtMinute(L.items,r,dt):[];
+}
 async function moveRoutineInstance(routineId,oldDateStr,newDt){
   const r=routines.find(x=>x.id==routineId);if(!r)return{ok:false};
-  let oldEv=null,replaced=false;
+  let oldEv=null,hit=null;
   Object.keys(r.scheduledWeeks||{}).forEach(wk=>{
     r.scheduledWeeks[wk].forEach((item,i)=>{
       const dt=typeof item==='string'?item:item?.dt;
-      if(dt===oldDateStr){
+      if(dt===oldDateStr&&!hit){
         if(item&&typeof item==='object'&&item.eventId&&!String(item.eventId).startsWith('local_'))oldEv=item.eventId;
-        r.scheduledWeeks[wk][i]=typeof item==='string'?newDt:{...item,dt:newDt};
-        replaced=true;
+        hit={wk,i,item};
       }
     });
   });
-  if(!replaced)return{ok:false};
+  if(!hit)return{ok:false};
+  // the instance keeps its flags and moves; it is filed under the week of its NEW date (as the manual postpone always did)
+  const moved=typeof hit.item==='string'?newDt:{...hit.item,dt:newDt};
+  const newWk=getWeekKey(new Date(newDt));
+  if(newWk===hit.wk)r.scheduledWeeks[hit.wk][hit.i]=moved;
+  else{r.scheduledWeeks[hit.wk].splice(hit.i,1);(r.scheduledWeeks[newWk]=r.scheduledWeeks[newWk]||[]).push(moved);}
   [r.completedDates,r.skippedDates].forEach(arr=>{
     if(!arr)return;
     const idx=arr.indexOf(oldDateStr);
@@ -4643,14 +4648,13 @@ async function moveRoutineInstance(routineId,oldDateStr,newDt){
   });
   saveRoutines();render();
   let calendar='none';
-  if(oldEv){
+  const marker='vt_routine_id:'+r.id;
+  let olds=oldEv?[oldEv]:[];
+  if(!olds.length){try{olds=(await routineEventsAt(r,oldDateStr)).map(e=>e.id);}catch(_){olds=[];}}
+  if(olds.length){
+    for(const id of olds)await delEventOrOrphan(id,marker,oldDateStr);   // failure -> orphan, never swallowed
     let ev=null;
-    try{
-      // Only this instance's own start minute: a whole-day purge would also delete a sibling instance's event that day.
-      const s0=new Date(oldDateStr);
-      if(!await purgeCalendarEventsByMarker('vt_routine_id:'+r.id,s0,new Date(+s0+60000)))await deleteCalendarEvent(oldEv);   // no marker hit -> by id
-      ev=await createCalendarEvent(r,newDt);
-    }catch(_){}
+    try{ev=await createCalendarEvent(r,newDt);}catch(_){}
     const okEv=ev&&ev.id&&!String(ev.id).startsWith('local_');
     Object.values(r.scheduledWeeks).forEach(arr=>arr.forEach(item=>{if(item&&typeof item==='object'&&item.dt===newDt)item.eventId=okEv?ev.id:null;}));
     calendar=okEv?'moved':'failed';
