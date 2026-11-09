@@ -192,6 +192,84 @@
     return (a && a.muscle) || DEFAULT_ALIASES[k] || null;
   }
 
+  // ── live workout engine: targets, rest, ONE reducer over an action log (pure; times come in on the actions) ──
+  var EQUIP = { dumbbell: { unit: 'kg', step: 2 }, barbell: { unit: 'kg', step: 2.5 }, machine: { unit: 'plates', step: 0.5 }, cable: { unit: 'kg', step: 2.5 }, bodyweight: { unit: null, step: 0 } };
+  var round2 = function (x) { return Math.round(x * 100) / 100; };
+  // snap to the step, never below one step; step 0 (bodyweight) = no weight
+  function snap(w, step) { if (w == null || !isFinite(w)) return null; if (!step) return round2(w); return Math.max(step, round2(Math.round(w / step) * step)); }
+  function rangeStatus(r, range) { return !range ? 'in' : r < range[0] ? 'below' : r > range[1] ? 'above' : 'in'; }
+  function restFor(reps, ex) { if (ex && ex.restSec > 0) return ex.restSec; return reps <= 6 ? 150 : reps <= 10 ? 120 : 75; }
+  function rangeOf(ex, i) { var rs = (ex.scheme && ex.scheme.ranges) || [[8, 12]]; return rs[Math.min(i, rs.length - 1)]; }
+  // Targets for every slot of an exercise: [{w, range, aim}]. `last` = the last session's sets for it (history beats the formula),
+  // `logged` = the sets already done today (set 1 off its target by more than a step rescales the rest).
+  function targetsFor(ex, last, logged) {
+    var sc = ex.scheme || {}, n = Math.max(sc.sets || 3, (logged || []).length), drop = sc.drop == null ? 0.2 : sc.drop, step = ex.step || 0, bw = ex.equip === 'bodyweight' || !step;
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var range = rangeOf(ex, i), l = last && last[i], w, aim;
+      if (l && l.r != null) {
+        if (l.r >= range[1]) { w = bw ? null : snap((l.w || 0) + step, step); aim = bw ? Math.min(l.r + 1, range[1]) : range[0]; }
+        else { w = bw ? null : snap(l.w, step); aim = Math.min(Math.max(l.r + 1, range[0]), range[1]); }
+      } else {
+        w = bw ? null : i === 0 ? snap(ex.startW, step) : snap(out[i - 1].w * (1 - drop), step);
+        aim = range[0];
+      }
+      out.push({ w: w, range: range, aim: aim });
+    }
+    var s1 = logged && logged[0];
+    if (!bw && s1 && s1.w != null && out[0].w && Math.abs(s1.w - out[0].w) > step) {
+      var ratio = s1.w / out[0].w;
+      for (var k = 1; k < out.length; k++) out[k].w = snap(out[k].w * ratio, step);
+    }
+    return out;
+  }
+  function nextEx(exs, from) {                                            // the next exercise not skipped and not complete
+    for (var k = 1; k <= exs.length; k++) { var j = (from + k) % exs.length, e = exs[j]; if (!e.skipped && e.sets.length < ((e.scheme && e.scheme.sets) || 3)) return j; }
+    return from;
+  }
+  function liveEx(p) { return { pid: p.id || null, label: String(p.label || ''), muscle: p.muscle || null, equip: p.equip || 'dumbbell', unit: p.unit === undefined ? (EQUIP[p.equip] || EQUIP.dumbbell).unit : p.unit, step: p.step == null ? (EQUIP[p.equip] || EQUIP.dumbbell).step : p.step, scheme: p.scheme || { sets: 3, ranges: [[4, 6], [6, 10], [10, 15]], drop: 0.2 }, startW: p.startW == null ? null : p.startW, restSec: p.restSec || 0, skipped: false, sets: [] }; }
+  // ONE reducer. Unknown or malformed actions are ignored (tolerant replay of an old draft).
+  function reduce(st, a) {
+    if (!a || !a.type) return st;
+    if (a.type === 'START') return { program: { id: a.program && a.program.id, name: (a.program && a.program.name) || '' }, startedAt: a.at, locker: a.locker == null ? null : a.locker, exIdx: 0, exercises: ((a.program && a.program.exercises) || []).map(liveEx), rest: null, finished: null, lastAt: a.at };
+    if (!st) return st;
+    var s = JSON.parse(JSON.stringify(st)), e = s.exercises[a.ex];
+    s.lastAt = Math.max(s.lastAt || 0, a.at || 0);
+    switch (a.type) {
+      case 'LOG_SET':
+        if (!e || !(a.r >= 0)) return st;
+        e.sets.push({ w: e.step && a.w != null ? a.w : null, r: a.r, t: a.at });
+        var sec = restFor(a.r, e); s.rest = { endsAt: a.at + sec * 1000, total: sec };
+        s.exIdx = e.sets.length >= ((e.scheme && e.scheme.sets) || 3) ? nextEx(s.exercises, a.ex) : a.ex;
+        return s;
+      case 'EDIT_SET': if (!e || !e.sets[a.i]) return st; if (a.w !== undefined) e.sets[a.i].w = e.step ? a.w : null; if (a.r != null) e.sets[a.i].r = a.r; return s;
+      case 'DELETE_SET': if (!e || !e.sets[a.i]) return st; e.sets.splice(a.i, 1); return s;
+      case 'SKIP_EXERCISE': if (!e) return st; e.skipped = true; s.exIdx = nextEx(s.exercises, a.ex); return s;
+      case 'ADD_EXERCISE': if (!a.exercise || !String(a.exercise.label || '').trim()) return st; s.exercises.push(liveEx(a.exercise)); s.exIdx = s.exercises.length - 1; return s;
+      case 'REST_ADJUST': if (!s.rest) return st; s.rest.endsAt = Math.max(a.at || 0, s.rest.endsAt + (a.delta || 0) * 1000); s.rest.total = Math.max(1, s.rest.total + (a.delta || 0)); return s;
+      case 'REST_SKIP': s.rest = null; return s;
+      case 'FINISH': s.finished = { at: a.at, effort: a.effort == null ? null : a.effort }; return s;
+      default: return st;
+    }
+  }
+  // Replay a draft's log; UNDO pops the last applied action (START is never undone).
+  function replay(actions) {
+    var eff = [];
+    (Array.isArray(actions) ? actions : []).forEach(function (a) { if (a && a.type === 'UNDO') { if (eff.length > 1) eff.pop(); } else if (a && a.type) eff.push(a); });
+    var st = null; eff.forEach(function (a) { try { st = reduce(st, a); } catch (_) { } });
+    return st;
+  }
+  function durationSec(st, now) { return st ? Math.max(0, Math.round(((st.finished ? st.finished.at : now) - st.startedAt) / 1000)) : 0; }
+  // The finished state -> a session in the stored shape (no id/createdAt: the caller adds them).
+  function sessionFromLive(st) {
+    var s = { date: ymdIn(new Date(st.startedAt)), type: st.program.name, typeRaw: st.program.name, locker: st.locker, mode: 'sets', classes: [],
+      exercises: st.exercises.filter(function (e) { return e.sets.length; }).map(function (e) { return { label: e.label, sets: e.sets.map(function (x) { return { w: x.w, r: x.r, t: x.t }; }), unparsed: [], note: null }; }),
+      source: 'live', programId: st.program.id || null, effort: st.finished ? st.finished.effort : null, durationSec: durationSec(st, st.lastAt) };
+    s.hash = hashOf(s);
+    return s;
+  }
+
   return { parse: parse, format: format, classify: classify, setsKey: setsKey, hashOf: hashOf, weekRange: weekRange, derive: derive, pattern: pattern, setsText: setsText,
-    lastTimeBefore: lastTimeBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ };
+    lastTimeBefore: lastTimeBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
+    EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive };
 });
