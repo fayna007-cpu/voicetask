@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const SITE_FILES = ['index.html', 'sw.js', 'style.css', 'manifest.json', 'icon.svg', 'hebrew-time.js', 'routine-schedule.js', 'workout-core.js', 'workout.js'];
+export const SITE_FILES = ['index.html', 'sw.js', 'style.css', 'manifest.json', 'icon.svg', 'hebrew-time.js', 'routine-schedule.js', 'workout-core.js', 'workout.js', 'workout-live.js'];
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, '_site');

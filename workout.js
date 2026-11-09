@@ -11,7 +11,7 @@
   var S = {
     title: 'אימונים', recent: 'אימונים אחרונים',
     weekNone: 'עוד לא התחלנו השבוע', week: function (n, sets) { return 'השבוע: ' + S.sessionsN(n) + (sets ? ' · ' + S.sets(sets) : ''); },
-    start: 'התחל אימון עכשיו', soon: 'זמין בקרוב',
+    start: 'התחל אימון עכשיו', resume: 'המשך את האימון', soon: 'זמין בקרוב', editProgram: 'ערוך תוכנית',
     empty: 'אחרי האימון הראשון תראה כאן את הסטים שלך',
     exercises: function (n) { return n === 1 ? 'תרגיל אחד' : n + ' תרגילים'; }, sets: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; },
     sessionsN: function (n) { return n === 1 ? 'אימון אחד' : n + ' אימונים'; },
@@ -42,7 +42,7 @@
       + '<div class="rsheet-head"><button class="rsheet-close-btn" onclick="Workout.close()" aria-label="סגור">✕</button><h3>🏋️ ' + S.title + '</h3><div style="width:32px"></div></div>'
       + '<div class="rsheet-scroll" style="padding:12px 16px calc(32px + var(--sab));direction:rtl">'
       + '<div id="wkWeek"></div>'
-      + '<button class="rform-save" id="wkStart" disabled style="opacity:.45">' + S.start + '</button><div class="wk-note" style="text-align:center">' + S.soon + '</div>'
+      + '<div id="wkStartBox"></div>'
       + '<div id="wkHistory"></div></div>';
     document.body.appendChild(el);
     if (window.initSheetSwipe && $('routineOverlay')) window.initSheetSwipe(el, $('routineOverlay'));
@@ -51,7 +51,7 @@
     ensureSheet();
     sessions = load(KEY_S, []); catalog = load(KEY_C, { aliases: {} });
     $('routineOverlay').classList.add('on'); $('wkSheet').classList.add('on');
-    renderWeek(); renderHistory();
+    renderWeek(); renderStart(); renderHistory();
   }
   function close() {
     var s = $('wkSheet'); if (s) s.classList.remove('on');
@@ -72,6 +72,13 @@
     var el = $('wkWeek'); if (!el) return;
     var r = W.weekRange(new Date()), inWeek = sessions.filter(function (s) { return s.date >= r.start && s.date <= r.end; });
     el.innerHTML = '<div class="wk-note" style="font-size:14px;color:var(--text);font-weight:700;margin:2px 0 12px">' + h(inWeek.length ? S.week(inWeek.length, inWeek.reduce(function (a, s) { return a + nSets(s); }, 0)) : S.weekNone) + '</div>';
+  }
+  function renderStart() {                                                // the live workout (workout-live.js); off = the kill switch
+    var el = $('wkStartBox'); if (!el) return;
+    var L = window.WorkoutLive, on = !!(L && L.enabled());
+    el.innerHTML = !on ? '<button class="rform-save" id="wkStart" disabled style="opacity:.45">' + S.start + '</button><div class="wk-note" style="text-align:center">' + S.soon + '</div>'
+      : L.resumeLine('sheet') + '<button class="rform-save" id="wkStart" onclick="WorkoutLive.start()">' + (L.hasDraft() ? S.resume : S.start) + '</button>'
+        + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.setup()">' + S.editProgram + '</button></div>';
   }
   function renderHistory() {
     var el = $('wkHistory'); if (!el) return;

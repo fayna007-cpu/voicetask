@@ -1748,3 +1748,79 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .wk-sess-s{font-size:12px;color:var(--muted);margin-inline-start:auto}
 .wk-body{padding:0 14px 12px;border-top:1px solid var(--border)}
 @media (prefers-reduced-motion:reduce){.wk-status,.wk-sess,.wk-sess-head,.wk-unit{transition:none;animation:none}}
+/* Live workout (wk-lv-*, wk-*) - appended only: the setup, live and summary screens of #wkLive. Existing tokens, ONE accent. */
+body.wk-lock{overflow:hidden;overscroll-behavior:none}
+.wk-live{position:fixed;inset:0;z-index:500;background:var(--bg);color:var(--text);display:flex;flex-direction:column;padding:calc(var(--sat) + 8px) calc(16px + var(--sar)) 0 calc(16px + var(--sal));transform:translateY(100%);transition:transform 220ms cubic-bezier(.2,.8,.2,1);font-size:15px;overscroll-behavior:contain}
+.wk-live.on{transform:translateY(0)}
+.wk-lv-head{display:grid;grid-template-columns:48px 1fr 72px;align-items:center;min-height:48px}
+.wk-lv-x{width:40px;height:40px;border-radius:50%;border:none;background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.wk-lv-name{text-align:center;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-lv-lk{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.wk-lv-el{text-align:left;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums;direction:ltr}
+.wk-lv-prog{display:flex;gap:4px;margin:8px 0 16px}
+.wk-lv-prog:empty{display:none}
+.wk-seg{flex:1;height:8px;padding:0;border:none;border-radius:4px;background:var(--surface3);overflow:hidden;cursor:pointer;position:relative;touch-action:manipulation}
+.wk-seg i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-seg.on{outline:2px solid var(--accent);outline-offset:2px}
+.wk-seg.skip i{background:var(--muted2)}
+.wk-lv-main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:16px}
+.wk-lv-ex{margin:0 0 16px}
+.wk-lv-title{font-size:20px;font-weight:800;line-height:1.3}
+.wk-lv-cap{font-size:12px;color:var(--muted);line-height:1.6;font-variant-numeric:tabular-nums}
+.wk-lv-title .wk-lv-cap{font-weight:600}
+.wk-lv-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 16px;margin:0 0 16px;display:flex;flex-direction:column;gap:8px}
+.wk-lv-group>.rfi{margin:0}
+.wk-lv-set{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 0;border:none;border-top:1px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:15px;text-align:start;width:100%;transition:all 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-lv-set:first-child{border-top:none}
+.wk-lv-set.done{cursor:pointer;touch-action:manipulation}
+.wk-lv-set.next{color:var(--muted)}
+.wk-lv-set.active,.wk-lv-set.edit{flex-direction:column;align-items:stretch;gap:8px;padding:16px 0}
+.wk-lv-n{font-size:12px;color:var(--muted);min-width:44px}
+.wk-lv-v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.wk-lv-st{margin-inline-start:auto;font-size:12px;color:var(--muted)}
+.wk-lv-st.in{color:var(--success)}
+.wk-lv-st.above{color:var(--accent)}
+.wk-lv-target{display:flex;align-items:baseline;justify-content:center;gap:8px;font-size:56px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.wk-lv-u{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:0}
+.wk-lv-x2{font-size:32px;color:var(--muted)}
+.wk-lv-steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.wk-stp{direction:ltr;display:flex;align-items:center;gap:4px;background:var(--surface2);border-radius:var(--r);padding:4px}
+.wk-stp-b{width:56px;height:56px;border-radius:14px;border:none;background:var(--surface3);color:var(--text);font-size:24px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform 100ms,background 100ms}
+.wk-stp-b.wk-pressed,.wk-stp-b:active{transform:scale(.94);background:var(--border2)}
+.wk-stp-v{min-width:72px;display:flex;flex-direction:column;align-items:center;font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.wk-stp-u{font-size:12px;font-weight:600;color:var(--muted);margin-top:4px}
+.wk-stp.sm .wk-stp-b{width:48px;height:48px;font-size:20px}
+.wk-stp.sm .wk-stp-v{min-width:48px;font-size:20px}
+.wk-lv-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px}
+.wk-rg{display:flex;gap:8px}
+.wk-row-h{display:flex;align-items:center;gap:8px}
+.wk-chips{display:flex;flex-wrap:wrap;gap:8px}
+.wk-chip{min-height:44px;padding:8px 16px;border-radius:22px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation;transition:background 100ms}
+.wk-chip.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.wk-chip:active{background:var(--surface3)}
+.wk-eff .wk-chip{flex:1;padding:8px 0}
+.wk-lv-more{justify-content:center;margin-top:8px}
+.wk-lv-link{background:none;border:none;color:var(--accent);font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;min-height:48px;padding:8px;touch-action:manipulation;text-align:start}
+.wk-lv-add{display:block;margin:0 auto}
+.wk-lv-warn{font-size:12px;color:var(--warn);margin:0 0 16px;line-height:1.6}
+.wk-lv-hint{text-align:center;margin:0 0 8px}
+.wk-lv-center{text-align:center;font-size:15px;color:var(--text);margin:8px 0}
+.wk-lv-cmp{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-height:44px;padding:8px 0;border-top:1px solid var(--border);font-variant-numeric:tabular-nums}
+.wk-lv-cmp:first-child{border-top:none}
+.wk-lv-cmp-l{font-weight:700;min-width:72px}
+.wk-lv-dock{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 calc(16px + var(--sab));justify-content:flex-end}
+.wk-done{width:96px;height:96px;border-radius:50%;border:none;background:var(--accent);color:var(--bg);font-size:44px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 32px oklch(0.55 0.16 285 / 0.35);transition:transform 100ms;animation:wk-in 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-done:active{transform:scale(.94)}
+.wk-big{width:100%;min-height:56px;border-radius:28px;border:none;background:var(--accent);color:var(--bg);font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;transition:transform 100ms}
+.wk-big:active{transform:scale(.98)}
+.wk-rest{direction:ltr;display:flex;align-items:center;gap:16px;animation:wk-in 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-rest-b{width:56px;height:56px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;direction:ltr}
+.wk-ring{position:relative;width:144px;height:144px}
+.wk-ring .focus-ring-progress{transition:stroke-dashoffset 1s linear}
+.wk-ring-t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.wk-ring-t span{font-size:12px;font-weight:600;color:var(--muted);margin-top:4px}
+@keyframes wk-in{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.wk-resume{position:fixed;top:calc(var(--sat) + 8px);left:16px;right:16px;max-width:448px;margin:0 auto;z-index:90;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:8px 8px 8px 16px;box-shadow:0 8px 32px oklch(0 0 0 / 0.35)}
+.wk-resume-in{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:700}
+#wkStartBox .wk-resume-in{background:var(--surface2);border-radius:var(--r-sm);padding:8px 8px 8px 16px;margin:0 0 8px}
+@media (prefers-reduced-motion:reduce){.wk-live,.wk-seg i,.wk-lv-set,.wk-done,.wk-rest,.wk-ring .focus-ring-progress{transition:none;animation:none}}
