@@ -1824,3 +1824,113 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-resume-in{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:700}
 #wkStartBox .wk-resume-in{background:var(--surface2);border-radius:var(--r-sm);padding:8px 8px 8px 16px;margin:0 0 8px}
 @media (prefers-reduced-motion:reduce){.wk-live,.wk-seg i,.wk-lv-set,.wk-done,.wk-rest,.wk-ring .focus-ring-progress{transition:none;animation:none}}
+/* Workout Milestone A (wk-*) - appended only. ONE shell for every full-screen workout view: fixed header, scroll only inside the
+   content, fixed footer with the primary action; it follows the visual viewport (keyboard) so nothing jumps or hides. */
+.wk-live{inset:auto 0 auto 0;top:var(--wk-top,0px);height:var(--wk-vh,100dvh);max-height:100dvh;overflow:hidden;padding:calc(var(--sat) + 8px) 0 0}
+.wk-lv-head,.wk-lv-prog{flex-shrink:0;margin-left:calc(16px + var(--sal));margin-right:calc(16px + var(--sar))}
+.wk-lv-head{grid-template-columns:48px minmax(0,1fr) 64px;gap:8px}
+.wk-lv-x{width:44px;height:44px;font-size:18px;font-weight:700}
+.wk-lv-main{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;padding:4px calc(16px + var(--sar)) 24px calc(16px + var(--sal));scroll-padding-bottom:24px}
+.wk-lv-dock{flex-shrink:0;gap:8px;padding:12px calc(16px + var(--sar)) calc(12px + var(--sab)) calc(16px + var(--sal));border-top:1px solid var(--border);background:var(--bg)}
+.wk-lv-dock>.wk-big{max-width:448px}
+.wk-big:disabled{opacity:.45;cursor:default}
+.wk-live:not([data-mode=live]):not([data-mode=finish]) .wk-lv-prog{display:none}
+/* live: 48 px targets, a dock of ONE height for the check and the rest ring (nothing jumps between them) */
+.wk-live[data-mode=live] .wk-lv-dock{border-top:none;height:calc(232px + var(--sab));justify-content:center}
+.wk-live[data-mode=live] .wk-lv-x,.wk-live[data-mode=finish] .wk-lv-x{width:48px;height:48px}
+.wk-live[data-mode=live] .wk-chip{min-height:48px}
+.wk-lv-link{min-width:48px}
+.wk-dock-links{display:flex;justify-content:center;gap:24px}
+.wk-lv-prog{margin-top:0;margin-bottom:4px}
+.wk-seg{height:48px;background:linear-gradient(var(--surface3),var(--surface3)) center/100% 8px no-repeat;border-radius:0;overflow:visible;outline:none}
+.wk-seg i{height:8px;margin:20px 0;border-radius:4px}
+.wk-seg.on{outline:none;background-image:linear-gradient(var(--border2),var(--border2))}
+.wk-seg.on i{box-shadow:0 0 0 2px var(--accent)}
+.wk-grp-t{font-size:12px;font-weight:700;color:var(--muted);margin:16px 4px 8px}
+.wk-lv-group{min-width:0}
+.wk-lv-group .wk-chips{min-width:0}
+.wk-lv-lbl{font-size:15px;color:var(--text);min-width:0}
+.wk-row{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;padding:8px 0;border:none;border-top:1px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:15px;text-align:start;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.wk-lv-group>.wk-row:first-child,.wk-pick-b>.wk-row:first-child{border-top:none}
+.wk-row:active{background:var(--surface2)}
+.wk-row-l{flex:1 1 auto;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.wk-row-s{flex:0 1 auto;min-width:0;font-size:12px;color:var(--muted);text-align:end}
+.wk-row-c{color:var(--accent);font-weight:800;font-size:15px}
+.wk-row.on .wk-row-l,.wk-row.wk-link .wk-row-l{color:var(--accent)}
+.wk-prow,.wk-exrow{display:flex;align-items:stretch;gap:4px;border-top:1px solid var(--border)}
+.wk-lv-group>.wk-prow:first-child,.wk-lv-group>.wk-exrow:first-child{border-top:none}
+.wk-prow .wk-row,.wk-exrow .wk-row{border-top:none;flex-wrap:wrap;row-gap:2px;min-width:0}
+.wk-prow .wk-row-s,.wk-exrow .wk-row-s{flex-basis:100%;text-align:start}
+.wk-on{color:var(--accent);font-weight:700}
+.wk-more{width:48px;min-height:48px;border:none;background:none;color:var(--text);font-size:20px;font-weight:800;cursor:pointer;touch-action:manipulation;flex-shrink:0}
+.wk-mv{display:flex;align-items:center;flex-shrink:0}
+.wk-mv-b{width:44px;height:44px;border:none;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;touch-action:manipulation}
+.wk-mv-b:disabled{opacity:.3;cursor:default}
+.wk-row-acts{padding:8px 0 4px}
+.wk-chip{min-height:44px}
+.wk-ghost{background:transparent;border-style:dashed;color:var(--accent)}
+.wk-days{margin:0 0 12px}
+.wk-five{flex-wrap:nowrap;gap:4px}
+.wk-five .wk-chip{flex:1 1 0;min-width:44px;padding:8px 0}
+.wk-lv-line{flex-wrap:wrap;row-gap:4px}
+.wk-rgrow .wk-row-l{font-weight:600}
+.wk-sw{width:44px;height:26px;border-radius:13px;background:var(--surface3);position:relative;flex-shrink:0;transition:background 150ms}
+.wk-sw::after{content:'';position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:var(--text);transition:inset-inline-start 150ms}
+.wk-sw.on{background:var(--accent)}
+.wk-sw.on::after{inset-inline-start:21px;background:var(--bg)}
+.wk-danger,.wk-row.wk-danger .wk-row-l{color:var(--danger)}
+.wk-center-link{display:block;margin:8px auto 0}
+.wk-center{justify-content:center}
+.wk-empty{text-align:center;color:var(--muted);font-size:15px;line-height:1.7;padding:48px 16px}
+.wk-pill{display:inline-flex;align-items:center;gap:4px;min-height:44px;max-width:100%;padding:8px 16px;border-radius:22px;border:1px solid var(--accent);background:var(--surface2);color:var(--accent);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-ready-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+.wk-exlist{margin:0 0 16px}
+.wk-coach{background:oklch(0.55 0.16 285 / 0.14);border:1px solid oklch(0.55 0.16 285 / 0.35);border-radius:var(--r);padding:12px 16px;margin:0 0 16px;font-size:15px;font-weight:600;line-height:1.6}
+.wk-pr{color:var(--gold);font-size:15px}
+.wk-warm .wk-wset{min-height:48px;cursor:pointer}
+.wk-warm .wk-wset.ok .wk-lv-v{color:var(--muted);text-decoration:line-through}
+.wk-warm .wk-lv-st{color:var(--success);font-size:15px}
+.wk-form-pill{margin-top:8px}
+.wk-kind{width:100%}
+.wk-greet{color:var(--accent);margin-top:2px}
+/* the bottom picker (program list, rep range, templates, + exercise) */
+.wk-pick{position:fixed;inset:0;z-index:600;display:none}
+.wk-pick.on{display:block}
+.wk-pick-bg{position:absolute;inset:0;background:oklch(0 0 0 / 0.55)}
+.wk-pick-card{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;max-height:80dvh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border2);border-bottom:none;border-radius:24px 24px 0 0;animation:wk-up 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-pick-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px 8px;font-size:17px;font-weight:800;flex-shrink:0}
+.wk-pick-b{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;padding:0 16px 8px;display:flex;flex-direction:column;gap:8px}
+.wk-pick-f{flex-shrink:0;padding:8px 16px calc(12px + var(--sab))}
+.wk-pick-f:empty{padding:0 0 calc(8px + var(--sab))}
+.wk-rgp{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:8px 0}
+.wk-rgp .wk-stp-v{min-width:64px}
+@keyframes wk-up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+/* after the workout: one tap to mark the routine done */
+.wk-prompt{position:fixed;left:16px;right:16px;bottom:calc(var(--nav-h) + 12px);max-width:448px;margin:0 auto;z-index:450;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:16px;box-shadow:0 12px 40px oklch(0 0 0 / 0.45);animation:wk-up 220ms cubic-bezier(.2,.8,.2,1)}
+.wk-prompt-q{font-size:15px;font-weight:700;margin:0 0 12px}
+.wk-prompt-a{display:flex;flex-direction:column;align-items:center;gap:4px}
+/* the HOME card of a workout routine: six states, each its own color from existing tokens */
+.wk-card{position:relative;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:inset 0 0 0 1.5px var(--wk-c,transparent);transition:background 150ms}
+.section-cards .wk-card:last-child{border-bottom:none}
+.wk-card:active{background:var(--surface2)}
+.wk-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);font-weight:600;margin:0 0 4px}
+.wk-card-tag{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-card-time{font-size:15px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.wk-card-h{font-size:17px;font-weight:800;line-height:1.4;color:var(--text)}
+.wk-card-d{font-size:13px;color:var(--muted);line-height:1.6;margin-top:2px;font-variant-numeric:tabular-nums}
+.wk-card-cd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:15px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.wk-card-cd .wk-card-link{margin-inline-start:auto}
+.wk-card-btn{display:block;width:100%;min-height:48px;margin-top:12px;border-radius:24px;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;transition:transform 100ms}
+.wk-card-btn:active{transform:scale(.98)}
+.wk-card-btn.primary{border:none;background:var(--accent);color:var(--bg);box-shadow:0 0 24px oklch(0.72 0.18 285 / 0.45);animation:wk-pulse 2.4s ease-in-out infinite}
+.wk-card-btn.ghost{border:1px solid var(--accent);background:transparent;color:var(--accent)}
+.wk-card-sec{display:flex;gap:8px;margin-top:4px}
+.wk-card-link{min-height:44px;min-width:44px;padding:8px;border:none;background:none;color:var(--accent);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.wk-st-tomorrow{--wk-c:oklch(0.72 0.18 285 / 0.6)}
+.wk-st-locked{--wk-c:oklch(0.80 0.15 75 / 0.6)}
+.wk-st-open{--wk-c:var(--accent);background:oklch(0.55 0.16 285 / 0.08)}
+.wk-st-progress{--wk-c:var(--accent);background:oklch(0.55 0.16 285 / 0.14)}
+.wk-st-done{--wk-c:oklch(0.68 0.14 145 / 0.5);background:oklch(0.68 0.14 145 / 0.08)}
+.wk-st-done .wk-card-d{color:var(--gold)}
+@keyframes wk-pulse{0%,100%{box-shadow:0 0 16px oklch(0.72 0.18 285 / 0.30)}50%{box-shadow:0 0 28px oklch(0.72 0.18 285 / 0.55)}}
+@media (prefers-reduced-motion:reduce){.wk-card-btn.primary,.wk-pick-card,.wk-prompt{animation:none}.wk-sw,.wk-sw::after,.wk-card{transition:none}}

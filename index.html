@@ -3763,6 +3763,7 @@ function renderTaskCard(task){
 </div>`;}
 
 function renderRoutineInstance(inst){
+  try{const wk=window.WorkoutHome&&WorkoutHome.card(inst,routines.find(rr=>rr.id===inst.routineId));if(wk)return wk;}catch(_){}
   const cat=CATS[inst.category]||CATS['כללי'];
   const dt=new Date(inst.datetime);
   const isOverdue=!inst.completed&&dt<new Date();
@@ -3903,6 +3904,7 @@ function updateGreeting(){
   if(routineCount)parts.push(routineCount+' שגרות');
   if(billCount)parts.push(billCount+' חשבונות');
   subEl.textContent=parts.length?'הכל מוכן · '+parts.join(' · '):'הלוח שלך פנוי — איך אוכל לסייע?';
+  try{window.WorkoutHome&&WorkoutHome.greeting(subEl);}catch(_){}
 }
 
 // ── Integrations ──────────────────────────────────────────────────────────────
@@ -4477,6 +4479,7 @@ function openRoutineForm(prefill,editId){
   document.getElementById('rVerbal').value=prefill?.verbCondition||'';   // before the mode: the live parse reads it
   rScheduleMode=prefill?.scheduleMode||'manual';
   selectSchedMode(rScheduleMode);                                  // a verbal routine opens with ITS derived count
+  try{window.WorkoutForm&&WorkoutForm.fill(prefill);}catch(_){}
   document.getElementById('routineListSheet').classList.remove('on');
   document.getElementById('routineFormSheet').classList.add('on');
 }
@@ -4538,6 +4541,7 @@ function saveRoutine(){
     scheduledWeeks:existing?.scheduledWeeks||{},
     createdAt:existing?.createdAt||new Date().toISOString()
   };
+  try{window.WorkoutForm&&WorkoutForm.apply(routine,existing);}catch(_){}   // optional kind / programId (absent = regular)
   if(editingRoutineId)routines=routines.map(r=>r.id===editingRoutineId?routine:r);
   else routines.unshift(routine);
   editingRoutineId=null;
@@ -4571,12 +4575,13 @@ function deleteRoutine(id){
 function toggleRoutineEnabled(id,enabled){
   const r=routines.find(x=>x.id===id);if(r){r.enabled=enabled;saveRoutines();render();scheduleSmartPushNotifs();}
 }
-function toggleRoutineComplete(routineId,dateStr){
+function toggleRoutineComplete(routineId,dateStr,opts){
   const r=routines.find(x=>x.id==routineId);if(!r)return;
   if(!r.completedDates)r.completedDates=[];
   const idx=r.completedDates.indexOf(dateStr);
   if(idx===-1){
-    r.completedDates.push(dateStr);vibrate([10,30,10]);toast('כל הכבוד! 🎉');
+    const silent=!!(opts&&opts.silent);                       // the workout summary's effort replaces the energy popup
+    r.completedDates.push(dateStr);if(!silent)vibrate([10,30,10]);toast('כל הכבוד! 🎉');
     saveRoutines();
     // If this instance was a rescheduled make-up, count it toward completedAfterReschedule
     try{
@@ -4587,7 +4592,7 @@ function toggleRoutineComplete(routineId,dateStr){
     }catch(_){}
     try{render();}catch(e){console.error('render error in toggleRoutineComplete',e);}
     // Show energy check-in after short delay
-    setTimeout(()=>openEnergyPopup(routineId,dateStr),600);
+    if(!silent)setTimeout(()=>openEnergyPopup(routineId,dateStr),600);
   } else {
     r.completedDates.splice(idx,1);
     saveRoutines();render();
@@ -12341,6 +12346,7 @@ function maybeShowDailyPopup(){
     // Pasted text never acts: a pasted line that starts with a command gets the fixed answer; any other
     // paste goes on as tasks/summary (the Worker and handle() refuse actions for it as well).
     if(!opts.forceChat&&isPasted(text)&&text.split('\n').some(l=>VERBS.some(([,re])=>{const m=l.trim().replace(/^[-•*–\d.)\s]+/,'').match(re);return m&&m.index===0;}))){push(SAY.pastedAction);return 'canned';}
+    if(!opts.forceChat&&!opts.fromPending&&!isPasted(text)&&window.WorkoutHome){try{const w=WorkoutHome.assistant(text);if(w){push(w.say);if(w.go)setTimeout(w.go,350);return 'workout';}}catch(_){}}
     // R9: a long detailed message -> ONE card right away (code); the summary refines it in the background
     if(!opts.forceChat&&!opts.fromPending&&A.isDetail(text)){const m=A.startDetail(text);saveChatHistory();renderChatMessages();A.summarize(m);return 'detail';}
     const act=opts.forceChat||isPasted(text)?null:A.parseAction(text);
