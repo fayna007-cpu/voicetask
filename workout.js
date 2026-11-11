@@ -11,7 +11,7 @@
   var S = {
     title: 'אימונים', recent: 'אימונים אחרונים',
     weekNone: 'עוד לא התחלנו השבוע', week: function (n, sets) { return 'השבוע: ' + S.sessionsN(n) + (sets ? ' · ' + S.sets(sets) : ''); },
-    start: 'התחל אימון עכשיו', resume: 'המשך את האימון', soon: 'זמין בקרוב', editProgram: 'ערוך תוכנית',
+    start: 'התחל אימון עכשיו', resume: 'המשך את האימון', soon: 'זמין בקרוב', programs: 'תוכניות',
     empty: 'אחרי האימון הראשון תראה כאן את הסטים שלך',
     exercises: function (n) { return n === 1 ? 'תרגיל אחד' : n + ' תרגילים'; }, sets: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; },
     sessionsN: function (n) { return n === 1 ? 'אימון אחד' : n + ' אימונים'; },
@@ -77,8 +77,8 @@
     var el = $('wkStartBox'); if (!el) return;
     var L = window.WorkoutLive, on = !!(L && L.enabled());
     el.innerHTML = !on ? '<button class="rform-save" id="wkStart" disabled style="opacity:.45">' + S.start + '</button><div class="wk-note" style="text-align:center">' + S.soon + '</div>'
-      : L.resumeLine('sheet') + '<button class="rform-save" id="wkStart" onclick="WorkoutLive.start()">' + (L.hasDraft() ? S.resume : S.start) + '</button>'
-        + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.setup()">' + S.editProgram + '</button></div>';
+      : L.resumeLine('sheet') + '<button class="rform-save" id="wkStart" onclick="Workout.start()">' + (L.hasDraft() ? S.resume : S.start) + '</button>'
+        + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.programs()">' + S.programs + '</button></div>';
   }
   function renderHistory() {
     var el = $('wkHistory'); if (!el) return;
@@ -101,5 +101,8 @@
       + (recent.length > list.length ? '<div class="chat-suggestions" style="justify-content:center"><button class="chat-suggestion" onclick="Workout.more()">' + S.more + '</button></div>' : '');
   }
 
-  window.Workout = { open: open, close: close, del: del, toggleUnit: toggleUnit, toggleOpen: toggleOpen, more: more, sessions: function () { return sessions.slice(); } };
+  // THE single entry of a workout (HOME card, this sheet, the assistant): {routineId, dateStr, programId} all optional
+  function start(o) { if (window.WorkoutLive && WorkoutLive.enabled()) WorkoutLive.start(o || {}); }
+
+  window.Workout = { open: open, close: close, start: start, del: del, toggleUnit: toggleUnit, toggleOpen: toggleOpen, more: more, sessions: function () { return sessions.slice(); } };
 })();
