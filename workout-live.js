@@ -85,6 +85,7 @@
   var clock = function (sec) { sec = Math.max(0, Math.round(sec)); var m = Math.floor(sec / 60), s = sec % 60, hh = Math.floor(m / 60); return (hh ? hh + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); };
   var hms = function (sec) { sec = Math.max(0, Math.floor(sec)); var p = function (n) { return String(n).padStart(2, '0'); }; return p(Math.floor(sec / 3600)) + ':' + p(Math.floor(sec / 60) % 60) + ':' + p(sec % 60); };
   var mins = function (sec) { return S.minutes(Math.max(1, Math.round((sec || 0) / 60))); };
+  var elMin = function (ms) { return Math.max(0, Math.floor(ms / 60000)); };           // elapsed whole minutes (a card never shows a clock-like 12:00)
 
   // ── the shell: fixed header, scroll area, fixed footer; page scroll locked; the keyboard never hides the footer ──
   var lockY = 0, locked = false;
@@ -317,7 +318,7 @@
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
   function restSkip() { dispatch({ type: 'REST_SKIP' }); renderDock(); }
-  function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { open: true, done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
+  function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { open: false, done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
   // + exercise during the workout: a picker of known exercises (no typing inside the live screen)
   function addPick() {
     var seen = {}, list = [];
@@ -497,7 +498,7 @@
     // warm-up: the first weighted exercise or any marked one; collapsible, skippable, never counted
     var wu = '';
     if (!bw && !ex.sets.length && (ex.warmup || i === warmIdx())) {
-      var w = ui.warm[i] || { open: true, done: {} }, first = t[0] && t[0].w, ws = W.warmupSets(first, ex.step);
+      var w = ui.warm[i] || { open: false, done: {} }, first = t[0] && t[0].w, ws = W.warmupSets(first, ex.step);
       if (ws.length && !w.skip) wu = '<div class="wk-lv-group wk-warm"><button class="wk-row" onclick="WorkoutLive.warm(' + i + ',\'toggle\')" aria-expanded="' + w.open + '"><span class="wk-row-l">' + S.warmT + '</span><span class="wk-row-s">' + S.setsDone(ws.length) + ' ' + (w.open ? '▴' : '▾') + '</span></button>'
         + (w.open ? ws.map(function (x, j) { return '<button class="wk-lv-set wk-wset' + (w.done[j] ? ' ok' : '') + '" onclick="WorkoutLive.warm(' + i + ',' + j + ')" aria-pressed="' + !!w.done[j] + '"><span class="wk-lv-n">' + S.warmT + ' ' + (j + 1) + '</span><span class="wk-lv-v"><bdi dir="ltr">' + x.w + '×' + x.r + '</bdi></span><span class="wk-lv-st">' + (w.done[j] ? '✓' : '') + '</span></button>'; }).join('')
           + '<button class="wk-lv-link" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button>' : '') + '</div>';
@@ -642,7 +643,7 @@
     var dayName = mine ? dft.s.dayName || dft.s.program.name : d ? d.name : r.name || '';
     var done = st === 'done' ? W.sortRecent(all.filter(function (s) { return String(s.routineId) === String(r.id) && s.dateStr === inst.dateStr; }))[0] : null;
     var vars = { day: h(dayName), time: num(time), days: num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))) };
-    if (st === 'progress') { var sets = dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0); vars.elapsed = '<bdi dir="ltr" data-wk-el="' + dft.s.startedAt + '">' + clock((now - dft.s.startedAt) / 1000) + '</bdi>'; vars.n = num(sets + 1); }
+    if (st === 'progress') { var sets = dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0); vars.elapsed = '<bdi dir="ltr" data-wk-el="' + dft.s.startedAt + '">' + elMin(now - dft.s.startedAt) + '</bdi> ' + S.minutes('').trim(); vars.n = num(sets + 1); }
     if (done) { vars.duration = num(mins(done.durationSec)); vars.n = num(done.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0)); }
     else if (st === 'done') { vars.duration = ''; vars.n = ''; }
     var seed = r.id + '|' + inst.dateStr + '|' + st, head = W.fill(W.pick(C[st], seed).text, vars);
@@ -676,7 +677,7 @@
     if (document.visibilityState === 'hidden') return;
     var now = Date.now(), due = false;
     cds.forEach(function (n) { var left = (+n.getAttribute('data-wk-cd') - now) / 1000; if (left <= 0) due = true; else n.textContent = hms(left); });
-    els.forEach(function (n) { n.textContent = clock((now - +n.getAttribute('data-wk-el')) / 1000); });
+    els.forEach(function (n) { n.textContent = elMin(now - +n.getAttribute('data-wk-el')); });
     if (due && now - rerendered > 5000) { rerendered = now; try { window.render(); } catch (_) { } }
   }
   // one extra line in the greeting area on a workout day

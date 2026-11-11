@@ -1934,3 +1934,6 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-st-done .wk-card-d{color:var(--gold)}
 @keyframes wk-pulse{0%,100%{box-shadow:0 0 16px oklch(0.72 0.18 285 / 0.30)}50%{box-shadow:0 0 28px oklch(0.72 0.18 285 / 0.55)}}
 @media (prefers-reduced-motion:reduce){.wk-card-btn.primary,.wk-pick-card,.wk-prompt{animation:none}.wk-sw,.wk-sw::after,.wk-card{transition:none}}
+.wk-card-cd .wk-card-link{margin-inline-start:0;flex-basis:100%;text-align:start;padding-inline-start:0}
+.wk-seg.on{background-image:linear-gradient(var(--accent-deep),var(--accent-deep))}
+.wk-seg.on i{box-shadow:none}
