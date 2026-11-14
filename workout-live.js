@@ -336,10 +336,12 @@
       dispatch({ type: 'LOG_SET', ex: c.ex, w: w0, r: all[0].r, parts: all.map(function (p, i) { return i && !bw && p.w !== w0 ? { r: p.r, w: p.w } : { r: p.r }; }) });
     } else dispatch({ type: 'LOG_SET', ex: c.ex, w: bw ? null : c.w, r: c.r });
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0;
-    sound('tick'); render();
+    sound('tick'); render(); reveal();
   }
-  function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); }
-  function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); }
+  function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); reveal(); }
+  function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); reveal(); }
+  // a short screen: the note, warm-up and parts lines may push the active steppers below the fold -> bring them into view
+  function reveal() { var a = document.querySelector('#wkLvMain .wk-lv-set.active .wk-lv-steps'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' }); }
   // the weight keypad: any value (0.25, 0.5, odd numbers); the step chips are remembered per exercise in the catalog
   function typeW() {
     var c = ui.editing || cur(), ex = state.exercises[c.ex], st = es(ex);
@@ -395,7 +397,7 @@
   }
   function noteSave() { var m = ui.pick && ui.pick.m, cc = cat(); if (!m) return; var v = String(($('wkNoteIn') || {}).value || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; saveCat(cc); pickClose(); render(); }
   function undo() { if (!draft || draft.actions.length < 2) return; dispatch({ type: 'UNDO' }); ui.pend = {}; ui.view = Math.min(ui.view, state.exercises.length - 1); render(); }
-  function view(i) { ui.view = i; ui.editing = null; render(); }
+  function view(i) { ui.view = i; ui.editing = null; render(); reveal(); }
   function addSet() { ui.extra[ui.view] = 1; render(); }
   function skipEx() { dispatch({ type: 'SKIP_EXERCISE', ex: ui.view }); ui.view = state.exIdx; render(); }
   function editSet(i) { var x = state.exercises[ui.view].sets[i]; ui.editing = { ex: ui.view, i: i, w: x.w, r: x.r }; render(); }
