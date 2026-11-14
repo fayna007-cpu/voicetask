@@ -1951,3 +1951,4 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-note-g{font-size:12px;font-weight:700;color:var(--gold)}
 .wk-note-in{min-height:88px;resize:vertical;line-height:1.5}
 .wk-pick-card{bottom:var(--wk-kb,0px);max-height:calc(var(--wk-pk-vh,100dvh) - 48px)}
+.wk-live.on[data-mode=live]~.wk-pick .wk-chip,.wk-live.on[data-mode=live]~.wk-pick .wk-lv-x{min-height:48px;min-width:48px}

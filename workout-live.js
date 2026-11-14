@@ -623,7 +623,7 @@
   function cmpLine(ex) {
     var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
     if (!b) d = S.cmpFirst;
-    else if (a.w != null && b.w != null && a.w !== b.w) d = S.cmpKg(W.snap(a.w - b.w, 0), u);
+    else if (a.w != null && b.w != null && a.w !== b.w) d = '<bdi dir="ltr">' + h(S.cmpKg(W.snap(a.w - b.w, 0), '').trim()) + '</bdi> ' + u;   // "+4.5" isolated
     else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
     return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + S.setN(1) + ' ← ' + setTxt(a) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
   }
