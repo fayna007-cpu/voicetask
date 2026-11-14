@@ -1937,3 +1937,17 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-card-cd .wk-card-link{margin-inline-start:0;flex-basis:100%;text-align:start;padding-inline-start:0}
 .wk-seg.on{background-image:linear-gradient(var(--accent-deep),var(--accent-deep))}
 .wk-seg.on i{box-shadow:none}
+/* Workout A2 (wk-*) - appended only: the weight keypad, combined sets, swap, group notes */
+.wk-tap{border:none;background:none;color:inherit;font-family:inherit;cursor:pointer;touch-action:manipulation;border-radius:12px;padding:4px 8px;min-height:48px;-webkit-tap-highlight-color:transparent}
+.wk-tap:active{background:var(--surface3)}
+.wk-tap bdi{text-decoration:underline dotted var(--muted2);text-underline-offset:6px;text-decoration-thickness:2px}
+.wk-num-in{font-size:32px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;direction:ltr}
+.wk-parts{display:flex;align-items:baseline;justify-content:center;gap:8px}
+.wk-parts-v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.wk-add-row{display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--border)}
+.wk-add-row .rfi{flex:1 1 auto;min-width:0}
+.wk-note-line{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;min-height:48px;margin:0 0 16px;padding:12px 16px;border:1px solid oklch(0.80 0.15 75 / 0.35);border-radius:var(--r-sm);background:oklch(0.80 0.15 75 / 0.08);color:var(--text);font-family:inherit;font-size:15px;line-height:1.5;text-align:start;cursor:pointer;touch-action:manipulation}
+.wk-note-ro{cursor:default;margin:0 0 8px}
+.wk-note-g{font-size:12px;font-weight:700;color:var(--gold)}
+.wk-note-in{min-height:88px;resize:vertical;line-height:1.5}
+.wk-pick-card{bottom:var(--wk-kb,0px);max-height:calc(var(--wk-pk-vh,100dvh) - 48px)}

@@ -282,7 +282,8 @@
         var sec = restFor(set.r, e, s.goal); s.rest = { endsAt: a.at + sec * 1000, total: sec };
         s.exIdx = e.sets.length >= ((e.scheme && e.scheme.sets) || 3) ? nextEx(s.exercises, a.ex) : a.ex;
         return s;
-      case 'EDIT_SET': if (!e || !e.sets[a.i]) return st; if (a.w !== undefined) e.sets[a.i].w = e.step ? a.w : null; if (a.r != null) e.sets[a.i].r = a.r; return s;
+      // editing the total of a combined set makes it a plain set (its parts no longer add up)
+      case 'EDIT_SET': if (!e || !e.sets[a.i]) return st; if (a.w !== undefined) e.sets[a.i].w = e.step ? a.w : null; if (a.r != null) { if (a.r !== e.sets[a.i].r) delete e.sets[a.i].parts; e.sets[a.i].r = a.r; } return s;
       case 'DELETE_SET': if (!e || !e.sets[a.i]) return st; e.sets.splice(a.i, 1); return s;
       case 'SKIP_EXERCISE': if (!e) return st; e.skipped = true; s.exIdx = nextEx(s.exercises, a.ex); return s;
       case 'ADD_EXERCISE': if (!a.exercise || !String(a.exercise.label || '').trim()) return st; s.exercises.push(liveEx(a.exercise)); s.exIdx = s.exercises.length - 1; return s;
