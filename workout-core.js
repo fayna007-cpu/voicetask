@@ -41,7 +41,8 @@
   var MARKS = /[‎‏‪-‮⁦-⁩﻿]/g;
   var PREFIX = /^\s*\[[^\]\n]*\]\s*[^:\n]{1,40}:\s*/;                  // the ONE tolerance: "[19:30, 2.11.2026] Name:"
   var HEADER = /^אימון\s+([A-Za-zא-ת])(?=\s|$)(.*)$/;
-  var TOKEN = /\d+(?:[.,]\d+)?(?:\s*[*xX×]\s*\d+)+|\([^)]*\)|[^\s,;]+/g;
+  // a set may be combined ("6+5", "28*6+5", a drop set "28*6+24*5"): one token, split on "+"
+  var TOKEN = /\d+(?:[.,]\d+)?(?:\s*[*xX×]\s*\d+)+(?:\s*\+\s*(?:\d+(?:[.,]\d+)?\s*[*xX×]\s*)?\d+)*|\d+(?:\s*\+\s*\d+)+|\([^)]*\)|[^\s,;]+/g;
   var SET = /^(\d+(?:[.,]\d+)?)\s*[*xX×]\s*(\d+)$/;
   var CLASS_VALUE = /^(\d{1,3})\s*דק(?:ות|׳|')?\.?$/;
   var num = function (s) { return parseFloat(String(s).replace(',', '.')); };
@@ -58,11 +59,24 @@
     return { ymd: cand, explicit: false };
   }
 
+  // "28*6+5" -> {w:28, r:11, parts:[{r:6},{r:5}]}; a part with its own weight ("+24*5") keeps it (drop set); null if malformed
+  function combined(tk) {
+    var bits = tk.split('+').map(function (b) { return b.trim(); }), first = bits[0].match(SET), w = first ? num(first[1]) : null, parts = [];
+    if (!first && !/^\d+$/.test(bits[0])) return null;
+    for (var i = 0; i < bits.length; i++) {
+      var m = bits[i].match(SET);
+      if (m) { if (w == null && i > 0) return null; var pw = num(m[1]), pr = parseInt(m[2], 10); parts.push(i && pw !== w ? { r: pr, w: pw } : { r: pr }); }
+      else if (/^\d+$/.test(bits[i])) parts.push({ r: parseInt(bits[i], 10) });
+      else return null;
+    }
+    return { w: w, r: parts.reduce(function (a, p) { return a + p.r; }, 0), parts: parts, raw: tk };
+  }
   function parseSets(value, ex, warn) {
     var m, re = new RegExp(TOKEN.source, 'g');
     while ((m = re.exec(value))) {
       var tk = m[0], p;
       if (tk.charAt(0) === '(' && tk.charAt(tk.length - 1) === ')') { ex.note = (ex.note ? ex.note + ' ' : '') + tk.slice(1, -1).trim(); continue; }
+      if (tk.indexOf('+') > 0 && (p = combined(tk))) { ex.sets.push(p); continue; }
       if ((p = tk.match(SET))) { ex.sets.push({ w: num(p[1]), r: parseInt(p[2], 10), raw: tk }); continue; }
       if (/^\d+$/.test(tk)) { ex.sets.push({ w: null, r: parseInt(tk, 10), raw: tk }); continue; }
       ex.unparsed.push(tk);
@@ -111,8 +125,16 @@
 
   // ── identity: same date + type + same sets ──
   function fmtNum(n) { return String(n); }
+  // one set as text with a separator: "28×6", "8", combined "28×6+5", a drop set "28×6+24×5" (a plain set prints exactly as before)
+  function setText(x, sep) {
+    sep = sep || '×';
+    if (!x.parts || x.parts.length < 2) return x.w == null ? String(x.r) : fmtNum(x.w) + sep + x.r;
+    return x.parts.map(function (p, i) { var w = i === 0 ? x.w : p.w; return (w != null && (i === 0 || w !== x.w) ? fmtNum(w) + sep : '') + p.r; }).join('+');
+  }
+  // progression, range status, e1RM and PRs read the FIRST part of a combined set; volume reads the total (r)
+  function firstR(x) { return x && x.parts && x.parts.length ? x.parts[0].r : x ? x.r : null; }
   function setsKey(s) {
-    return (s.exercises || []).map(function (e) { return labelKey(e.label) + ':' + (e.sets || []).map(function (x) { return (x.w == null ? '' : fmtNum(x.w)) + 'x' + x.r; }).join(','); }).join('|')
+    return (s.exercises || []).map(function (e) { return labelKey(e.label) + ':' + (e.sets || []).map(function (x) { return x.parts && x.parts.length > 1 ? setText(x, 'x') : (x.w == null ? '' : fmtNum(x.w)) + 'x' + x.r; }).join(','); }).join('|')
       + '#' + (s.classes || []).map(function (c) { return labelKey(c.label) + c.minutes; }).join(',');
   }
   function fnv(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
@@ -133,7 +155,7 @@
       var ds = d + '.' + m + (r && r.ymd === s.date ? '' : '.' + y);
       var out = ['אימון ' + s.type + (s.locker != null ? ' ' + s.locker : '') + ' ' + ds];
       (s.exercises || []).forEach(function (e) {
-        var parts = (e.sets || []).map(function (x) { return x.w == null ? String(x.r) : fmtNum(x.w) + '*' + x.r; }).concat(e.unparsed || []);
+        var parts = (e.sets || []).map(function (x) { return setText(x, '*'); }).concat(e.unparsed || []);
         if (e.note) parts.push('(' + e.note + ')');
         out.push(e.label + ' - ' + parts.join(', '));
       });
@@ -143,7 +165,7 @@
   }
 
   // ── derived data (never stored) ──
-  function setsText(sets) { return (sets || []).map(function (x) { return x.w == null ? String(x.r) : fmtNum(x.w) + '×' + x.r; }).join(' · '); }
+  function setsText(sets) { return (sets || []).map(function (x) { return setText(x, '×'); }).join(' · '); }
   // straight (same weight) | descending | ascending | mixed | bodyweight
   function pattern(sets) {
     if (!sets || !sets.length) return 'none';
@@ -212,10 +234,10 @@
     var sc = ex.scheme || {}, n = Math.max(sc.sets || 3, (logged || []).length), drop = sc.drop == null ? 0.2 : sc.drop, step = ex.step || 0, bw = ex.equip === 'bodyweight' || !step;
     var out = [];
     for (var i = 0; i < n; i++) {
-      var range = rangeOf(ex, i), l = last && last[i], w, aim;
-      if (l && l.r != null) {
-        if (l.r >= range[1]) { w = bw ? null : snap((l.w || 0) + step, step); aim = bw ? Math.min(l.r + 1, range[1]) : range[0]; }
-        else { w = bw ? null : snap(l.w, step); aim = Math.min(Math.max(l.r + 1, range[0]), range[1]); }
+      var range = rangeOf(ex, i), l = last && last[i], lr = firstR(l), w, aim;
+      if (l && lr != null) {
+        if (lr >= range[1]) { w = bw ? null : snap((l.w || 0) + step, step); aim = bw ? Math.min(lr + 1, range[1]) : range[0]; }
+        else { w = bw ? null : snap(l.w, step); aim = Math.min(Math.max(lr + 1, range[0]), range[1]); }
       } else {
         w = bw ? null : i === 0 ? snap(ex.startW, step) : snap(out[i - 1].w * (1 - drop), step);
         aim = range[0];
@@ -252,14 +274,25 @@
     switch (a.type) {
       case 'LOG_SET':
         if (!e || !(a.r >= 0)) return st;
-        e.sets.push({ w: e.step && a.w != null ? a.w : null, r: a.r, t: a.at });
-        var sec = restFor(a.r, e, s.goal); s.rest = { endsAt: a.at + sec * 1000, total: sec };
+        // a combined set ("6+5"): r = the sum of the parts; a part may carry its own weight (drop set); malformed parts are dropped
+        var parts = Array.isArray(a.parts) ? a.parts.filter(function (p) { return p && p.r >= 0 && p.r === Math.round(p.r); }).map(function (p) { return p.w != null && e.step ? { r: p.r, w: p.w } : { r: p.r }; }) : [];
+        var set = { w: e.step && a.w != null ? a.w : null, r: parts.length > 1 ? parts.reduce(function (x, p) { return x + p.r; }, 0) : a.r, t: a.at };
+        if (parts.length > 1) set.parts = parts;
+        e.sets.push(set);
+        var sec = restFor(set.r, e, s.goal); s.rest = { endsAt: a.at + sec * 1000, total: sec };
         s.exIdx = e.sets.length >= ((e.scheme && e.scheme.sets) || 3) ? nextEx(s.exercises, a.ex) : a.ex;
         return s;
       case 'EDIT_SET': if (!e || !e.sets[a.i]) return st; if (a.w !== undefined) e.sets[a.i].w = e.step ? a.w : null; if (a.r != null) e.sets[a.i].r = a.r; return s;
       case 'DELETE_SET': if (!e || !e.sets[a.i]) return st; e.sets.splice(a.i, 1); return s;
       case 'SKIP_EXERCISE': if (!e) return st; e.skipped = true; s.exIdx = nextEx(s.exercises, a.ex); return s;
       case 'ADD_EXERCISE': if (!a.exercise || !String(a.exercise.label || '').trim()) return st; s.exercises.push(liveEx(a.exercise)); s.exIdx = s.exercises.length - 1; return s;
+      // this session only, before any set of it is logged; the original name (swapOf) and the muscle group stay linked
+      case 'SWAP_EXERCISE': {
+        if (!e || e.sets.length || !a.exercise || !String(a.exercise.label || '').trim()) return st;
+        var n = liveEx(Object.assign({ muscle: e.muscle, scheme: e.scheme, startW: e.startW, restSec: e.restSec, warmup: e.warmup }, a.exercise));
+        n.swapOf = e.swapOf || e.label; n.muscle = a.exercise.muscle || e.muscle || null; n.pid = e.pid;
+        s.exercises[a.ex] = n; return s;
+      }
       case 'REST_ADJUST': if (!s.rest) return st; s.rest.endsAt = Math.max(a.at || 0, s.rest.endsAt + (a.delta || 0) * 1000); s.rest.total = Math.max(1, s.rest.total + (a.delta || 0)); return s;
       case 'REST_SKIP': s.rest = null; return s;
       case 'FINISH': s.finished = { at: a.at, effort: a.effort == null ? null : a.effort }; return s;
@@ -277,7 +310,10 @@
   // The finished state -> a session in the stored shape (no id/createdAt: the caller adds them).
   function sessionFromLive(st) {
     var s = { date: ymdIn(new Date(st.startedAt)), type: st.program.name, typeRaw: st.program.name, locker: st.locker, mode: 'sets', classes: [],
-      exercises: st.exercises.filter(function (e) { return e.sets.length; }).map(function (e) { return { label: e.label, unit: e.unit, sets: e.sets.map(function (x) { return { w: x.w, r: x.r, t: x.t }; }), unparsed: [], note: null }; }),
+      exercises: st.exercises.filter(function (e) { return e.sets.length; }).map(function (e) {
+        var o = { label: e.label, unit: e.unit, sets: e.sets.map(function (x) { var y = { w: x.w, r: x.r, t: x.t }; if (x.parts) y.parts = x.parts; return y; }), unparsed: [], note: null };
+        if (e.muscle) o.muscle = e.muscle; if (e.swapOf) o.swapOf = e.swapOf; return o;
+      }),
       source: 'live', programId: st.program.id || null, effort: st.finished ? st.finished.effort : null, durationSec: durationSec(st, st.lastAt) };
     ['dayId', 'dayName', 'routineId', 'dateStr', 'goal', 'mode'].forEach(function (k) { if (st[k] != null) s[k] = st[k]; });
     s.hash = hashOf(s);
@@ -350,7 +386,7 @@
       if (!prev.length) return;
       var kg = e.unit === 'kg' || (e.unit === undefined && (e.sets || []).some(function (x) { return x.w != null; }));
       if (kg) {
-        var best = function (sets) { return sets.reduce(function (m, x) { var v = e1rm(x.w, x.r); return v != null && v > m ? v : m; }, 0); };
+        var best = function (sets) { return sets.reduce(function (m, x) { var v = e1rm(x.w, firstR(x)); return v != null && v > m ? v : m; }, 0); };
         var now = best(e.sets || []), was = best(prev);
         if (now > 0 && was > 0) { if (now > was) out.push({ label: e.label, kind: 'e1rm', value: now, prev: was }); return; }
       }
@@ -358,8 +394,8 @@
       (e.sets || []).forEach(function (x) {
         var same = prev.filter(function (p) { return (p.w == null && x.w == null) || p.w === x.w; });
         if (!same.length) return;
-        var m = Math.max.apply(null, same.map(function (p) { return p.r; }));
-        if (x.r > m && (!top || x.r - m > top.r - top.prev)) top = { label: e.label, kind: 'reps', w: x.w, r: x.r, prev: m };
+        var m = Math.max.apply(null, same.map(firstR)), xr = firstR(x);
+        if (xr > m && (!top || xr - m > top.r - top.prev)) top = { label: e.label, kind: 'reps', w: x.w, r: xr, prev: m };
       });
       if (top) out.push(top);
     });
@@ -369,7 +405,7 @@
   function cardState(o) {
     if (!o || !o.dt) return null;
     var now = o.now, today = ymdIn(new Date(now)), d = ymdIn(new Date(o.dt));
-    if (o.completed) return 'done';
+    if (o.completed || o.hasSession) return 'done';                          // a saved live session for the instance = done (locked)
     if (d < today) return null;                                           // after midnight: missed / postpone own it
     if (o.inProgress) return 'progress';
     if (d > addDaysYmd(today, 1)) return 'far';
@@ -388,9 +424,43 @@
   function coachKind(session, prs, last) {
     if (prs && prs.length) return 'pr';
     if (!last) return 'first';
-    var up = (session.exercises || []).some(function (e) { var l = (last.exercises || []).filter(function (x) { return labelKey(x.label) === labelKey(e.label); })[0]; var a = e.sets[0], b = l && l.sets[0]; return a && b && ((a.w || 0) > (b.w || 0) || ((a.w || 0) === (b.w || 0) && a.r > b.r)); });
+    var up = (session.exercises || []).some(function (e) { var l = (last.exercises || []).filter(function (x) { return labelKey(x.label) === labelKey(e.label); })[0]; var a = e.sets[0], b = l && l.sets[0]; return a && b && ((a.w || 0) > (b.w || 0) || ((a.w || 0) === (b.w || 0) && firstR(a) > firstR(b))); });
     return up ? 'up' : 'same';
   }
+
+  // ── Milestone A2: typed weights, the step choice, volume, the lock, swap within a group, notes per group ──
+  var STEP_CHIPS = [0.5, 1, 2.5, 5], DRAFT_V = 2;                           // drafts v1 (M1a) and v2 replay the same way
+  // a typed weight: "22.5" / "22,5" / "0.25" / "0"; 0-999, two decimals at most; anything else -> null
+  function parseWeight(v) {
+    var s = String(v == null ? '' : v).trim().replace(',', '.');
+    if (!/^\d+(?:\.\d*)?$|^\.\d+$/.test(s)) return null;
+    var n = Math.round(parseFloat(s) * 100) / 100; return n >= 0 && n <= 999 ? n : null;
+  }
+  // the owner's step choice (vt_wk_catalog) wins; the program / history step is only the default, never a limit
+  function effStep(ex, catalog) { var a = catalog && catalog.aliases && catalog.aliases[labelKey(ex && ex.label)]; return a && a.step > 0 && ex.step ? a.step : (ex && ex.step) || 0; }
+  function addStep(w, step, d) { return Math.max(0, round2((w || 0) + d * step)); }        // +- a step, no snapping (a typed 22.75 stays odd)
+  function volume(session) { return (session.exercises || []).reduce(function (a, e) { return a + (e.sets || []).reduce(function (b, x) { return b + (x.w || 0) * (x.r || 0); }, 0); }, 0); }
+  function muscleKey(ex, catalog) { var k = labelKey(ex && ex.label), a = catalog && catalog.aliases && catalog.aliases[k]; return (ex && ex.muscle) || (a && a.muscle) || DEFAULT_ALIASES[k] || 'other'; }
+  // the variants of ONE muscle group: the owner's own first, then the programs', then the defaults; unique; the current excluded
+  function variantsFor(muscle, o) {
+    o = o || {}; var out = [], seen = {}, add = function (l) { var k = labelKey(l); if (l && !seen[k] && k !== labelKey(o.exclude)) { seen[k] = 1; out.push(String(l)); } };
+    ((o.catalog && o.catalog.variants && o.catalog.variants[muscle]) || []).forEach(add);
+    (o.programs || []).forEach(function (p) { (p.days || []).forEach(function (d) { (d.exercises || []).forEach(function (e) { if (muscleKey(e, o.catalog) === muscle) add(e.label); }); }); });
+    (TEXT.variants[muscle] || []).forEach(add);
+    return out;
+  }
+  // a completed instance, or one with a saved live session, refuses a new start (no override in this part)
+  function startBlock(o) {
+    var r = o && o.routine, d = o && o.dateStr; if (!r || !d) return null;
+    if ((r.completedDates || []).indexOf(d) > -1) return 'done';
+    return (o.sessions || []).some(function (s) { return s && s.source === 'live' && String(s.routineId) === String(r.id) && s.dateStr === d; }) ? 'done' : null;
+  }
+  function notesFor(exercises, catalog) {
+    var out = [], seen = {}, notes = (catalog && catalog.notes) || {};
+    (exercises || []).forEach(function (e) { var m = muscleKey(e, catalog), t = String(notes[m] || '').trim(); if (!seen[m] && t) out.push({ muscle: m, text: t }); seen[m] = 1; });
+    return out;
+  }
+  function firstOfGroup(exercises, i, catalog) { var m = muscleKey(exercises[i], catalog); for (var j = 0; j < i; j++) if (muscleKey(exercises[j], catalog) === m) return false; return true; }
 
   // ── ONE Hebrew string table for every workout screen and the HOME card (warm, short, masculine, never guilt) ──
   var TEXT = {
@@ -441,10 +511,25 @@
       cmpReps: function (d) { return d > 0 ? '+' + (d === 1 ? 'חזרה אחת' : d + ' חזרות') : (d === -1 ? 'חזרה אחת פחות' : -d + ' חזרות פחות'); },
       prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + r + ' חזרות' + (w != null ? ' ב-' + w + ' ' + u : ''); },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
+      typeW: 'הקלד משקל', badW: 'משקל לא תקין', stepT: 'קפיצה', addPart: '+ חלק', partN: function (i) { return 'חלק ' + i; }, removePart: 'הסר חלק',
+      swap: 'החלף', swapT: function (m) { return 'החלפה · ' + m; }, remember: 'זכור כברירת מחדל', addVariant: 'הוסף', variantName: 'תרגיל אחר מאותה קבוצה',
+      swappedFrom: function (l) { return 'במקום ' + l; }, noteT: function (m) { return 'הערה · ' + m; }, noteEdit: 'הערה', noteHint: 'הערה קבועה לקבוצת השריר', noteGroup: 'הערה לקבוצת השריר',
+      locked: 'האימון של היום כבר הושלם', lockedSheet: 'האימון של היום כבר הושלם. נתראה באימון הבא',
       lockerN: function (n) { return 'תא ' + n; }, kindT: 'סוג', kinds: { regular: 'רגיל', workout: 'אימון' }, minutes: function (n) { return n + ' דק׳'; }, open: 'יש אימון פתוח', resume: 'המשך', saveOld: 'שמור', delOld: 'מחק', delConfirm: 'למחוק את האימון הפתוח?',
       markQ: 'לסמן את השגרה כבוצעה?', mark: 'סמן כבוצעה', notNow: 'לא עכשיו', attachQ: 'לצרף לשגרה של היום?', attach: 'צרף', without: 'בלי', marked: 'סומן. כל הכבוד',
       asstStart: 'פותח את האימון.', asstNone: 'עוד אין תוכנית אימון. פותח את התוכניות.', asstNext: function (d, p, w) { return 'האימון הבא: ' + d + ' (' + p + ')' + (w ? ', ' + w : '') + '.'; },
       asstWhen: function (t) { return 'בשגרה: ' + t; }, asstOff: 'האימון החי כבוי כרגע.'
+    },
+    // swap suggestions per muscle group (content; the owner's own variants come first)
+    variants: {
+      chest: ['לחיצת חזה במוט', 'לחיצת חזה בשיפוע', 'פרפר במכונה', 'שכיבות סמיכה'],
+      back: ['מתח', 'חתירה בכבל', 'פולי עליון', 'חתירה במוט'],
+      shoulders: ['לחיצת כתפיים', 'הרחקה לצדדים', 'פייס פול'],
+      biceps: ['כפיפת מרפקים', 'פטישים', 'כפיפה בכבל'],
+      triceps: ['פשיטת מרפקים בכבל', 'מקבילים', 'פרנץ\' פרס'],
+      legs: ['סקוואט', 'לחיצת רגליים', 'מכרעים', 'פשיטת ברכיים'],
+      core: ['בטן', 'פלאנק', 'הרמות רגליים'],
+      other: []
     },
     coach: {
       pr: ['שיא חדש ב{ex}: {val}. ככה בונים כוח', '{ex}: {val}, שיא. רשמתי', 'שברת שיא ב{ex}, {val}. יפה מאוד'],
@@ -459,5 +544,7 @@
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
     readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
-    pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT };
+    pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
+    setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
+    muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup };
 });
