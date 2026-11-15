@@ -1984,3 +1984,6 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-note-line{border-color:oklch(0.55 0.16 285 / 0.30);background:oklch(0.55 0.16 285 / 0.10)}
 .wk-note-g{color:var(--accent)}
 @media (prefers-reduced-motion:reduce){.wk-coach-line{transition:none}.wk-done.wk-pulse{animation:none}}
+/* the big target never breaks inside a number ("10-15", "18.5"); it scales down on narrow phones instead */
+.wk-lv-target{flex-wrap:nowrap;white-space:nowrap;font-size:clamp(36px,12.5vw,56px)}
+.wk-lv-target bdi{white-space:nowrap}
