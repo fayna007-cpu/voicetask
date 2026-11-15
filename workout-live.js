@@ -895,12 +895,24 @@
     return { label: S.finish, fn: 'WorkoutLive.finishOpen()', cls: '' };
   }
   function nextEx() { var k = state.exercises.map(function (e, j) { return j; }).filter(function (j) { return j !== ui.view && !exDone(state.exercises[j]); })[0]; if (k != null) view(k); }
+  function topFact(done, tl, n, cnt) {
+    var day = W.ymdIn(new Date(state.startedAt)), best = null;
+    var top = function (ss) { return ss.reduce(function (m, x) { return x.w != null && x.w > m ? x.w : m; }, -1); };
+    done.forEach(function (ex) {
+      var l = W.lastTimeBefore(sessions(), ex.label, day); if (!l || !l.sets.length || isBw(ex)) return;
+      var was = top(l.sets), now = top(ex.sets), d = W.snap(now - was, 0);
+      if (was >= 0 && d > 0 && (!best || d > best.d)) best = { d: d, label: ex.label, u: unitTxt(ex) };
+    });
+    if (best) return { html: S.factUp(h(best.label), num(best.d), best.u) };
+    if (tl.of) return { html: S.tally(cnt(tl.ok), cnt(tl.of)), tally: true };
+    return { html: S.factSets(cnt(n), num(Math.max(1, Math.round(W.durationSec(state, Date.now()) / 60)))) };
+  }
   function cmpLine(ex) {
     var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
     if (!b) d = S.cmpFirst;
     else if (a.w != null && b.w != null && a.w !== b.w) d = '<bdi dir="ltr">' + h(S.cmpKg(W.snap(a.w - b.w, 0), '').trim()) + '</bdi> ' + u;   // "+4.5" isolated
     else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
-    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + S.setN(1) + ' ← ' + setTxt(a) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
+    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + (b ? S.cmpWas(setTxt(b), setTxt(a)) : S.cmpNow(setTxt(a))) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
   }
   // the end of a TEST run: nothing is saved; edits made during it (notes, steps, variants, a remembered swap) only if the owner confirms
   function closeTest() {
@@ -929,9 +941,11 @@
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
     var prs = W.prsFor(s, sessions()), fin = finishLine(), tl = tallyNow();
     var cnt = function (v) { return '<bdi dir="ltr" data-wk-count="' + v + '">' + v + '</bdi>'; };   // counted up once (staggered)
+    var ft = topFact(done, tl, n, cnt);
     return '<div class="wk-lv-ex"><div class="wk-lv-title">' + S.sumT + '</div><div class="wk-lv-cap">' + S.duration + ' ' + num(clock(W.durationSec(state, Date.now()))) + ' · ' + S.setsDone(cnt(n)) + '</div></div>'
-      + (fin ? '<div class="wk-coach">' + h(fin) + '</div>' : '')
-      + (tl.of ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
+      // the TOP line opens with a real number (the biggest weight gain vs last time, else the on-target tally, else sets in minutes) + the coach's line
+      + '<div class="wk-coach"><b class="wk-fact">' + ft.html + '</b>' + (fin ? ' ' + h(fin) : '') + '</div>'
+      + (tl.of && !ft.tally ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
       + group(done.map(cmpLine).join(''))

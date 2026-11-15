@@ -2085,3 +2085,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-m-pv{display:flex;align-items:center;gap:var(--wk-s3);margin:var(--wk-s2) 0}
 .wk-m-pv-c{flex:0 0 56px;width:56px;height:56px}
 .wk-m-pv-t{flex:1 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:20px;color:var(--text)}
+/* Part 3 stage 4: HOME card states recolored from tokens - no boxed frame; a 4px state stripe on the start edge + a soft wash from it */
+.wk-card{box-shadow:none;--wk-wash:transparent;background:linear-gradient(to left,var(--wk-wash),transparent 75%)}
+.wk-card::before{content:"";position:absolute;inset-block:var(--wk-s3);inset-inline-start:0;width:4px;border-radius:4px 0 0 4px;background:var(--wk-c,transparent)}
+.wk-st-far{--wk-c:var(--border2)}
+.wk-st-tomorrow{--wk-c:oklch(0.72 0.18 285 / 0.55);--wk-wash:oklch(0.55 0.16 285 / 0.06)}
+.wk-st-locked{--wk-c:var(--gold);--wk-wash:oklch(0.80 0.15 75 / 0.08)}
+.wk-st-open{--wk-c:var(--accent);--wk-wash:oklch(0.55 0.16 285 / 0.16)}
+.wk-st-progress{--wk-c:var(--accent);--wk-wash:oklch(0.55 0.16 285 / 0.22)}
+.wk-st-done{--wk-c:var(--success);--wk-wash:oklch(0.68 0.14 145 / 0.10)}
+.wk-card-cd .wk-card-link{flex-basis:auto;padding-inline-start:var(--wk-s1)}
+/* the summary's top line: the real number first, on its own line, then the coach's words */
+.wk-coach .wk-fact{display:block;font-size:var(--wk-fs-lead);font-weight:800;color:var(--text);margin-bottom:var(--wk-s1)}
