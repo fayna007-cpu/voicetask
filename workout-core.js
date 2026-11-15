@@ -593,6 +593,7 @@
       cmpReps: function (d) { return d > 0 ? '+' + (d === 1 ? 'חזרה אחת' : d + ' חזרות') : (d === -1 ? 'חזרה אחת פחות' : -d + ' חזרות פחות'); },
       prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + r + ' חזרות' + (w != null ? ' ב-' + w + ' ' + u : ''); },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
+      restDone: function (n) { return 'המנוחה נגמרה · סט ' + n; }, restDoneNotif: function (n) { return 'המנוחה נגמרה · סט ' + n + ' מחכה'; },
       openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + sets + ' סטים נרשמו. מה לעשות איתו?'; },
       openResume: 'המשך באימון הפתוח', openFinish: 'סיים אותו', openDelete: 'מחק ללא שמירה', cancelWorkout: 'בטל אימון (ללא שמירה)',
       cancelWorkoutQ: function (n) { return n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },

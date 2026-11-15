@@ -827,7 +827,7 @@
     var nt = active && ex ? nextTargetText() : '', ended = !resting && state.rest && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3;
     var main = resting
       ? (nt ? '<div class="wk-next-t">' + S.nextSet('<bdi dir="ltr">' + h(nt) + '</bdi>') + '</div>' : '') + '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div><div class="wk-dock-links">' + link(S.skipRest, 'WorkoutLive.restSkip()') + link(S.finish, 'WorkoutLive.finishOpen()') + '</div>'
-      : active ? (ended ? '<div class="wk-next-t wk-next-go">' + S.nextSetBtn + '</div>' : '') + '<button class="wk-done' + (ended ? ' wk-pulse' : '') + '" onclick="WorkoutLive.logSet()" aria-label="' + (ended ? S.nextSetBtn : S.doneLbl) + '">' + S.done + '</button>' + link(S.finish, 'WorkoutLive.finishOpen()')
+      : active ? (ended ? '<div class="wk-next-t wk-next-go">' + S.restDone(num(ex.sets.length + 1)) + '</div>' : '') + '<button class="wk-done' + (ended ? ' wk-pulse wk-flash' : '') + '" onclick="WorkoutLive.logSet()" aria-label="' + (ended ? S.nextSetBtn : S.doneLbl) + '">' + S.done + '</button>' + link(S.finish, 'WorkoutLive.finishOpen()')
       : allDone ? big(S.finish, 'WorkoutLive.finishOpen()') : link(S.finish, 'WorkoutLive.finishOpen()');
     d.innerHTML = main;
   }
@@ -863,8 +863,28 @@
   function stopTimer() { clearInterval(timer); timer = null; }
   document.addEventListener('visibilitychange', function () {
     if (!isOpen()) return;
-    if (document.visibilityState === 'visible') { startTimer(); if (ui.mode === 'live') { renderDock(); acquireWake(); } tick(); } else stopTimer();
+    if (document.visibilityState === 'visible') { clearTimeout(ui.hiddenAlert); startTimer(); if (ui.mode === 'live') { renderDock(); acquireWake(); } tick(); }
+    else { stopTimer(); hiddenRestAlert(); }
   });
+  // hidden mid-rest: ONE notification at the rest end ("המנוחה נגמרה · סט N מחכה") where the page still runs (desktop, some Android).
+  // iOS freezes a hidden / locked PWA's JS, so there it cannot fire: the in-app alert plays once on return (dueAlert). No server push.
+  function hiddenRestAlert() {
+    clearTimeout(ui.hiddenAlert);
+    var r = state && state.rest, ex = state && state.exercises[ui.view];
+    if (!r || !ex || ui.mode !== 'live') return;
+    var wait = r.endsAt - Date.now(); if (wait < 0 || wait > 10 * 60e3) return;
+    var title = S.restDoneNotif(ex.sets.length + 1);
+    ui.hiddenAlert = setTimeout(function () {
+      if (document.visibilityState !== 'hidden' || !window.Notification || Notification.permission !== 'granted') return;
+      var plain = function () { try { new Notification(title, { tag: 'wk-rest' }); } catch (_) { } };
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          var done = false, t = setTimeout(function () { if (!done) { done = true; plain(); } }, 400);
+          navigator.serviceWorker.ready.then(function (reg) { if (done) return; done = true; clearTimeout(t); reg.showNotification(title, { tag: 'wk-rest' }); }).catch(function () { if (!done) { done = true; plain(); } });
+        } else plain();
+      } catch (_) { plain(); }
+    }, wait);
+  }
 
   // ── wake lock (feature-detected) + one-time hint ──
   function acquireWake() {
