@@ -7,7 +7,7 @@
 (function () {
   'use strict';
   var W = window.WCore, T = W.TEXT, S = T.ui;
-  var KEY_P = 'vt_wk_programs', KEY_D = 'vt_wk_draft', KEY_S = 'vt_wk_sessions', KEY_OFF = 'vt_wk_off', KEY_HINT = 'vt_wk_wakehint', KEY_COACH = 'vt_wk_coach', KEY_C = 'vt_wk_catalog';
+  var KEY_P = 'vt_wk_programs', KEY_D = 'vt_wk_draft', KEY_S = 'vt_wk_sessions', KEY_OFF = 'vt_wk_off', KEY_HINT = 'vt_wk_wakehint', KEY_COACH = 'vt_wk_coach', KEY_C = 'vt_wk_catalog', KEY_PREFS = 'vt_wk_prefs';
   var STALE_MS = 6 * 3600e3, RING = 552.92;
   var EQUIP_ORDER = ['dumbbell', 'barbell', 'machine', 'cable', 'bodyweight'], MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'core', 'other'];
   var START_W = { dumbbell: 10, barbell: 20, machine: 4, cable: 15, bodyweight: null }, STEPS = [0.5, 1, 1.25, 2, 2.5, 5], RESTS = [0, 60, 90, 120, 150, 180];
@@ -28,15 +28,31 @@
   // index.html keeps routines in a top-level `let` (shared by classic scripts, not on window)
   function allRoutines() { try { return Array.isArray(routines) ? routines : []; } catch (_) { return []; } }
 
+  // ── writes: READ-MODIFY-WRITE only (WCore.updateJSON re-reads the stored value; an in-memory copy is never saved).
+  // During a TEST run the catalog / program edits are queued instead (applied only if the owner confirms at the end).
+  var testQ = null;                                                     // [{key, fn}] while a test workout runs
+  function patch(key, def, fn) {
+    if (testQ && (key === KEY_C || key === KEY_P)) { testQ.push({ key: key, fn: fn }); return true; }
+    return W.updateJSON(localStorage, key, def, fn) != null;
+  }
+  function normCat(c) { c = c && typeof c === 'object' ? c : {}; c.aliases = c.aliases || {}; c.variants = c.variants || {}; c.notes = c.notes || {}; return c; }
+  function patchCat(fn) { return patch(KEY_C, {}, function (c) { c = normCat(c); fn(c); return c; }); }
+  function patchStore(fn) { return patch(KEY_P, {}, function (raw) { var st = W.readPrograms(raw); fn(st); return { v: 2, activeId: st.activeId, programs: st.programs }; }); }
+  function queued(key, v) { (testQ || []).forEach(function (q) { if (q.key === key) v = q.fn(v) || v; }); return v; }
+
+  // ── prefs (vt_wk_prefs, optional): coach mode, sound, tactile tick, test mode — the owner's choices ──
+  function prefs() { return W.readPrefs(load(KEY_PREFS, null)); }
+  function setPref(k, v) { W.updateJSON(localStorage, KEY_PREFS, {}, function (p) { p[k] = v; return p; }); }
+  var CO = window.WkCoach, CP = window.WkCopy;                            // the two copy tables (wk-coach.js, wk-copy.js)
+  function curMode() { var m = draft && draft.prefs && draft.prefs.coachMode; return W.COACH_MODES.indexOf(m) > -1 ? m : prefs().coachMode; }
+
   // ── the catalog (vt_wk_catalog): per exercise {muscle, unit, step}; per group variants[] and ONE note. Read fresh, written on the owner's edit only ──
-  function cat() { var c = load(KEY_C, null); c = c && typeof c === 'object' ? c : {}; c.aliases = c.aliases || {}; c.variants = c.variants || {}; c.notes = c.notes || {}; return c; }
-  function saveCat(c) { return put(KEY_C, c); }
+  function cat() { var c = normCat(load(KEY_C, null)); return testQ ? normCat(queued(KEY_C, c)) : c; }
   function es(ex) { return W.effStep(ex, cat()); }                        // the step in use: the owner's choice, else the program's
   var muscleName = function (m) { return T.muscle[m] || T.muscle.other; };
 
   // ── programs ──
-  function store() { return W.readPrograms(load(KEY_P, null)); }
-  function saveStore(st) { return put(KEY_P, { v: 2, activeId: st.activeId, programs: st.programs }); }
+  function store() { var raw = load(KEY_P, null); return W.readPrograms(testQ ? queued(KEY_P, raw) : raw); }
   function programById(id) { var st = store(); return st.programs.filter(function (p) { return p.id === id; })[0] || st.programs.filter(function (p) { return p.id === st.activeId; })[0] || null; }
   function mkEx(label, equip, muscle, goal) {
     var q = W.EQUIP[equip];
@@ -71,7 +87,8 @@
     var s = W.replay(d.actions);
     return s && !s.finished ? { d: d, s: s } : null;
   }
-  function hasDraft() { return enabled() && !!readDraft(); }
+  function hasDraft() { var r = enabled() && readDraft(); return !!r && !r.s.test; }   // a TEST draft is never offered as a real workout
+  function hasTestDraft() { var r = enabled() && readDraft(); return !!r && !!r.s.test; }
   function isStale(d) { return Date.now() - Math.max(d.s.startedAt || 0, d.s.lastAt || 0) > STALE_MS; }
   function dispatch(a) {
     a.at = a.at || Date.now();
@@ -83,7 +100,8 @@
 
   // ── UI state (not persisted) ──
   var ui = { noteEdits: {}, mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
-    chimed: 0, wakeHint: false, lastTap: 0, warm: {}, prog: null, dirty: false, dayIdx: 0, ex: null, exIdx: -1, ctx: null, ready: null, pick: null, after: null };
+    chimed: 0, wakeHint: false, lastTap: 0, warm: {}, prog: null, dirty: false, dayIdx: 0, ex: null, exIdx: -1, ctx: null, ready: null, pick: null, after: null,
+    coachAt: -1e9, coachLast: {}, coachSeen: {}, coachTimer: null, restTouched: 0, fired: {}, soundOk: false };
   var timer = null, wake = null;
   var tomorrow = function () { return W.addDaysYmd(W.ymdIn(new Date()), 1); };
   function lastOf(label) { return W.lastTimeBefore(sessions(), label, tomorrow()); }
@@ -115,14 +133,18 @@
     if ($('wkLive')) return;
     var el = document.createElement('div');
     el.id = 'wkLive'; el.className = 'wk-live'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.dir = 'rtl';
-    el.innerHTML = '<div class="wk-lv-head"><button class="wk-lv-x" id="wkLvX" onclick="WorkoutLive.close()" aria-label="' + S.close + '">✕</button><div class="wk-lv-name" id="wkLvName"></div><div class="wk-lv-el" id="wkLvEl" dir="ltr"></div></div>'
-      + '<div class="wk-lv-prog" id="wkLvProg"></div><div class="wk-lv-main" id="wkLvMain"></div><div class="wk-lv-dock" id="wkLvDock"></div>';
+    el.innerHTML = '<div class="wk-lv-head"><button class="wk-lv-x" id="wkLvX" onclick="WorkoutLive.close()" aria-label="' + S.close + '">✕</button><div class="wk-lv-name" id="wkLvName"></div>'
+      + '<div class="wk-lv-hr"><div class="wk-lv-el" id="wkLvEl" dir="ltr"></div><button class="wk-lv-menu" id="wkLvMenu" onclick="WorkoutLive.menuOpen()" aria-label="' + S.menuT + '">⋯</button></div></div>'
+      // the coach slot: ALWAYS reserved in the live screen (a line appearing moves nothing), non-blocking, tap to dismiss
+      + '<div class="wk-coach-slot" id="wkCoachSlot" aria-live="polite"><button class="wk-coach-line" id="wkCoachLine" onclick="WorkoutLive.coachHide()" tabindex="-1"></button></div>'
+      + '<div class="wk-lv-prog" id="wkLvProg"></div><div class="wk-lv-main" id="wkLvMain"></div><div class="wk-lv-dock" id="wkLvDock"></div>'
+      + '<label class="wk-hap" id="wkHapL" aria-hidden="true"><input type="checkbox" switch id="wkHap" tabindex="-1"></label>';
     document.body.appendChild(el);
     var pk = document.createElement('div');
     pk.id = 'wkPick'; pk.className = 'wk-pick'; pk.dir = 'rtl';
     pk.innerHTML = '<div class="wk-pick-bg" onclick="WorkoutLive.pickClose()"></div><div class="wk-pick-card" role="dialog" aria-modal="true"><div class="wk-pick-h"><span id="wkPickT"></span><button class="wk-lv-x" onclick="WorkoutLive.pickClose()" aria-label="' + S.close + '">✕</button></div><div class="wk-pick-b" id="wkPickB"></div><div class="wk-pick-f" id="wkPickF"></div></div>';
     document.body.appendChild(pk);
-    [el, pk].forEach(function (x) { x.addEventListener('pointerdown', onPress); });
+    [el, pk].forEach(function (x) { x.addEventListener('pointerdown', onPress); x.addEventListener('pointerdown', touched, true); });
     ['pointerup', 'pointercancel'].forEach(function (t) { document.addEventListener(t, stopRepeat, true); });
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitViewport); window.visualViewport.addEventListener('scroll', fitViewport); }
     el.addEventListener('focusin', function (e) { if (e.target.matches('input')) setTimeout(function () { fitViewport(); e.target.scrollIntoView({ block: 'center' }); }, 250); });
@@ -144,12 +166,16 @@
     if (!enabled()) return;
     audio(true);
     var r = readDraft();
-    if (r) { draft = r.d; state = r.s; ui.view = state.exIdx; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.stack = []; ui.mode = 'live'; acquireWake(); hideBanner(); show(); return; }
-    // completed = locked: a done instance (or one with a saved live session) refuses a new start; no override in this part
-    var lock = lockFor(o);
-    if (lock.blocked) { say(lock.line); return; }
-    if (lock.inst) o = Object.assign({}, o, lock.inst);
-    ui.ctx = { routineId: o.routineId != null ? String(o.routineId) : null, dateStr: o.dateStr || null, programId: o.programId || null };
+    // a real draft always resumes (never lose a real workout); a TEST draft resumes only from the test button, a real start drops it
+    if (r && r.s.test && !o.test) { drop(KEY_D); r = null; }
+    if (r) { draft = r.d; state = r.s; testQ = state.test ? [] : null; ui.view = state.exIdx; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.stack = []; ui.mode = 'live'; ui.coachSeen = { start: true }; acquireWake(); hideBanner(); show(); return; }
+    // completed = locked: a done instance (or one with a saved live session) refuses a new start; a TEST run is never blocked
+    if (!o.test) {
+      var lock = lockFor(o);
+      if (lock.blocked) { say(lock.line); return; }
+      if (lock.inst) o = Object.assign({}, o, lock.inst);
+    }
+    ui.ctx = { routineId: o.test || o.routineId == null ? null : String(o.routineId), dateStr: o.test ? null : o.dateStr || null, programId: o.programId || null, test: !!o.test };
     if (!store().programs.length) { ui.after = 'ready'; ui.stack = []; ui.mode = 'programs'; show(); return; }
     openReady();
   }
@@ -168,25 +194,59 @@
     var c = ui.ctx || {}, r = c.routineId ? routineOf(c.routineId) : null;
     var p = programById(c.programId || (r && r.programId) || null); if (!p) { ui.mode = 'programs'; show(); return; }
     var d = W.nextDay(p, sessions()), prev = W.sortRecent(sessions()).filter(function (s) { return s.programId === p.id && s.locker != null; })[0];
-    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: false, feelOpen: false, feel: {}, mode: 'full', modeTouched: false };
+    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: false, feelOpen: false, feel: {}, mode: 'full', modeTouched: false, coachMode: prefs().coachMode };
     ui.stack = []; ui.mode = 'ready'; show();
   }
   function begin() {
     var R = ui.ready, p = programById(R.programId), d = p && p.days.filter(function (x) { return x.id === R.dayId; })[0];
     if (!d || !d.exercises.length) return;
     var c = ui.ctx || {};
-    draft = { v: W.DRAFT_V, startedAt: Date.now(), actions: [] };        // v2 (combined sets); readDraft replays any version
+    // v2 (combined sets); readDraft replays any version. The coach mode travels in the draft so a resume keeps it.
+    draft = { v: W.DRAFT_V, startedAt: Date.now(), actions: [], prefs: { coachMode: R.coachMode || prefs().coachMode }, test: !!c.test };
+    testQ = c.test ? [] : null;
     dispatch({ type: 'START', at: draft.startedAt, locker: R.locker, program: { id: p.id, name: p.days.length > 1 ? p.name + ' · ' + d.name : p.name, exercises: copy(d.exercises) },
-      dayId: d.id, dayName: d.name, routineId: c.routineId, dateStr: c.dateStr, goal: p.goal, mode: R.mode });
+      dayId: d.id, dayName: d.name, routineId: c.routineId, dateStr: c.dateStr, goal: p.goal, mode: R.mode, test: c.test ? true : null, coachMode: draft.prefs.coachMode });
     ui.view = 0; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.effort = null; ui.exists = false; ui.err = ''; ui.chimed = 0; ui.warm = {}; ui.stack = [];
+    ui.coachSeen = {}; ui.coachLast = {}; ui.coachAt = -1e9; ui.fired = {}; ui.restTouched = 0;
     acquireWake(); hideBanner(); go('live');
+    coachStart();
   }
+  // ── the live coach: ONE line in the reserved slot; mode "off" = no lines (the set-row marks stay) ──
+  function coachShow(text) {
+    var b = $('wkCoachLine'); if (!b || !text) return;
+    b.textContent = text; b.classList.add('on'); clearTimeout(ui.coachTimer);
+    ui.coachTimer = setTimeout(coachHide, 4000);
+  }
+  function coachHide() { var b = $('wkCoachLine'); if (b) b.classList.remove('on'); clearTimeout(ui.coachTimer); }
+  function coachSay(m) {
+    if (!m || curMode() === 'off' || !CO) return;
+    var now = performance.now();
+    if (m.kind !== 'pr' && now - ui.coachAt < 20000) return;                  // one line per 20 s (a record always speaks)
+    var r;
+    if (m.kind === 'comebackGap' || m.kind === 'comebackPostponed') {          // from the copy table (mode-independent)
+      var all = (CP && CP.COPY.coach[m.kind]) || [], ok = W.fillable(all, m.vars); if (!ok.length) return;
+      var p = CP.pick(ok, ok.indexOf(all[ui.coachLast[m.kind]])); r = { text: CP.fill(p.text, m.vars), index: all.indexOf(p.text) };
+    } else r = CO.line(curMode(), m.kind, m.vars, ui.coachLast[m.kind] == null ? -1 : ui.coachLast[m.kind]);
+    if (!r.text || r.index === ui.coachLast[m.kind]) return;                 // never the same line twice in a row
+    ui.coachLast[m.kind] = r.index; ui.coachAt = now; if (m.kind === 'halfway') ui.coachSeen.halfway = true;
+    coachShow(r.text);
+  }
+  function coachStart() {
+    if (!state) return;
+    var last = W.sortRecent(sessions().filter(function (s) { return s.programId === state.program.id; }))[0];
+    var gap = last && W.daysBetween(last.date, W.ymdIn(new Date())) > 10;   // back after more than 10 days
+    ui.coachSeen.start = false;
+    var t0 = targets(0)[0], m = gap ? { kind: 'comebackGap', vars: {} } : W.coachMoment(state, { atStart: true, firstTarget: t0 ? { w: t0.w, r: t0.aim } : null, seen: ui.coachSeen });
+    coachSay(m); ui.coachSeen.start = true;
+  }
+  function touched() { if (state && state.rest && Date.now() >= state.rest.endsAt) ui.restTouched = state.rest.endsAt; }   // a tap after the rest ends stops the alerts
   function close() {
     if (ui.pick) { pickClose(); return; }
     if (ui.mode === 'program' && ui.dirty && !confirm(S.discard)) return;
     if (ui.mode === 'finish') { go('live'); return; }
     if (ui.mode === 'live') {
       var logged = state && state.exercises.some(function (e) { return e.sets.length; });
+      if (state && state.test) { if (logged && !confirm(S.leave)) return; if (!logged) { drop(KEY_D); draft = null; state = null; testQ = null; } hide(); refreshAll(); return; }
       if (logged) { if (!confirm(S.leave)) return; }
       else { drop(KEY_D); draft = null; state = null; }
       hide(); refreshAll(); return;
@@ -198,7 +258,7 @@
   // ── programs screen ──
   function openPrograms(after) { ui.after = after || null; ui.stack = []; ui.mode = 'programs'; show(); }
   function useTemplate(kind) {
-    var st = store(), p = template(kind); st.programs.push(p); st.activeId = p.id; saveStore(st); pickClose();
+    var p = template(kind); patchStore(function (st) { st.programs.push(p); st.activeId = p.id; }); pickClose();
     if (ui.after === 'form') { ui.after = null; form.programId = p.id; hide(); formRender(); return; }
     if (ui.after === 'ready') { ui.after = null; ui.ctx = ui.ctx || {}; ui.ctx.programId = p.id; openReady(); return; }
     editProgram(p.id);
@@ -207,9 +267,12 @@
     var st = store(), p = st.programs.filter(function (x) { return x.id === id; })[0]; if (!p) return;
     pickOpen(h(p.name), [st.activeId !== id ? row(S.makeActive, 'WorkoutLive.setActive(' + js(id) + ')') : '', row(S.duplicate, 'WorkoutLive.dupProgram(' + js(id) + ')'), row(S.del, 'WorkoutLive.delProgram(' + js(id) + ')', 'wk-danger')].join(''), '');
   }
-  function setActive(id) { var st = store(); st.activeId = id; saveStore(st); pickClose(); render(); }
-  function dupProgram(id) { var st = store(), p = copy(st.programs.filter(function (x) { return x.id === id; })[0]); p.id = uid('p'); p.name = S.copyOf(p.name); p.lastDay = null; p.days.forEach(function (d) { d.id = uid('d'); d.exercises.forEach(function (e) { e.id = uid('e'); }); }); st.programs.push(p); saveStore(st); pickClose(); render(); }
-  function delProgram(id) { if (!confirm(S.delProgram)) return; var st = store(); st.programs = st.programs.filter(function (x) { return x.id !== id; }); if (st.activeId === id) st.activeId = st.programs[0] ? st.programs[0].id : null; saveStore(st); pickClose(); render(); }
+  function setActive(id) { patchStore(function (st) { st.activeId = id; }); pickClose(); render(); }
+  function dupProgram(id) {
+    patchStore(function (st) { var src = st.programs.filter(function (x) { return x.id === id; })[0]; if (!src) return; var p = copy(src); p.id = uid('p'); p.name = S.copyOf(p.name); p.lastDay = null; p.days.forEach(function (d) { d.id = uid('d'); d.exercises.forEach(function (e) { e.id = uid('e'); }); }); st.programs.push(p); });
+    pickClose(); render();
+  }
+  function delProgram(id) { if (!confirm(S.delProgram)) return; patchStore(function (st) { st.programs = st.programs.filter(function (x) { return x.id !== id; }); if (st.activeId === id) st.activeId = st.programs[0] ? st.programs[0].id : null; }); pickClose(); render(); }
   function templatesPick() {
     pickOpen(S.chooseTemplate, ['fullbody', 'ppl', 'ul', 'empty'].map(function (k) {
       var p = template(k); return row(T.templates[k], 'WorkoutLive.useTemplate(\'' + k + '\')', '', S.daysN(p.days.length) + ' · ' + T.goal[p.goal]);
@@ -229,10 +292,12 @@
   function saveProgram() {
     var p = ui.prog; p.name = String(p.name || '').trim() || T.templates.empty;
     p.days.forEach(function (d, i) { d.name = String(d.name || '').trim() || T.dayN(i); });
-    var st = store(), i = st.programs.map(function (x) { return x.id; }).indexOf(p.id);
-    if (i > -1) st.programs[i] = p; else st.programs.push(p);
-    if (!st.activeId) st.activeId = p.id;
-    saveStore(st); ui.dirty = false; back();
+    patchStore(function (st) {                                            // only THIS program is replaced; the rest is re-read
+      var i = st.programs.map(function (x) { return x.id; }).indexOf(p.id), keep = i > -1 ? st.programs[i].lastDay : null;
+      var np = copy(p); if (i > -1) { np.lastDay = keep || np.lastDay; st.programs[i] = np; } else st.programs.push(np);
+      if (!st.activeId) st.activeId = p.id;
+    });
+    ui.dirty = false; back();
   }
 
   // ── exercise editor ──
@@ -251,7 +316,7 @@
     if (!e.label) { ui.err = S.needName; render(); var b = $('wkExName'); if (b) b.focus(); return; }
     var l = pDay().exercises; if (ui.exIdx < 0) l.push(e); else l[ui.exIdx] = e;
     var ks = Object.keys(ui.noteEdits);                                   // group notes are catalog data: saved with the exercise
-    if (ks.length) { var cc = cat(); ks.forEach(function (m) { var v = String(ui.noteEdits[m] || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; }); saveCat(cc); }
+    if (ks.length) { var edits = copy(ui.noteEdits); patchCat(function (cc) { Object.keys(edits).forEach(function (m) { var v = String(edits[m] || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; }); }); }
     ui.dirty = true; back();
   }
   function exNote(v) { ui.noteEdits[W.muscleKey(ui.ex, cat())] = v; }
@@ -275,9 +340,26 @@
     else if (k === 'warm') R.warmOpen = !R.warmOpen;
     else if (k === 'feelOpen') R.feelOpen = !R.feelOpen;
     else if (k === 'mode') { R.mode = v; R.modeTouched = true; }
+    else if (k === 'coach') { R.coachMode = v; setPref('coachMode', v); }
     else if (k === 'sleep' || k === 'energy' || k === 'pain') { R.feel[k] = v; if (!R.modeTouched) R.mode = suggestMode(R.feel); }
     render();
   }
+  // labels: the coach modes from wk-coach.js (+ "כבוי"); the day modes full / lighter from wk-copy.js; "short" stays ours (2 sets, not 20 min)
+  function modeLabels() { var o = {}; W.COACH_MODES.forEach(function (k) { o[k] = k === 'off' ? S.coachOff : (CO && CO.MODES[k] ? CO.MODES[k].label : k); }); return o; }
+  function modeHint(k) { return k === 'off' ? S.coachOffHint : CO && CO.MODES[k] ? CO.MODES[k].hint : ''; }
+  function dayModes() { return { full: CP ? CP.COPY.label.readinessFull : S.modes.full, light: CP ? CP.COPY.label.readinessLight : S.modes.light, short: S.modes.short }; }
+  function soundTest() { audio(true); sound('rest', true); setPref('soundTested', true); ui.soundOk = true; var e = $('wkSoundHint'); if (e) e.textContent = S.soundOk + ' · ' + S.soundHint; }
+  // the live header menu: coach mode, sound, the tactile tick (the draft keeps the mode for a resume)
+  function menuOpen() {
+    var p = prefs(), m = curMode();
+    ui.pick = { kind: 'menu' };
+    pickOpen(S.menuT, '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, m, function (k) { return 'WorkoutLive.setMode(\'' + k + '\')'; }, modeLabels())
+      + '<div class="wk-lv-cap">' + h(modeHint(m)) + '</div>'
+      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'sound\')" role="switch" aria-checked="' + p.sound + '"><span class="wk-row-l">' + S.soundT + '</span><span class="wk-sw' + (p.sound ? ' on' : '') + '"></span></button>'
+      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>', '', true);
+  }
+  function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); put(KEY_D, draft); } if (k === 'off') coachHide(); menuOpen(); }
+  function togglePref(k) { setPref(k, !prefs()[k]); menuOpen(); }
   // neutral: the mean of sleep, energy and (6 - pain) -> full / lighter / short; the owner can always pick another
   function suggestMode(f) { var v = []; if (f.sleep) v.push(f.sleep); if (f.energy) v.push(f.energy); if (f.pain) v.push(6 - f.pain); if (!v.length) return 'full'; var m = v.reduce(function (a, b) { return a + b; }, 0) / v.length; return m >= 3.5 ? 'full' : m >= 2.5 ? 'light' : 'short'; }
   function programPick(cb) {
@@ -330,14 +412,19 @@
   // ── live actions ──
   function logSet() {
     var now = performance.now(); if (ui.lastTap && now - ui.lastTap < 300) return; ui.lastTap = now;   // double tap guard (monotonic clock)
-    var c = cur(), ex = state.exercises[c.ex], bw = isBw(ex);
+    var c = cur(), ex = state.exercises[c.ex], bw = isBw(ex), slot = ex.sets.length, ts = targets(c.ex), tg = ts[Math.min(slot, ts.length - 1)];
     if (c.parts && c.parts.length) {                                      // "6+5": the set weight = the first part's; a lighter later part = a drop set
       var all = c.parts.concat([{ w: c.w, r: c.r }]), w0 = bw ? null : all[0].w;
       dispatch({ type: 'LOG_SET', ex: c.ex, w: w0, r: all[0].r, parts: all.map(function (p, i) { return i && !bw && p.w !== w0 ? { r: p.r, w: p.w } : { r: p.r }; }) });
     } else dispatch({ type: 'LOG_SET', ex: c.ex, w: bw ? null : c.w, r: c.r });
-    delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0;
-    sound('tick'); render(); reveal();
+    var done = state.exercises[c.ex].sets[slot];
+    delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
+    sound('tick'); haptic(); render(); reveal();
+    // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
+    coachSay(W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen }));
   }
+  // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
+  function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } }
   function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); reveal(); }
   function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); reveal(); }
   // a short screen: the note, warm-up and parts lines may push the active steppers below the fold -> bring them into view
@@ -358,8 +445,8 @@
     c.w = v; pickClose(); render();
   }
   function setStep(s) {
-    var c = ui.editing || cur(), ex = state.exercises[c.ex], cc = cat(), k = W.labelKey(ex.label);
-    cc.aliases[k] = Object.assign({}, cc.aliases[k], { step: s }); saveCat(cc);
+    var c = ui.editing || cur(), ex = state.exercises[c.ex], k = W.labelKey(ex.label);
+    patchCat(function (cc) { cc.aliases[k] = Object.assign({}, cc.aliases[k], { step: s }); });
     document.querySelectorAll('#wkPickB .wk-chip').forEach(function (b) { b.classList.toggle('on', +b.textContent === s); });
   }
   // swap: variants of the SAME muscle group; this session only, or remembered in the program (the owner's own edit)
@@ -375,8 +462,8 @@
   function swapRemember() { ui.pick.remember = !ui.pick.remember; var b = document.querySelector('#wkPickB .wk-sw'); if (b) b.classList.toggle('on', ui.pick.remember); }
   function swapAdd() {
     var v = String(($('wkVarIn') || {}).value || '').trim(); if (!v) { var i = $('wkVarIn'); if (i) i.focus(); return; }
-    var ex = state.exercises[ui.view], m = W.muscleKey(ex, cat()), cc = cat();
-    cc.variants[m] = [v].concat((cc.variants[m] || []).filter(function (x) { return W.labelKey(x) !== W.labelKey(v); })); saveCat(cc);
+    var ex = state.exercises[ui.view], m = W.muscleKey(ex, cat());
+    patchCat(function (cc) { cc.variants[m] = [v].concat((cc.variants[m] || []).filter(function (x) { return W.labelKey(x) !== W.labelKey(v); })); });
     swapApply(v);
   }
   function swapTo(i) { var l = (ui.swapList || [])[i]; if (l) swapApply(l); }
@@ -384,8 +471,8 @@
     var i = ui.view, ex = state.exercises[i], m = W.muscleKey(ex, cat()), remember = ui.pick && ui.pick.remember;
     dispatch({ type: 'SWAP_EXERCISE', ex: i, exercise: { label: label, muscle: m, equip: ex.equip, unit: ex.unit, step: ex.step } });
     if (remember && state.program.id && ex.pid) {                         // the owner chose it: the program's exercise takes the new name
-      var st = store(); st.programs.forEach(function (p) { if (p.id !== state.program.id) return; p.days.forEach(function (d) { d.exercises.forEach(function (e) { if (e.id === ex.pid) { e.label = label; e.muscle = e.muscle || m; } }); }); });
-      saveStore(st);
+      var pid = state.program.id, eid = ex.pid;
+      patchStore(function (st) { st.programs.forEach(function (p) { if (p.id !== pid) return; p.days.forEach(function (d) { d.exercises.forEach(function (e) { if (e.id === eid) { e.label = label; e.muscle = e.muscle || m; } }); }); }); });
     }
     ui.pend = {}; pickClose(); render();
   }
@@ -395,7 +482,7 @@
     ui.pick = { kind: 'note', m: m };
     pickOpen(S.noteT(muscleName(m)), '<textarea class="rfi wk-note-in" id="wkNoteIn" rows="3" placeholder="' + S.noteHint + '">' + h(cat().notes[m] || '') + '</textarea>', '<button class="wk-big" onclick="WorkoutLive.noteSave()">' + S.save + '</button>', true);
   }
-  function noteSave() { var m = ui.pick && ui.pick.m, cc = cat(); if (!m) return; var v = String(($('wkNoteIn') || {}).value || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; saveCat(cc); pickClose(); render(); }
+  function noteSave() { var m = ui.pick && ui.pick.m; if (!m) return; var v = String(($('wkNoteIn') || {}).value || '').trim(); patchCat(function (cc) { if (v) cc.notes[m] = v; else delete cc.notes[m]; }); pickClose(); render(); }
   function undo() { if (!draft || draft.actions.length < 2) return; dispatch({ type: 'UNDO' }); ui.pend = {}; ui.view = Math.min(ui.view, state.exercises.length - 1); render(); }
   function view(i) { ui.view = i; ui.editing = null; render(); reveal(); }
   function addSet() { ui.extra[ui.view] = 1; render(); }
@@ -427,15 +514,20 @@
   }
   function saveWorkout(how) {
     // FINISH is applied in memory only: the draft stays until the session is really stored (no data loss if the app dies here)
-    var s = preview(), all = sessions(), same = all.filter(function (x) { return x.date === s.date && x.type === s.type; });
+    if (state.test) { closeTest(); return; }                              // a TEST run never writes a session (only "סגור")
+    var s = preview(), same = sessions().filter(function (x) { return x.date === s.date && x.type === s.type; });
     if (same.length && !how) { ui.exists = true; render(); return; }
     var now = new Date().toISOString(), rec = Object.assign({ id: uid('w'), createdAt: now, updatedAt: now, instanceId: null }, s);
-    if (how === 'replace') { var idx = all.indexOf(same[0]); rec.id = same[0].id; rec.createdAt = same[0].createdAt || now; all[idx] = rec; }
-    else all.push(rec);
-    if (!put(KEY_S, all)) { ui.err = S.saveErr; render(); return; }
+    var ok = patch(KEY_S, [], function (all) {                            // read-modify-write on the CURRENT list
+      all = Array.isArray(all) ? all : [];
+      var hit = how === 'replace' ? all.filter(function (x) { return x.date === s.date && x.type === s.type; })[0] : null;
+      if (hit) { rec.id = hit.id; rec.createdAt = hit.createdAt || now; all[all.indexOf(hit)] = rec; } else all.push(rec);
+      return all;
+    });
+    if (!ok) { ui.err = S.saveErr; render(); return; }
     // lastDay only on a program already stored in the days shape (an M1a-shaped store is never rewritten by a workout)
     var raw = load(KEY_P, null), rp = raw && (Array.isArray(raw) ? raw : raw.programs) || [], stored = rp.filter(function (x) { return x && x.id === s.programId; })[0];
-    if (stored && Array.isArray(stored.days) && s.dayId) { var st = store(); st.programs.forEach(function (x) { if (x.id === s.programId) x.lastDay = s.dayId; }); saveStore(st); }
+    if (stored && Array.isArray(stored.days) && s.dayId) patchStore(function (st) { st.programs.forEach(function (x) { if (x.id === s.programId) x.lastDay = s.dayId; }); });
     drop(KEY_D); draft = null; state = null;
     hide(); if (window.Workout && $('wkSheet') && $('wkSheet').classList.contains('on')) window.Workout.close();
     refreshAll(); offerComplete(rec);
@@ -463,7 +555,7 @@
     if (!linked && !t) return;
     prompt(linked ? S.markQ : S.attachQ, linked ? S.mark : S.attach, linked ? S.notNow : S.without, function () {
       var rid = linked ? rec.routineId : t.routineId, ds = linked ? rec.dateStr : t.dateStr;
-      if (!linked) { var all = sessions(), x = all.filter(function (y) { return y.id === rec.id; })[0]; if (x) { x.routineId = rid; x.dateStr = ds; put(KEY_S, all); } }
+      if (!linked) patch(KEY_S, [], function (all) { (Array.isArray(all) ? all : []).forEach(function (y) { if (y.id === rec.id) { y.routineId = rid; y.dateStr = ds; } }); return all; });
       completeRoutine(rid, ds);
     });
   }
@@ -502,7 +594,7 @@
       main.innerHTML = ui.mode === 'programs' ? programsHtml() : ui.mode === 'program' ? programHtml() : ui.mode === 'exercise' ? exerciseHtml() : readyHtml();
       renderDock(); return;
     }
-    name.innerHTML = h(state.program.name) + (state.locker != null ? '<span class="wk-lv-lk">' + h(S.lockerN(state.locker)) + '</span>' : '');
+    name.innerHTML = h(state.program.name) + (state.test ? '<span class="wk-lv-lk wk-test-ban">' + S.testBanner + '</span>' : state.locker != null ? '<span class="wk-lv-lk">' + h(S.lockerN(state.locker)) + '</span>' : '');
     prog.innerHTML = state.exercises.map(function (e, i) {
       var n = (e.scheme && e.scheme.sets) || 3, f = e.skipped ? 1 : Math.min(1, e.sets.length / n);
       return '<button class="wk-seg' + (i === ui.view ? ' on' : '') + (e.skipped ? ' skip' : '') + '" onclick="WorkoutLive.view(' + i + ')" aria-label="' + h(e.label) + '"><i style="width:' + Math.round(f * 100) + '%"></i></button>';
@@ -568,13 +660,18 @@
     return '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
       + (p.days.length > 1 ? '<div class="wk-chips wk-days">' + p.days.map(function (x) { return '<button class="wk-chip' + (x.id === d.id ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'day\',' + js(x.id) + ')">' + h(x.name) + (x.id === R.nextId ? ' · ' + S.next : '') + '</button>'; }).join('') + '</div>' : '')
       + '<div class="wk-lv-cap wk-exlist">' + d.exercises.map(function (e) { return h(e.label); }).join(' · ') + '</div>'
+      + (CP && !d.exercises.some(function (e) { return lastOf(e.label); }) ? '<div class="wk-lv-cap wk-cue">' + h(CP.COPY.label.firstSessionHint) + '</div>' : '')
       + W.notesFor(d.exercises, cat()).map(function (n) { return '<div class="wk-note-line wk-note-ro"><span class="wk-note-g">📝 ' + muscleName(n.muscle) + '</span><span>' + h(n.text) + '</span></div>'; }).join('')
       + group(line(S.lockerT, stepper('rlk', R.locker == null ? S.none : R.locker, '', 'wkLk', 1)))
+      // the coach: רגוע / מאמן / אש / כבוי (the owner's choice, remembered) + a sound check
+      + group('<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
+        + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div>'
+        + '<div class="wk-sound-row"><button class="wk-chip" onclick="WorkoutLive.soundTest()">🔊 ' + S.soundTest + '</button><span class="wk-lv-cap" id="wkSoundHint">' + (ui.soundOk ? S.soundOk + ' · ' : '') + S.soundHint + '</span></div>')
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
         + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return '<bdi dir="ltr">' + x.w + ' × ' + x.r + '</bdi>'; }).join(' · ') + ' ' + unitTxt(wex) + '</div>' : '')) : '')
-      + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + S.modes[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
+      + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
         + (R.feelOpen ? feel('sleep') + feel('energy') + feel('pain')
-          + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, S.modes)
+          + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, dayModes())
           + '<div class="wk-lv-cap">' + S.modeHint[R.mode] + (Object.keys(R.feel).length && !R.modeTouched ? ' · ' + S.suggested : '') + '</div>' : ''));
   }
   function liveHtml() {
@@ -585,8 +682,8 @@
         return '<div class="wk-lv-set edit"><div class="wk-lv-n">' + S.setN(k + 1) + ' · ' + S.edit + '</div><div class="wk-lv-steps">' + (bw ? '' : stepper('w', ui.editing.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', ui.editing.r, S.reps, 'wkLvR') + '</div>'
           + '<div class="wk-chips wk-center"><button class="wk-chip on" onclick="WorkoutLive.saveEdit()">' + S.keep + '</button><button class="wk-chip" onclick="WorkoutLive.delSet()">' + S.del + '</button><button class="wk-chip" onclick="WorkoutLive.cancelEdit()">' + S.cancel + '</button></div></div>';
       }
-      var stt = W.rangeStatus(W.firstR(x), t[k] && t[k].range);
-      return '<button class="wk-lv-set done" onclick="WorkoutLive.editSet(' + k + ')"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + setTxt(x) + '</span><span class="wk-lv-st ' + stt + '">' + S.st[stt] + '</span></button>';
+      var stt = W.rangeStatus(W.firstR(x), t[k] && t[k].range), rx = reaction(ex, x, t[k]);
+      return '<button class="wk-lv-set done' + (rx ? ' wk-r-' + rx : '') + '" onclick="WorkoutLive.editSet(' + k + ')"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + setTxt(x) + '</span><span class="wk-lv-st ' + stt + '">' + S.st[stt] + '</span></button>';
     }).join('');
     var act = '';
     if (active && !ui.editing) {
@@ -629,25 +726,35 @@
     else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
     return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + S.setN(1) + ' ← ' + setTxt(a) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
   }
-  function coachLine(s, prs) {
-    var hist = sessions(), last = W.sortRecent(hist.filter(function (x) { return x.programId === s.programId && (x.dayId || null) === (s.dayId || null) && x.date <= s.date; }))[0] || null;
-    var kind = W.coachKind(s, prs, last), vars = { n: s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) };
-    if (kind === 'pr') { var p = prs[0]; vars.ex = h(p.label); vars.val = p.kind === 'e1rm' ? '~' + num(p.value) + ' ' + T.unit.kg : num(p.r) + ' ' + S.reps; }
-    if (kind === 'up') (s.exercises || []).some(function (e) {
-      var lx = (last.exercises || []).filter(function (x) { return W.labelKey(x.label) === W.labelKey(e.label); })[0], a = e.sets[0], b = lx && lx.sets[0]; if (!a || !b) return false;
-      if ((a.w || 0) > (b.w || 0)) { vars.ex = h(e.label); vars.delta = num('+' + W.snap(a.w - b.w, 0)) + ' ' + (e.unit === 'plates' ? T.unit.plates : T.unit.kg); return true; }
-      if ((a.w || 0) === (b.w || 0) && a.r > b.r) { vars.ex = h(e.label); vars.delta = S.cmpReps(a.r - b.r); return true; }
-      return false;
-    });
-    var prev = load(KEY_COACH, {}) || {}, pk = W.pick(T.coach[kind], s.startedAt || s.date + kind, prev.kind === kind ? prev.i : -1);
-    ui.coachPick = { kind: kind, i: pk.i };
-    return W.fill(pk.text, vars);
+  // the end of a TEST run: nothing is saved; edits made during it (notes, steps, variants, a remembered swap) only if the owner confirms
+  function closeTest() {
+    var q = testQ || []; testQ = null;
+    if (q.length && confirm(S.testKeep)) q.forEach(function (x) { W.updateJSON(localStorage, x.key, {}, x.fn); });   // read-modify-write, in order
+    drop(KEY_D); draft = null; state = null;
+    hide(); refreshAll();
+  }
+  // the summary's coach line: a postponed instance that still got done -> comebackPostponed (copy table); else the mode's finish line
+  function finishLine() {
+    if (curMode() === 'off' || !CO) return '';
+    if (ui.finText != null && ui.finFor === state.startedAt) return ui.finText;          // stable while the summary is open
+    var r = state.routineId && routineOf(state.routineId), inst = r && Object.values(r.scheduledWeeks || {}).reduce(function (a, l) { return a.concat(l || []); }, []).filter(function (i) { return i && typeof i === 'object' && i.dt === state.dateStr; })[0];
+    var t = '';
+    if (inst && inst.wasRescheduled === true && CP) { var p = CP.pick(W.fillable(CP.COPY.coach.comebackPostponed, {}), -1); t = p.text; }
+    if (!t) t = CO.line(curMode(), 'finish', {}, ui.coachLast.finish == null ? -1 : ui.coachLast.finish).text;
+    ui.finText = t; ui.finFor = state.startedAt; return t;
+  }
+  // "ביעד: X מתוך Y סטים": every logged set against the target it had (sets without a target are not counted)
+  function tallyNow() {
+    var pairs = [];
+    state.exercises.forEach(function (e, i) { var t = targets(i); e.sets.forEach(function (x, k) { var tg = t[k]; pairs.push({ set: x, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null }); }); });
+    return CO ? W.tally(pairs, CO.judge) : { ok: 0, of: 0 };
   }
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
-    var prs = W.prsFor(s, sessions());
+    var prs = W.prsFor(s, sessions()), fin = finishLine(), tl = tallyNow();
     return '<div class="wk-lv-ex"><div class="wk-lv-title">' + S.sumT + '</div><div class="wk-lv-cap">' + S.duration + ' ' + num(clock(W.durationSec(state, Date.now()))) + ' · ' + S.setsDone(n) + '</div></div>'
-      + '<div class="wk-coach">' + coachLine(s, prs) + '</div>'
+      + (fin ? '<div class="wk-coach">' + h(fin) + '</div>' : '')
+      + (tl.of ? '<div class="wk-tally">' + S.tally(num(tl.ok), num(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
       + group(done.map(cmpLine).join(''))
@@ -664,16 +771,25 @@
     if (ui.mode === 'program') { d.innerHTML = big(S.save, 'WorkoutLive.saveProgram()'); return; }
     if (ui.mode === 'exercise') { d.innerHTML = big(S.saveEx, 'WorkoutLive.saveEx()'); return; }
     if (ui.mode === 'ready') { var R = ui.ready, p = programById(R.programId), dd = p && p.days.filter(function (x) { return x.id === R.dayId; })[0]; d.innerHTML = big(S.start, 'WorkoutLive.begin()', !dd || !dd.exercises.length); return; }
+    if (ui.mode === 'finish' && state.test) { d.innerHTML = big(S.testClose, 'WorkoutLive.saveWorkout()') + link(S.backLive, 'WorkoutLive.backToLive()'); return; }   // TEST: nothing is saved
     if (ui.mode === 'finish') { d.innerHTML = ui.exists ? big(S.replace, 'WorkoutLive.saveWorkout(\'replace\')') + link(S.both, 'WorkoutLive.saveWorkout(\'both\')') : big(S.saveW, 'WorkoutLive.saveWorkout()') + link(S.backLive, 'WorkoutLive.backToLive()'); return; }
     var ex = state.exercises[ui.view], resting = state.rest && state.rest.endsAt > Date.now(), allDone = state.exercises.every(exDone);
     var active = ex && !ex.skipped && (ex.sets.length < Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length) || ui.extra[ui.view]) && !ui.editing;
+    // while resting: the NEXT target, big; once the rest ends (until a tap): the check pulses as "סט הבא"
+    var nt = active && ex ? nextTargetText() : '', ended = !resting && state.rest && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3;
     var main = resting
-      ? '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div><div class="wk-dock-links">' + link(S.skipRest, 'WorkoutLive.restSkip()') + link(S.finish, 'WorkoutLive.finishOpen()') + '</div>'
-      : active ? '<button class="wk-done" onclick="WorkoutLive.logSet()" aria-label="' + S.doneLbl + '">' + S.done + '</button>' + link(S.finish, 'WorkoutLive.finishOpen()')
+      ? (nt ? '<div class="wk-next-t">' + S.nextSet('<bdi dir="ltr">' + h(nt) + '</bdi>') + '</div>' : '') + '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div><div class="wk-dock-links">' + link(S.skipRest, 'WorkoutLive.restSkip()') + link(S.finish, 'WorkoutLive.finishOpen()') + '</div>'
+      : active ? (ended ? '<div class="wk-next-t wk-next-go">' + S.nextSetBtn + '</div>' : '') + '<button class="wk-done' + (ended ? ' wk-pulse' : '') + '" onclick="WorkoutLive.logSet()" aria-label="' + (ended ? S.nextSetBtn : S.doneLbl) + '">' + S.done + '</button>' + link(S.finish, 'WorkoutLive.finishOpen()')
       : allDone ? big(S.finish, 'WorkoutLive.finishOpen()') : link(S.finish, 'WorkoutLive.finishOpen()');
     d.innerHTML = main;
   }
   function backToLive() { go('live'); }
+  // the set row's reaction class (Part 3 animates them): pr (gold) > exceed / met / under against the target it had; none without a target
+  function reaction(ex, set, tg) {
+    if (W.isPR(set, ex, sessions())) return 'pr';
+    return tg && tg.aim != null && CO ? CO.judge({ w: tg.w, r: tg.aim }, { w: set.w, r: set.r }) : '';
+  }
+  function nextTargetText() { var i = ui.view, ex = state.exercises[i], t = targets(i), tg = t[Math.min(ex.sets.length, t.length - 1)]; return tg && tg.aim != null ? W.targetText({ w: isBw(ex) ? null : tg.w, r: tg.aim }) : ''; }
 
   // ── timers: ONE 1-second interval while visible; only text nodes change ──
   function tick() {
@@ -684,7 +800,15 @@
       var left = Math.max(0, (r.endsAt - now) / 1000), ring = $('wkRing');
       t.textContent = clock(Math.ceil(left));
       if (ring) ring.style.strokeDashoffset = (RING * (1 - left / Math.max(1, r.total))).toFixed(1);
-      if (left <= 0 && ui.chimed !== r.endsAt) { ui.chimed = r.endsAt; sound('chime'); renderDock(); }
+    }
+    // the rest-end alert: at the end, +10 s, +30 s until a tap (computed from timestamps: a rest that ended in the background alerts on return)
+    if (r && ui.mode === 'live') {
+      var a = W.dueAlert(W.restAlertSchedule(r.endsAt, now, ui.restTouched === r.endsAt), now, ui.fired);
+      if (a) {
+        W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
+        sound('rest'); if (a.kind === 'end') { acquireWake(); if (ui.chimed !== r.endsAt) { ui.chimed = r.endsAt; coachSay({ kind: 'rest', vars: nextTargetText() ? { target: W.iso(nextTargetText()) } : {} }); } }
+        renderDock();
+      }
     }
   }
   function startTimer() { stopTimer(); if (document.visibilityState !== 'hidden') timer = setInterval(tick, 1000); tick(); }
@@ -707,10 +831,13 @@
     try { if (!actx) actx = window.getAudioCtx ? window.getAudioCtx() : new (window.AudioContext || window.webkitAudioContext)(); if (resume && actx.state === 'suspended') actx.resume(); } catch (_) { actx = null; }
     return actx;
   }
-  function sound(kind) {
+  // 'tick' per set (quiet); 'rest' = the rest-end chime: three rising notes, clearly louder than any UI sound
+  function sound(kind, force) {
+    if (!force && !prefs().sound) return;                                 // the check button always plays
     var c = audio(false); if (!c) return;
     try {
-      (kind === 'tick' ? [[1320, 0, 0.05, 0.08]] : [[660, 0, 0.18, 0.16], [880, 0.16, 0.34, 0.14]]).forEach(function (n) {
+      if (c.state === 'suspended' && c.resume) c.resume();
+      (kind === 'tick' ? [[1320, 0, 0.05, 0.08]] : kind === 'rest' ? [[784, 0, 0.16, 0.42], [988, 0.17, 0.33, 0.42], [1175, 0.34, 0.62, 0.45]] : [[660, 0, 0.18, 0.16], [880, 0.16, 0.34, 0.14]]).forEach(function (n) {
         var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + n[1];
         o.type = 'sine'; o.frequency.value = n[0]; o.connect(g); g.connect(c.destination);
         g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(n[3], t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + n[2] + 0.12);
@@ -721,7 +848,7 @@
 
   // ── resume banner (app open) and the sheet line ──
   function resumeLine(where) {
-    var r = enabled() && readDraft(); if (!r) return '';
+    var r = enabled() && readDraft(); if (!r || r.s.test) return '';          // a TEST draft never shows as a real workout
     return '<div class="wk-resume-in"><span>🏋️ ' + S.open + '</span><span class="wk-chips">'
       + (isStale(r) ? '<button class="wk-chip on" onclick="WorkoutLive.saveOld()">' + S.saveOld + '</button><button class="wk-chip" onclick="WorkoutLive.delOld()">' + S.delOld + '</button>'
         : '<button class="wk-chip on" onclick="Workout.start()">' + S.resume + '</button>' + (where === 'banner' ? '<button class="wk-chip" onclick="WorkoutLive.hideBanner()" aria-label="' + S.close + '">✕</button>' : '')) + '</span></div>';
@@ -732,7 +859,7 @@
     var b = document.createElement('div'); b.id = 'wkResume'; b.className = 'wk-resume'; b.dir = 'rtl'; b.innerHTML = html; document.body.appendChild(b);
   }
   function hideBanner() { var b = $('wkResume'); if (b) b.remove(); }
-  function saveOld() { var r = readDraft(); if (!r) return; draft = r.d; state = r.s; ui.effort = null; ui.locker = state.locker; ui.exists = false; ui.err = ''; hideBanner(); ui.stack = []; ui.mode = 'finish'; show(); }
+  function saveOld() { var r = readDraft(); if (!r) return; draft = r.d; state = r.s; testQ = state.test ? [] : null; ui.effort = null; ui.locker = state.locker; ui.exists = false; ui.err = ''; hideBanner(); ui.stack = []; ui.mode = 'finish'; show(); }
   function delOld() { if (!confirm(S.delConfirm)) return; drop(KEY_D); hideBanner(); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', banner); else banner();
   // the audio context is created (suspended) in idle time, so a tap only resumes it (creating it costs ~50 ms)
@@ -757,19 +884,27 @@
     else if (st === 'done') { vars.duration = ''; vars.n = ''; }
     var seed = r.id + '|' + inst.dateStr + '|' + st, head = W.fill(W.pick(C[st], seed).text, vars);
     if (st === 'done' && !done) head = h(r.name || dayName) + ' · ✓';
-    // ONE data line from history
-    var data = '';
-    if (st === 'done' && done) { var prs = W.prsFor(done, all.filter(function (s) { return s.id !== done.id && s.date <= done.date; })); if (prs[0]) data = C.pr(prs[0].kind === 'e1rm' ? h(prs[0].label) + ' ~' + num(prs[0].value) + ' ' + T.unit.kg : h(prs[0].label) + ' ' + num(prs[0].r) + ' ' + S.reps); }
+    // ONE data line from history (the fallback when the copy table cannot be filled)
+    var data = '', prs = done ? W.prsFor(done, all.filter(function (s) { return s.id !== done.id && s.date <= done.date; })) : [];
+    if (st === 'done' && done) { if (prs[0]) data = C.pr(prs[0].kind === 'e1rm' ? h(prs[0].label) + ' ~' + num(prs[0].value) + ' ' + T.unit.kg : h(prs[0].label) + ' ' + num(prs[0].r) + ' ' + S.reps); }
     else if (st !== 'done' && st !== 'progress' && st !== 'far') {
       var ex = d && d.exercises.filter(function (e) { var l = lastOf(e.label); return l && l.sets.length; })[0], l = ex && lastOf(ex.label);
       data = l ? W.fill(W.pick(C.last, seed).text, { ex: h(ex.label), set: setTxt(l.sets[0]) }) : W.fill(W.pick(C.first, seed).text, { day: h(dayName) });
     }
+    // the copy table (wk-copy.js): headline / line / cta per state, filled ONLY from the owner's own data; no fillable variant -> the fallback
+    var unlockAt = dt.getTime() - (r.wkUnlockMin == null ? 30 : r.wkUnlockMin) * 60000, cdSpan = '<bdi dir="ltr" data-wk-cd="' + unlockAt + '">' + hms((unlockAt - now) / 1000) + '</bdi>';
+    var key = st === 'progress' ? 'inProgress' : st, K = CP && CP.COPY.card[key], cv = copyVars(st, r, inst, dt, dayName, d, dft, done, prs, now, cdSpan, unlockAt);
+    if (K) {
+      var ch = copyLine(seed + '|h', K.headline, cv); if (ch && !(st === 'done' && !done)) head = ch;
+      var cl = copyLine(seed + '|l', st === 'done' && prs.length && K.linePR ? K.linePR : K.line, cv); if (cl) data = cl;
+    }
+    var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
     var arg = js({ routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }), go = 'event.stopPropagation();Workout.start(' + arg + ')';
-    var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + C.unlocks + ' <bdi dir="ltr" data-wk-cd="' + (dt.getTime() - (r.wkUnlockMin == null ? 30 : r.wkUnlockMin) * 60000) + '">' + hms((dt.getTime() - (r.wkUnlockMin == null ? 30 : r.wkUnlockMin) * 60000 - now) / 1000) + '</bdi>'
-      + '<button class="wk-card-link" onclick="' + go + '">' + C.openNow + '</button></div>' : '';
-    var btn = st === 'tomorrow' ? '<button class="wk-card-btn ghost" onclick="' + go + '">' + C.prepare + '</button>'
-      : st === 'open' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + C.start + '</button>'
-      : st === 'progress' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + C.resume + '</button>' : '';
+    var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
+      + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
+    var btn = st === 'tomorrow' ? '<button class="wk-card-btn ghost" onclick="' + go + '">' + cta(C.prepare) + '</button>'
+      : st === 'open' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.start) + '</button>'
+      : st === 'progress' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.resume) + '</button>' : '';
     var sec = st !== 'done' && st !== 'progress' ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
       + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
@@ -777,6 +912,33 @@
     return '<div class="wk-card wk-st-' + st + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
       + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
       + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + cd + btn + sec + '</div>';
+  }
+  // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
+  function copyVars(st, r, inst, dt, dayName, d, dft, done, prs, now, cdSpan, unlockAt) {
+    var tz = { timeZone: W.TZ }, hm = function (t) { return num(new Date(t).toLocaleTimeString('he-IL', Object.assign({ hour: '2-digit', minute: '2-digit', hour12: false }, tz))); };
+    var v = { name: h(dayName), time: hm(dt.getTime()), unlock: hm(unlockAt), countdown: cdSpan, day: h(dt.toLocaleDateString('he-IL', Object.assign({ weekday: 'long' }, tz)).replace(/^יום\s+/, '')), n: num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))) };
+    var lastTxt = function (ex, sets) { return h(ex) + ' <bdi dir="ltr">' + h(sets.slice(0, 2).map(function (x) { return W.setText(x); }).join(', ')) + '</bdi>'; };
+    if (st === 'done' && done) {
+      v.duration = num(Math.max(1, Math.round((done.durationSec || 0) / 60))); v.sets = num(done.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0));
+      if (prs[0]) v.pr = h(prs[0].label) + ' <bdi dir="ltr">' + (prs[0].kind === 'e1rm' ? '~' + h(prs[0].value) : h(prs[0].w == null ? prs[0].r : prs[0].w + '×' + prs[0].r)) + '</bdi>';
+      var e0 = done.exercises[0]; if (e0 && e0.sets.length) v.last = lastTxt(e0.label, e0.sets);
+    } else if (st === 'progress' && dft) {
+      var s = dft.s, n = s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0), cx = s.exercises[s.exIdx] || s.exercises[0];
+      v.elapsed = '<bdi dir="ltr" data-wk-el="' + s.startedAt + '">' + elMin(now - s.startedAt) + '</bdi> ' + S.minutes('').trim();
+      v.sets = num(n); v.setN = num((cx ? cx.sets.length : 0) + 1); v.exN = num(s.exIdx + 1); v.exTotal = num(s.exercises.length);
+    } else if (d) {
+      var ex = d.exercises.filter(function (e) { var l = lastOf(e.label); return l && l.sets.length; })[0], l = ex && lastOf(ex.label);
+      if (l) v.last = lastTxt(ex.label, l.sets);
+    }
+    return v;
+  }
+  // a stable variant per card + part (re-renders keep the same sentence); only fillable variants; never throws
+  var cardIdx = {};
+  function copyLine(key, list, vars) {
+    var ok = W.fillable(list, vars); if (!ok.length) return '';
+    var t = cardIdx[key] != null && ok.indexOf(list[cardIdx[key]]) > -1 ? list[cardIdx[key]] : CP.pick(ok, -1).text;
+    cardIdx[key] = list.indexOf(t);
+    try { return CP.fill(t, vars); } catch (_) { return ''; }
   }
   // the countdown / elapsed text nodes; a state change (unlock) re-renders HOME once
   var homeTimer = null, rerendered = 0;
@@ -854,7 +1016,21 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
+    coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
+    testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
+    coachReset: function () { ui.coachAt = -1e9; },                       // tests: lift the 20 s rate limit
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
+  // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
+  function injectSettings() {
+    if ($('wkTestRow') || !enabled()) return;
+    var lm = $('lightModeToggle'), cards = lm && lm.closest('.settings-cards'); if (!cards) return;
+    var sec = document.createElement('div'); sec.className = 'settings-section'; sec.textContent = S.settingsSection;
+    var box = document.createElement('div'); box.className = 'settings-cards'; box.id = 'wkTestRow';
+    box.innerHTML = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🧪</div><div class="settings-row-body"><div class="settings-row-title">' + S.testMode + '</div><div class="settings-row-sub">' + S.testModeSub + '</div></div>'
+      + '<label class="rtoggle"><input type="checkbox" id="wkTestToggle"' + (prefs().testMode ? ' checked' : '') + ' onchange="WorkoutLive.setTestMode(this.checked)"><span class="rtoggle-sl"></span></label></div>';
+    cards.parentNode.insertBefore(box, cards.nextSibling); cards.parentNode.insertBefore(sec, box);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, assistant: assistant, tick: homeTick };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

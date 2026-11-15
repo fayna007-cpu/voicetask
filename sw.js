@@ -1,5 +1,5 @@
-const V = 'alfred-v38';
-const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './workout-live.js'];
+const V = 'alfred-v39';
+const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './workout-live.js'];
 
 // ═══════════════════════════════════════════════════════════════════
 // Notif v2 — IDB shadow store access (mirrors index.html Stage 1 module)

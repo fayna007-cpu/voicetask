@@ -264,7 +264,7 @@
     if (a.type === 'START') {
       var st0 = { program: { id: a.program && a.program.id, name: (a.program && a.program.name) || '' }, startedAt: a.at, locker: a.locker == null ? null : a.locker, exIdx: 0, exercises: ((a.program && a.program.exercises) || []).map(liveEx), rest: null, finished: null, lastAt: a.at };
       // optional (Milestone A): the day, the routine instance, the goal and the day's mode (full / light / short)
-      ['dayId', 'dayName', 'routineId', 'dateStr', 'goal', 'mode'].forEach(function (k) { if (a[k] != null) st0[k] = a[k]; });
+      ['dayId', 'dayName', 'routineId', 'dateStr', 'goal', 'mode', 'test', 'coachMode'].forEach(function (k) { if (a[k] != null) st0[k] = a[k]; });   // test / coachMode: A2 part 2 (a resume keeps them)
       if (a.mode === 'short') st0.exercises.forEach(function (e) { e.scheme = Object.assign({}, e.scheme, { sets: Math.min(2, e.scheme.sets || 3) }); });
       return st0;
     }
@@ -463,6 +463,76 @@
   }
   function firstOfGroup(exercises, i, catalog) { var m = muscleKey(exercises[i], catalog); for (var j = 0; j < i; j++) if (muscleKey(exercises[j], catalog) === m) return false; return true; }
 
+  // ── A2 part 2: the live coach, the rest-end alert, read-modify-write storage, prefs ──
+  var LRI = '⁦', PDI = '⁩';
+  function iso(s) { return LRI + s + PDI; }                               // numerals inside plain text (the coach slot): an LTR isolate
+  function targetText(t) { return t ? (t.w == null ? String(t.r) : fmtNum(t.w) + '×' + t.r) : ''; }
+  // is THIS set a personal record against earlier sessions? (the prsFor rules: kg -> Epley e1RM on the first part; else reps at the same load)
+  // -> "חזה 30×3" or null; the first time an exercise is done is never a record
+  function isPR(set, ex, history) {
+    var k = labelKey(ex.label), prev = [];
+    (history || []).forEach(function (s) { (s.exercises || []).forEach(function (x) { if (labelKey(x.label) === k) prev = prev.concat(x.sets || []); }); });
+    if (!prev.length || !set) return null;
+    var kg = ex.unit === 'kg' || (ex.unit === undefined && set.w != null), r = firstR(set), hit = false;
+    if (kg && set.w != null && e1rm(set.w, r) != null) {
+      var was = prev.reduce(function (m, x) { var v = e1rm(x.w, firstR(x)); return v != null && v > m ? v : m; }, 0);
+      hit = was > 0 && e1rm(set.w, r) > was;
+    } else {
+      var same = prev.filter(function (p) { return (p.w == null && set.w == null) || p.w === set.w; });
+      hit = same.length > 0 && r > Math.max.apply(null, same.map(firstR));
+    }
+    return hit ? ex.label + ' ' + iso(set.w == null ? String(r) : fmtNum(set.w) + '×' + r) : null;
+  }
+  function plannedSets(e) { return e.skipped ? e.sets.length : Math.max((e.scheme && e.scheme.sets) || 3, e.sets.length); }
+  // the coach's moment after an action -> {kind, vars} | null. Priority: pr > exceed|under|met (judged against the set's
+  // target, done = the TOTAL reps of a combined set) > lastSet (arriving at an exercise's last set) > halfway (once) > start (once).
+  // No target -> no judgement (never "on target" without one). ctx: {atStart, firstTarget, set, target, pr, judge, seen}
+  function coachMoment(state, ctx) {
+    if (!state || !ctx) return null;
+    var seen = ctx.seen || {};
+    if (ctx.atStart) return seen.start ? null : { kind: 'start', vars: ctx.firstTarget ? { target: iso(targetText(ctx.firstTarget)) } : {} };
+    if (ctx.pr) return { kind: 'pr', vars: { pr: ctx.pr } };
+    if (ctx.set && ctx.target && ctx.target.r != null && typeof ctx.judge === 'function') {
+      var k = ctx.judge({ w: ctx.target.w, r: ctx.target.r }, { w: ctx.set.w, r: ctx.set.r });
+      return { kind: k, vars: { target: iso(targetText(ctx.target)), done: iso(setText(ctx.set)) } };
+    }
+    var e = state.exercises[state.exIdx];
+    if (ctx.set && e && !e.skipped && plannedSets(e) - e.sets.length === 1) return { kind: 'lastSet', vars: {} };
+    var planned = 0, done = 0; state.exercises.forEach(function (x) { planned += plannedSets(x); done += x.sets.length; });
+    if (ctx.set && !seen.halfway && planned > 1 && done * 2 >= planned) return { kind: 'halfway', vars: {} };
+    return null;
+  }
+  // "ביעד: X מתוך Y סטים" — only sets that HAD a target count in Y; on target = met or exceeded
+  function tally(pairs, judge) {
+    var of = 0, ok = 0;
+    (pairs || []).forEach(function (p) { if (!p || !p.target || p.target.r == null || !p.set) return; of++; var k = judge({ w: p.target.w, r: p.target.r }, { w: p.set.w, r: p.set.r }); if (k !== 'under') ok++; });
+    return { ok: ok, of: of };
+  }
+  // the rest-end alert: at the end, then +10 s and +30 s, until the user taps anything; a rest older than 5 min alerts no more
+  function restAlertSchedule(endsAt, now, interacted) {
+    if (interacted || !(endsAt > 0) || now - endsAt > 5 * 60e3) return [];
+    return [{ atMs: endsAt, kind: 'end' }, { atMs: endsAt + 10e3, kind: 'repeat' }, { atMs: endsAt + 30e3, kind: 'repeat' }];
+  }
+  // the one alert to fire now: the latest due one not fired yet (a rest that ended in the background alerts ONCE on return)
+  function dueAlert(schedule, now, fired) {
+    var due = (schedule || []).filter(function (a) { return a.atMs <= now && !(fired && fired[a.atMs]); });
+    return due.length ? due[due.length - 1] : null;
+  }
+  // read-modify-write: every write re-reads the stored value first, so two writers never erase each other
+  function updateJSON(storage, key, def, fn) {
+    var cur; try { cur = JSON.parse(storage.getItem(key) || 'null'); } catch (_) { cur = null; }
+    if (cur == null || typeof cur !== 'object') cur = JSON.parse(JSON.stringify(def));
+    var next = fn(cur) || cur;
+    try { storage.setItem(key, JSON.stringify(next)); return next; } catch (_) { return null; }
+  }
+  var COACH_MODES = ['calm', 'coach', 'fire', 'off'];
+  function readPrefs(raw) {
+    var p = raw && typeof raw === 'object' ? raw : {};
+    return { coachMode: COACH_MODES.indexOf(p.coachMode) > -1 ? p.coachMode : 'coach', sound: p.sound !== false, haptic: p.haptic !== false, testMode: p.testMode === true, soundTested: p.soundTested === true };
+  }
+  // only the variants whose placeholders the user's own data can fill
+  function fillable(list, vars) { return (list || []).filter(function (t) { return (String(t).match(/\{(\w+)\}/g) || []).every(function (p) { var k = p.slice(1, -1); return vars && vars[k] != null && vars[k] !== ''; }); }); }
+
   // ── ONE Hebrew string table for every workout screen and the HOME card (warm, short, masculine, never guilt) ──
   var TEXT = {
     dayOne: 'אימון', dayN: function (i) { return 'אימון ' + String.fromCharCode(65 + i); },
@@ -512,6 +582,11 @@
       cmpReps: function (d) { return d > 0 ? '+' + (d === 1 ? 'חזרה אחת' : d + ' חזרות') : (d === -1 ? 'חזרה אחת פחות' : -d + ' חזרות פחות'); },
       prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + r + ' חזרות' + (w != null ? ' ב-' + w + ' ' + u : ''); },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
+      coachOff: 'כבוי', coachOffHint: 'בלי משפטים. הסימונים נשארים', coachModeT: 'המאמן', soundT: 'צליל', hapticT: 'רטט עדין (אם הטלפון תומך)', menuT: 'הגדרות האימון',
+      soundTest: 'בדוק צליל', soundHint: 'לא שמעת? בדוק את מתג השקט בצד הטלפון', soundOk: 'הצליל נבדק',
+      nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + ' סטים'; },
+      testBanner: 'מצב בדיקה · לא נשמר', testStart: 'אימון בדיקה', testClose: 'סגור', testMode: 'מצב בדיקת אימון', testModeSub: 'אימון שלם בלי לשמור כלום',
+      testKeep: 'לשמור את השינויים בהערות, בקפיצות ובתרגילים שהוספת?', settingsSection: 'אימונים',
       typeW: 'הקלד משקל', badW: 'משקל לא תקין', stepT: 'קפיצה', addPart: '+ חלק', partN: function (i) { return 'חלק ' + i; }, removePart: 'הסר חלק',
       swap: 'החלף', swapT: function (m) { return 'החלפה · ' + m; }, remember: 'זכור כברירת מחדל', addVariant: 'הוסף', variantName: 'תרגיל אחר מאותה קבוצה',
       swappedFrom: function (l) { return 'במקום ' + l; }, noteT: function (m) { return 'הערה · ' + m; }, noteEdit: 'הערה', noteHint: 'הערה קבועה לקבוצת השריר', noteGroup: 'הערה לקבוצת השריר',
@@ -547,5 +622,7 @@
     readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
-    muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup };
+    muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
+    iso: iso, targetText: targetText, isPR: isPR, coachMoment: coachMoment, tally: tally, restAlertSchedule: restAlertSchedule, dueAlert: dueAlert,
+    updateJSON: updateJSON, COACH_MODES: COACH_MODES, readPrefs: readPrefs, fillable: fillable };
 });
