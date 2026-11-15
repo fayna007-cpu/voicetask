@@ -7,14 +7,14 @@
 (function () {
   'use strict';
   var W = window.WCore, T = W.TEXT, S = T.ui;
-  var KEY_P = 'vt_wk_programs', KEY_D = 'vt_wk_draft', KEY_S = 'vt_wk_sessions', KEY_OFF = 'vt_wk_off', KEY_HINT = 'vt_wk_wakehint', KEY_COACH = 'vt_wk_coach';
+  var KEY_P = 'vt_wk_programs', KEY_D = 'vt_wk_draft', KEY_S = 'vt_wk_sessions', KEY_OFF = 'vt_wk_off', KEY_HINT = 'vt_wk_wakehint', KEY_COACH = 'vt_wk_coach', KEY_C = 'vt_wk_catalog';
   var STALE_MS = 6 * 3600e3, RING = 552.92;
   var EQUIP_ORDER = ['dumbbell', 'barbell', 'machine', 'cable', 'bodyweight'], MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'core', 'other'];
   var START_W = { dumbbell: 10, barbell: 20, machine: 4, cable: 15, bodyweight: null }, STEPS = [0.5, 1, 1.25, 2, 2.5, 5], RESTS = [0, 60, 90, 120, 150, 180];
   var $ = function (id) { return document.getElementById(id); };
   var h = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var num = function (n) { return '<bdi dir="ltr">' + h(n) + '</bdi>'; };
-  var setTxt = function (x) { return '<bdi dir="ltr">' + (x.w == null ? h(x.r) : h(x.w) + '×' + h(x.r)) + '</bdi>'; };
+  var setTxt = function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; };          // "28×6", combined "28×6+5"
   var js = function (v) { return h(JSON.stringify(v)); };                // a value inside an onclick="" attribute
 
   // ── storage (never throws; a full storage keeps the workout in memory) ──
@@ -27,6 +27,12 @@
   var copy = function (x) { return JSON.parse(JSON.stringify(x)); };
   // index.html keeps routines in a top-level `let` (shared by classic scripts, not on window)
   function allRoutines() { try { return Array.isArray(routines) ? routines : []; } catch (_) { return []; } }
+
+  // ── the catalog (vt_wk_catalog): per exercise {muscle, unit, step}; per group variants[] and ONE note. Read fresh, written on the owner's edit only ──
+  function cat() { var c = load(KEY_C, null); c = c && typeof c === 'object' ? c : {}; c.aliases = c.aliases || {}; c.variants = c.variants || {}; c.notes = c.notes || {}; return c; }
+  function saveCat(c) { return put(KEY_C, c); }
+  function es(ex) { return W.effStep(ex, cat()); }                        // the step in use: the owner's choice, else the program's
+  var muscleName = function (m) { return T.muscle[m] || T.muscle.other; };
 
   // ── programs ──
   function store() { return W.readPrograms(load(KEY_P, null)); }
@@ -76,7 +82,7 @@
   }
 
   // ── UI state (not persisted) ──
-  var ui = { mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
+  var ui = { noteEdits: {}, mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
     chimed: 0, wakeHint: false, lastTap: 0, warm: {}, prog: null, dirty: false, dayIdx: 0, ex: null, exIdx: -1, ctx: null, ready: null, pick: null, after: null };
   var timer = null, wake = null;
   var tomorrow = function () { return W.addDaysYmd(W.ymdIn(new Date()), 1); };
@@ -102,6 +108,8 @@
   function fitViewport() {                                             // follow the visual viewport (keyboard open) so the footer stays visible
     var el = $('wkLive'), vv = window.visualViewport; if (!el || !vv) return;
     el.style.setProperty('--wk-vh', Math.round(vv.height) + 'px'); el.style.setProperty('--wk-top', Math.round(vv.offsetTop) + 'px');
+    var pk = $('wkPick');                                                 // the picker (keypad, notes) rides above the keyboard
+    if (pk) { pk.style.setProperty('--wk-kb', Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px'); pk.style.setProperty('--wk-pk-vh', Math.round(vv.height) + 'px'); }
   }
   function ensure() {
     if ($('wkLive')) return;
@@ -137,10 +145,24 @@
     audio(true);
     var r = readDraft();
     if (r) { draft = r.d; state = r.s; ui.view = state.exIdx; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.stack = []; ui.mode = 'live'; acquireWake(); hideBanner(); show(); return; }
+    // completed = locked: a done instance (or one with a saved live session) refuses a new start; no override in this part
+    var lock = lockFor(o);
+    if (lock.blocked) { say(lock.line); return; }
+    if (lock.inst) o = Object.assign({}, o, lock.inst);
     ui.ctx = { routineId: o.routineId != null ? String(o.routineId) : null, dateStr: o.dateStr || null, programId: o.programId || null };
     if (!store().programs.length) { ui.after = 'ready'; ui.stack = []; ui.mode = 'programs'; show(); return; }
     openReady();
   }
+  // {blocked, line} for an explicit instance; without one (sheet / assistant): today's workout instances — all done -> blocked,
+  // otherwise the first open one is used (so the session links to it); no workout routine today -> a free session
+  function lockFor(o) {
+    var all = sessions();
+    if (o.routineId != null && o.dateStr) return W.startBlock({ routine: routineOf(o.routineId), dateStr: o.dateStr, sessions: all }) ? { blocked: true, line: S.locked } : {};
+    var today = todayInstances(); if (!today.length) return {};
+    var open = today.filter(function (i) { return !W.startBlock({ routine: routineOf(i.routineId), dateStr: i.dateStr, sessions: all }); })[0];
+    return open ? { inst: open } : { blocked: true, line: S.lockedSheet };
+  }
+  function say(line) { try { if (typeof toast === 'function') toast(line); } catch (_) { } }
   function routineOf(id) { try { return allRoutines().filter(function (r) { return String(r.id) === String(id); })[0] || null; } catch (_) { return null; } }
   function openReady() {
     var c = ui.ctx || {}, r = c.routineId ? routineOf(c.routineId) : null;
@@ -153,7 +175,7 @@
     var R = ui.ready, p = programById(R.programId), d = p && p.days.filter(function (x) { return x.id === R.dayId; })[0];
     if (!d || !d.exercises.length) return;
     var c = ui.ctx || {};
-    draft = { v: 1, startedAt: Date.now(), actions: [] };
+    draft = { v: W.DRAFT_V, startedAt: Date.now(), actions: [] };        // v2 (combined sets); readDraft replays any version
     dispatch({ type: 'START', at: draft.startedAt, locker: R.locker, program: { id: p.id, name: p.days.length > 1 ? p.name + ' · ' + d.name : p.name, exercises: copy(d.exercises) },
       dayId: d.id, dayName: d.name, routineId: c.routineId, dateStr: c.dateStr, goal: p.goal, mode: R.mode });
     ui.view = 0; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.effort = null; ui.exists = false; ui.err = ''; ui.chimed = 0; ui.warm = {}; ui.stack = [];
@@ -214,7 +236,7 @@
   }
 
   // ── exercise editor ──
-  function editEx(i) { var d = pDay(); ui.exIdx = i; ui.ex = i < 0 ? mkEx('', 'dumbbell', null, ui.prog.goal) : copy(d.exercises[i]); if (!ui.ex.scheme) ui.ex.scheme = W.goalScheme(ui.prog.goal); ui.err = ''; push('exercise'); }
+  function editEx(i) { var d = pDay(); ui.exIdx = i; ui.noteEdits = {}; ui.ex = i < 0 ? mkEx('', 'dumbbell', null, ui.prog.goal) : copy(d.exercises[i]); if (!ui.ex.scheme) ui.ex.scheme = W.goalScheme(ui.prog.goal); ui.err = ''; push('exercise'); }
   function exSet(k, v) {
     var e = ui.ex;
     if (k === 'label') { e.label = v; return; }
@@ -228,8 +250,11 @@
     var e = ui.ex; e.label = String(e.label || '').trim();
     if (!e.label) { ui.err = S.needName; render(); var b = $('wkExName'); if (b) b.focus(); return; }
     var l = pDay().exercises; if (ui.exIdx < 0) l.push(e); else l[ui.exIdx] = e;
+    var ks = Object.keys(ui.noteEdits);                                   // group notes are catalog data: saved with the exercise
+    if (ks.length) { var cc = cat(); ks.forEach(function (m) { var v = String(ui.noteEdits[m] || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; }); saveCat(cc); }
     ui.dirty = true; back();
   }
+  function exNote(v) { ui.noteEdits[W.muscleKey(ui.ex, cat())] = v; }
   function removeEx() { if (!confirm(S.delEx)) return; pDay().exercises.splice(ui.exIdx, 1); ui.dirty = true; back(); }
   // the rep-range picker: one bottom sheet, two steppers, preset chips
   function rangeOpen(j) { ui.pick = { kind: 'range', j: j, r: ui.ex.scheme.ranges[j].slice() }; renderRangePick(); }
@@ -275,10 +300,10 @@
   var clamp = function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); };
   var txt = function (id, v) { var t = $(id); if (t) t.textContent = v; };
   function bump(k, d) {
-    if (k === 'w' || k === 'r') {                                          // the active set (or the set being edited)
+    if (k === 'w' || k === 'r') {                                          // the active set / its current part (or the set being edited)
       var c = ui.editing || cur(), ex = state.exercises[c.ex];
-      if (k === 'w') c.w = W.snap(Math.max(ex.step, (c.w || 0) + d * ex.step), ex.step); else c.r = clamp((c.r || 0) + d, 0, 99);
-      txt('wkLvW', c.w); txt('wkLvR', c.r); return;
+      if (k === 'w') c.w = W.addStep(c.w, es(ex), d); else c.r = clamp((c.r || 0) + d, 0, 99);   // +- the step, no snapping
+      txt('wkLvW', c.w); txt('wkLvR', c.r); if (c.parts && c.parts.length) txt('wkParts', partsTxt(c)); return;
     }
     if (k === 'lk' || k === 'rlk') {                                       // the locker (summary / ready)
       var o = k === 'lk' ? ui : ui.ready, v = o.locker == null ? (d > 0 ? 1 : null) : o.locker + d;
@@ -292,7 +317,9 @@
   }
 
   // ── the current (active) set of the viewed exercise ──
-  function targets(i) { var ex = state.exercises[i], l = lastOf(ex.label); return W.targetsFor(ex, l && l.sets, ex.sets, { scale: state.mode === 'light' ? 0.9 : 1 }); }
+  function targets(i) { var ex = state.exercises[i], l = lastOf(ex.label); return W.targetsFor(Object.assign({}, ex, { step: es(ex) }), l && l.sets, ex.sets, { scale: state.mode === 'light' ? 0.9 : 1 }); }
+  // a combined set in progress: c.parts = the parts already done ({w, r}), c.w / c.r = the current part
+  var partsTxt = function (c) { return c.parts.concat([{ w: c.w, r: c.r }]).map(function (p, i) { return (i && p.w !== c.parts[0].w && p.w != null ? p.w + '×' : '') + p.r; }).join(' + '); };
   function cur() {
     var i = ui.view, ex = state.exercises[i], slot = ex.sets.length, key = i + ':' + slot;
     if (!ui.pend[key]) { var t = targets(i), tg = t[Math.min(slot, t.length - 1)], prevSet = ex.sets[slot - 1]; ui.pend[key] = { ex: i, w: tg.w != null ? tg.w : (prevSet && prevSet.w) || null, r: tg.aim }; }
@@ -303,13 +330,74 @@
   // ── live actions ──
   function logSet() {
     var now = performance.now(); if (ui.lastTap && now - ui.lastTap < 300) return; ui.lastTap = now;   // double tap guard (monotonic clock)
-    var c = cur(), ex = state.exercises[c.ex];
-    dispatch({ type: 'LOG_SET', ex: c.ex, w: isBw(ex) ? null : c.w, r: c.r });
+    var c = cur(), ex = state.exercises[c.ex], bw = isBw(ex);
+    if (c.parts && c.parts.length) {                                      // "6+5": the set weight = the first part's; a lighter later part = a drop set
+      var all = c.parts.concat([{ w: c.w, r: c.r }]), w0 = bw ? null : all[0].w;
+      dispatch({ type: 'LOG_SET', ex: c.ex, w: w0, r: all[0].r, parts: all.map(function (p, i) { return i && !bw && p.w !== w0 ? { r: p.r, w: p.w } : { r: p.r }; }) });
+    } else dispatch({ type: 'LOG_SET', ex: c.ex, w: bw ? null : c.w, r: c.r });
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0;
-    sound('tick'); render();
+    sound('tick'); render(); reveal();
   }
+  function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); reveal(); }
+  function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); reveal(); }
+  // a short screen: the note, warm-up and parts lines may push the active steppers below the fold -> bring them into view
+  function reveal() { var a = document.querySelector('#wkLvMain .wk-lv-set.active .wk-lv-steps'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' }); }
+  // the weight keypad: any value (0.25, 0.5, odd numbers); the step chips are remembered per exercise in the catalog
+  function typeW() {
+    var c = ui.editing || cur(), ex = state.exercises[c.ex], st = es(ex);
+    ui.pick = { kind: 'weight' };
+    pickOpen(h(ex.label) + ' · ' + unitTxt(ex), '<input class="rfi wk-num-in" id="wkWIn" type="text" inputmode="decimal" dir="ltr" autocomplete="off" value="' + h(c.w == null ? '' : c.w) + '" aria-label="' + S.typeW + '" enterkeyhint="done" onkeydown="if(event.key===\'Enter\')WorkoutLive.typeWOk()">'
+      + '<div class="wk-lv-warn" id="wkWErr" hidden>' + S.badW + '</div>'
+      + '<div class="wk-lv-cap">' + S.stepT + '</div><div class="wk-chips">' + W.STEP_CHIPS.map(function (s) { return '<button class="wk-chip' + (s === st ? ' on' : '') + '" onclick="WorkoutLive.setStep(' + s + ')"><bdi dir="ltr">' + s + '</bdi></button>'; }).join('') + '</div>',
+      '<button class="wk-big" onclick="WorkoutLive.typeWOk()">' + S.ok + '</button>', true);
+    setTimeout(function () { var i = $('wkWIn'); if (i) { i.focus(); i.select(); } }, 60);
+  }
+  function typeWOk() {
+    var v = W.parseWeight(($('wkWIn') || {}).value), c = ui.editing || cur();
+    if (v == null) { var e = $('wkWErr'); if (e) e.hidden = false; return; }
+    c.w = v; pickClose(); render();
+  }
+  function setStep(s) {
+    var c = ui.editing || cur(), ex = state.exercises[c.ex], cc = cat(), k = W.labelKey(ex.label);
+    cc.aliases[k] = Object.assign({}, cc.aliases[k], { step: s }); saveCat(cc);
+    document.querySelectorAll('#wkPickB .wk-chip').forEach(function (b) { b.classList.toggle('on', +b.textContent === s); });
+  }
+  // swap: variants of the SAME muscle group; this session only, or remembered in the program (the owner's own edit)
+  function swapOpen() {
+    var ex = state.exercises[ui.view], m = W.muscleKey(ex, cat());
+    ui.pick = { kind: 'swap', remember: !!(ui.pick && ui.pick.remember) };
+    var list = W.variantsFor(m, { programs: store().programs, catalog: cat(), exclude: ex.label });
+    ui.swapList = list;
+    pickOpen(S.swapT(muscleName(m)), '<button class="wk-row" onclick="WorkoutLive.swapRemember()" role="switch" aria-checked="' + ui.pick.remember + '"><span class="wk-row-l">' + S.remember + '</span><span class="wk-sw' + (ui.pick.remember ? ' on' : '') + '"></span></button>'
+      + list.map(function (l, i) { return row(h(l), 'WorkoutLive.swapTo(' + i + ')'); }).join('')
+      + '<div class="wk-add-row"><input class="rfi" id="wkVarIn" type="text" placeholder="' + S.variantName + '" enterkeyhint="done"><button class="wk-chip" onclick="WorkoutLive.swapAdd()">' + S.addVariant + '</button></div>', '', true);
+  }
+  function swapRemember() { ui.pick.remember = !ui.pick.remember; var b = document.querySelector('#wkPickB .wk-sw'); if (b) b.classList.toggle('on', ui.pick.remember); }
+  function swapAdd() {
+    var v = String(($('wkVarIn') || {}).value || '').trim(); if (!v) { var i = $('wkVarIn'); if (i) i.focus(); return; }
+    var ex = state.exercises[ui.view], m = W.muscleKey(ex, cat()), cc = cat();
+    cc.variants[m] = [v].concat((cc.variants[m] || []).filter(function (x) { return W.labelKey(x) !== W.labelKey(v); })); saveCat(cc);
+    swapApply(v);
+  }
+  function swapTo(i) { var l = (ui.swapList || [])[i]; if (l) swapApply(l); }
+  function swapApply(label) {
+    var i = ui.view, ex = state.exercises[i], m = W.muscleKey(ex, cat()), remember = ui.pick && ui.pick.remember;
+    dispatch({ type: 'SWAP_EXERCISE', ex: i, exercise: { label: label, muscle: m, equip: ex.equip, unit: ex.unit, step: ex.step } });
+    if (remember && state.program.id && ex.pid) {                         // the owner chose it: the program's exercise takes the new name
+      var st = store(); st.programs.forEach(function (p) { if (p.id !== state.program.id) return; p.days.forEach(function (d) { d.exercises.forEach(function (e) { if (e.id === ex.pid) { e.label = label; e.muscle = e.muscle || m; } }); }); });
+      saveStore(st);
+    }
+    ui.pend = {}; pickClose(); render();
+  }
+  // ONE note per muscle group (catalog), editable here and in the exercise editor
+  function noteOpen(m) {
+    m = m || W.muscleKey(state.exercises[ui.view], cat());
+    ui.pick = { kind: 'note', m: m };
+    pickOpen(S.noteT(muscleName(m)), '<textarea class="rfi wk-note-in" id="wkNoteIn" rows="3" placeholder="' + S.noteHint + '">' + h(cat().notes[m] || '') + '</textarea>', '<button class="wk-big" onclick="WorkoutLive.noteSave()">' + S.save + '</button>', true);
+  }
+  function noteSave() { var m = ui.pick && ui.pick.m, cc = cat(); if (!m) return; var v = String(($('wkNoteIn') || {}).value || '').trim(); if (v) cc.notes[m] = v; else delete cc.notes[m]; saveCat(cc); pickClose(); render(); }
   function undo() { if (!draft || draft.actions.length < 2) return; dispatch({ type: 'UNDO' }); ui.pend = {}; ui.view = Math.min(ui.view, state.exercises.length - 1); render(); }
-  function view(i) { ui.view = i; ui.editing = null; render(); }
+  function view(i) { ui.view = i; ui.editing = null; render(); reveal(); }
   function addSet() { ui.extra[ui.view] = 1; render(); }
   function skipEx() { dispatch({ type: 'SKIP_EXERCISE', ex: ui.view }); ui.view = state.exIdx; render(); }
   function editSet(i) { var x = state.exercises[ui.view].sets[i]; ui.editing = { ex: ui.view, i: i, w: x.w, r: x.r }; render(); }
@@ -358,6 +446,13 @@
     var today = W.ymdIn(new Date()), out = null;
     allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }).forEach(function (r) {
       (window.listRoutineInstances ? window.listRoutineInstances(r) : []).forEach(function (i) { if (!out && !i.skipped && !i.completed && W.ymdIn(new Date(i.dt)) === today) out = { routineId: String(r.id), dateStr: i.dt }; });
+    });
+    return out;
+  }
+  function todayInstances() {                                             // today's workout instances (not skipped), done or not
+    var today = W.ymdIn(new Date()), out = [];
+    allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }).forEach(function (r) {
+      (window.listRoutineInstances ? window.listRoutineInstances(r) : []).forEach(function (i) { if (!i.skipped && W.ymdIn(new Date(i.dt)) === today) out.push({ routineId: String(r.id), dateStr: i.dt }); });
     });
     return out;
   }
@@ -416,9 +511,14 @@
     renderDock(); tick();
   }
   function chips(list, sel, fn, labels) { return '<div class="wk-chips">' + list.map(function (k) { return '<button class="wk-chip' + (sel === k ? ' on' : '') + '" onclick="' + fn(k) + '">' + labels[k] + '</button>'; }).join('') + '</div>'; }
-  function stepper(k, val, unit, id, small) {
-    return '<div class="wk-stp' + (small ? ' sm' : '') + '"><button class="wk-stp-b" data-k="' + k + '" data-d="-1" aria-label="−">−</button><div class="wk-stp-v"><bdi dir="ltr" id="' + id + '">' + h(val) + '</bdi>' + (unit ? '<span class="wk-stp-u">' + unit + '</span>' : '') + '</div><button class="wk-stp-b" data-k="' + k + '" data-d="1" aria-label="+">+</button></div>';
+  // tap: the value itself is a button (the weight -> the keypad)
+  function stepper(k, val, unit, id, small, tap) {
+    var v = '<bdi dir="ltr" id="' + id + '">' + h(val) + '</bdi>' + (unit ? '<span class="wk-stp-u">' + unit + '</span>' : '');
+    return '<div class="wk-stp' + (small ? ' sm' : '') + '"><button class="wk-stp-b" data-k="' + k + '" data-d="-1" aria-label="−">−</button>'
+      + (tap ? '<button class="wk-stp-v wk-tap" onclick="' + tap + '" aria-label="' + S.typeW + '">' + v + '</button>' : '<div class="wk-stp-v">' + v + '</div>')
+      + '<button class="wk-stp-b" data-k="' + k + '" data-d="1" aria-label="+">+</button></div>';
   }
+  var wUnit = function (ex) { return unitTxt(ex) + ' · ±<bdi dir="ltr">' + es(ex) + '</bdi>'; };
   var line = function (label, ctl) { return '<div class="wk-lv-line"><span class="wk-lv-lbl">' + label + '</span>' + ctl + '</div>'; };
   var group = function (inner, title) { return (title ? '<div class="wk-grp-t">' + title + '</div>' : '') + '<div class="wk-lv-group">' + inner + '</div>'; };
 
@@ -457,6 +557,7 @@
         + sc.ranges.slice(0, sc.sets).map(function (r, j) { return '<button class="wk-row wk-rgrow" onclick="WorkoutLive.rangeOpen(' + j + ')"><span class="wk-row-l">' + S.setN(j + 1) + ' · <bdi dir="ltr">' + r[0] + '-' + r[1] + '</bdi></span><span class="wk-row-s">' + S.reps + ' ›</span></button>'; }).join(''), S.schemeT)
       + group(chips(RESTS.map(String), String(e.restSec || 0), function (k) { return 'WorkoutLive.exSet(\'restSec\',' + k + ')'; }, RESTS.reduce(function (o, s) { o[s] = s ? '<bdi dir="ltr">' + s + '</bdi> ' + S.sec : S.restAuto; return o; }, {})), S.restT)
       + group('<button class="wk-row" onclick="WorkoutLive.exSet(\'warmup\',' + !e.warmup + ')" role="switch" aria-checked="' + !!e.warmup + '"><span class="wk-row-l">' + S.warmOn + '</span><span class="wk-sw' + (e.warmup ? ' on' : '') + '"></span></button>', S.warmT)
+      + (function () { var m = W.muscleKey(e, cat()), v = m in ui.noteEdits ? ui.noteEdits[m] : cat().notes[m] || ''; return group('<textarea class="rfi wk-note-in" id="wkExNote" rows="2" placeholder="' + S.noteHint + '" oninput="WorkoutLive.exNote(this.value)">' + h(v) + '</textarea>', S.noteGroup + ' · ' + muscleName(m)); })()
       + (ui.exIdx > -1 ? '<button class="wk-lv-link wk-danger wk-center-link" onclick="WorkoutLive.removeEx()">' + S.removeEx + '</button>' : '');
   }
   function readyHtml() {
@@ -467,6 +568,7 @@
     return '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
       + (p.days.length > 1 ? '<div class="wk-chips wk-days">' + p.days.map(function (x) { return '<button class="wk-chip' + (x.id === d.id ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'day\',' + js(x.id) + ')">' + h(x.name) + (x.id === R.nextId ? ' · ' + S.next : '') + '</button>'; }).join('') + '</div>' : '')
       + '<div class="wk-lv-cap wk-exlist">' + d.exercises.map(function (e) { return h(e.label); }).join(' · ') + '</div>'
+      + W.notesFor(d.exercises, cat()).map(function (n) { return '<div class="wk-note-line wk-note-ro"><span class="wk-note-g">📝 ' + muscleName(n.muscle) + '</span><span>' + h(n.text) + '</span></div>'; }).join('')
       + group(line(S.lockerT, stepper('rlk', R.locker == null ? S.none : R.locker, '', 'wkLk', 1)))
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
         + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return '<bdi dir="ltr">' + x.w + ' × ' + x.r + '</bdi>'; }).join(' · ') + ' ' + unitTxt(wex) + '</div>' : '')) : '')
@@ -480,10 +582,10 @@
     var n = Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length), active = !ex.skipped && (ex.sets.length < n || ui.extra[i]);
     var rows = ex.sets.map(function (x, k) {
       if (ui.editing && ui.editing.ex === i && ui.editing.i === k) {
-        return '<div class="wk-lv-set edit"><div class="wk-lv-n">' + S.setN(k + 1) + ' · ' + S.edit + '</div><div class="wk-lv-steps">' + (bw ? '' : stepper('w', ui.editing.w, u, 'wkLvW')) + stepper('r', ui.editing.r, S.reps, 'wkLvR') + '</div>'
+        return '<div class="wk-lv-set edit"><div class="wk-lv-n">' + S.setN(k + 1) + ' · ' + S.edit + '</div><div class="wk-lv-steps">' + (bw ? '' : stepper('w', ui.editing.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', ui.editing.r, S.reps, 'wkLvR') + '</div>'
           + '<div class="wk-chips wk-center"><button class="wk-chip on" onclick="WorkoutLive.saveEdit()">' + S.keep + '</button><button class="wk-chip" onclick="WorkoutLive.delSet()">' + S.del + '</button><button class="wk-chip" onclick="WorkoutLive.cancelEdit()">' + S.cancel + '</button></div></div>';
       }
-      var stt = W.rangeStatus(x.r, t[k] && t[k].range);
+      var stt = W.rangeStatus(W.firstR(x), t[k] && t[k].range);
       return '<button class="wk-lv-set done" onclick="WorkoutLive.editSet(' + k + ')"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + setTxt(x) + '</span><span class="wk-lv-st ' + stt + '">' + S.st[stt] + '</span></button>';
     }).join('');
     var act = '';
@@ -491,7 +593,9 @@
       var c = cur(), tg = t[Math.min(ex.sets.length, t.length - 1)];
       act = '<div class="wk-lv-set active"><div class="wk-lv-n">' + S.setN(ex.sets.length + 1) + ' · ' + S.target + '</div>'
         + '<div class="wk-lv-target">' + (bw ? '' : num(tg.w) + '<span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + num(tg.range[0] + '-' + tg.range[1]) + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
-        + '<div class="wk-lv-steps">' + (bw ? '' : stepper('w', c.w, u, 'wkLvW')) + stepper('r', c.r, S.reps, 'wkLvR') + '</div></div>';
+        + (c.parts && c.parts.length ? '<div class="wk-parts"><span class="wk-lv-cap">' + S.partN(c.parts.length + 1) + '</span><bdi dir="ltr" id="wkParts" class="wk-parts-v">' + h(partsTxt(c)) + '</bdi></div>' : '')
+        + '<div class="wk-lv-steps">' + (bw ? '' : stepper('w', c.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', c.r, S.reps, 'wkLvR') + '</div>'
+        + '<div class="wk-chips wk-center"><button class="wk-chip" onclick="WorkoutLive.addPart()">' + S.addPart + '</button>' + (c.parts && c.parts.length ? '<button class="wk-chip" onclick="WorkoutLive.removePart()">' + S.removePart + '</button>' : '') + '</div></div>';
     }
     var next = '';
     for (var k = ex.sets.length + (active ? 1 : 0); k < n && !ex.skipped; k++) next += '<div class="wk-lv-set next"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + (bw ? '' : num(t[k].w) + ' ' + u + ' × ') + num(t[k].range[0] + '-' + t[k].range[1]) + '</span></div>';
@@ -503,13 +607,17 @@
         + (w.open ? ws.map(function (x, j) { return '<button class="wk-lv-set wk-wset' + (w.done[j] ? ' ok' : '') + '" onclick="WorkoutLive.warm(' + i + ',' + j + ')" aria-pressed="' + !!w.done[j] + '"><span class="wk-lv-n">' + S.warmT + ' ' + (j + 1) + '</span><span class="wk-lv-v"><bdi dir="ltr">' + x.w + '×' + x.r + '</bdi></span><span class="wk-lv-st">' + (w.done[j] ? '✓' : '') + '</span></button>'; }).join('')
           + '<button class="wk-lv-link" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button>' : '') + '</div>';
     }
-    var allDone = state.exercises.every(exDone);
+    var allDone = state.exercises.every(exDone), cc = cat(), m = W.muscleKey(ex, cc), note = W.firstOfGroup(state.exercises, i, cc) ? String(cc.notes[m] || '').trim() : '';
     return (ui.memOnly ? '<div class="wk-lv-warn">' + S.memFull + '</div>' : '') + (ui.wakeHint ? '<div class="wk-lv-cap wk-lv-hint">' + S.wake + '</div>' : '')
       + '<div class="wk-lv-ex"><div class="wk-lv-title">' + h(ex.label) + (ex.unit === 'kg' && ex.equip === 'dumbbell' ? '<span class="wk-lv-cap"> · ' + S.perHand + '</span>' : '') + '</div>'
+      + (ex.swapOf ? '<div class="wk-lv-cap">' + h(S.swappedFrom(ex.swapOf)) + '</div>' : '')
       + '<div class="wk-lv-cap">' + (l ? S.lastTime + ': ' + l.sets.map(setTxt).join(' · ') : S.first) + '</div></div>'
+      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       + '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
+      + (!ex.sets.length && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.swapOpen()">' + S.swap + '</button>' : '')
+      + (!note ? '<button class="wk-chip" onclick="WorkoutLive.noteOpen()">' + S.noteEdit + '</button>' : '')
       + (!exDone(ex) ? '<button class="wk-chip" onclick="WorkoutLive.skipEx()">' + S.skipEx + '</button>' : '')
       + '<button class="wk-chip" onclick="WorkoutLive.addPick()">' + S.addExLive + '</button>'
       + (draft.actions.length > 1 ? '<button class="wk-chip" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>';
@@ -517,7 +625,7 @@
   function cmpLine(ex) {
     var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
     if (!b) d = S.cmpFirst;
-    else if (a.w != null && b.w != null && a.w !== b.w) d = S.cmpKg(W.snap(a.w - b.w, 0), u);
+    else if (a.w != null && b.w != null && a.w !== b.w) d = '<bdi dir="ltr">' + h(S.cmpKg(W.snap(a.w - b.w, 0), '').trim()) + '</bdi> ' + u;   // "+4.5" isolated
     else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
     return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + S.setN(1) + ' ← ' + setTxt(a) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
   }
@@ -636,9 +744,10 @@
   function card(inst, r) {
     if (!enabled() || !r || r.kind !== 'workout' || !inst || !inst.datetime) return null;
     var now = Date.now(), dft = readDraft(), mine = dft && String(dft.s.routineId) === String(r.id) && dft.s.dateStr === inst.dateStr;
-    var st = W.cardState({ now: now, dt: inst.datetime, completed: inst.completed, inProgress: mine, unlockMin: r.wkUnlockMin });
+    var all = sessions(), saved = all.some(function (s) { return s && s.source === 'live' && String(s.routineId) === String(r.id) && s.dateStr === inst.dateStr; });
+    var st = W.cardState({ now: now, dt: inst.datetime, completed: inst.completed, hasSession: saved, inProgress: mine, unlockMin: r.wkUnlockMin });
     if (!st) return null;
-    var p = programFor(r), all = sessions(), d = p ? W.nextDay(p, all) : null, dt = new Date(inst.datetime);
+    var p = programFor(r), d = p ? W.nextDay(p, all) : null, dt = new Date(inst.datetime);
     var time = dt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
     var dayName = mine ? dft.s.dayName || dft.s.program.name : d ? d.name : r.name || '';
     var done = st === 'done' ? W.sortRecent(all.filter(function (s) { return String(s.routineId) === String(r.id) && s.dateStr === inst.dateStr; }))[0] : null;
@@ -664,7 +773,8 @@
     var sec = st !== 'done' && st !== 'progress' ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
       + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
-    return '<div class="wk-card wk-st-' + st + '" data-wk-state="' + st + '" onclick="Workout.start(' + arg + ')">'
+    // DONE = locked: no start action on the card (Workout.start refuses it too)
+    return '<div class="wk-card wk-st-' + st + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
       + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
       + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + cd + btn + sec + '</div>';
   }
@@ -698,7 +808,7 @@
     if (!isStart && !isNext) return null;
     if (!enabled()) return { say: S.asstOff };
     var st = store();
-    if (isStart) return { say: st.programs.length ? S.asstStart : S.asstNone, go: function () { var i = todayWorkoutInstance(); start(i || {}); } };
+    if (isStart) { if (!readDraft()) { var lk = lockFor({}); if (lk.blocked) return { say: lk.line }; } return { say: st.programs.length ? S.asstStart : S.asstNone, go: function () { start({}); } }; }
     if (!st.programs.length) return { say: S.asstNone, go: function () { openPrograms(); } };
     var i = todayWorkoutInstance(), r = i && routineOf(i.routineId), p = programById(r && r.programId || null), d = W.nextDay(p, sessions());
     var when = i ? S.asstWhen(new Date(i.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ })) : '';
@@ -740,6 +850,8 @@
     editEx: editEx, exSet: exSet, saveEx: saveEx, removeEx: removeEx, rangeOpen: rangeOpen, rangePreset: rangePreset, rangeOk: rangeOk,
     readySet: readySet, readyProgram: function (id) { readySet('program', id); }, programPick: programPick, begin: begin,
     view: view, logSet: logSet, undo: undo, addSet: addSet, skipEx: skipEx, editSet: editSet, saveEdit: saveEdit, delSet: delSet, cancelEdit: cancelEdit,
+    typeW: typeW, typeWOk: typeWOk, setStep: setStep, addPart: addPart, removePart: removePart, swapOpen: swapOpen, swapRemember: swapRemember, swapAdd: swapAdd, swapTo: swapTo,
+    noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };

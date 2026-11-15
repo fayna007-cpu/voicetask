@@ -28,7 +28,7 @@
 
   // ── formatting helpers ──
   var dayLabel = function (ymd) { var d = new Date(ymd + 'T12:00:00Z'), p = ymd.split('-'); return d.toLocaleDateString('he-IL', { weekday: 'short', timeZone: 'UTC' }) + ' ' + (+p[2]) + '.' + (+p[1]) + (+p[0] !== new Date().getFullYear() ? '.' + p[0] : ''); };
-  var setChips = function (sets) { return sets.map(function (x) { return '<span class="wk-set" dir="ltr">' + (x.w == null ? x.r : h(x.w) + '×' + x.r) + '</span>'; }).join(''); };
+  var setChips = function (sets) { return sets.map(function (x) { return '<span class="wk-set" dir="ltr">' + h(W.setText(x)) + '</span>'; }).join(''); };   // combined "28×6+5"
   var nSets = function (s) { return s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0); };
   var summary = function (s) { return s.mode === 'class' && !s.exercises.length ? S.cls(s.classes[0].minutes) : S.exercises(s.exercises.length) + ' · ' + S.sets(nSets(s)); };
   var unitOf = function (label) { var a = catalog.aliases[W.labelKey(label)]; return a && a.unit === 'kg'; };
@@ -63,7 +63,8 @@
     if (!confirm(S.delConfirm)) return;
     sessions = sessions.filter(function (x) { return x.id !== id; }); persist(); renderWeek(); renderHistory();
   }
-  function toggleUnit(key) { var a = catalog.aliases[key] || {}; catalog.aliases[key] = Object.assign({}, a, { unit: a.unit === 'kg' ? '' : 'kg' }); put(KEY_C, catalog); renderHistory(); }
+  // read fresh before writing: the live screen keeps notes / steps / variants in the same catalog
+  function toggleUnit(key) { catalog = load(KEY_C, { aliases: {} }); catalog.aliases = catalog.aliases || {}; var a = catalog.aliases[key] || {}; catalog.aliases[key] = Object.assign({}, a, { unit: a.unit === 'kg' ? '' : 'kg' }); put(KEY_C, catalog); renderHistory(); }
   function toggleOpen(id) { st.open[id] = !st.open[id]; renderHistory(); }
   function more() { st.shown += 20; renderHistory(); }
 
@@ -92,7 +93,7 @@
           var lt = W.lastTimeBefore(sessions, e.label, s.date), key = W.labelKey(e.label), kg = unitOf(e.label);
           return '<div class="wk-row"><span class="wk-label">' + h(e.label) + '</span><span class="wk-sets">' + setChips(e.sets) + '</span>'
             + '<button class="wk-unit' + (kg ? ' on' : '') + '" onclick="Workout.toggleUnit(\'' + h(key).replace(/'/g, '&#39;') + '\')" aria-label="' + S.kg + '">' + S.kg + '</button>'
-            + (lt ? '<div class="wk-last">' + S.lastTime + ': ' + lt.sets.map(function (x) { return '<bdi dir="ltr">' + (x.w == null ? x.r : h(x.w) + '×' + x.r) + '</bdi>'; }).join(' · ') + ' · ' + dayLabel(lt.date) + '</div>' : '') + '</div>';
+            + (lt ? '<div class="wk-last">' + S.lastTime + ': ' + lt.sets.map(function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; }).join(' · ') + ' · ' + dayLabel(lt.date) + '</div>' : '') + '</div>';
         }).join('') + (s.exercises.some(function (e) { return e.unparsed.length; }) ? '<div class="wk-last">' + s.exercises.map(function (e) { return e.unparsed.join(' '); }).filter(Boolean).map(h).join(' · ') + '</div>' : ''))
           + '<div class="chat-suggestions"><button class="chat-suggestion" onclick="Workout.del(\'' + s.id + '\')">' + S.del + '</button></div></div>';
         return '<div class="wk-sess"><button class="wk-sess-head" onclick="Workout.toggleOpen(\'' + s.id + '\')"><span class="wk-sess-t">אימון ' + h(s.type) + ' · ' + dayLabel(s.date) + '</span>'
