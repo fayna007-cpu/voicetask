@@ -549,7 +549,7 @@
   var COACH_MODES = ['calm', 'coach', 'fire', 'off'];
   function readPrefs(raw) {
     var p = raw && typeof raw === 'object' ? raw : {};
-    return { coachMode: COACH_MODES.indexOf(p.coachMode) > -1 ? p.coachMode : 'coach', sound: p.sound !== false, haptic: p.haptic !== false, testMode: p.testMode === true, soundTested: p.soundTested === true };
+    return { coachMode: COACH_MODES.indexOf(p.coachMode) > -1 ? p.coachMode : 'coach', sound: p.sound !== false, haptic: p.haptic !== false, testMode: p.testMode === true, soundTested: p.soundTested === true, silent: p.silent === true };
   }
   // only the variants whose placeholders the user's own data can fill
   function fillable(list, vars) { return (list || []).filter(function (t) { return (String(t).match(/\{(\w+)\}/g) || []).every(function (p) { var k = p.slice(1, -1); return vars && vars[k] != null && vars[k] !== ''; }); }); }
@@ -613,6 +613,8 @@
       cancelWorkoutQ: function (n) { return n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },
       coachOff: 'כבוי', coachOffHint: 'בלי משפטים. הסימונים נשארים', coachModeT: 'המאמן', soundT: 'צליל', hapticT: 'רטט עדין (אם הטלפון תומך)', menuT: 'הגדרות האימון',
       soundTest: 'בדוק צליל', soundHint: 'לא שמעת? בדוק את מתג השקט בצד הטלפון', soundOk: 'הצליל נבדק',
+      hapticTest: 'בדוק רטט', hapticHint: 'לא הרגשת? בדוק שרטט המערכת מופעל בהגדרות הטלפון',
+      silentT: 'צליל גם במצב שקט (ניסיוני)', silentHint: 'עלול לעצור מוזיקה שמתנגנת ברקע', mascotT: 'המאמן',
       nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + ' סטים'; },
       testBanner: 'מצב בדיקה · לא נשמר', testStart: 'אימון בדיקה', testClose: 'סגור', testMode: 'מצב בדיקת אימון', testModeSub: 'אימון שלם בלי לשמור כלום',
       testKeep: 'לשמור את השינויים בהערות, בקפיצות ובתרגילים שהוספת?', settingsSection: 'אימונים',

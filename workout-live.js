@@ -147,7 +147,7 @@
       + '<div class="wk-lv-hr"><div class="wk-lv-el" id="wkLvEl" dir="ltr"></div><button class="wk-lv-menu" id="wkLvMenu" onclick="WorkoutLive.menuOpen()"><span aria-hidden="true">⋯</span> ' + S.options + '</button></div></div>'
       // the coach slot: ALWAYS reserved in the live screen (a line appearing moves nothing), non-blocking, tap to dismiss
       // ONE scrolling column (coach slot + progress + content); the bar below is the only fixed part
-      + '<div class="wk-lv-scroll" id="wkLvScroll"><div class="wk-coach-slot" id="wkCoachSlot" aria-live="polite"><button class="wk-coach-line" id="wkCoachLine" onclick="WorkoutLive.coachHide()" tabindex="-1"></button></div>'
+      + '<div class="wk-lv-scroll" id="wkLvScroll"><div class="wk-coach-slot" id="wkCoachSlot" aria-live="polite"><div class="wk-mascot" id="wkMascot"></div><button class="wk-coach-line" id="wkCoachLine" onclick="WorkoutLive.coachHide()" tabindex="-1"></button></div>'
       + '<div class="wk-lv-prog" id="wkLvProg"></div><div class="wk-lv-main" id="wkLvMain"></div></div><div class="wk-lv-dock" id="wkLvDock"></div>'
       + '<label class="wk-hap" id="wkHapL" aria-hidden="true"><input type="checkbox" switch id="wkHap" tabindex="-1"></label>';
     document.body.appendChild(el);
@@ -156,6 +156,7 @@
     pk.innerHTML = '<div class="wk-pick-bg" onclick="WorkoutLive.pickClose()"></div><div class="wk-pick-card" role="dialog" aria-modal="true"><div class="wk-pick-h"><span id="wkPickT"></span><button class="wk-lv-x" onclick="WorkoutLive.pickClose()" aria-label="' + S.close + '">✕</button></div><div class="wk-pick-b" id="wkPickB"></div><div class="wk-pick-f" id="wkPickF"></div></div>';
     document.body.appendChild(pk);
     [el, pk].forEach(function (x) { x.addEventListener('pointerdown', onPress); x.addEventListener('pointerdown', touched, true); });
+    el.addEventListener('pointerdown', mascotLook, true); mascotMount();
     ['pointerup', 'pointercancel'].forEach(function (t) { document.addEventListener(t, stopRepeat, true); });
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitViewport); window.visualViewport.addEventListener('scroll', fitViewport); }
     el.addEventListener('focusin', function (e) { if (e.target.matches('input')) setTimeout(function () { fitViewport(); e.target.scrollIntoView({ block: 'center' }); }, 250); });
@@ -251,7 +252,43 @@
     if (!r.text || r.text === (ui.coachLine && ui.coachLine.text)) { coachSlot(); return; }   // no fillable line: keep the slot as is
     ui.coachLast[m.kind] = r.index; if (m.kind === 'halfway') ui.coachSeen.halfway = true;
     if (!W.EVENT_KINDS[m.kind]) ui.coachAt = now;                           // only fillers count against the 20 s budget
-    coachShow(r.text, m.kind);
+    coachShow(r.text, m.kind); mascotReact(m.kind, r.text);
+  }
+  // ── the mascot (wk-mascot.js): Alfred beside the coach line. A gesture on a NEW line only (never on a re-render);
+  // the text always stays in the slot (its own bubble is hidden: the slot is never emptied by a timer) ──
+  var mascot = null, pvM = null;
+  var MOOD = { start: 'start', exceed: 'exceed', met: 'met', under: 'under', pr: 'pr', rest: 'wake', halfway: 'nudge', lastSet: 'nudge', comebackGap: 'wake', comebackPostponed: 'wake' };
+  function mascotMode(k) { k = k || curMode(); return k === 'off' ? 'calm' : k; }
+  function mascotMount() {
+    var el = $('wkMascot'); if (!el || mascot || !window.WkMascot) return;
+    try { mascot = window.WkMascot.mount(el, { mode: mascotMode(), onTap: function () { coachSlot(); } }); } catch (_) { mascot = null; }
+  }
+  function mascotReact(kind, text) { if (!mascot) return; try { mascot.say(text, { mood: MOOD[kind] || 'idle', ms: 1 }); } catch (_) { } }
+  function mascotLook(ev) {
+    var m = $('wkMascot'); if (!mascot || !m || ui.mode !== 'live' || m.contains(ev.target)) return;
+    var r = m.getBoundingClientRect(); try { mascot.look((ev.clientX - r.left - r.width / 2) / 180, (ev.clientY - r.top - r.height / 2) / 320, 1400); } catch (_) { }
+  }
+  function mascotSync() {
+    var s = $('wkCoachSlot'); if (s) s.classList.toggle('wk-m-off', curMode() === 'off');
+    if (!mascot || !state) return;
+    if (mascot.cur !== mascotMode()) { mascot.cur = mascotMode(); try { mascot.mode(mascot.cur); } catch (_) { } }   // a resume keeps the draft's mode
+    var pl = 0, dn = 0; state.exercises.forEach(function (e) { var n = (e.scheme && e.scheme.sets) || 3; pl += e.skipped ? e.sets.length || 1 : Math.max(n, e.sets.length); dn += e.skipped ? e.sets.length || 1 : e.sets.length; });
+    try { mascot.progress(pl ? dn / pl : 0); } catch (_) { }
+  }
+  // a mode sample: the first line of that mode the user's data needs nothing for
+  function modeSample(k) { var L = CO && CO.MODES[k] && CO.MODES[k].met; return (L || []).filter(function (t) { return t.indexOf('{') < 0; })[0] || modeHint(k); }
+  // the ready screen's preview: the mascot in the chosen mode + its sample line (re-mounted on each render; none when "off")
+  function pvMount() {
+    pvKill(); var el = $('wkMascotPv'), R = ui.ready; if (!el || !window.WkMascot || !R || R.coachMode === 'off') return;
+    try { pvM = window.WkMascot.mount(el, { mode: R.coachMode }); } catch (_) { pvM = null; }
+  }
+  function pvKill() { if (pvM) try { pvM.destroy(); } catch (_) { } pvM = null; }
+  // a mode change previews itself: the gesture in the new feel + that mode's own rest-end chime
+  function modePreview(k) {
+    if (k === 'off') return;
+    var m = ui.mode === 'ready' ? pvM : mascot;
+    if (m) try { m.mode(k); m.say(modeSample(k), { mood: k === 'fire' ? 'exceed' : 'met', ms: 1 }); } catch (_) { }
+    sound('rest', true, k);
   }
   // ARRIVAL at the next set (the rest ended or was skipped): the event line yields to lastSet / halfway / the rest line, or the fallback
   function coachArrive(withRest) {
@@ -390,7 +427,7 @@
     else if (k === 'mode') { R.mode = v; R.modeTouched = true; }
     else if (k === 'coach') { R.coachMode = v; setPref('coachMode', v); }
     else if (k === 'sleep' || k === 'energy' || k === 'pain') { R.feel[k] = v; if (!R.modeTouched) R.mode = suggestMode(R.feel); }
-    render();
+    render(); if (k === 'coach') modePreview(v);
   }
   // labels: the coach modes from wk-coach.js (+ "כבוי"); the day modes full / lighter from wk-copy.js; "short" stays ours (2 sets, not 20 min)
   function modeLabels() { var o = {}; W.COACH_MODES.forEach(function (k) { o[k] = k === 'off' ? S.coachOff : (CO && CO.MODES[k] ? CO.MODES[k].label : k); }); return o; }
@@ -408,14 +445,30 @@
       + '<div class="wk-grp-t">' + S.menuT + '</div><div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, m, function (k) { return 'WorkoutLive.setMode(\'' + k + '\')'; }, modeLabels())
       + '<div class="wk-lv-cap">' + h(modeHint(m)) + '</div>'
       + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'sound\')" role="switch" aria-checked="' + p.sound + '"><span class="wk-row-l">' + S.soundT + '</span><span class="wk-sw' + (p.sound ? ' on' : '') + '"></span></button>'
-      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>', '', true);
+      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>'
+      + checksHtml() + silentRow(p), '', true);
+  }
+  // the two checks (sound + touch), each with an honest hint: the phone decides, not the app
+  function checksHtml() {
+    return '<div class="wk-sound-row"><button class="wk-chip" onclick="WorkoutLive.soundTest()">🔊 ' + S.soundTest + '</button><button class="wk-chip" onclick="WorkoutLive.hapticTest()">📳 ' + S.hapticTest + '</button></div>'
+      + '<div class="wk-lv-cap" id="wkSoundHint">' + (ui.soundOk ? S.soundOk + ' · ' : '') + S.soundHint + '</div><div class="wk-lv-cap" id="wkHapHint" hidden>' + S.hapticHint + '</div>';
+  }
+  // the silent-switch EXPERIMENT (navigator.audioSession, Safari 16.4+): only where the API exists, opt-in, off by default
+  function silentRow(p) {
+    if (!navigator.audioSession) return '';
+    return '<button class="wk-row" onclick="WorkoutLive.togglePref(\'silent\')" role="switch" aria-checked="' + p.silent + '"><span class="wk-row-l">' + S.silentT + '</span><span class="wk-sw' + (p.silent ? ' on' : '') + '"></span></button><div class="wk-lv-cap">' + S.silentHint + '</div>';
+  }
+  function hapticTest() {
+    try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { }
+    try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) { }
+    var e = $('wkHapHint'); if (e) e.hidden = false;
   }
   // "סיים אימון" left the primary row: a confirm sheet says what happens
   function finishAsk() {
     ui.pick = { kind: 'finish' };
     pickOpen(S.finish, '<div class="wk-lv-cap wk-ask">' + S.finishQ(num(loggedSets(state))) + '</div>', '<button class="wk-big" onclick="WorkoutLive.pickClose();WorkoutLive.finishOpen()">' + S.finish + '</button><button class="wk-lv-link wk-center-link" onclick="WorkoutLive.pickClose()">' + S.keepGoing + '</button>', true);
   }
-  function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); saveDraft(); } if (k === 'off') coachHide(); menuOpen(); }
+  function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); saveDraft(); } if (k === 'off') coachHide(); menuOpen(); mascotSync(); modePreview(k); }
   function togglePref(k) { setPref(k, !prefs()[k]); menuOpen(); }
   // neutral: the mean of sleep, energy and (6 - pain) -> full / lighter / short; the owner can always pick another
   function suggestMode(f) { var v = []; if (f.sleep) v.push(f.sleep); if (f.energy) v.push(f.energy); if (f.pain) v.push(6 - f.pain); if (!v.length) return 'full'; var m = v.reduce(function (a, b) { return a + b; }, 0) / v.length; return m >= 3.5 ? 'full' : m >= 2.5 ? 'light' : 'short'; }
@@ -484,7 +537,7 @@
     if (m) coachSay(m); else { ui.coachLine = null; coachFallback(); }     // no target -> no judgement, the slot shows the next target
   }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
-  function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } }
+  function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) { } }
   // "= כמו הסט הקודם": the previous set of this exercise prefills the active one (a combined set keeps its parts)
   function sameAsLast() {
     var c = cur(), ex = state.exercises[c.ex], p = ex.sets[ex.sets.length - 1]; if (!p) return;
@@ -673,7 +726,7 @@
     if (TITLES[ui.mode]) {
       name.textContent = TITLES[ui.mode](); el.textContent = ''; prog.innerHTML = '';
       main.innerHTML = ui.mode === 'programs' ? programsHtml() : ui.mode === 'program' ? programHtml() : ui.mode === 'exercise' ? exerciseHtml() : readyHtml();
-      renderDock(); return;
+      renderDock(); if (ui.mode === 'ready') pvMount(); else pvKill(); return;
     }
     name.innerHTML = h(state.program.name) + (state.test ? '<span class="wk-lv-lk wk-test-ban">' + S.testBanner + '</span>' : state.locker != null ? '<span class="wk-lv-lk">' + h(S.lockerN(state.locker)) + '</span>' : '');
     // progress, grouped by muscle group: icon + label + a restrained bar; a tap jumps to the group's next unfinished exercise
@@ -685,7 +738,7 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    renderDock(); tick(); if (ui.mode === 'live') coachSlot();             // the slot is never left empty on a re-render
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
   }
   // the summary's numbers count up once, staggered (480 ms each, 80 ms apart; text nodes only; reduced motion = no animation)
@@ -762,7 +815,8 @@
       // the coach: רגוע / מאמן / אש / כבוי (the owner's choice, remembered) + a sound check
       + group('<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
         + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div>'
-        + '<div class="wk-sound-row"><button class="wk-chip" onclick="WorkoutLive.soundTest()">🔊 ' + S.soundTest + '</button><span class="wk-lv-cap" id="wkSoundHint">' + (ui.soundOk ? S.soundOk + ' · ' : '') + S.soundHint + '</span></div>')
+        + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
+        + checksHtml())
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
         + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return '<bdi dir="ltr">' + x.w + ' × ' + x.r + '</bdi>'; }).join(' · ') + ' ' + unitTxt(wex) + '</div>' : '')) : '')
       + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
@@ -971,12 +1025,22 @@
     return actx;
   }
   // 'tick' per set (quiet); 'rest' = the rest-end chime: three rising notes, clearly louder than any UI sound
-  function sound(kind, force) {
+  // the rest-end chime has the coach mode's character: calm = two soft low notes, coach = three rising, fire = four quick bright ones
+  var CHIME = { calm: [[523, 0, 0.3, 0.34], [659, 0.3, 0.75, 0.34]], coach: [[784, 0, 0.16, 0.42], [988, 0.17, 0.33, 0.42], [1175, 0.34, 0.62, 0.45]],
+    fire: [[880, 0, 0.09, 0.45], [1109, 0.1, 0.19, 0.45], [1319, 0.2, 0.29, 0.47], [1760, 0.3, 0.55, 0.45]] };
+  var sessT = 0;
+  // the silent-switch experiment: 'playback' lets Web Audio sound with the switch on (it may pause music), back to 'auto' right after
+  function audioSession() {
+    var a = navigator.audioSession; if (!a || !prefs().silent) return;
+    try { a.type = 'playback'; clearTimeout(sessT); sessT = setTimeout(function () { try { a.type = 'auto'; } catch (_) { } }, 1500); } catch (_) { }
+  }
+  function sound(kind, force, mode) {
     if (!force && !prefs().sound) return;                                 // the check button always plays
     var c = audio(false); if (!c) return;
+    audioSession();
     try {
       if (c.state === 'suspended' && c.resume) c.resume();
-      (kind === 'tick' ? [[1320, 0, 0.05, 0.08]] : kind === 'rest' ? [[784, 0, 0.16, 0.42], [988, 0.17, 0.33, 0.42], [1175, 0.34, 0.62, 0.45]] : [[660, 0, 0.18, 0.16], [880, 0.16, 0.34, 0.14]]).forEach(function (n) {
+      (kind === 'tick' ? [[1320, 0, 0.05, 0.08]] : kind === 'rest' ? CHIME[mascotMode(mode)] : [[660, 0, 0.18, 0.16], [880, 0.16, 0.34, 0.14]]).forEach(function (n) {
         var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + n[1];
         o.type = 'sine'; o.frequency.value = n[0]; o.connect(g); g.connect(c.destination);
         g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(n[3], t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + n[2] + 0.12);
@@ -1155,7 +1219,7 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
-    coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
+    coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };

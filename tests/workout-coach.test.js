@@ -93,7 +93,7 @@ check('read-modify-write tolerates a missing / corrupt value (starts from the de
 });
 check('prefs: defaults coach / sound on / tactile on / test off; junk tolerated; "off" is a mode', () => {
   const d = W.readPrefs(null), j = W.readPrefs({ coachMode: 'loud', sound: false, testMode: 'yes' }), o = W.readPrefs({ coachMode: 'off', testMode: true });
-  return J(d) === J({ coachMode: 'coach', sound: true, haptic: true, testMode: false, soundTested: false }) && j.coachMode === 'coach' && j.sound === false && j.testMode === false && o.coachMode === 'off' && o.testMode === true ? '' : J([d, j, o]);
+  return J(d) === J({ coachMode: 'coach', sound: true, haptic: true, testMode: false, soundTested: false, silent: false }) && j.coachMode === 'coach' && j.sound === false && j.testMode === false && o.coachMode === 'off' && o.testMode === true ? '' : J([d, j, o]);
 });
 check('copy filter: only variants the user\'s own data can fill; nothing with "{" survives a fill', () => {
   const vars = { name: 'אימון כוח', time: '18:00' }, all = [];

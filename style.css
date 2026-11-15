@@ -2076,3 +2076,12 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 24px oklch(0.72 0.18 285 / 0.55);pointer-events:none;opacity:.25;animation:wk-breathe 4s ease-in-out infinite}
 @keyframes wk-breathe{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.9;transform:scale(1.03)}}
 @media (prefers-reduced-motion:reduce){.wk-fresh,.wk-fresh .wk-chk,.wk-fresh.wk-r-pr::after,.wk-lv-dock .wk-done.wk-primary.wk-flash,.wk-live[data-mode=ready] .wk-lv-dock .wk-big::after{animation:none}.wk-seg i::after,.wk-lv-set{transition:none}}
+/* Part 3 stage 3: the mascot strip (Alfred beside the coach line; his own bubble stays hidden, the line is the text) */
+.wk-live[data-mode=live] .wk-coach-slot{display:flex;align-items:center;gap:var(--wk-s2)}
+.wk-mascot{flex:0 0 52px;width:52px;height:52px}
+.wk-coach-slot.wk-m-off .wk-mascot{display:none}
+.wk-coach-slot .wk-coach-line{flex:1 1 auto;min-width:0}
+.wk-mascot .wkm-bubble,.wk-m-pv-c .wkm-bubble{display:none}
+.wk-m-pv{display:flex;align-items:center;gap:var(--wk-s3);margin:var(--wk-s2) 0}
+.wk-m-pv-c{flex:0 0 56px;width:56px;height:56px}
+.wk-m-pv-t{flex:1 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:20px;color:var(--text)}
