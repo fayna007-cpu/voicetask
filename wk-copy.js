@@ -81,7 +81,7 @@
 
     // ── labels and empty states (single strings) ──
     label: {
-      readinessFull: 'מלא', readinessLight: 'קל יותר', readinessShort: 'קצר · 20 דק׳',
+      readinessFull: 'מלא', readinessLight: 'קל יותר', readinessShort: 'קצר',
       historyEmpty: 'אחרי האימון הראשון תראה כאן את הסטים שלך',
       firstSessionHint: 'הכנס את הסט הראשון, ואציע את השאר'
     }
