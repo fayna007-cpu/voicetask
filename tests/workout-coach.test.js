@@ -104,6 +104,12 @@ check('the draft keeps test + coachMode through a replay (a resume keeps them)',
   const s = W.replay([{ type: 'START', at: NOW, test: true, coachMode: 'fire', program: { id: 'p', name: 'P', exercises: [{ label: 'a' }] } }]);
   return s.test === true && s.coachMode === 'fire' ? '' : J(s);
 });
+check('last-3 peek: the last n sessions of an exercise before a date, newest first, only sessions that have it', () => {
+  const S = [{ id: 'a', date: '2026-10-20', exercises: [{ label: 'חזה', sets: [{ w: 18, r: 6 }] }] }, { id: 'b', date: '2026-10-25', exercises: [{ label: 'גב', sets: [{ w: 1, r: 1 }] }] },
+    { id: 'c', date: '2026-10-28', exercises: [{ label: 'חזה', sets: [{ w: 20, r: 5 }] }] }, { id: 'd', date: '2026-11-01', exercises: [{ label: 'חזה', sets: [{ w: 20, r: 6 }] }] }, { id: 'e', date: '2026-11-04', exercises: [{ label: 'חזה', sets: [{ w: 22, r: 4 }] }] }];
+  const r = W.lastNBefore(S, 'חזה', '2026-11-04', 3);
+  return J(r.map((x) => x.date)) === '["2026-11-01","2026-10-28","2026-10-20"]' && W.lastNBefore(S, 'כתפיים', '2026-11-05', 3).length === 0 ? '' : J(r);
+});
 check('string table: the part 2 UI strings exist', () => { const U = W.TEXT.ui; const miss = ['coachOff', 'coachModeT', 'soundTest', 'soundHint', 'nextSet', 'nextSetBtn', 'tally', 'testBanner', 'testStart', 'testClose', 'testMode', 'testModeSub', 'testKeep', 'menuT', 'soundT', 'hapticT'].filter((k) => !U[k]); return miss.length ? J(miss) : ''; });
 
 let bad = 0; rows.forEach(([n, e], i) => { if (e) bad++; console.log(`${String(i + 1).padStart(2)}. ${e ? 'FAIL' : 'PASS'}  ${n}${e ? '\n      ' + e : ''}`); });

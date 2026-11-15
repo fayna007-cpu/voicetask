@@ -108,7 +108,7 @@
   }
 
   // ── UI state (not persisted) ──
-  var ui = { noteEdits: {}, mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
+  var ui = { noteEdits: {}, peek: {}, mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
     chimed: 0, wakeHint: false, lastTap: 0, warm: {}, prog: null, dirty: false, dayIdx: 0, ex: null, exIdx: -1, ctx: null, ready: null, pick: null, after: null,
     coachAt: -1e9, coachLast: {}, coachSeen: {}, coachLine: null, restTouched: 0, fired: {}, soundOk: false };
   var timer = null, wake = null;
@@ -466,13 +466,33 @@
     } else dispatch({ type: 'LOG_SET', ex: c.ex, w: bw ? null : c.w, r: c.r });
     var done = state.exercises[c.ex].sets[slot];
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
-    sound('tick'); haptic(); render(); reveal();
+    sound('tick'); haptic(); render(); reveal(); undoToast(slot + 1);
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
     var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen });
     if (m) coachSay(m); else { ui.coachLine = null; coachFallback(); }     // no target -> no judgement, the slot shows the next target
   }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
   function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } }
+  // "= כמו הסט הקודם": the previous set of this exercise prefills the active one (a combined set keeps its parts)
+  function sameAsLast() {
+    var c = cur(), ex = state.exercises[c.ex], p = ex.sets[ex.sets.length - 1]; if (!p) return;
+    if (p.parts && p.parts.length > 1) { var ps = p.parts.map(function (x, i) { return { w: x.w != null ? x.w : p.w, r: x.r }; }); var last = ps.pop(); c.parts = ps; c.w = last.w; c.r = last.r; }
+    else { c.parts = null; c.w = p.w; c.r = p.r; }
+    render(); reveal();
+  }
+  function peek() { ui.peek[ui.view] = !ui.peek[ui.view]; render(); }
+  // after a set: a 5 s toast "נרשם סט N · ↶ בטל" over the dock (absolute: moves nothing); undo removes that set (and any rest action after it)
+  function undoToast(n) {
+    var d = $('wkLvDock'); if (!d) return;
+    var t = $('wkUndoT'); if (!t) { t = document.createElement('div'); t.id = 'wkUndoT'; t.className = 'wk-undo-t'; $('wkLive').appendChild(t); }
+    t.innerHTML = '<span>' + S.undoToast(num(n)) + '</span><button class="wk-chip" onclick="WorkoutLive.undoSet()">' + S.undoBtn + '</button>';
+    t.classList.add('on'); clearTimeout(ui.undoT); ui.undoT = setTimeout(function () { t.classList.remove('on'); }, 5000);
+  }
+  function undoSet() {
+    var t = $('wkUndoT'); if (t) t.classList.remove('on'); clearTimeout(ui.undoT);
+    if (!draft) return; var i = -1; draft.actions.forEach(function (a, k) { if (a.type === 'LOG_SET') i = k; }); if (i < 1) return;
+    draft.actions.splice(i); state = W.replay(draft.actions); saveDraft(); ui.pend = {}; ui.view = state.exIdx; ui.coachLine = null; render(); reveal();
+  }
   function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); reveal(); }
   function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); reveal(); }
   // a short screen: the note, warm-up and parts lines may push the active steppers below the fold -> bring them into view
@@ -740,7 +760,8 @@
         + '<div class="wk-lv-target">' + (bw ? '' : num(tg.w) + '<span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + num(tg.range[0] + '-' + tg.range[1]) + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
         + (c.parts && c.parts.length ? '<div class="wk-parts"><span class="wk-lv-cap">' + S.partN(c.parts.length + 1) + '</span><bdi dir="ltr" id="wkParts" class="wk-parts-v">' + h(partsTxt(c)) + '</bdi></div>' : '')
         + '<div class="wk-lv-steps">' + (bw ? '' : stepper('w', c.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', c.r, S.reps, 'wkLvR') + '</div>'
-        + '<div class="wk-chips wk-center"><button class="wk-chip" onclick="WorkoutLive.addPart()">' + S.addPart + '</button>' + (c.parts && c.parts.length ? '<button class="wk-chip" onclick="WorkoutLive.removePart()">' + S.removePart + '</button>' : '') + '</div></div>';
+        + '<div class="wk-chips wk-center">' + (ex.sets.length ? '<button class="wk-chip" onclick="WorkoutLive.sameAsLast()">' + S.sameAsLast + '</button>' : '')
+        + '<button class="wk-chip" onclick="WorkoutLive.addPart()">' + S.addPart + '</button>' + (c.parts && c.parts.length ? '<button class="wk-chip" onclick="WorkoutLive.removePart()">' + S.removePart + '</button>' : '') + '</div></div>';
     }
     var next = '';
     for (var k = ex.sets.length + (active ? 1 : 0); k < n && !ex.skipped; k++) next += '<div class="wk-lv-set next"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + (bw ? '' : num(t[k].w) + ' ' + u + ' × ') + num(t[k].range[0] + '-' + t[k].range[1]) + '</span></div>';
@@ -756,7 +777,10 @@
     return (ui.memOnly ? '<div class="wk-lv-warn">' + S.memFull + '</div>' : '') + (ui.wakeHint ? '<div class="wk-lv-cap wk-lv-hint">' + S.wake + '</div>' : '')
       + '<div class="wk-lv-ex"><div class="wk-lv-title">' + h(ex.label) + (ex.unit === 'kg' && ex.equip === 'dumbbell' ? '<span class="wk-lv-cap"> · ' + S.perHand + '</span>' : '') + '</div>'
       + (ex.swapOf ? '<div class="wk-lv-cap">' + h(S.swappedFrom(ex.swapOf)) + '</div>' : '')
-      + '<div class="wk-lv-cap">' + (l ? S.lastTime + ': ' + l.sets.map(setTxt).join(' · ') : S.first) + '</div></div>'
+      // "בפעם שעברה" opens a peek at the last 3 sessions of this exercise
+      + (l ? '<button class="wk-peek-b" onclick="WorkoutLive.peek()" aria-expanded="' + !!ui.peek[i] + '">' + S.lastTime + ': ' + l.sets.map(setTxt).join(' · ') + ' ' + (ui.peek[i] ? '▴' : '▾') + '</button>'
+        + (ui.peek[i] ? '<div class="wk-peek">' + W.lastNBefore(sessions(), ex.label, tomorrow(), 3).map(function (p) { var d = p.date.split('-'); return '<div class="wk-peek-r"><span class="wk-lv-n">' + num(+d[2] + '.' + +d[1]) + '</span><span class="wk-lv-v">' + p.sets.map(setTxt).join(' · ') + '</span></div>'; }).join('') + '</div>' : '')
+        : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
       + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
@@ -1085,7 +1109,7 @@
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
     coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
-    conflict: conflict, cancelWorkout: cancelWorkout,
+    conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
