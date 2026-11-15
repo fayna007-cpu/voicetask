@@ -22,7 +22,6 @@
 
   // ── storage ──
   function load(k, def) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? def : v; } catch (_) { return def; } }
-  function put(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (_) { return false; } }
   var sessions = load(KEY_S, []), catalog = load(KEY_C, { aliases: {} });
   var st = { open: {}, shown: 20 };
 
@@ -58,13 +57,17 @@
     var o = $('routineOverlay'); if (o) o.classList.remove('on');
   }
 
-  function persist() { return put(KEY_S, sessions); }
+  // read-modify-write: re-read the stored list (a workout may have been saved since this sheet opened)
   function del(id) {
     if (!confirm(S.delConfirm)) return;
-    sessions = sessions.filter(function (x) { return x.id !== id; }); persist(); renderWeek(); renderHistory();
+    var next = W.updateJSON(localStorage, KEY_S, [], function (all) { return (Array.isArray(all) ? all : []).filter(function (x) { return x.id !== id; }); });
+    if (next) sessions = next; renderWeek(); renderHistory();
   }
   // read fresh before writing: the live screen keeps notes / steps / variants in the same catalog
-  function toggleUnit(key) { catalog = load(KEY_C, { aliases: {} }); catalog.aliases = catalog.aliases || {}; var a = catalog.aliases[key] || {}; catalog.aliases[key] = Object.assign({}, a, { unit: a.unit === 'kg' ? '' : 'kg' }); put(KEY_C, catalog); renderHistory(); }
+  function toggleUnit(key) {
+    var next = W.updateJSON(localStorage, KEY_C, { aliases: {} }, function (c) { c.aliases = c.aliases || {}; var a = c.aliases[key] || {}; c.aliases[key] = Object.assign({}, a, { unit: a.unit === 'kg' ? '' : 'kg' }); return c; });
+    if (next) catalog = next; renderHistory();
+  }
   function toggleOpen(id) { st.open[id] = !st.open[id]; renderHistory(); }
   function more() { st.shown += 20; renderHistory(); }
 
@@ -79,6 +82,8 @@
     var L = window.WorkoutLive, on = !!(L && L.enabled());
     el.innerHTML = !on ? '<button class="rform-save" id="wkStart" disabled style="opacity:.45">' + S.start + '</button><div class="wk-note" style="text-align:center">' + S.soon + '</div>'
       : L.resumeLine('sheet') + '<button class="rform-save" id="wkStart" onclick="Workout.start()">' + (L.hasDraft() ? S.resume : S.start) + '</button>'
+        // test mode (settings): a secondary "אימון בדיקה" — the full flow, nothing saved
+        + (L.testOn && L.testOn() ? '<button class="wk-test-btn" id="wkTestStart" onclick="Workout.start({test:true})">🧪 ' + W.TEXT.ui.testStart + '</button>' : '')
         + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.programs()">' + S.programs + '</button></div>';
   }
   function renderHistory() {

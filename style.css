@@ -1953,3 +1953,34 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-pick-card{bottom:var(--wk-kb,0px);max-height:calc(var(--wk-pk-vh,100dvh) - 48px)}
 .wk-live.on[data-mode=live]~.wk-pick .wk-chip,.wk-live.on[data-mode=live]~.wk-pick .wk-lv-x{min-height:48px;min-width:48px}
 .wk-tap .wk-stp-u bdi{text-decoration:none}
+/* Workout A2 part 2 (wk-*) - appended only: the live coach, rest-end, test mode */
+.wk-lv-head{grid-template-columns:48px minmax(0,1fr) auto}
+.wk-lv-hr{display:flex;align-items:center;gap:4px;justify-content:flex-end;min-width:64px}
+.wk-lv-menu{display:none;width:48px;height:48px;border:none;border-radius:50%;background:none;color:var(--text);font-size:22px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.wk-live[data-mode=live] .wk-lv-menu{display:block}
+.wk-coach-slot{display:none;flex-shrink:0;height:52px;margin:0 calc(16px + var(--sar)) 0 calc(16px + var(--sal))}
+.wk-live[data-mode=live] .wk-coach-slot{display:block}
+.wk-coach-line{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;width:100%;height:52px;padding:6px 12px;border:none;border-radius:var(--r-sm);background:oklch(0.55 0.16 285 / 0.16);color:var(--text);font-family:inherit;font-size:15px;font-weight:700;line-height:20px;text-align:start;cursor:pointer;opacity:0;visibility:hidden;transition:opacity 220ms cubic-bezier(.2,.8,.2,1),visibility 220ms}
+.wk-coach-line.on{opacity:1;visibility:visible}
+.wk-hap{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
+.wk-hap input{opacity:0}
+.wk-lv-set.wk-r-exceed{box-shadow:inset 3px 0 0 var(--accent)}
+.wk-lv-set.wk-r-met{box-shadow:inset 3px 0 0 oklch(0.72 0.18 285 / 0.45)}
+.wk-lv-set.wk-r-under{box-shadow:inset 3px 0 0 oklch(0.70 0.06 240)}
+.wk-lv-set.wk-r-pr{box-shadow:inset 3px 0 0 var(--gold)}
+.wk-lv-set.wk-r-pr .wk-lv-v{color:var(--gold)}
+.wk-live[data-mode=live] .wk-lv-dock{height:calc(268px + var(--sab))}
+.wk-next-t{font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;min-height:28px}
+.wk-next-go{color:var(--accent)}
+.wk-done.wk-pulse{animation:wk-pulse 1.6s ease-in-out infinite}
+.wk-tally{font-size:15px;font-weight:700;color:var(--text);margin:-8px 0 16px;padding:0 4px}
+.wk-sound-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wk-sound-row .wk-lv-cap{flex:1 1 160px}
+.wk-cue{margin:-8px 0 16px}
+.wk-test-ban{color:var(--warn);font-weight:700}
+.wk-test-btn{display:block;width:100%;min-height:48px;margin-top:8px;border-radius:24px;border:1px dashed var(--border2);background:transparent;color:var(--text);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.wk-set-ico{background:oklch(0.55 0.16 285 / 0.15);color:var(--accent)}
+/* the muscle-group note: gold is for records only -> the neutral lavender tint */
+.wk-note-line{border-color:oklch(0.55 0.16 285 / 0.30);background:oklch(0.55 0.16 285 / 0.10)}
+.wk-note-g{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){.wk-coach-line{transition:none}.wk-done.wk-pulse{animation:none}}
