@@ -101,7 +101,7 @@
   // ── UI state (not persisted) ──
   var ui = { noteEdits: {}, mode: 'live', stack: [], view: 0, pend: {}, extra: {}, editing: null, memOnly: false, effort: null, locker: null, exists: false, err: '',
     chimed: 0, wakeHint: false, lastTap: 0, warm: {}, prog: null, dirty: false, dayIdx: 0, ex: null, exIdx: -1, ctx: null, ready: null, pick: null, after: null,
-    coachAt: -1e9, coachLast: {}, coachSeen: {}, coachTimer: null, restTouched: 0, fired: {}, soundOk: false };
+    coachAt: -1e9, coachLast: {}, coachSeen: {}, coachLine: null, restTouched: 0, fired: {}, soundOk: false };
   var timer = null, wake = null;
   var tomorrow = function () { return W.addDaysYmd(W.ymdIn(new Date()), 1); };
   function lastOf(label) { return W.lastTimeBefore(sessions(), label, tomorrow()); }
@@ -207,29 +207,45 @@
     dispatch({ type: 'START', at: draft.startedAt, locker: R.locker, program: { id: p.id, name: p.days.length > 1 ? p.name + ' · ' + d.name : p.name, exercises: copy(d.exercises) },
       dayId: d.id, dayName: d.name, routineId: c.routineId, dateStr: c.dateStr, goal: p.goal, mode: R.mode, test: c.test ? true : null, coachMode: draft.prefs.coachMode });
     ui.view = 0; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.effort = null; ui.exists = false; ui.err = ''; ui.chimed = 0; ui.warm = {}; ui.stack = [];
-    ui.coachSeen = {}; ui.coachLast = {}; ui.coachAt = -1e9; ui.fired = {}; ui.restTouched = 0;
+    ui.coachSeen = {}; ui.coachLast = {}; ui.coachAt = -1e9; ui.coachLine = null; ui.fired = {}; ui.restTouched = 0;
     acquireWake(); hideBanner(); go('live');
     coachStart();
   }
   // ── the live coach: ONE line in the reserved slot; mode "off" = no lines (the set-row marks stay) ──
-  function coachShow(text) {
+  // the slot is NEVER empty during a workout: the latest coach line stays until the next event or the next set's arrival;
+  // without one (no line yet, dismissed, mode off, a filler held back) it shows the next target
+  function coachShow(text, kind) {
     var b = $('wkCoachLine'); if (!b || !text) return;
-    b.textContent = text; b.classList.add('on'); clearTimeout(ui.coachTimer);
-    ui.coachTimer = setTimeout(coachHide, 4000);
+    ui.coachLine = { text: text, kind: kind }; b.textContent = text; b.className = 'wk-coach-line on k-' + kind;
   }
-  function coachHide() { var b = $('wkCoachLine'); if (b) b.classList.remove('on'); clearTimeout(ui.coachTimer); }
+  function coachFallback() {
+    var b = $('wkCoachLine'); if (!b) return;
+    var t = state && !state.finished && ui.mode === 'live' ? nextTargetText() : '';
+    if (!t) { b.className = 'wk-coach-line'; b.textContent = ''; return; }
+    b.textContent = S.nextSet(W.iso(t)); b.className = 'wk-coach-line on fb';
+  }
+  function coachHide() { ui.coachLine = null; coachFallback(); }          // tap = dismiss -> the next-target line
+  function coachSlot() { if (ui.coachLine) coachShow(ui.coachLine.text, ui.coachLine.kind); else coachFallback(); }
   function coachSay(m) {
-    if (!m || curMode() === 'off' || !CO) return;
+    if (!m || curMode() === 'off' || !CO) { coachSlot(); return; }
     var now = performance.now();
-    if (m.kind !== 'pr' && now - ui.coachAt < 20000) return;                  // one line per 20 s (a record always speaks)
+    if (!W.coachAllowed(m.kind, now, ui.coachAt)) { coachSlot(); return; }   // a filler held back: the slot keeps what it shows
     var r;
     if (m.kind === 'comebackGap' || m.kind === 'comebackPostponed') {          // from the copy table (mode-independent)
       var all = (CP && CP.COPY.coach[m.kind]) || [], ok = W.fillable(all, m.vars); if (!ok.length) return;
       var p = CP.pick(ok, ok.indexOf(all[ui.coachLast[m.kind]])); r = { text: CP.fill(p.text, m.vars), index: all.indexOf(p.text) };
     } else r = CO.line(curMode(), m.kind, m.vars, ui.coachLast[m.kind] == null ? -1 : ui.coachLast[m.kind]);
-    if (!r.text || r.index === ui.coachLast[m.kind]) return;                 // never the same line twice in a row
-    ui.coachLast[m.kind] = r.index; ui.coachAt = now; if (m.kind === 'halfway') ui.coachSeen.halfway = true;
-    coachShow(r.text);
+    if (!r.text || r.text === (ui.coachLine && ui.coachLine.text)) { coachSlot(); return; }   // no fillable line: keep the slot as is
+    ui.coachLast[m.kind] = r.index; if (m.kind === 'halfway') ui.coachSeen.halfway = true;
+    if (!W.EVENT_KINDS[m.kind]) ui.coachAt = now;                           // only fillers count against the 20 s budget
+    coachShow(r.text, m.kind);
+  }
+  // ARRIVAL at the next set (the rest ended or was skipped): the event line yields to lastSet / halfway / the rest line, or the fallback
+  function coachArrive(withRest) {
+    if (!state) return;
+    var m = W.pickMoment([W.arrivalMoment(state, ui.coachSeen), withRest ? { kind: 'rest', vars: nextTargetText() ? { target: W.iso(nextTargetText()) } : {} } : null]);
+    ui.coachLine = null;
+    if (m) coachSay(m); else coachFallback();
   }
   function coachStart() {
     if (!state) return;
@@ -421,7 +437,8 @@
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
     sound('tick'); haptic(); render(); reveal();
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
-    coachSay(W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen }));
+    var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen });
+    if (m) coachSay(m); else { ui.coachLine = null; coachFallback(); }     // no target -> no judgement, the slot shows the next target
   }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
   function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } }
@@ -492,7 +509,7 @@
   function delSet() { var e = ui.editing; dispatch({ type: 'DELETE_SET', ex: e.ex, i: e.i }); ui.editing = null; ui.pend = {}; render(); }
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
-  function restSkip() { dispatch({ type: 'REST_SKIP' }); renderDock(); }
+  function restSkip() { dispatch({ type: 'REST_SKIP' }); renderDock(); coachArrive(false); }
   function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { open: false, done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
   // + exercise during the workout: a picker of known exercises (no typing inside the live screen)
   function addPick() {
@@ -600,7 +617,7 @@
       return '<button class="wk-seg' + (i === ui.view ? ' on' : '') + (e.skipped ? ' skip' : '') + '" onclick="WorkoutLive.view(' + i + ')" aria-label="' + h(e.label) + '"><i style="width:' + Math.round(f * 100) + '%"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    renderDock(); tick();
+    renderDock(); tick(); if (ui.mode === 'live') coachSlot();             // the slot is never left empty on a re-render
   }
   function chips(list, sel, fn, labels) { return '<div class="wk-chips">' + list.map(function (k) { return '<button class="wk-chip' + (sel === k ? ' on' : '') + '" onclick="' + fn(k) + '">' + labels[k] + '</button>'; }).join('') + '</div>'; }
   // tap: the value itself is a button (the weight -> the keypad)
@@ -806,7 +823,7 @@
       var a = W.dueAlert(W.restAlertSchedule(r.endsAt, now, ui.restTouched === r.endsAt), now, ui.fired);
       if (a) {
         W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
-        sound('rest'); if (a.kind === 'end') { acquireWake(); if (ui.chimed !== r.endsAt) { ui.chimed = r.endsAt; coachSay({ kind: 'rest', vars: nextTargetText() ? { target: W.iso(nextTargetText()) } : {} }); } }
+        sound('rest'); if (a.kind === 'end') { acquireWake(); if (ui.chimed !== r.endsAt) { ui.chimed = r.endsAt; coachArrive(true); } }
         renderDock();
       }
     }
@@ -1018,7 +1035,6 @@
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
     coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
-    coachReset: function () { ui.coachAt = -1e9; },                       // tests: lift the 20 s rate limit
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
   function injectSettings() {

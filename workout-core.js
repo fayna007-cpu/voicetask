@@ -496,12 +496,23 @@
       var k = ctx.judge({ w: ctx.target.w, r: ctx.target.r }, { w: ctx.set.w, r: ctx.set.r });
       return { kind: k, vars: { target: iso(targetText(ctx.target)), done: iso(setText(ctx.set)) } };
     }
+    return null;                                                          // lastSet / halfway are ARRIVAL lines (arrivalMoment)
+  }
+  // ARRIVAL at the next set (the rest ended or was skipped): lastSet (this exercise's last planned set) > halfway (once, >= 50%)
+  function arrivalMoment(state, seen) {
+    if (!state) return null; seen = seen || {};
     var e = state.exercises[state.exIdx];
-    if (ctx.set && e && !e.skipped && plannedSets(e) - e.sets.length === 1) return { kind: 'lastSet', vars: {} };
+    if (e && !e.skipped && e.sets.length > 0 && plannedSets(e) - e.sets.length === 1) return { kind: 'lastSet', vars: {} };
     var planned = 0, done = 0; state.exercises.forEach(function (x) { planned += plannedSets(x); done += x.sets.length; });
-    if (ctx.set && !seen.halfway && planned > 1 && done * 2 >= planned) return { kind: 'halfway', vars: {} };
+    if (!seen.halfway && planned > 1 && done * 2 >= planned) return { kind: 'halfway', vars: {} };
     return null;
   }
+  // EVENT lines (a judged set) always speak; FILLER lines (start, rest, arrival, comeback) at most one per 20 s
+  var COACH_PRI = ['pr', 'exceed', 'under', 'met', 'lastSet', 'halfway', 'start', 'rest', 'comebackGap', 'comebackPostponed'];
+  var EVENT_KINDS = { pr: 1, exceed: 1, under: 1, met: 1 };
+  function coachAllowed(kind, now, lastFillerAt) { return !!EVENT_KINDS[kind] || !(now - (lastFillerAt == null ? -1e12 : lastFillerAt) < 20000); }
+  // colliding moments: the higher priority wins (never dropped silently: the caller always gets the best one)
+  function pickMoment(list) { return (list || []).filter(Boolean).sort(function (a, b) { return COACH_PRI.indexOf(a.kind) - COACH_PRI.indexOf(b.kind); })[0] || null; }
   // "ביעד: X מתוך Y סטים" — only sets that HAD a target count in Y; on target = met or exceeded
   function tally(pairs, judge) {
     var of = 0, ok = 0;
@@ -623,6 +634,6 @@
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
-    iso: iso, targetText: targetText, isPR: isPR, coachMoment: coachMoment, tally: tally, restAlertSchedule: restAlertSchedule, dueAlert: dueAlert,
+    iso: iso, targetText: targetText, isPR: isPR, coachMoment: coachMoment, arrivalMoment: arrivalMoment, coachAllowed: coachAllowed, pickMoment: pickMoment, COACH_PRI: COACH_PRI, EVENT_KINDS: EVENT_KINDS, tally: tally, restAlertSchedule: restAlertSchedule, dueAlert: dueAlert,
     updateJSON: updateJSON, COACH_MODES: COACH_MODES, readPrefs: readPrefs, fillable: fillable };
 });

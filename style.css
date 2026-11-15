@@ -1987,3 +1987,5 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 /* the big target never breaks inside a number ("10-15", "18.5"); it scales down on narrow phones instead */
 .wk-lv-target{flex-wrap:nowrap;white-space:nowrap;font-size:clamp(36px,12.5vw,56px)}
 .wk-lv-target bdi{white-space:nowrap}
+/* Part 3 stage 1: the coach slot is never empty — without a fresh line it shows the next target, calmer */
+.wk-coach-line.fb{background:var(--surface);color:var(--text);font-weight:600}
