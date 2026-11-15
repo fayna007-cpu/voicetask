@@ -95,7 +95,16 @@
     if (a.type === 'UNDO') { if (draft.actions.length > 1) draft.actions.pop(); }
     else draft.actions.push(a);
     state = W.replay(draft.actions);
-    ui.memOnly = !put(KEY_D, draft);
+    saveDraft();
+  }
+  // read-modify-write on vt_wk_draft: never overwrite a DIFFERENT workout's draft (another tab / window started one)
+  function saveDraft() {
+    var mine = draft, clash = false;
+    var ok = W.updateJSON(localStorage, KEY_D, {}, function (cur) {
+      if (cur && Array.isArray(cur.actions) && cur.startedAt && cur.startedAt !== mine.startedAt) { clash = true; return cur; }
+      return mine;
+    });
+    ui.memOnly = !ok || clash;                                           // keep working in memory; the warning line says so
   }
 
   // ── UI state (not persisted) ──
@@ -168,6 +177,8 @@
     var r = readDraft();
     // a real draft always resumes (never lose a real workout); a TEST draft resumes only from the test button, a real start drops it
     if (r && r.s.test && !o.test) { drop(KEY_D); r = null; }
+    // a TEST start never silently resumes a REAL open workout: the owner chooses
+    if (r && !r.s.test && o.test) { openConflict(r); return; }
     if (r) { draft = r.d; state = r.s; testQ = state.test ? [] : null; ui.view = state.exIdx; ui.pend = {}; ui.extra = {}; ui.editing = null; ui.stack = []; ui.mode = 'live'; ui.coachSeen = { start: true }; acquireWake(); hideBanner(); show(); return; }
     // completed = locked: a done instance (or one with a saved live session) refuses a new start; a TEST run is never blocked
     if (!o.test) {
@@ -232,7 +243,7 @@
     if (!W.coachAllowed(m.kind, now, ui.coachAt)) { coachSlot(); return; }   // a filler held back: the slot keeps what it shows
     var r;
     if (m.kind === 'comebackGap' || m.kind === 'comebackPostponed') {          // from the copy table (mode-independent)
-      var all = (CP && CP.COPY.coach[m.kind]) || [], ok = W.fillable(all, m.vars); if (!ok.length) return;
+      var all = (CP && CP.COPY.coach[m.kind]) || [], ok = W.fillable(all, m.vars); if (!ok.length) { coachSlot(); return; }
       var p = CP.pick(ok, ok.indexOf(all[ui.coachLast[m.kind]])); r = { text: CP.fill(p.text, m.vars), index: all.indexOf(p.text) };
     } else r = CO.line(curMode(), m.kind, m.vars, ui.coachLast[m.kind] == null ? -1 : ui.coachLast[m.kind]);
     if (!r.text || r.text === (ui.coachLine && ui.coachLine.text)) { coachSlot(); return; }   // no fillable line: keep the slot as is
@@ -254,6 +265,25 @@
     ui.coachSeen.start = false;
     var t0 = targets(0)[0], m = gap ? { kind: 'comebackGap', vars: {} } : W.coachMoment(state, { atStart: true, firstTarget: t0 ? { w: t0.w, r: t0.aim } : null, seen: ui.coachSeen });
     coachSay(m); ui.coachSeen.start = true;
+  }
+  var loggedSets = function (s) { return s ? s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0; };
+  function openConflict(r) {
+    ensure(); ui.pick = { kind: 'conflict' };
+    pickOpen(S.openReal, '<div class="wk-lv-cap">' + S.openRealSub(h(r.s.program.name), num(loggedSets(r.s))) + '</div>'
+      + row(S.openResume, 'WorkoutLive.conflict(\'resume\')') + row(S.openFinish, 'WorkoutLive.conflict(\'finish\')')
+      + row(S.openDelete, 'WorkoutLive.conflict(\'delete\')', 'wk-danger') + row(S.cancel, 'WorkoutLive.conflict(\'cancel\')'), '', true);
+  }
+  function conflict(k) {
+    var r = readDraft(); pickClose(); if (!r || k === 'cancel') return;
+    if (k === 'resume') { start({}); return; }
+    if (k === 'finish') { draft = r.d; state = r.s; testQ = null; ui.locker = state.locker; ui.effort = null; ui.exists = false; ui.err = ''; hideBanner(); ui.stack = []; ui.mode = 'finish'; show(); return; }
+    if (k === 'delete' && confirm(S.cancelWorkoutQ(loggedSets(r.s)))) { drop(KEY_D); draft = null; state = null; hideBanner(); start({ test: true }); }
+  }
+  // "בטל אימון (ללא שמירה)": the open workout is deleted; the confirm says exactly what is lost
+  function cancelWorkout() {
+    if (!state) return;
+    if (!confirm(S.cancelWorkoutQ(loggedSets(state)))) return;
+    pickClose(); drop(KEY_D); draft = null; state = null; testQ = null; hide(); refreshAll();
   }
   function touched() { if (state && state.rest && Date.now() >= state.rest.endsAt) ui.restTouched = state.rest.endsAt; }   // a tap after the rest ends stops the alerts
   function close() {
@@ -372,7 +402,8 @@
     pickOpen(S.menuT, '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, m, function (k) { return 'WorkoutLive.setMode(\'' + k + '\')'; }, modeLabels())
       + '<div class="wk-lv-cap">' + h(modeHint(m)) + '</div>'
       + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'sound\')" role="switch" aria-checked="' + p.sound + '"><span class="wk-row-l">' + S.soundT + '</span><span class="wk-sw' + (p.sound ? ' on' : '') + '"></span></button>'
-      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>', '', true);
+      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>'
+      + (state ? '<button class="wk-row wk-danger" onclick="WorkoutLive.cancelWorkout()"><span class="wk-row-l">' + S.cancelWorkout + '</span></button>' : ''), '', true);
   }
   function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); put(KEY_D, draft); } if (k === 'off') coachHide(); menuOpen(); }
   function togglePref(k) { setPref(k, !prefs()[k]); menuOpen(); }
@@ -1034,6 +1065,7 @@
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
     coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
+    conflict: conflict, cancelWorkout: cancelWorkout,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
