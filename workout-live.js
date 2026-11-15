@@ -9,6 +9,7 @@
   var W = window.WCore, T = W.TEXT, S = T.ui;
   var KEY_P = 'vt_wk_programs', KEY_D = 'vt_wk_draft', KEY_S = 'vt_wk_sessions', KEY_OFF = 'vt_wk_off', KEY_HINT = 'vt_wk_wakehint', KEY_COACH = 'vt_wk_coach', KEY_C = 'vt_wk_catalog', KEY_PREFS = 'vt_wk_prefs';
   var STALE_MS = 6 * 3600e3, RING = 552.92;
+  var MUSCLE_ICON = { chest: '◆', back: '▲', shoulders: '●', biceps: '◗', triceps: '◖', legs: '▼', core: '■', other: '○' };   // restrained glyphs, tinted by CSS
   var EQUIP_ORDER = ['dumbbell', 'barbell', 'machine', 'cable', 'bodyweight'], MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'core', 'other'];
   var START_W = { dumbbell: 10, barbell: 20, machine: 4, cable: 15, bodyweight: null }, STEPS = [0.5, 1, 1.25, 2, 2.5, 5], RESTS = [0, 60, 90, 120, 150, 180];
   var $ = function (id) { return document.getElementById(id); };
@@ -143,10 +144,11 @@
     var el = document.createElement('div');
     el.id = 'wkLive'; el.className = 'wk-live'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.dir = 'rtl';
     el.innerHTML = '<div class="wk-lv-head"><button class="wk-lv-x" id="wkLvX" onclick="WorkoutLive.close()" aria-label="' + S.close + '">✕</button><div class="wk-lv-name" id="wkLvName"></div>'
-      + '<div class="wk-lv-hr"><div class="wk-lv-el" id="wkLvEl" dir="ltr"></div><button class="wk-lv-menu" id="wkLvMenu" onclick="WorkoutLive.menuOpen()" aria-label="' + S.menuT + '">⋯</button></div></div>'
+      + '<div class="wk-lv-hr"><div class="wk-lv-el" id="wkLvEl" dir="ltr"></div><button class="wk-lv-menu" id="wkLvMenu" onclick="WorkoutLive.menuOpen()"><span aria-hidden="true">⋯</span> ' + S.options + '</button></div></div>'
       // the coach slot: ALWAYS reserved in the live screen (a line appearing moves nothing), non-blocking, tap to dismiss
-      + '<div class="wk-coach-slot" id="wkCoachSlot" aria-live="polite"><button class="wk-coach-line" id="wkCoachLine" onclick="WorkoutLive.coachHide()" tabindex="-1"></button></div>'
-      + '<div class="wk-lv-prog" id="wkLvProg"></div><div class="wk-lv-main" id="wkLvMain"></div><div class="wk-lv-dock" id="wkLvDock"></div>'
+      // ONE scrolling column (coach slot + progress + content); the bar below is the only fixed part
+      + '<div class="wk-lv-scroll" id="wkLvScroll"><div class="wk-coach-slot" id="wkCoachSlot" aria-live="polite"><button class="wk-coach-line" id="wkCoachLine" onclick="WorkoutLive.coachHide()" tabindex="-1"></button></div>'
+      + '<div class="wk-lv-prog" id="wkLvProg"></div><div class="wk-lv-main" id="wkLvMain"></div></div><div class="wk-lv-dock" id="wkLvDock"></div>'
       + '<label class="wk-hap" id="wkHapL" aria-hidden="true"><input type="checkbox" switch id="wkHap" tabindex="-1"></label>';
     document.body.appendChild(el);
     var pk = document.createElement('div');
@@ -164,7 +166,7 @@
     var el = $('wkLive'); if (el) el.classList.remove('on'); pickClose(); unlockPage();
     stopTimer(); releaseWake(); stopRepeat(); ui.stack = [];
   }
-  function go(mode) { ui.mode = mode; var m = $('wkLvMain'); render(); if (m) m.scrollTop = 0; }
+  function go(mode) { ui.mode = mode; var m = $('wkLvScroll'); render(); if (m) m.scrollTop = 0; }
   function push(mode) { ui.stack.push(ui.mode); go(mode); }
   function back() { var m = ui.stack.pop(); if (m) go(m); else { hide(); refreshAll(); } }
   function refreshAll() { var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); try { if (window.render) window.render(); } catch (_) { } banner(); }
@@ -397,15 +399,23 @@
   function soundTest() { audio(true); sound('rest', true); setPref('soundTested', true); ui.soundOk = true; var e = $('wkSoundHint'); if (e) e.textContent = S.soundOk + ' · ' + S.soundHint; }
   // the live header menu: coach mode, sound, the tactile tick (the draft keeps the mode for a resume)
   function menuOpen() {
-    var p = prefs(), m = curMode();
+    var p = prefs(), m = curMode(), ex = state && state.exercises[ui.view];
     ui.pick = { kind: 'menu' };
-    pickOpen(S.menuT, '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, m, function (k) { return 'WorkoutLive.setMode(\'' + k + '\')'; }, modeLabels())
+    var act = function (icon, label, fn, cls) { return '<button class="wk-row wk-act' + (cls ? ' ' + cls : '') + '" onclick="' + fn + '"><span class="wk-act-i" aria-hidden="true">' + icon + '</span><span class="wk-row-l">' + label + '</span></button>'; };
+    pickOpen(S.options, (ex ? (!ex.sets.length && !ex.skipped ? act('⇄', S.swapEx, 'WorkoutLive.swapOpen()') : '') + act('✎', S.noteEdit, 'WorkoutLive.noteOpen()')
+        + (!exDone(ex) ? act('⤼', S.skipEx, 'WorkoutLive.pickClose();WorkoutLive.skipEx()') : '') + act('＋', S.addExMenu, 'WorkoutLive.addPick()')
+        + act('⚑', S.finish, 'WorkoutLive.finishAsk()') + act('✕', S.cancelWorkout, 'WorkoutLive.cancelWorkout()', 'wk-danger') : '')
+      + '<div class="wk-grp-t">' + S.menuT + '</div><div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, m, function (k) { return 'WorkoutLive.setMode(\'' + k + '\')'; }, modeLabels())
       + '<div class="wk-lv-cap">' + h(modeHint(m)) + '</div>'
       + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'sound\')" role="switch" aria-checked="' + p.sound + '"><span class="wk-row-l">' + S.soundT + '</span><span class="wk-sw' + (p.sound ? ' on' : '') + '"></span></button>'
-      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>'
-      + (state ? '<button class="wk-row wk-danger" onclick="WorkoutLive.cancelWorkout()"><span class="wk-row-l">' + S.cancelWorkout + '</span></button>' : ''), '', true);
+      + '<button class="wk-row" onclick="WorkoutLive.togglePref(\'haptic\')" role="switch" aria-checked="' + p.haptic + '"><span class="wk-row-l">' + S.hapticT + '</span><span class="wk-sw' + (p.haptic ? ' on' : '') + '"></span></button>', '', true);
   }
-  function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); put(KEY_D, draft); } if (k === 'off') coachHide(); menuOpen(); }
+  // "סיים אימון" left the primary row: a confirm sheet says what happens
+  function finishAsk() {
+    ui.pick = { kind: 'finish' };
+    pickOpen(S.finish, '<div class="wk-lv-cap wk-ask">' + S.finishQ(num(loggedSets(state))) + '</div>', '<button class="wk-big" onclick="WorkoutLive.pickClose();WorkoutLive.finishOpen()">' + S.finish + '</button><button class="wk-lv-link wk-center-link" onclick="WorkoutLive.pickClose()">' + S.keepGoing + '</button>', true);
+  }
+  function setMode(k) { setPref('coachMode', k); if (draft) { draft.prefs = Object.assign({}, draft.prefs, { coachMode: k }); saveDraft(); } if (k === 'off') coachHide(); menuOpen(); }
   function togglePref(k) { setPref(k, !prefs()[k]); menuOpen(); }
   // neutral: the mean of sleep, energy and (6 - pain) -> full / lighter / short; the owner can always pick another
   function suggestMode(f) { var v = []; if (f.sleep) v.push(f.sleep); if (f.energy) v.push(f.energy); if (f.pain) v.push(6 - f.pain); if (!v.length) return 'full'; var m = v.reduce(function (a, b) { return a + b; }, 0) / v.length; return m >= 3.5 ? 'full' : m >= 2.5 ? 'light' : 'short'; }
@@ -457,7 +467,7 @@
   function warmIdx() { for (var i = 0; i < state.exercises.length; i++) if (!isBw(state.exercises[i])) return i; return -1; }
 
   // ── live actions ──
-  function logSet() {
+  function logSet(then) {
     var now = performance.now(); if (ui.lastTap && now - ui.lastTap < 300) return; ui.lastTap = now;   // double tap guard (monotonic clock)
     var c = cur(), ex = state.exercises[c.ex], bw = isBw(ex), slot = ex.sets.length, ts = targets(c.ex), tg = ts[Math.min(slot, ts.length - 1)];
     if (c.parts && c.parts.length) {                                      // "6+5": the set weight = the first part's; a lighter later part = a drop set
@@ -465,8 +475,10 @@
       dispatch({ type: 'LOG_SET', ex: c.ex, w: w0, r: all[0].r, parts: all.map(function (p, i) { return i && !bw && p.w !== w0 ? { r: p.r, w: p.w } : { r: p.r }; }) });
     } else dispatch({ type: 'LOG_SET', ex: c.ex, w: bw ? null : c.w, r: c.r });
     var done = state.exercises[c.ex].sets[slot];
+    ui.fresh = { ex: c.ex, k: slot, at: performance.now() };
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
     sound('tick'); haptic(); render(); reveal(); undoToast(slot + 1);
+    if (then === 'finish') { finishOpen(); return; }                       // the final set of the final exercise: straight to the summary
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
     var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen });
     if (m) coachSay(m); else { ui.coachLine = null; coachFallback(); }     // no target -> no judgement, the slot shows the next target
@@ -496,7 +508,8 @@
   function addPart() { var c = cur(); c.parts = (c.parts || []).concat([{ w: c.w, r: c.r }]); render(); reveal(); }
   function removePart() { var c = cur(); if (!c.parts || !c.parts.length) return; var p = c.parts.pop(); c.w = p.w; c.r = p.r; render(); reveal(); }
   // a short screen: the note, warm-up and parts lines may push the active steppers below the fold -> bring them into view
-  function reveal() { var a = document.querySelector('#wkLvMain .wk-lv-set.active .wk-lv-steps'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' }); }
+  // the active set card scrolls to just under the sticky coach line (the card owns the screen; the line stays in view)
+  function reveal() { var a = document.querySelector('#wkLvMain .wk-lv-sets'), sc = $('wkLvScroll'); if (!a || !sc || !document.querySelector('#wkLvMain .wk-lv-set.active')) return; sc.scrollTop += a.getBoundingClientRect().top - sc.getBoundingClientRect().top - ($('wkCoachSlot') ? $('wkCoachSlot').offsetHeight + 8 : 8); }
   // the weight keypad: any value (0.25, 0.5, odd numbers); the step chips are remembered per exercise in the catalog
   function typeW() {
     var c = ui.editing || cur(), ex = state.exercises[c.ex], st = es(ex);
@@ -560,7 +573,7 @@
   function delSet() { var e = ui.editing; dispatch({ type: 'DELETE_SET', ex: e.ex, i: e.i }); ui.editing = null; ui.pend = {}; render(); }
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
-  function restSkip() { dispatch({ type: 'REST_SKIP' }); renderDock(); coachArrive(false); }
+  function restSkip() { dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }
   function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { open: false, done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
   // + exercise during the workout: a picker of known exercises (no typing inside the live screen)
   function addPick() {
@@ -663,12 +676,27 @@
       renderDock(); return;
     }
     name.innerHTML = h(state.program.name) + (state.test ? '<span class="wk-lv-lk wk-test-ban">' + S.testBanner + '</span>' : state.locker != null ? '<span class="wk-lv-lk">' + h(S.lockerN(state.locker)) + '</span>' : '');
-    prog.innerHTML = state.exercises.map(function (e, i) {
-      var n = (e.scheme && e.scheme.sets) || 3, f = e.skipped ? 1 : Math.min(1, e.sets.length / n);
-      return '<button class="wk-seg' + (i === ui.view ? ' on' : '') + (e.skipped ? ' skip' : '') + '" onclick="WorkoutLive.view(' + i + ')" aria-label="' + h(e.label) + '"><i style="width:' + Math.round(f * 100) + '%"></i></button>';
+    // progress, grouped by muscle group: icon + label + a restrained bar; a tap jumps to the group's next unfinished exercise
+    var cc0 = cat(), groups = [];
+    state.exercises.forEach(function (e, i) { var m = W.muscleKey(e, cc0), g = groups.filter(function (x) { return x.m === m; })[0]; if (!g) groups.push(g = { m: m, idx: [] }); g.idx.push(i); });
+    prog.innerHTML = groups.map(function (g) {
+      var planned = 0, done = 0; g.idx.forEach(function (i) { var e = state.exercises[i], n = (e.scheme && e.scheme.sets) || 3; planned += e.skipped ? e.sets.length || 1 : Math.max(n, e.sets.length); done += e.skipped ? e.sets.length || 1 : e.sets.length; });
+      var jump = g.idx.filter(function (i) { return !exDone(state.exercises[i]); })[0]; if (jump == null) jump = g.idx[0];
+      return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
     renderDock(); tick(); if (ui.mode === 'live') coachSlot();             // the slot is never left empty on a re-render
+    if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
+  }
+  // the summary's numbers count up once, staggered (480 ms each, 80 ms apart; text nodes only; reduced motion = no animation)
+  function countUp() {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    [].forEach.call(document.querySelectorAll('#wkLvMain [data-wk-count]'), function (el, i) {
+      var to = +el.getAttribute('data-wk-count'), t0 = null, delay = i * 80; if (!(to > 0)) return;
+      el.textContent = '0';
+      var step = function (ts) { if (t0 == null) t0 = ts + delay; var p = Math.min(1, Math.max(0, (ts - t0) / 480)); el.textContent = String(Math.round(to * (1 - Math.pow(1 - p, 3)))); if (p < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
   }
   function chips(list, sel, fn, labels) { return '<div class="wk-chips">' + list.map(function (k) { return '<button class="wk-chip' + (sel === k ? ' on' : '') + '" onclick="' + fn(k) + '">' + labels[k] + '</button>'; }).join('') + '</div>'; }
   // tap: the value itself is a button (the weight -> the keypad)
@@ -725,7 +753,7 @@
     var wi = -1; d.exercises.some(function (e, i) { if (!isBw(e)) { wi = i; return true; } return false; });
     var wex = wi > -1 ? d.exercises[wi] : null, wl = wex && lastOf(wex.label), wt = wex && W.targetsFor(wex, wl && wl.sets, [], { scale: R.mode === 'light' ? 0.9 : 1 })[0], ws = wt ? W.warmupSets(wt.w, wex.step) : [];
     var feel = function (k) { return line(S[k], '<div class="wk-chips wk-five">' + [1, 2, 3, 4, 5].map(function (n) { return '<button class="wk-chip' + (R.feel[k] === n ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'' + k + '\',' + n + ')">' + n + '</button>'; }).join('') + '</div>'); };
-    return '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
+    return (ui.ctx && ui.ctx.test ? '<div class="wk-test-strip">' + S.testBanner + '</div>' : '') + '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
       + (p.days.length > 1 ? '<div class="wk-chips wk-days">' + p.days.map(function (x) { return '<button class="wk-chip' + (x.id === d.id ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'day\',' + js(x.id) + ')">' + h(x.name) + (x.id === R.nextId ? ' · ' + S.next : '') + '</button>'; }).join('') + '</div>' : '')
       + '<div class="wk-lv-cap wk-exlist">' + d.exercises.map(function (e) { return h(e.label); }).join(' · ') + '</div>'
       + (CP && !d.exercises.some(function (e) { return lastOf(e.label); }) ? '<div class="wk-lv-cap wk-cue">' + h(CP.COPY.label.firstSessionHint) + '</div>' : '')
@@ -751,12 +779,19 @@
           + '<div class="wk-chips wk-center"><button class="wk-chip on" onclick="WorkoutLive.saveEdit()">' + S.keep + '</button><button class="wk-chip" onclick="WorkoutLive.delSet()">' + S.del + '</button><button class="wk-chip" onclick="WorkoutLive.cancelEdit()">' + S.cancel + '</button></div></div>';
       }
       var stt = W.rangeStatus(W.firstR(x), t[k] && t[k].range), rx = reaction(ex, x, t[k]);
-      return '<button class="wk-lv-set done' + (rx ? ' wk-r-' + rx : '') + '" onclick="WorkoutLive.editSet(' + k + ')"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + setTxt(x) + '</span><span class="wk-lv-st ' + stt + '">' + S.st[stt] + '</span></button>';
+      var fresh = ui.fresh && ui.fresh.ex === i && ui.fresh.k === k && performance.now() - ui.fresh.at < 1500;   // only the set just logged animates
+      return '<button class="wk-lv-set done' + (rx ? ' wk-r-' + rx : '') + (fresh ? ' wk-fresh' : '') + '" onclick="WorkoutLive.editSet(' + k + ')"><svg class="wk-chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + setTxt(x) + '</span><span class="wk-lv-st ' + (rx ? 'rx-' + rx : stt) + '">' + (rx ? S.rx[rx] : S.st[stt]) + '</span></button>';
     }).join('');
-    var act = '';
-    if (active && !ui.editing) {
+    var act = '', resting = state.rest && state.rest.endsAt > Date.now(), ended = !resting && state.rest && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3;
+    if (active && !ui.editing && resting) {
+      // REST = a hero inside the set card: "הסט הבא" + the next target, big; the ring; -15 / +15 (the bar holds "דלג על המנוחה")
+      var nt = t[Math.min(ex.sets.length, t.length - 1)];
+      act = '<div class="wk-lv-set active wk-rest-card"><div class="wk-lv-n">' + S.restNext + '</div>'
+        + '<div class="wk-lv-target">' + (bw ? '' : num(nt.w) + '<span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + num(nt.aim) + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
+        + '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div></div>';
+    } else if (active && !ui.editing) {
       var c = cur(), tg = t[Math.min(ex.sets.length, t.length - 1)];
-      act = '<div class="wk-lv-set active"><div class="wk-lv-n">' + S.setN(ex.sets.length + 1) + ' · ' + S.target + '</div>'
+      act = '<div class="wk-lv-set active' + (ended ? ' wk-rest-over' : '') + '"><div class="wk-lv-n">' + (ended ? S.restDone(num(ex.sets.length + 1)) : S.setN(ex.sets.length + 1) + ' · ' + S.target) + '</div>'
         + '<div class="wk-lv-target">' + (bw ? '' : num(tg.w) + '<span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + num(tg.range[0] + '-' + tg.range[1]) + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
         + (c.parts && c.parts.length ? '<div class="wk-parts"><span class="wk-lv-cap">' + S.partN(c.parts.length + 1) + '</span><bdi dir="ltr" id="wkParts" class="wk-parts-v">' + h(partsTxt(c)) + '</bdi></div>' : '')
         + '<div class="wk-lv-steps">' + (bw ? '' : stepper('w', c.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', c.r, S.reps, 'wkLvR') + '</div>'
@@ -781,16 +816,31 @@
       + (l ? '<button class="wk-peek-b" onclick="WorkoutLive.peek()" aria-expanded="' + !!ui.peek[i] + '">' + S.lastTime + ': ' + l.sets.map(setTxt).join(' · ') + ' ' + (ui.peek[i] ? '▴' : '▾') + '</button>'
         + (ui.peek[i] ? '<div class="wk-peek">' + W.lastNBefore(sessions(), ex.label, tomorrow(), 3).map(function (p) { var d = p.date.split('-'); return '<div class="wk-peek-r"><span class="wk-lv-n">' + num(+d[2] + '.' + +d[1]) + '</span><span class="wk-lv-v">' + p.sets.map(setTxt).join(' · ') + '</span></div>'; }).join('') + '</div>' : '')
         : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
-      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>' : '')
+      // the group note, or ONE quiet line to add it (an empty card would only take space)
+      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
+        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()">📝 ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
-      + '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
-      + (!ex.sets.length && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.swapOpen()">' + S.swap + '</button>' : '')
-      + (!note ? '<button class="wk-chip" onclick="WorkoutLive.noteOpen()">' + S.noteEdit + '</button>' : '')
-      + (!exDone(ex) ? '<button class="wk-chip" onclick="WorkoutLive.skipEx()">' + S.skipEx + '</button>' : '')
-      + '<button class="wk-chip" onclick="WorkoutLive.addPick()">' + S.addExLive + '</button>'
-      + (draft.actions.length > 1 ? '<button class="wk-chip" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>';
+      // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
+      + (!active && !ex.skipped || draft.actions.length > 1 ? '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
+        + (draft.actions.length > 1 ? '<button class="wk-chip" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '');
   }
+  // the primary bar's ONE action for the current position (the label says exactly what happens)
+  function primaryAction() {
+    var i = ui.view, ex = state.exercises[i], resting = state.rest && state.rest.endsAt > Date.now();
+    var active = ex && !ex.skipped && (ex.sets.length < Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length) || ui.extra[i]) && !ui.editing;
+    var others = state.exercises.filter(function (e, k) { return k !== i && !exDone(e); }).length;
+    if (resting && active) return { label: S.skipRestBtn, fn: 'WorkoutLive.restSkip()', cls: 'wk-skip' };
+    if (active) {
+      var lastOfEx = ex.sets.length + 1 >= Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length + (ui.extra[i] ? 1 : 0)) && !ui.extra[i];
+      if (lastOfEx && !others) return { label: S.finish, fn: 'WorkoutLive.logSet(\'finish\')', cls: 'wk-done' };
+      if (lastOfEx) return { label: S.nextExBtn, fn: 'WorkoutLive.logSet()', cls: 'wk-done' };
+      return { label: S.doneSetN(ex.sets.length + 1), fn: 'WorkoutLive.logSet()', cls: 'wk-done' };
+    }
+    if (others) return { label: S.nextExBtn, fn: 'WorkoutLive.nextEx()', cls: '' };
+    return { label: S.finish, fn: 'WorkoutLive.finishOpen()', cls: '' };
+  }
+  function nextEx() { var k = state.exercises.map(function (e, j) { return j; }).filter(function (j) { return j !== ui.view && !exDone(state.exercises[j]); })[0]; if (k != null) view(k); }
   function cmpLine(ex) {
     var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
     if (!b) d = S.cmpFirst;
@@ -824,9 +874,10 @@
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
     var prs = W.prsFor(s, sessions()), fin = finishLine(), tl = tallyNow();
-    return '<div class="wk-lv-ex"><div class="wk-lv-title">' + S.sumT + '</div><div class="wk-lv-cap">' + S.duration + ' ' + num(clock(W.durationSec(state, Date.now()))) + ' · ' + S.setsDone(n) + '</div></div>'
+    var cnt = function (v) { return '<bdi dir="ltr" data-wk-count="' + v + '">' + v + '</bdi>'; };   // counted up once (staggered)
+    return '<div class="wk-lv-ex"><div class="wk-lv-title">' + S.sumT + '</div><div class="wk-lv-cap">' + S.duration + ' ' + num(clock(W.durationSec(state, Date.now()))) + ' · ' + S.setsDone(cnt(n)) + '</div></div>'
       + (fin ? '<div class="wk-coach">' + h(fin) + '</div>' : '')
-      + (tl.of ? '<div class="wk-tally">' + S.tally(num(tl.ok), num(tl.of)) + '</div>' : '')
+      + (tl.of ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
       + group(done.map(cmpLine).join(''))
@@ -845,15 +896,9 @@
     if (ui.mode === 'ready') { var R = ui.ready, p = programById(R.programId), dd = p && p.days.filter(function (x) { return x.id === R.dayId; })[0]; d.innerHTML = big(S.start, 'WorkoutLive.begin()', !dd || !dd.exercises.length); return; }
     if (ui.mode === 'finish' && state.test) { d.innerHTML = big(S.testClose, 'WorkoutLive.saveWorkout()') + link(S.backLive, 'WorkoutLive.backToLive()'); return; }   // TEST: nothing is saved
     if (ui.mode === 'finish') { d.innerHTML = ui.exists ? big(S.replace, 'WorkoutLive.saveWorkout(\'replace\')') + link(S.both, 'WorkoutLive.saveWorkout(\'both\')') : big(S.saveW, 'WorkoutLive.saveWorkout()') + link(S.backLive, 'WorkoutLive.backToLive()'); return; }
-    var ex = state.exercises[ui.view], resting = state.rest && state.rest.endsAt > Date.now(), allDone = state.exercises.every(exDone);
-    var active = ex && !ex.skipped && (ex.sets.length < Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length) || ui.extra[ui.view]) && !ui.editing;
-    // while resting: the NEXT target, big; once the rest ends (until a tap): the check pulses as "סט הבא"
-    var nt = active && ex ? nextTargetText() : '', ended = !resting && state.rest && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3;
-    var main = resting
-      ? (nt ? '<div class="wk-next-t">' + S.nextSet('<bdi dir="ltr">' + h(nt) + '</bdi>') + '</div>' : '') + '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div><div class="wk-dock-links">' + link(S.skipRest, 'WorkoutLive.restSkip()') + link(S.finish, 'WorkoutLive.finishOpen()') + '</div>'
-      : active ? (ended ? '<div class="wk-next-t wk-next-go">' + S.restDone(num(ex.sets.length + 1)) + '</div>' : '') + '<button class="wk-done' + (ended ? ' wk-pulse wk-flash' : '') + '" onclick="WorkoutLive.logSet()" aria-label="' + (ended ? S.nextSetBtn : S.doneLbl) + '">' + S.done + '</button>' + link(S.finish, 'WorkoutLive.finishOpen()')
-      : allDone ? big(S.finish, 'WorkoutLive.finishOpen()') : link(S.finish, 'WorkoutLive.finishOpen()');
-    d.innerHTML = main;
+    // LIVE: a compact sticky bar with ONE primary action; once the rest ends (until a tap) it flashes + pulses
+    var a = primaryAction(), ended = state.rest && state.rest.endsAt <= Date.now() && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3 && a.cls === 'wk-done';
+    d.innerHTML = '<button class="wk-big wk-primary ' + a.cls + (ended ? ' wk-pulse wk-flash' : '') + '" onclick="' + a.fn + '">' + a.label + '</button>';
   }
   function backToLive() { go('live'); }
   // the set row's reaction class (Part 3 animates them): pr (gold) > exceed / met / under against the target it had; none without a target
@@ -878,8 +923,10 @@
       var a = W.dueAlert(W.restAlertSchedule(r.endsAt, now, ui.restTouched === r.endsAt), now, ui.fired);
       if (a) {
         W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
-        sound('rest'); if (a.kind === 'end') { acquireWake(); if (ui.chimed !== r.endsAt) { ui.chimed = r.endsAt; coachArrive(true); } }
-        renderDock();
+        sound('rest'); var first = a.kind === 'end' && ui.chimed !== r.endsAt;
+        if (a.kind === 'end') { acquireWake(); if (first) ui.chimed = r.endsAt; }
+        if (first) render(); else renderDock();                             // the rest card turns back into the set (once)
+        if (first) coachArrive(true);
       }
     }
   }
@@ -887,7 +934,7 @@
   function stopTimer() { clearInterval(timer); timer = null; }
   document.addEventListener('visibilitychange', function () {
     if (!isOpen()) return;
-    if (document.visibilityState === 'visible') { clearTimeout(ui.hiddenAlert); startTimer(); if (ui.mode === 'live') { renderDock(); acquireWake(); } tick(); }
+    if (document.visibilityState === 'visible') { clearTimeout(ui.hiddenAlert); if (ui.mode === 'live') { render(); acquireWake(); } startTimer(); }
     else { stopTimer(); hiddenRestAlert(); }
   });
   // hidden mid-rest: ONE notification at the rest end ("המנוחה נגמרה · סט N מחכה") where the page still runs (desktop, some Android).
@@ -1109,7 +1156,7 @@
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
     coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hasTestDraft: hasTestDraft,
-    conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet,
+    conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
