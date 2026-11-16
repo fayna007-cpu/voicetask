@@ -240,7 +240,7 @@
     var b = $('wkCoachLine'); if (!b) return;
     var t = state && !state.finished && ui.mode === 'live' ? nextTargetText() : '';
     if (!t) { b.className = 'wk-coach-line'; b.textContent = ''; return; }
-    b.textContent = S.nextSet(W.iso(t)); b.className = 'wk-coach-line on fb';
+    b.textContent = S.nextSet(nextTargetIso()); b.className = 'wk-coach-line on fb';
   }
   function coachHide() { ui.coachLine = null; coachFallback(); }          // tap = dismiss -> the next-target line
   function coachSlot() { if (ui.coachLine) coachShow(ui.coachLine.text, ui.coachLine.kind); else coachFallback(); }
@@ -284,6 +284,27 @@
     var pl = 0, dn = 0; state.exercises.forEach(function (e) { var n = (e.scheme && e.scheme.sets) || 3; pl += e.skipped ? e.sets.length || 1 : Math.max(n, e.sets.length); dn += e.skipped ? e.sets.length || 1 : e.sets.length; });
     try { mascot.progress(pl ? dn / pl : 0); } catch (_) { }
   }
+  // the mascot during a rest, every motion = information: he breathes WITH the ring (a slow 4 s in / 4 s out guide), looks at the
+  // next target as the rest starts, and beats once on each of the last 3 seconds; back to his normal breath when the rest ends
+  function mascotRest(r, now) {
+    if (!mascot || ui.mode !== 'live') return;
+    var resting = !!(r && r.endsAt > now), left = resting ? Math.ceil((r.endsAt - now) / 1000) : 0;
+    if (resting !== !!ui.mBreath) { ui.mBreath = resting; try { mascot.breathe(resting); } catch (_) { } }
+    if (resting && ui.mRestFor !== r.endsAt) { ui.mRestFor = r.endsAt; ui.mCount = 0; setTimeout(function () { try { if (mascot && state && state.rest && state.rest.endsAt === r.endsAt) mascot.look(0, 1, 2600); } catch (_) { } }, 1300); }
+    if (resting && left >= 1 && left <= 3 && ui.mCount !== left) { ui.mCount = left; try { mascot.set('count'); } catch (_) { } }
+  }
+  // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
+  var sumM = null;
+  function sumMount() {
+    if (sumM) { try { sumM.destroy(); } catch (_) { } sumM = null; }
+    var started = state && state.startedAt;
+    afterPaint(function () {
+      var el = $('wkMascotSum'); if (!el || el.firstChild || ui.mode !== 'finish' || !state || state.startedAt !== started || !window.WkMascot) return;
+      try { sumM = window.WkMascot.mount(el, { mode: mascotMode() }); } catch (_) { sumM = null; return; }
+      if (ui.sumPlayed !== started) { ui.sumPlayed = started; var pr = W.prsFor(preview(), sessions()).length; try { sumM.set(pr ? 'pr' : 'finish'); } catch (_) { } }
+    });
+  }
+  function sumKill() { if (sumM) { try { sumM.destroy(); } catch (_) { } sumM = null; } }
   // a mode sample: the first line of that mode the user's data needs nothing for
   function modeSample(k) { var L = CO && CO.MODES[k] && CO.MODES[k].met; return (L || []).filter(function (t) { return t.indexOf('{') < 0; })[0] || modeHint(k); }
   // the ready screen's preview: the mascot in the chosen mode + its sample line (re-mounted on each render; none when "off")
@@ -307,7 +328,7 @@
   // ARRIVAL at the next set (the rest ended or was skipped): the event line yields to lastSet / halfway / the rest line, or the fallback
   function coachArrive(withRest) {
     if (!state) return;
-    var m = W.pickMoment([W.arrivalMoment(state, ui.coachSeen), withRest ? { kind: 'rest', vars: nextTargetText() ? { target: W.iso(nextTargetText()) } : {} } : null]);
+    var m = W.pickMoment([W.arrivalMoment(state, ui.coachSeen), withRest ? { kind: 'rest', vars: nextTargetText() ? { target: nextTargetIso() } : {} } : null]);
     ui.coachLine = null;
     if (m) coachSay(m); else coachFallback();
   }
@@ -781,6 +802,7 @@
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
     pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
+    if (ui.mode === 'finish') sumMount(); else sumKill();
   }
   // the summary's numbers count up once, staggered (480 ms each, 80 ms apart; text nodes only; reduced motion = no animation)
   function countUp() {
@@ -993,7 +1015,7 @@
     var cnt = function (v) { return '<bdi dir="ltr" data-wk-count="' + v + '">' + v + '</bdi>'; };   // counted up once (staggered)
     var ft = topFact(done, tl, n, cnt);
     // the summary's ONE hero: sets + time as big numbers (labels small and muted)
-    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero"><div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>'
+    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '') + '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>'
       + '<div class="wk-sum-k"><b><bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi></b> ' + S.duration + '</div></div>'
       + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '') + '</div>'
       // the TOP line opens with a real number (the biggest weight gain vs last time, else the on-target tally, else sets in minutes) + the coach's line
@@ -1029,6 +1051,8 @@
     if (W.isPR(set, ex, sessions())) return 'pr';
     return tg && tg.aim != null && CO ? CO.judge({ w: tg.w, r: tg.aim }, { w: set.w, r: set.r }) : '';
   }
+  // the next target for the coach line: numerals isolated, a bodyweight target carries "חזרות" OUTSIDE the isolate (never a bare tail)
+  function nextTargetIso() { var t = nextTargetText(), ex = state.exercises[ui.view]; return t ? W.coachNum(t, isBw(ex) ? null : 1) : ''; }
   function nextTargetText() { var i = ui.view, ex = state.exercises[i], t = targets(i), tg = t[Math.min(ex.sets.length, t.length - 1)]; return tg && tg.aim != null ? W.targetText({ w: isBw(ex) ? null : tg.w, r: tg.aim }) : ''; }
 
   // ── timers: ONE 1-second interval while visible; only text nodes change ──
@@ -1041,6 +1065,7 @@
       t.textContent = clock(Math.ceil(left));
       if (ring) ring.style.strokeDashoffset = (RING * (1 - left / Math.max(1, r.total))).toFixed(1);
     }
+    mascotRest(r, now);
     // the rest-end alert: at the end, +10 s, +30 s until a tap (computed from timestamps: a rest that ended in the background alerts on return)
     if (r && ui.mode === 'live') {
       var a = W.dueAlert(W.restAlertSchedule(r.endsAt, now, ui.restTouched === r.endsAt), now, ui.fired);

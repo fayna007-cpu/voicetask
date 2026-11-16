@@ -1,4 +1,4 @@
-// wk-mascot.js v3 - Alfred as the workout coach: a rigged SVG character (2-bone arms, spring physics, gestures, speech). No dependencies.
+// wk-mascot.js v3.1 (calm palette, breathe() + "count" for the rest ring) - Alfred as the workout coach: a rigged SVG character (2-bone arms, spring physics, gestures, speech). No dependencies.
 // m = WkMascot.mount(el, {variant:'strength'|'class', mode:'calm'|'coach'|'fire', onTap:fn})   el should have a height (e.g. 64px); width is free: the speech bubble fills it.
 //   m.set(state)  idle start met exceed under pr rest wake finish nudge think shrug tap watch   (gesture + expression; a new one replaces the old)
 //   m.say(text, {ms, mood})   speech bubble: words appear one by one, the mouth moves while he speaks, then fades. mood = a state to play with it
@@ -33,12 +33,13 @@
     nudge: [[0, { lookY: .95, lean: -4, hRx: 108, hRy: 104, point: 1, pointAng: 105, mouthC: .5, browLift: 2 }], [500, { bob: -4 }], [800, { bob: 0 }], [1900, {}]],
     think: [[0, { hRx: 86, hRy: 90, lookX: -.6, lookY: -.7, browLA: -6, browRA: 6, mouthC: 0, mouthW: 7, lean: 3 }], [1500, {}]],
     shrug: [[0, { hLx: 10, hLy: 78, hRx: 130, hRy: 78, browLift: 4, mouthC: -.1, mouthW: 9, bob: -2, lean: 2 }], [1300, {}]],
+    count: [[0, { bob: -5, squash: -.04, open: 1.1, lookY: .8 }], [170, { bob: 0, squash: 0 }], [420, {}]],   // one beat per second of the last 3 of a rest
     tap: [[0, { squash: .1 }], [100, { bob: -12, squash: -.05, happy: .8, mouthC: .9, mouthO: .4 }], [380, { bob: 0, squash: .05 }], [600, { squash: 0 }], [1200, {}]]
   };
   var HOLD = { rest: 1, wake: 1 };
 
   function head(id) {
-    return '<defs><radialGradient id="b' + id + '" cx="36%" cy="28%" r="85%"><stop offset="0" stop-color="#d6ccff"/><stop offset=".45" stop-color="#9684f7"/><stop offset=".85" stop-color="#5d4bd0"/><stop offset="1" stop-color="#46379f"/></radialGradient>' +
+    return '<defs><radialGradient id="b' + id + '" cx="36%" cy="28%" r="85%"><stop offset="0" stop-color="#d9d3f5"/><stop offset=".45" stop-color="#958ddb"/><stop offset=".85" stop-color="#5b53b0"/><stop offset="1" stop-color="#423b8c"/></radialGradient>' +
       '<radialGradient id="h' + id + '" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d6ccff"/><stop offset="1" stop-color="#6a58dc"/></radialGradient>' +
       '<radialGradient id="s' + id + '" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
       '<linearGradient id="r' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#2b1f7a" stop-opacity=".5"/></linearGradient></defs>';
@@ -56,7 +57,7 @@
       '<circle cx="70" cy="66" r="44" fill="url(#b' + id + ')"/><circle cx="70" cy="66" r="44" fill="url(#r' + id + ')"/>' +
       '<path d="M101 38 A44 44 0 0 1 112 70" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".16"/>' +
       '<g data-r="spec"><ellipse cx="54" cy="38" rx="15" ry="7" fill="#fff" opacity=".2" transform="rotate(-24 54 38)"/></g>' + acc +
-      '<ellipse data-r="chL" cx="43" cy="79" rx="6.5" ry="3.8" fill="#ff9fc2"/><ellipse data-r="chR" cx="97" cy="79" rx="6.5" ry="3.8" fill="#ff9fc2"/>' +
+      '<ellipse data-r="chL" cx="43" cy="79" rx="6.5" ry="3.8" fill="#e8b4cb"/><ellipse data-r="chR" cx="97" cy="79" rx="6.5" ry="3.8" fill="#e8b4cb"/>' +
       '<g data-r="eyes"><g data-r="eyeL" transform="translate(54 62)"><ellipse data-r="eL" rx="6.4" ry="8.8" fill="#1b1736"/><circle cx="2.2" cy="-3.6" r="2.1" fill="#fff"/><circle cx="-2" cy="3" r="1" fill="#fff" opacity=".6"/><path data-r="hL" d="M-8 4 Q0 -9 8 4" fill="none" stroke="#1b1736" stroke-width="3.2" stroke-linecap="round" opacity="0"/></g>' +
       '<g data-r="eyeR" transform="translate(86 62)"><ellipse data-r="eR" rx="6.4" ry="8.8" fill="#1b1736"/><circle cx="2.2" cy="-3.6" r="2.1" fill="#fff"/><circle cx="-2" cy="3" r="1" fill="#fff" opacity=".6"/><path data-r="hR" d="M-8 4 Q0 -9 8 4" fill="none" stroke="#1b1736" stroke-width="3.2" stroke-linecap="round" opacity="0"/></g></g>' +
       '<line data-r="bL" x1="44" y1="47" x2="63" y2="47" stroke="#1b1736" stroke-width="3.4" stroke-linecap="round"/><line data-r="bR" x1="77" y1="47" x2="96" y2="47" stroke="#1b1736" stroke-width="3.4" stroke-linecap="round"/>' +
@@ -70,8 +71,9 @@
     '.wkm-bubble.on{opacity:1;transform:none;pointer-events:auto}.wkm-bubble:before{content:"";position:absolute;inset-inline-start:-6px;top:50%;width:10px;height:10px;margin-top:-5px;transform:rotate(45deg);background:rgba(58,50,128,.7);border-inline-start:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-block-end:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}' +
     '.wkm-bubble span{opacity:0;transition:opacity .22s ease}.wkm-bubble span.on{opacity:1}' +
     '.wkm .wkm-breath{transform-origin:70px 120px;animation:wkm-b var(--bt,3.6s) ease-in-out infinite}.wkm .wkm-ring{transform-origin:70px 66px;animation:wkm-r var(--rt,3.6s) ease-in-out infinite}' +
+    '.wkm.wkm-rest .wkm-breath{animation:wkm-bb 8s ease-in-out infinite}.wkm.wkm-rest .wkm-ring{animation:wkm-rb 8s ease-in-out infinite}@keyframes wkm-bb{0%,100%{transform:scale(1,1)}50%{transform:scale(1.05,1.04)}}@keyframes wkm-rb{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.14);opacity:1}}' +
     '@keyframes wkm-b{0%,100%{transform:scale(1,1)}50%{transform:scale(1.018,.982)}}@keyframes wkm-r{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}' +
-    '@media (prefers-reduced-motion:reduce){.wkm .wkm-breath,.wkm .wkm-ring{animation:none}.wkm-bubble,.wkm-bubble span{transition:none}}';
+    '@media (prefers-reduced-motion:reduce){.wkm .wkm-breath,.wkm .wkm-ring,.wkm.wkm-rest .wkm-breath,.wkm.wkm-rest .wkm-ring{animation:none}.wkm-bubble,.wkm-bubble span{transition:none}}';
   var injected = false; function inject() { if (injected) return; var s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); injected = true; }
   var reduce = function () { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); };
   function ik(side, hx, hy) {
@@ -150,6 +152,7 @@
     apply(); blinkT = setTimeout(blink, 1800); sacT = setTimeout(saccade, 1200);
     var api = {
       set: set, look: look, say: say,
+      breathe: function (on) { node.classList.toggle('wkm-rest', !!on); },   // the rest-ring breathing guide: 4 s in, 4 s out
       progress: function (p) { prog = Math.max(0, Math.min(1, p || 0)); base.glow = prog * .85; T.glow = base.glow; kick(); },
       mode: function (m) { if (!FEEL[m]) return; mode = m; rebase(); T.browLA = base.browLA; T.browRA = base.browRA; T.mouthC = base.mouthC; T.open = base.open; T.glow = base.glow; paintMode(); kick(); },
       destroy: function () { destroyed = true; clearT(); stopTalk(); clearTimeout(blinkT); clearTimeout(sacT); clearTimeout(hideT); document.removeEventListener('visibilitychange', onVis); el.innerHTML = ''; }

@@ -2172,3 +2172,12 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-wrow.ok .wk-lv-v{color:var(--muted);text-decoration:line-through}
 .wk-wedit{flex:0 0 48px;width:48px;height:48px;border:none;border-radius:50%;background:none;color:var(--muted);font-size:16px;font-family:inherit;cursor:pointer;touch-action:manipulation}
 .wk-wedit:active{background:var(--surface2)}
+/* polish 1 · S4: the mascot's own coach stage - 64 px in a set (the slot is 64 tall, fixed: CLS 0), 120 px on READY and the summary */
+.wk-live[data-mode=live] .wk-coach-slot{height:64px}
+.wk-mascot{flex:0 0 64px;width:64px;height:64px}
+.wk-m-pv-c{flex:0 0 120px;width:120px;height:120px}
+.wk-m-pv-t{font-size:var(--wk-fs-body);color:var(--muted)}
+.wk-sum-hero{align-items:center}
+.wk-sum-m{flex:0 0 120px;width:120px;height:120px}
+.wk-sum-hero{flex-wrap:wrap;row-gap:var(--wk-s2)}
+@media (max-width:380px){.wk-sum-hero{gap:var(--wk-s4)}.wk-sum-m{flex-basis:96px;width:96px;height:96px}.wk-sum-k b{font-size:48px}}

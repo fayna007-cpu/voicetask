@@ -496,6 +496,8 @@
   // ── A2 part 2: the live coach, the rest-end alert, read-modify-write storage, prefs ──
   var LRI = '⁦', PDI = '⁩';
   function iso(s) { return LRI + s + PDI; }                               // numerals inside plain text (the coach slot): an LTR isolate
+  // a coach number: a bodyweight value always carries its unit (never a bare "8" at the end of a line)
+  function coachNum(text, w) { return iso(text) + (w == null && text ? ' ' + TEXT.ui.reps : ''); }
   function targetText(t) { return t ? (t.w == null ? String(t.r) : fmtNum(t.w) + '×' + t.r) : ''; }
   // is THIS set a personal record against earlier sessions? (the prsFor rules: kg -> Epley e1RM on the first part; else reps at the same load)
   // -> "חזה 30×3" or null; the first time an exercise is done is never a record
@@ -520,11 +522,11 @@
   function coachMoment(state, ctx) {
     if (!state || !ctx) return null;
     var seen = ctx.seen || {};
-    if (ctx.atStart) return seen.start ? null : { kind: 'start', vars: ctx.firstTarget ? { target: iso(targetText(ctx.firstTarget)) } : {} };
+    if (ctx.atStart) return seen.start ? null : { kind: 'start', vars: ctx.firstTarget ? { target: coachNum(targetText(ctx.firstTarget), ctx.firstTarget.w) } : {} };
     if (ctx.pr) return { kind: 'pr', vars: { pr: ctx.pr } };
     if (ctx.set && ctx.target && ctx.target.r != null && typeof ctx.judge === 'function') {
       var k = ctx.judge({ w: ctx.target.w, r: ctx.target.r }, { w: ctx.set.w, r: ctx.set.r });
-      return { kind: k, vars: { target: iso(targetText(ctx.target)), done: iso(setText(ctx.set)) } };
+      return { kind: k, vars: { target: coachNum(targetText(ctx.target), ctx.target.w), done: coachNum(setText(ctx.set), ctx.set.w) } };
     }
     return null;                                                          // lastSet / halfway are ARRIVAL lines (arrivalMoment)
   }
@@ -677,7 +679,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     lastTimeBefore: lastTimeBefore, lastNBefore: lastNBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
-    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
+    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, coachNum: coachNum, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,

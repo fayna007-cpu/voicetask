@@ -64,5 +64,16 @@ check('warm-ups are never work: a replayed draft with START + one LOG has exactl
   return s && s.exercises[0].sets.length === 1 ? '' : J(s && s.exercises[0].sets);
 });
 
+// ── S5: copy — a number never ends a line bare ──
+check('coach numbers: a bodyweight target / set carries its unit ("8 חזרות"); a weighted one stays "26×8"', () => {
+  const C = require('../wk-coach.js'), st = { exercises: [{ label: 'מתח', sets: [{ w: null, r: 7 }], scheme: { sets: 3 } }], exIdx: 0 };
+  const bw = W.coachMoment(st, { set: { w: null, r: 7 }, target: { w: null, r: 8 }, judge: C.judge, seen: {} });
+  const kg = W.coachMoment(st, { set: { w: 26, r: 8 }, target: { w: 28, r: 8 }, judge: C.judge, seen: {} });
+  const vis = (s) => String(s).replace(/[⁦-⁩]/g, '');
+  const ok = bw && vis(bw.vars.target) === '8 חזרות' && vis(bw.vars.done) === '7 חזרות' && kg && vis(kg.vars.target) === '28×8' && vis(kg.vars.done) === '26×8';
+  const line = bw && vis(C.fill('מתחת ליעד. הסט הבא: {target}', bw.vars));
+  return ok && /חזרות$/.test(line) ? '' : J([bw && bw.vars, kg && kg.vars, line]);
+});
+
 let bad = 0; rows.forEach(([n, e], i) => { if (e) bad++; console.log(`${String(i + 1).padStart(2)}. ${e ? 'FAIL' : 'PASS'}  ${n}${e ? '\n      ' + e : ''}`); });
 console.log(`\n${rows.length - bad}/${rows.length} passed, ${bad} failed`); process.exit(bad ? 1 : 0);
