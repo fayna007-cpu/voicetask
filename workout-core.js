@@ -379,6 +379,11 @@
     var i = ids.indexOf(last ? last.dayId : p.lastDay);
     return p.days[i < 0 ? 0 : (i + 1) % ids.length];
   }
+  // exercises done (>= 1 logged set) of all in the session: "X מתוך Y תרגילים בוצעו" + the stored partial flag
+  function exProgress(s) {
+    var ex = (s && s.exercises) || [], d = ex.filter(function (e) { return e && e.sets && e.sets.length; }).length;
+    return { done: d, total: ex.length, partial: d < ex.length, sets: ex.reduce(function (a, e) { return a + (e && e.sets ? e.sets.length : 0); }, 0) };
+  }
   // Warm-up: ~40% x 8, 60% x 5, 80% x 3 of the first work target, snapped; never counted as work sets.
   function warmupSets(w, step) {
     if (!(w > 0) || !step) return [];
@@ -596,7 +601,7 @@
       pickEx: 'הוסף תרגיל', edit: 'עריכה', keep: 'שמור', warmSkip: 'דלג על החימום', warmDone: 'סט חימום בוצע',
       wake: 'השאר את המסך דולק', memFull: 'הזיכרון מלא. האימון נשמר רק כאן עד שתסיים',
       leave: 'לצאת? האימון נשמר, ותוכל להמשיך מאיפה שעצרת.', noSets: 'עוד לא נרשם אף סט. לסגור בלי לשמור?',
-      sumT: 'סיכום', duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
+      sumT: 'סיכום', setsW: function (n) { return n === 1 ? 'סט' : 'סטים'; }, duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
       backLive: 'חזרה לאימון', saveW: 'שמור אימון', existsQ: 'כבר שמרת היום אימון כזה', replace: 'החלף את הקיים', both: 'שמור את שניהם',
       saveErr: 'לא הצלחתי לשמור, אין מקום בזיכרון. האימון עדיין כאן',
       cmpFirst: 'פעם ראשונה', cmpSame: 'כמו בפעם שעברה',
@@ -609,7 +614,9 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
       rx: { exceed: 'מעל היעד', met: 'ביעד', under: 'מתחת ליעד', pr: 'שיא אישי' },   // the row tag = the same judgement as the coach
       doneSetN: function (n) { return 'סיימתי סט ' + n; }, nextExBtn: 'לתרגיל הבא ←', skipRestBtn: 'דלג על המנוחה', options: 'אפשרויות', addNote: 'הוסף הערה',
-      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + n + ' סטים נרשמו, והם יישמרו בסיכום.'; }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
+      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + n + ' סטים נרשמו, והם יישמרו בסיכום.'; },
+      finishHere: 'סיים אימון כאן', exDoneOf: function (x, y) { return x + ' מתוך ' + y + ' תרגילים בוצעו'; }, setsLogged: function (n) { return +n === 1 ? 'סט אחד נרשם' : n + ' סטים נרשמו'; },
+      savePartial: 'סיים ושמור כאימון חלקי', discardW: 'בטל בלי לשמור', partialT: function (x, y) { return 'אימון חלקי · ' + x + ' מתוך ' + y + ' תרגילים'; }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
       sameAsLast: '= כמו הסט הקודם', undoToast: function (n) { return 'נרשם סט ' + n; }, undoBtn: '↶ בטל', peekT: 'שלושת האחרונים',
       restDone: function (n) { return 'המנוחה נגמרה · סט ' + n; }, restDoneNotif: function (n) { return 'המנוחה נגמרה · סט ' + n + ' מחכה'; },
       openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + sets + ' סטים נרשמו. מה לעשות איתו?'; },
@@ -654,7 +661,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     lastTimeBefore: lastTimeBefore, lastNBefore: lastNBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
-    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
+    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, exProgress: exProgress, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
