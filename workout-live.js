@@ -156,7 +156,7 @@
     pk.innerHTML = '<div class="wk-pick-bg" onclick="WorkoutLive.pickClose()"></div><div class="wk-pick-card" role="dialog" aria-modal="true"><div class="wk-pick-h"><span id="wkPickT"></span><button class="wk-lv-x" onclick="WorkoutLive.pickClose()" aria-label="' + S.close + '">✕</button></div><div class="wk-pick-b" id="wkPickB"></div><div class="wk-pick-f" id="wkPickF"></div></div>';
     document.body.appendChild(pk);
     [el, pk].forEach(function (x) { x.addEventListener('pointerdown', onPress); x.addEventListener('pointerdown', touched, true); });
-    el.addEventListener('pointerdown', mascotLook, true); mascotMount();
+    el.addEventListener('pointerdown', mascotLook, true); afterPaint(mascotMount);   // never inside the tap that opens the screen
     ['pointerup', 'pointercancel'].forEach(function (t) { document.addEventListener(t, stopRepeat, true); });
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitViewport); window.visualViewport.addEventListener('scroll', fitViewport); }
     el.addEventListener('focusin', function (e) { if (e.target.matches('input')) setTimeout(function () { fitViewport(); e.target.scrollIntoView({ block: 'center' }); }, 250); });
@@ -256,14 +256,19 @@
   }
   // ── the mascot (wk-mascot.js): Alfred beside the coach line. A gesture on a NEW line only (never on a re-render);
   // the text always stays in the slot (its own bubble is hidden: the slot is never emptied by a timer) ──
-  var mascot = null, pvM = null;
+  var mascot = null, pvM = null, pvSeq = 0, pvAfter = null, mPending = null;
+  // the mascot is built AFTER the frame that shows the tap's result (next frame + a short task), so it never delays that paint;
+  // its box (52 / 56 px) is reserved by CSS, so a late mount moves nothing
+  function afterPaint(fn) { var go = function () { setTimeout(fn, 34); }; if (window.requestAnimationFrame) requestAnimationFrame(go); else go(); }
   var MOOD = { start: 'start', exceed: 'exceed', met: 'met', under: 'under', pr: 'pr', rest: 'wake', halfway: 'nudge', lastSet: 'nudge', comebackGap: 'wake', comebackPostponed: 'wake' };
   function mascotMode(k) { k = k || curMode(); return k === 'off' ? 'calm' : k; }
   function mascotMount() {
     var el = $('wkMascot'); if (!el || mascot || !window.WkMascot) return;
     try { mascot = window.WkMascot.mount(el, { mode: mascotMode(), onTap: function () { coachSlot(); } }); } catch (_) { mascot = null; }
+    if (state && ui.mode === 'live') mascotSync();
+    if (mPending) { var q = mPending; mPending = null; mascotReact(q.kind, q.text); }   // the line that arrived before he did (the start line)
   }
-  function mascotReact(kind, text) { if (!mascot) return; try { mascot.say(text, { mood: MOOD[kind] || 'idle', ms: 1 }); } catch (_) { } }
+  function mascotReact(kind, text) { if (!mascot) { mPending = { kind: kind, text: text }; return; } try { mascot.say(text, { mood: MOOD[kind] || 'idle', ms: 1 }); } catch (_) { } }
   function mascotLook(ev) {
     var m = $('wkMascot'); if (!mascot || !m || ui.mode !== 'live' || m.contains(ev.target)) return;
     var r = m.getBoundingClientRect(); try { mascot.look((ev.clientX - r.left - r.width / 2) / 180, (ev.clientY - r.top - r.height / 2) / 320, 1400); } catch (_) { }
@@ -279,14 +284,19 @@
   function modeSample(k) { var L = CO && CO.MODES[k] && CO.MODES[k].met; return (L || []).filter(function (t) { return t.indexOf('{') < 0; })[0] || modeHint(k); }
   // the ready screen's preview: the mascot in the chosen mode + its sample line (re-mounted on each render; none when "off")
   function pvMount() {
-    pvKill(); var el = $('wkMascotPv'), R = ui.ready; if (!el || !window.WkMascot || !R || R.coachMode === 'off') return;
-    try { pvM = window.WkMascot.mount(el, { mode: R.coachMode }); } catch (_) { pvM = null; }
+    pvKill(); var seq = pvSeq;
+    afterPaint(function () {
+      var el = $('wkMascotPv'), R = ui.ready; if (seq !== pvSeq || ui.mode !== 'ready' || !el || el.firstChild || !window.WkMascot || !R || R.coachMode === 'off') return;   // a newer render won
+      try { pvM = window.WkMascot.mount(el, { mode: R.coachMode }); } catch (_) { pvM = null; }
+      if (pvM && pvAfter) { var k = pvAfter; pvAfter = null; try { pvM.say(modeSample(k), { mood: k === 'fire' ? 'exceed' : 'met', ms: 1 }); } catch (_) { } }
+    });
   }
-  function pvKill() { if (pvM) try { pvM.destroy(); } catch (_) { } pvM = null; }
+  function pvKill() { pvSeq++; if (pvM) try { pvM.destroy(); } catch (_) { } pvM = null; }
   // a mode change previews itself: the gesture in the new feel + that mode's own rest-end chime
   function modePreview(k) {
     if (k === 'off') return;
     var m = ui.mode === 'ready' ? pvM : mascot;
+    if (!m && ui.mode === 'ready') pvAfter = k;                             // he is mounting right after this render: play it then
     if (m) try { m.mode(k); m.say(modeSample(k), { mood: k === 'fire' ? 'exceed' : 'met', ms: 1 }); } catch (_) { }
     sound('rest', true, k);
   }
