@@ -934,6 +934,8 @@
             + '<button class="wk-wedit" onclick="WorkoutLive.warmEdit(' + i + ',' + j + ')" aria-label="' + S.edit + ' · ' + S.warmT + ' ' + (j + 1) + '">✎</button></div>';
         }).join('') + '</div>';
     }
+    // bodyweight on 'auto': no ramp, said in one muted line where the warm-up would be (first of its muscle group, before the first set)
+    if (!wu && bw && !ex.sets.length && !resting && !ex.skipped && W.warmupMode(ex) === 'auto' && W.firstOfGroup(state.exercises, i, cat())) wu = '<div class="wk-lv-cap wk-warm-none">' + S.noWarmBw + '</div>';
     var allDone = state.exercises.every(exDone), cc = cat(), m = W.muscleKey(ex, cc), note = W.firstOfGroup(state.exercises, i, cc) ? String(cc.notes[m] || '').trim() : '';
     return (ui.memOnly ? '<div class="wk-lv-warn">' + S.memFull + '</div>' : '') + (ui.wakeHint ? '<div class="wk-lv-cap wk-lv-hint">' + S.wake + '</div>' : '')
       // the exercise name is in the header; here only its quiet facts (per hand, swapped from)
@@ -1235,7 +1237,7 @@
     var ok = W.fillable(list, vars); if (!ok.length) return '';
     var t = cardIdx[key] != null && ok.indexOf(list[cardIdx[key]]) > -1 ? list[cardIdx[key]] : CP.pick(ok, -1).text;
     cardIdx[key] = list.indexOf(t);
-    try { return CP.fill(t, vars); } catch (_) { return ''; }
+    try { return W.plural(CP.fill(t, vars)); } catch (_) { return ''; }
   }
   // the countdown / elapsed text nodes; a state change (unlock) re-renders HOME once
   var homeTimer = null, rerendered = 0;

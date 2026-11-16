@@ -26,7 +26,7 @@ check('exProgress: all done -> not partial; empty / missing session -> 0 of 0, n
 });
 check('strings: "סיים אימון כאן", "X מתוך Y תרגילים בוצעו", the two partial choices, the summary line', () => {
   const U = W.TEXT.ui;
-  return U.finishHere === 'סיים אימון כאן' && U.exDoneOf(2, 6) === '2 מתוך 6 תרגילים בוצעו' && U.savePartial === 'סיים ושמור כאימון חלקי' && U.discardW === 'בטל בלי לשמור' && U.partialT(2, 6) === 'אימון חלקי · 2 מתוך 6 תרגילים' ? '' : 'missing';
+  return U.finishHere === 'סיים אימון כאן' && U.exDoneOf(2, 6) === '2 מתוך 6 תרגילים בוצעו' && U.exDoneOf(1, 3) === '1 מתוך 3 תרגילים בוצע' && U.savePartial === 'סיים ושמור כאימון חלקי' && U.discardW === 'בטל בלי לשמור' && U.partialT(2, 6) === 'אימון חלקי · 2 מתוך 6 תרגילים' ? '' : 'missing';
 });
 
 // ── S3: warm-up ──
@@ -74,6 +74,28 @@ check('coach numbers: a bodyweight target / set carries its unit ("8 חזרות"
   const line = bw && vis(C.fill('מתחת ליעד. הסט הבא: {target}', bw.vars));
   return ok && /חזרות$/.test(line) ? '' : J([bw && bw.vars, kg && kg.vars, line]);
 });
+
+// ── deploy fixes: singular / plural in every count; "אין חימום: משקל גוף" ──
+check('counts: "1 מתוך 1 סט", "2 מתוך 3 סטים", HTML-wrapped numbers too; exercises, the verb, the confirm texts', () => {
+  const U = W.TEXT.ui, b = (n) => '<bdi dir="ltr" data-wk-count="' + n + '">' + n + '</bdi>';
+  const r = [U.tally(1, 1), U.tally(2, 3), U.tally(b(1), b(1)).replace(/<[^>]*>/g, ''), U.exDoneOf(1, 3), U.exDoneOf(2, 6), U.exDoneOf(1, 1), U.partialT(1, 2), U.setsLogged(1), U.setsLogged(4),
+    U.factSets(1, 5), U.factSets(3, 5), U.warmPreview(1), U.warmPreview(3), U.cancelWorkoutQ(1), U.openRealSub('x', 1)];
+  const want = ['ביעד: 1 מתוך 1 סט', 'ביעד: 2 מתוך 3 סטים', 'ביעד: 1 מתוך 1 סט', '1 מתוך 3 תרגילים בוצע', '2 מתוך 6 תרגילים בוצעו', '1 מתוך 1 תרגיל בוצע', 'אימון חלקי · 1 מתוך 2 תרגילים', 'סט אחד נרשם', '4 סטים נרשמו',
+    'סט אחד ב-5 דק׳', '3 סטים ב-5 דק׳', 'חימום · סט אחד', 'חימום · 3 סטים', 'לבטל את האימון? סט אחד שנרשם יימחק ולא יישמר.', 'x · סט אחד נרשם. מה לעשות איתו?'];
+  return J(r) === J(want) ? '' : J(r);
+});
+check('plural(): a lone 1 before a plural noun -> singular (plain / <bdi> / isolated); 11, 21, "2×1", "8-1" untouched; fill() applies it', () => {
+  const r = [W.plural('1 סטים'), W.plural('כל הכבוד. <bdi dir="ltr">1</bdi> סטים'), W.plural('⁦1⁩ חזרות'), W.plural('11 סטים · 21 סטים'), W.plural('2×1 חזרות · 8-1 חזרות'), W.plural('1 ימים · 1 תרגילים · 1 אימונים'), W.fill('שמרת על הקצב: {n} סטים', { n: 1 }), W.fill('{n} סטים', { n: 5 })];
+  const want = ['סט אחד', 'כל הכבוד. סט אחד', 'חזרה אחת', '11 סטים · 21 סטים', '2×1 חזרות · 8-1 חזרות', 'יום אחד · תרגיל אחד · אימון אחד', 'שמרת על הקצב: סט אחד', '5 סטים'];
+  return J(r) === J(want) ? '' : J(r);
+});
+check('no table line breaks when its count is 1 (every "{n} סטים" / "{sets} סטים" template reads as Hebrew)', () => {
+  const CP = require('../wk-copy.js'), bad = [];
+  const walk = (o, p) => { for (const k in o) { const v = o[k]; if (Array.isArray(v)) v.forEach((t) => { if (/\{(n|sets)\} סטים/.test(t)) { const r = W.plural(t.replace(/\{(n|sets)\}/g, '1').replace(/\{\w+\}/g, 'x')); if (/(^|\D)1 סטים|סט אחד ראשונים/.test(r)) bad.push(p + '.' + k + ': ' + r); } }); else if (v && typeof v === 'object') walk(v, p + '.' + k); } };
+  walk(CP.COPY, 'copy'); walk(W.TEXT, 'text');
+  return bad.join(' | ');
+});
+check('strings: "אין חימום: משקל גוף" exists', () => W.TEXT.ui.noWarmBw === 'אין חימום: משקל גוף' ? '' : 'missing');
 
 let bad = 0; rows.forEach(([n, e], i) => { if (e) bad++; console.log(`${String(i + 1).padStart(2)}. ${e ? 'FAIL' : 'PASS'}  ${n}${e ? '\n      ' + e : ''}`); });
 console.log(`\n${rows.length - bad}/${rows.length} passed, ${bad} failed`); process.exit(bad ? 1 : 0);
