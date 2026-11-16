@@ -1987,3 +1987,115 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 /* the big target never breaks inside a number ("10-15", "18.5"); it scales down on narrow phones instead */
 .wk-lv-target{flex-wrap:nowrap;white-space:nowrap;font-size:clamp(36px,12.5vw,56px)}
 .wk-lv-target bdi{white-space:nowrap}
+/* Part 3 stage 1: the coach slot is never empty — without a fresh line it shows the next target, calmer */
+.wk-coach-line.fb{background:var(--surface);color:var(--text);font-weight:600}
+/* rest end, in-app: the check flashes a ring (3x) while it pulses as the next set (until a tap) */
+.wk-done.wk-flash{animation:wk-ring-flash 480ms cubic-bezier(.2,.8,.2,1) 3,wk-pulse 1.6s ease-in-out 1.44s infinite}
+@keyframes wk-ring-flash{0%{box-shadow:0 0 0 0 oklch(0.72 0.18 285 / 0.85)}100%{box-shadow:0 0 0 18px oklch(0.72 0.18 285 / 0)}}
+@media (prefers-reduced-motion:reduce){.wk-done.wk-flash{animation:none;box-shadow:0 0 0 4px var(--accent)}}
+/* stage 0: undo toast (absolute over the dock: moves nothing), the last-3 peek */
+.wk-undo-t{position:absolute;left:16px;right:16px;bottom:calc(var(--wk-dock-h,268px) + var(--sab) + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 16px;border-radius:24px;background:var(--surface3);color:var(--text);font-size:15px;font-weight:700;box-shadow:0 8px 24px oklch(0 0 0 / 0.4);opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity 240ms cubic-bezier(.2,.8,.2,1),transform 240ms cubic-bezier(.2,.8,.2,1),visibility 240ms;z-index:2}
+.wk-undo-t.on{opacity:1;visibility:visible;transform:none}
+.wk-live:not([data-mode=live]) .wk-undo-t{display:none}
+.wk-peek-b{display:block;width:100%;min-height:48px;padding:8px 0;border:none;background:none;color:var(--muted);font-family:inherit;font-size:12px;line-height:1.6;text-align:start;cursor:pointer;touch-action:manipulation;font-variant-numeric:tabular-nums}
+.wk-peek{display:flex;flex-direction:column;gap:4px;margin:0 0 4px;padding:8px 12px;border-radius:var(--r-sm);background:var(--surface)}
+.wk-peek-r{display:flex;gap:8px;align-items:baseline;font-size:13px}
+@media (prefers-reduced-motion:reduce){.wk-undo-t{transition:none}}
+/* ═══ Part 3 stage 2 — the wk- DESIGN SYSTEM (tokens) + the live layout. Gold = personal records ONLY. ═══ */
+.wk-live,.wk-pick,.wk-card,.wk-prompt,.wk-resume{--wk-s1:4px;--wk-s2:8px;--wk-s3:12px;--wk-s4:16px;--wk-s5:24px;--wk-s6:32px;
+  --wk-r1:12px;--wk-r2:18px;--wk-r3:28px;--wk-fs-cap:12px;--wk-fs-body:15px;--wk-fs-lead:17px;--wk-fs-title:20px;--wk-fs-num:44px;--wk-fs-hero:56px;
+  --wk-t1:120ms;--wk-t2:240ms;--wk-t3:480ms;--wk-ease:cubic-bezier(.2,.8,.2,1);--wk-ease-io:cubic-bezier(.4,0,.2,1);
+  --wk-sh1:0 1px 2px oklch(0 0 0 / 0.25);--wk-sh2:0 8px 24px oklch(0 0 0 / 0.35);--wk-tint:oklch(0.55 0.16 285 / 0.12);--wk-under:oklch(0.72 0.06 240);--wk-bar:72px}
+/* one scrolling column; the sticky bar is the only fixed part (nothing ever sits under it) */
+.wk-lv-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 calc(var(--wk-s4) + var(--sar)) var(--wk-s5) calc(var(--wk-s4) + var(--sal))}
+.wk-lv-scroll>.wk-lv-main{flex:none;min-height:0;overflow:visible;padding:var(--wk-s1) 0 0}
+.wk-lv-scroll>.wk-lv-prog{margin:var(--wk-s2) 0 var(--wk-s3)}
+.wk-lv-scroll>.wk-coach-slot{margin:0;position:sticky;top:0;z-index:2;padding:var(--wk-s1) 0;background:var(--bg)}
+.wk-live{--wk-dock-h:var(--wk-bar)}
+.wk-lv-dock{min-height:var(--wk-bar);padding:var(--wk-s2) calc(var(--wk-s4) + var(--sar)) calc(var(--wk-s2) + var(--sab)) calc(var(--wk-s4) + var(--sal));justify-content:center;background:oklch(0.13 0.025 285 / 0.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.wk-live[data-mode=live] .wk-lv-dock{height:auto;border-top:1px solid var(--border)}
+.wk-lv-dock>.wk-big{min-height:56px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead)}
+/* the primary bar button (the set action); flashes + pulses once the rest ends */
+.wk-lv-dock .wk-done.wk-primary{width:100%;height:56px;min-height:56px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead);font-weight:800;box-shadow:var(--wk-sh2);animation:none}
+.wk-lv-dock .wk-done.wk-primary.wk-flash{animation:wk-ring-flash var(--wk-t3) var(--wk-ease) 3,wk-pulse 1.6s ease-in-out 1.44s infinite}
+.wk-lv-dock .wk-skip{background:var(--surface3);color:var(--text)}
+/* header: the labeled options control */
+.wk-lv-menu{width:auto;min-width:48px;padding:0 var(--wk-s3);border-radius:24px;background:var(--surface2);font-size:var(--wk-fs-body);font-weight:700;white-space:nowrap}
+.wk-lv-hr{gap:var(--wk-s2)}
+/* progress, grouped by muscle group */
+.wk-lv-prog{gap:var(--wk-s2)}
+.wk-seg{flex:1 1 0;min-width:0;height:auto;min-height:48px;margin:0;padding:var(--wk-s1) 0;background:none;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:6px;color:var(--muted);font-family:inherit}
+.wk-seg.on{background:none;color:var(--text)}
+.wk-seg-l{font-size:var(--wk-fs-cap);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:start}
+.wk-seg i{display:block;height:6px;margin:0;border-radius:3px;background:var(--surface3);position:relative;overflow:hidden;box-shadow:none;width:auto}
+.wk-seg i::after{content:'';position:absolute;inset:0;border-radius:3px;background:var(--accent);transform-origin:100% 50%;transform:scaleX(var(--f,0));transition:transform var(--wk-t2) var(--wk-ease)}
+.wk-seg.on i{background:var(--wk-tint)}
+/* set rows: state transitions <= 240 ms; the status tag never collides with the reaction bar */
+.wk-lv-set{transition:opacity var(--wk-t2) var(--wk-ease),transform var(--wk-t2) var(--wk-ease)}
+.wk-lv-set.done{padding-inline-end:var(--wk-s3);gap:var(--wk-s3)}
+.wk-lv-set.wk-r-exceed,.wk-lv-set.wk-r-met,.wk-lv-set.wk-r-under,.wk-lv-set.wk-r-pr{box-shadow:none;border-inline-end:3px solid transparent}
+.wk-lv-set.wk-r-exceed{border-inline-end-color:var(--accent)}
+.wk-lv-set.wk-r-met{border-inline-end-color:oklch(0.72 0.18 285 / 0.45)}
+.wk-lv-set.wk-r-under{border-inline-end-color:var(--wk-under)}
+.wk-lv-set.wk-r-pr{border-inline-end-color:var(--gold);position:relative;overflow:hidden}
+.wk-lv-st.rx-exceed{color:var(--accent)}
+.wk-lv-st.rx-met{color:var(--success)}
+.wk-lv-st.rx-under{color:var(--wk-under)}
+.wk-lv-st.rx-pr{color:var(--gold);font-weight:700}
+/* motion: the drawn check on the set just logged; the PR shimmer (gold, once, no confetti) */
+.wk-chk{width:18px;height:18px;flex-shrink:0;stroke:var(--accent);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:0}
+.wk-fresh .wk-chk{animation:wk-draw var(--wk-t2) var(--wk-ease) both}
+.wk-r-pr .wk-chk{stroke:var(--gold)}
+.wk-fresh.wk-r-pr::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 30%,oklch(0.80 0.15 75 / 0.28) 50%,transparent 70%);transform:translateX(100%);animation:wk-shimmer 960ms var(--wk-ease) both}
+.wk-fresh{animation:wk-settle var(--wk-t2) var(--wk-ease) both}
+@keyframes wk-draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+@keyframes wk-shimmer{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+@keyframes wk-settle{from{opacity:.4;transform:scale(.98)}to{opacity:1;transform:none}}
+/* the active set card owns the screen: generous rhythm, 64 px steppers (thumb-sized) */
+.wk-lv-sets .wk-lv-set.active,.wk-lv-sets .wk-lv-set.edit{padding:var(--wk-s5) 0;gap:var(--wk-s4)}
+.wk-lv-sets .wk-lv-steps{gap:var(--wk-s3)}
+.wk-lv-sets .wk-stp{padding:var(--wk-s2)}
+.wk-lv-sets .wk-stp-b{width:64px;height:64px;font-size:26px}
+.wk-lv-sets .wk-stp-v{min-width:96px}
+/* REST inside the set card: "הסט הבא" + the next target as the hero; the ring */
+.wk-rest-card{align-items:center;text-align:center;gap:var(--wk-s3)}
+.wk-rest-card .wk-lv-n{font-size:var(--wk-fs-body);font-weight:800;color:var(--accent)}
+.wk-rest-card .wk-rest{justify-content:center}
+.wk-rest-card .wk-ring{width:132px;height:132px}
+.wk-rest-over .wk-lv-n{color:var(--accent);font-weight:800;font-size:var(--wk-fs-body)}
+/* the empty group note -> one quiet line */
+.wk-note-add{display:block;width:100%;min-height:48px;margin:0 0 var(--wk-s3);padding:var(--wk-s2) 0;border:none;background:none;color:var(--accent);font-family:inherit;font-size:var(--wk-fs-body);font-weight:700;text-align:start;cursor:pointer;touch-action:manipulation}
+/* the menu: labeled rows with an icon */
+.wk-act .wk-act-i{width:28px;flex-shrink:0;text-align:center;font-size:18px;color:var(--accent)}
+.wk-act.wk-danger .wk-act-i{color:var(--danger)}
+.wk-ask{font-size:var(--wk-fs-body);color:var(--text);padding:var(--wk-s2) 0}
+/* the test banner on READY too */
+.wk-test-strip{margin:var(--wk-s2) 0 var(--wk-s3);padding:var(--wk-s2) var(--wk-s3);border-radius:var(--wk-r1);background:oklch(0.78 0.16 60 / 0.12);color:var(--warn);font-size:var(--wk-fs-body);font-weight:700;text-align:center}
+/* READY: the only breathing element is the start button */
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled){position:relative;overflow:visible}
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 24px oklch(0.72 0.18 285 / 0.55);pointer-events:none;opacity:.25;animation:wk-breathe 4s ease-in-out infinite}
+@keyframes wk-breathe{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.9;transform:scale(1.03)}}
+@media (prefers-reduced-motion:reduce){.wk-fresh,.wk-fresh .wk-chk,.wk-fresh.wk-r-pr::after,.wk-lv-dock .wk-done.wk-primary.wk-flash,.wk-live[data-mode=ready] .wk-lv-dock .wk-big::after{animation:none}.wk-seg i::after,.wk-lv-set{transition:none}}
+/* Part 3 stage 3: the mascot strip (Alfred beside the coach line; his own bubble stays hidden, the line is the text) */
+.wk-live[data-mode=live] .wk-coach-slot{display:flex;align-items:center;gap:var(--wk-s2)}
+.wk-mascot{flex:0 0 52px;width:52px;height:52px}
+.wk-coach-slot.wk-m-off .wk-mascot{display:none}
+.wk-coach-slot .wk-coach-line{flex:1 1 auto;min-width:0}
+.wk-mascot .wkm-bubble,.wk-m-pv-c .wkm-bubble{display:none}
+.wk-m-pv{display:flex;align-items:center;gap:var(--wk-s3);margin:var(--wk-s2) 0}
+.wk-m-pv-c{flex:0 0 56px;width:56px;height:56px}
+.wk-m-pv-t{flex:1 1 auto;min-width:0;font-size:15px;font-weight:600;line-height:20px;color:var(--text)}
+/* Part 3 stage 4: HOME card states recolored from tokens - no boxed frame; a 4px state stripe on the start edge + a soft wash from it */
+.wk-card{box-shadow:none;--wk-wash:transparent;background:linear-gradient(to left,var(--wk-wash),transparent 75%)}
+.wk-card::before{content:"";position:absolute;inset-block:var(--wk-s3);inset-inline-start:0;width:4px;border-radius:4px 0 0 4px;background:var(--wk-c,transparent)}
+.wk-st-far{--wk-c:var(--border2)}
+.wk-st-tomorrow{--wk-c:oklch(0.72 0.18 285 / 0.55);--wk-wash:oklch(0.55 0.16 285 / 0.06)}
+.wk-st-locked{--wk-c:var(--gold);--wk-wash:oklch(0.80 0.15 75 / 0.08)}
+.wk-st-open{--wk-c:var(--accent);--wk-wash:oklch(0.55 0.16 285 / 0.16)}
+.wk-st-progress{--wk-c:var(--accent);--wk-wash:oklch(0.55 0.16 285 / 0.22)}
+.wk-st-done{--wk-c:var(--success);--wk-wash:oklch(0.68 0.14 145 / 0.10)}
+.wk-card-cd .wk-card-link{flex-basis:auto;padding-inline-start:var(--wk-s1)}
+/* the summary's top line: the real number first, on its own line, then the coach's words */
+.wk-coach .wk-fact{display:block;font-size:var(--wk-fs-lead);font-weight:800;color:var(--text);margin-bottom:var(--wk-s1)}
+/* the in-content "↶ בטל" chip hides (no layout change) while the undo bar covers it: no clipped twin peeking behind the bar */
+.wk-live:has(.wk-undo-t.on) .wk-undo-c{visibility:hidden}

@@ -37,15 +37,24 @@ check('a combined set is judged on its TOTAL: 28×6+5 (11) vs 28×8 -> exceed; d
   const s = st([log(0, 28, 6, [{ r: 6 }, { r: 5 }])]), set = s.exercises[0].sets[0], m = W.coachMoment(s, { set, target: { w: 28, r: 8 }, judge: C.judge });
   return set.r === 11 && m.kind === 'exceed' && plain(m.vars.done) === '28×6+5' ? '' : J([set, m]);
 });
-check('NO target -> no judgement line (never "on target" without one); falls to lastSet / halfway / null', () => {
+check('NO target -> no judgement line after a set (never "on target" without one): null', () => {
   const s1 = st([log(0, 28, 6)]), a = W.coachMoment(s1, { set: s1.exercises[0].sets[0], target: null, judge: C.judge });
-  const s2 = st([log(0, 28, 6), log(0, 24, 8)]), b = W.coachMoment(s2, { set: s2.exercises[0].sets[1], target: null, judge: C.judge, seen: {} });
   const s3 = st([log(0, 28, 6), log(0, 24, 8), log(0, 20, 12)]), c = W.coachMoment(s3, { set: s3.exercises[0].sets[2], target: { w: null, r: null }, judge: C.judge, seen: {} });
-  return a === null && b.kind === 'lastSet' && c.kind === 'halfway' ? '' : J([a, b, c]);
+  return a === null && c === null ? '' : J([a, c]);
 });
-check('halfway only once (seen.halfway) and only at >= 50% of the planned sets', () => {
-  const s = st([log(0, 28, 6), log(0, 24, 8), log(0, 20, 12)]), set = s.exercises[0].sets[2];
-  return W.coachMoment(s, { set, seen: { halfway: true } }) === null && W.coachMoment(st([log(0, 28, 6)]), { set: { w: 28, r: 6 }, seen: {} }) === null ? '' : 'x';
+check('ARRIVAL: lastSet when arriving at an exercise\'s last planned set; halfway once at >= 50%; lastSet beats halfway', () => {
+  const two = st([log(0, 28, 6), log(0, 24, 8)]), a = W.arrivalMoment(two, {});                        // chest 2/3 -> arriving at set 3
+  const half = st([log(0, 28, 6), log(0, 24, 8), log(0, 20, 12)]), b = W.arrivalMoment(half, {});       // chest done (3 of 5 planned) -> halfway
+  const c = W.arrivalMoment(half, { halfway: true }), d = W.arrivalMoment(st([]), {}), e = W.arrivalMoment(st([log(0, 28, 6)]), {});
+  return a.kind === 'lastSet' && b.kind === 'halfway' && c === null && d === null && e === null ? '' : J([a, b, c, d, e]);
+});
+check('gate: event lines (pr / exceed / under / met) ALWAYS speak; filler lines at most one per 20 s', () => {
+  const r = [W.coachAllowed('under', 1000, 500), W.coachAllowed('pr', 1000, 999), W.coachAllowed('met', 0, null), W.coachAllowed('rest', 1000, 500), W.coachAllowed('rest', 25000, 1000), W.coachAllowed('start', 0, null), W.coachAllowed('lastSet', 5000, 0)];
+  return J(r) === J([true, true, true, false, true, true, false]) ? '' : J(r);
+});
+check('collisions: the higher priority wins (pr > exceed|under|met > lastSet > halfway > start); nulls ignored; never empty when one exists', () => {
+  const k = (l) => (W.pickMoment(l) || {}).kind;
+  return k([{ kind: 'halfway' }, { kind: 'pr' }, { kind: 'exceed' }]) === 'pr' && k([null, { kind: 'start' }, { kind: 'lastSet' }]) === 'lastSet' && k([{ kind: 'rest' }, { kind: 'halfway' }]) === 'halfway' && W.pickMoment([null]) === null ? '' : 'x';
 });
 check('isPR: kg = a higher Epley e1RM on the first part; else more reps at the same load; first time never; text isolated', () => {
   const h = [{ exercises: [{ label: 'חזה', unit: 'kg', sets: [{ w: 28, r: 6 }] }, { label: 'מתח', unit: null, sets: [{ w: null, r: 8 }] }] }];
@@ -84,7 +93,7 @@ check('read-modify-write tolerates a missing / corrupt value (starts from the de
 });
 check('prefs: defaults coach / sound on / tactile on / test off; junk tolerated; "off" is a mode', () => {
   const d = W.readPrefs(null), j = W.readPrefs({ coachMode: 'loud', sound: false, testMode: 'yes' }), o = W.readPrefs({ coachMode: 'off', testMode: true });
-  return J(d) === J({ coachMode: 'coach', sound: true, haptic: true, testMode: false, soundTested: false }) && j.coachMode === 'coach' && j.sound === false && j.testMode === false && o.coachMode === 'off' && o.testMode === true ? '' : J([d, j, o]);
+  return J(d) === J({ coachMode: 'coach', sound: true, haptic: true, testMode: false, soundTested: false, silent: false }) && j.coachMode === 'coach' && j.sound === false && j.testMode === false && o.coachMode === 'off' && o.testMode === true ? '' : J([d, j, o]);
 });
 check('copy filter: only variants the user\'s own data can fill; nothing with "{" survives a fill', () => {
   const vars = { name: 'אימון כוח', time: '18:00' }, all = [];
@@ -94,6 +103,12 @@ check('copy filter: only variants the user\'s own data can fill; nothing with "{
 check('the draft keeps test + coachMode through a replay (a resume keeps them)', () => {
   const s = W.replay([{ type: 'START', at: NOW, test: true, coachMode: 'fire', program: { id: 'p', name: 'P', exercises: [{ label: 'a' }] } }]);
   return s.test === true && s.coachMode === 'fire' ? '' : J(s);
+});
+check('last-3 peek: the last n sessions of an exercise before a date, newest first, only sessions that have it', () => {
+  const S = [{ id: 'a', date: '2026-10-20', exercises: [{ label: 'חזה', sets: [{ w: 18, r: 6 }] }] }, { id: 'b', date: '2026-10-25', exercises: [{ label: 'גב', sets: [{ w: 1, r: 1 }] }] },
+    { id: 'c', date: '2026-10-28', exercises: [{ label: 'חזה', sets: [{ w: 20, r: 5 }] }] }, { id: 'd', date: '2026-11-01', exercises: [{ label: 'חזה', sets: [{ w: 20, r: 6 }] }] }, { id: 'e', date: '2026-11-04', exercises: [{ label: 'חזה', sets: [{ w: 22, r: 4 }] }] }];
+  const r = W.lastNBefore(S, 'חזה', '2026-11-04', 3);
+  return J(r.map((x) => x.date)) === '["2026-11-01","2026-10-28","2026-10-20"]' && W.lastNBefore(S, 'כתפיים', '2026-11-05', 3).length === 0 ? '' : J(r);
 });
 check('string table: the part 2 UI strings exist', () => { const U = W.TEXT.ui; const miss = ['coachOff', 'coachModeT', 'soundTest', 'soundHint', 'nextSet', 'nextSetBtn', 'tally', 'testBanner', 'testStart', 'testClose', 'testMode', 'testModeSub', 'testKeep', 'menuT', 'soundT', 'hapticT'].filter((k) => !U[k]); return miss.length ? J(miss) : ''; });
 
