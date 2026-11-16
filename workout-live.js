@@ -536,7 +536,6 @@
     if (!ui.pend[key]) { var t = targets(i), tg = t[Math.min(slot, t.length - 1)], prevSet = ex.sets[slot - 1]; ui.pend[key] = { ex: i, w: tg.w != null ? tg.w : (prevSet && prevSet.w) || null, r: tg.aim }; }
     return ui.pend[key];
   }
-  function warmIdx() { for (var i = 0; i < state.exercises.length; i++) if (!isBw(state.exercises[i])) return i; return -1; }
 
   // ── live actions ──
   function logSet(then) {
@@ -647,7 +646,26 @@
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
   function restSkip() { dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }
-  function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { open: false, done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
+  // the warm-up rows of exercise i: [] when it gets none (setting / auto rule), skipped, or no first target; edits apply to this session only
+  function warmRows(i) {
+    var ex = state.exercises[i], w = ui.warm[i] || {}; if (w.skip || W.warmupIdx(state.exercises, cat()).indexOf(i) < 0) return [];
+    var t = targets(i)[0], ws = isBw(ex) ? W.warmupBw(t && t.aim) : W.warmupSets(t && t.w, es(ex));
+    return ws.map(function (x, j) { return (w.ed && w.ed[j]) || x; });
+  }
+  function warm(i, k) { var w = ui.warm[i] = ui.warm[i] || { done: {} }; if (k === 'toggle') w.open = !w.open; else if (k === 'skip') w.skip = true; else w.done[k] = !w.done[k]; render(); }
+  function warmEdit(i, j) {
+    var x = warmRows(i)[j]; if (!x) return; ui.pick = { kind: 'warm', i: i, j: j };
+    pickOpen(S.warmT + ' ' + (j + 1), (x.w == null ? '' : '<label class="rform-lbl" for="wkWuW">' + S.weightT + '</label><input class="rfi" id="wkWuW" inputmode="decimal" dir="ltr" value="' + h(x.w) + '">')
+      + '<label class="rform-lbl" for="wkWuR">' + S.reps + '</label><input class="rfi" id="wkWuR" inputmode="numeric" dir="ltr" value="' + h(x.r) + '"><div class="wk-lv-cap">' + S.warmEditHint + '</div>',
+      '<button class="wk-big" onclick="WorkoutLive.warmSave()">' + S.keep + '</button>', true);
+  }
+  function warmSave() {
+    var P = ui.pick; if (!P || P.kind !== 'warm') return;
+    var x = warmRows(P.i)[P.j], we = $('wkWuW'), r = parseInt(($('wkWuR') || {}).value, 10), wv = we ? W.parseWeight(we.value) : null;
+    if (!x || !(r > 0) || (we && wv == null)) return;
+    var w = ui.warm[P.i] = ui.warm[P.i] || { done: {} }; w.ed = w.ed || {}; w.ed[P.j] = { w: we ? wv : null, r: Math.min(99, r) };
+    pickClose(); render();
+  }
   // + exercise during the workout: a picker of known exercises (no typing inside the live screen)
   function addPick() {
     var seen = {}, list = [];
@@ -820,7 +838,9 @@
         + line(S.setsN, stepper('sets', sc.sets, '', 'wkExSets', 1))
         + sc.ranges.slice(0, sc.sets).map(function (r, j) { return '<button class="wk-row wk-rgrow" onclick="WorkoutLive.rangeOpen(' + j + ')"><span class="wk-row-l">' + S.setN(j + 1) + ' · <bdi dir="ltr">' + r[0] + '-' + r[1] + '</bdi></span><span class="wk-row-s">' + S.reps + ' ›</span></button>'; }).join(''), S.schemeT)
       + group(chips(RESTS.map(String), String(e.restSec || 0), function (k) { return 'WorkoutLive.exSet(\'restSec\',' + k + ')'; }, RESTS.reduce(function (o, s) { o[s] = s ? '<bdi dir="ltr">' + s + '</bdi> ' + S.sec : S.restAuto; return o; }, {})), S.restT)
-      + group('<button class="wk-row" onclick="WorkoutLive.exSet(\'warmup\',' + !e.warmup + ')" role="switch" aria-checked="' + !!e.warmup + '"><span class="wk-row-l">' + S.warmOn + '</span><span class="wk-sw' + (e.warmup ? ' on' : '') + '"></span></button>', S.warmT)
+      // warm-up: auto / always / never (stored as false / true / 'off', so older data keeps its meaning)
+      + group(chips(['auto', 'on', 'off'], W.warmupMode(e), function (k) { return 'WorkoutLive.exSet(\'warmup\',' + (k === 'on' ? 'true' : k === 'off' ? '\'off\'' : 'false') + ')'; }, S.warmModes)
+        + '<div class="wk-lv-cap">' + S.warmModeHint[W.warmupMode(e)] + '</div>', S.warmT)
       + (function () { var m = W.muscleKey(e, cat()), v = m in ui.noteEdits ? ui.noteEdits[m] : cat().notes[m] || ''; return group('<textarea class="rfi wk-note-in" id="wkExNote" rows="2" placeholder="' + S.noteHint + '" oninput="WorkoutLive.exNote(this.value)">' + h(v) + '</textarea>', S.noteGroup + ' · ' + muscleName(m)); })()
       + (ui.exIdx > -1 ? '<button class="wk-lv-link wk-danger wk-center-link" onclick="WorkoutLive.removeEx()">' + S.removeEx + '</button>' : '');
   }
@@ -841,7 +861,7 @@
         + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
         + checksHtml())
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
-        + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return '<bdi dir="ltr">' + x.w + ' × ' + x.r + '</bdi>'; }).join(' · ') + ' ' + unitTxt(wex) + '</div>' : '')) : '')
+        + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return num(x.w) + ' ' + unitTxt(wex) + ' × ' + num(x.r); }).join(' · ') + '</div>' : '')) : '')
       + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
         + (R.feelOpen ? feel('sleep') + feel('energy') + feel('pain')
           + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, dayModes())
@@ -879,13 +899,18 @@
     }
     var next = '';
     for (var k = ex.sets.length + (active ? 1 : 0); k < n && !ex.skipped; k++) next += '<div class="wk-lv-set next"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + (bw ? '' : num(t[k].w) + ' ' + u + ' × ') + num(t[k].range[0] + '-' + t[k].range[1]) + '</span></div>';
-    // warm-up: the first weighted exercise or any marked one; collapsible, skippable, never counted
-    var wu = '';
-    if (!bw && !ex.sets.length && (ex.warmup || i === warmIdx())) {
-      var w = ui.warm[i] || { open: false, done: {} }, first = t[0] && t[0].w, ws = W.warmupSets(first, ex.step);
-      if (ws.length && !w.skip) wu = '<div class="wk-lv-group wk-warm"><button class="wk-row" onclick="WorkoutLive.warm(' + i + ',\'toggle\')" aria-expanded="' + w.open + '"><span class="wk-row-l">' + S.warmT + '</span><span class="wk-row-s">' + S.setsDone(ws.length) + ' ' + (w.open ? '▴' : '▾') + '</span></button>'
-        + (w.open ? ws.map(function (x, j) { return '<button class="wk-lv-set wk-wset' + (w.done[j] ? ' ok' : '') + '" onclick="WorkoutLive.warm(' + i + ',' + j + ')" aria-pressed="' + !!w.done[j] + '"><span class="wk-lv-n">' + S.warmT + ' ' + (j + 1) + '</span><span class="wk-lv-v"><bdi dir="ltr">' + x.w + '×' + x.r + '</bdi></span><span class="wk-lv-st">' + (w.done[j] ? '✓' : '') + '</span></button>'; }).join('')
-          + '<button class="wk-lv-link" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button>' : '') + '</div>';
+    // warm-up (WCore.warmupIdx: auto = the first weighted exercise of each muscle group; on / off per exercise): shown ONCE,
+    // before the first set, never during rest; every step tickable + editable for this session; skip-all in one tap; never counted
+    var wu = '', ws = !ex.sets.length && !resting ? warmRows(i) : [];
+    if (ws.length) {
+      var w = ui.warm[i] || { done: {} };
+      wu = '<div class="wk-lv-group wk-warm"><div class="wk-warm-h"><span class="wk-row-l">' + S.warmT + '</span><button class="wk-lv-link wk-warm-skip" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button></div>'
+        + ws.map(function (x, j) {
+          var v = x.w == null ? num(x.r) + ' ' + S.reps : num(x.w) + ' ' + u + ' × ' + num(x.r);
+          return '<div class="wk-wrow' + (w.done[j] ? ' ok' : '') + '"><button class="wk-lv-set wk-wset" onclick="WorkoutLive.warm(' + i + ',' + j + ')" aria-pressed="' + !!w.done[j] + '"><span class="wk-wtick" aria-hidden="true">' + (w.done[j] ? '✓' : '') + '</span>'
+            + '<span class="wk-lv-n">' + S.warmT + ' ' + (j + 1) + '</span><span class="wk-lv-v">' + v + '</span></button>'
+            + '<button class="wk-wedit" onclick="WorkoutLive.warmEdit(' + i + ',' + j + ')" aria-label="' + S.edit + ' · ' + S.warmT + ' ' + (j + 1) + '">✎</button></div>';
+        }).join('') + '</div>';
     }
     var allDone = state.exercises.every(exDone), cc = cat(), m = W.muscleKey(ex, cc), note = W.firstOfGroup(state.exercises, i, cc) ? String(cc.notes[m] || '').trim() : '';
     return (ui.memOnly ? '<div class="wk-lv-warn">' + S.memFull + '</div>' : '') + (ui.wakeHint ? '<div class="wk-lv-cap wk-lv-hint">' + S.wake + '</div>' : '')
@@ -1263,7 +1288,7 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
-    coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
+    warmEdit: warmEdit, warmSave: warmSave, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };

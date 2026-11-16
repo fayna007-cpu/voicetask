@@ -384,11 +384,26 @@
     var ex = (s && s.exercises) || [], d = ex.filter(function (e) { return e && e.sets && e.sets.length; }).length;
     return { done: d, total: ex.length, partial: d < ex.length, sets: ex.reduce(function (a, e) { return a + (e && e.sets ? e.sets.length : 0); }, 0) };
   }
-  // Warm-up: ~40% x 8, 60% x 5, 80% x 3 of the first work target, snapped; never counted as work sets.
+  // Warm-up: the ONE ramp config (share of the first working weight, reps), snapped to the exercise's step; never counted as work sets.
+  var WARMUP_RAMP = [[0.4, 8], [0.6, 5], [0.8, 3]], WARMUP_BW_SHARE = 0.5;
+  // the exercise's setting: 'on' / 'off' / 'auto' (old data: true = on, false / missing = auto)
+  function warmupMode(ex) { var v = ex && ex.warmup; return v === true || v === 'on' ? 'on' : v === 'off' ? 'off' : 'auto'; }
+  // which exercises get a warm-up: 'on' always; 'auto' = the FIRST weighted exercise of each muscle group; 'off' never
+  function warmupIdx(exercises, cat) {
+    var seen = {}, out = [];
+    (exercises || []).forEach(function (e, i) {
+      var m = muscleKey(e, cat), bw = e.equip === 'bodyweight' || !e.step || !e.unit, mode = warmupMode(e);   // the live screen's bodyweight rule
+      if (mode === 'on') out.push(i); else if (mode === 'auto' && !bw && !seen[m]) out.push(i);
+      if (!bw) seen[m] = true;
+    });
+    return out;
+  }
+  // bodyweight (only when set to 'on'): no weight ramp; one light set at ~50% of the target reps
+  function warmupBw(reps) { return reps > 0 ? [{ w: null, r: Math.max(1, Math.round(reps * WARMUP_BW_SHARE)) }] : []; }
   function warmupSets(w, step) {
     if (!(w > 0) || !step) return [];
     var out = [];
-    [[0.4, 8], [0.6, 5], [0.8, 3]].forEach(function (f) { var x = snap(w * f[0], step); if (x < w && !out.some(function (o) { return o.w === x; })) out.push({ w: x, r: f[1] }); });
+    WARMUP_RAMP.forEach(function (f) { var x = snap(w * f[0], step); if (x < w && !out.some(function (o) { return o.w === x; })) out.push({ w: x, r: f[1] }); });
     return out;
   }
   // Epley e1RM, only from sets of 2-10 reps (an ESTIMATE); null otherwise.
@@ -589,7 +604,8 @@
       delDay: 'להסיר את היום?', addEx: '+ תרגיל', moveUp: 'הזז למעלה', moveDown: 'הזז למטה', discard: 'לצאת בלי לשמור?', noEx: 'אין עדיין תרגילים ביום הזה',
       exercise: 'תרגיל', exName: 'שם התרגיל', newEx: 'תרגיל חדש', muscleT: 'שריר', equipT: 'ציוד', unitT: 'יחידה', step: 'קפיצה', schemeT: 'שיטה',
       setsN: 'סטים', setN: function (i) { return 'סט ' + i; }, startW: 'משקל התחלה', restT: 'מנוחה', restAuto: 'אוטומטי', sec: 'שנ׳', warmT: 'חימום',
-      warmOn: 'סטי חימום לפני התרגיל', saveEx: 'שמור תרגיל', removeEx: 'הסר תרגיל', delEx: 'להסיר את התרגיל?', needName: 'צריך שם לתרגיל',
+      warmOn: 'סטי חימום לפני התרגיל', weightT: 'משקל', warmEditHint: 'לאימון הזה בלבד', warmModes: { auto: 'אוטומטי', on: 'תמיד', off: 'בלי' },
+      warmModeHint: { auto: 'לתרגיל הראשון עם משקל בכל קבוצת שרירים', on: 'לפני הסט הראשון (משקל גוף: סט קל בחצי מהחזרות)', off: 'בלי סטי חימום לתרגיל הזה' }, saveEx: 'שמור תרגיל', removeEx: 'הסר תרגיל', delEx: 'להסיר את התרגיל?', needName: 'צריך שם לתרגיל',
       range: function (i) { return 'סט ' + i + ' · טווח חזרות'; }, min: 'מינימום', max: 'מקסימום', presets: 'מוכנים',
       ready: 'מוכן?', start: 'התחל', next: 'הבא', lockerT: 'תא ציוד', warmPreview: function (n) { return 'חימום · ' + n + ' סטים'; },
       feel: 'איך אתה מרגיש?', sleep: 'שינה', energy: 'אנרגיה', pain: 'כאבים', modeT: 'היום', modes: { full: 'מלא', light: 'קל יותר', short: 'קצר' },
@@ -661,7 +677,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     lastTimeBefore: lastTimeBefore, lastNBefore: lastNBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
-    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, exProgress: exProgress, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
+    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
