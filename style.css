@@ -2097,3 +2097,5 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-card-cd .wk-card-link{flex-basis:auto;padding-inline-start:var(--wk-s1)}
 /* the summary's top line: the real number first, on its own line, then the coach's words */
 .wk-coach .wk-fact{display:block;font-size:var(--wk-fs-lead);font-weight:800;color:var(--text);margin-bottom:var(--wk-s1)}
+/* the in-content "↶ בטל" chip hides (no layout change) while the undo bar covers it: no clipped twin peeking behind the bar */
+.wk-live:has(.wk-undo-t.on) .wk-undo-c{visibility:hidden}

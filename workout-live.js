@@ -887,7 +887,7 @@
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
       + (!active && !ex.skipped || draft.actions.length > 1 ? '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
-        + (draft.actions.length > 1 ? '<button class="wk-chip" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '');
+        + (draft.actions.length > 1 ? '<button class="wk-chip wk-undo-c" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '');
   }
   // the primary bar's ONE action for the current position (the label says exactly what happens)
   function primaryAction() {
