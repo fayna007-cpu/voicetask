@@ -59,7 +59,7 @@
         body: ['{streak} שבועות ברצף. {hint}. הכול מוכן.', 'מחר {muscle}. {hint}', 'הכול מוכן למחר.']
       },
       morning: {
-        title: ['הגיע הזמן. {muscle}', '{muscle}, {mins} דק׳', 'היום אימון'],
+        title: ['הגיע הזמן. {muscle}, {mins} דק׳', '{muscle}, {mins} דק׳', 'היום אימון'],
         body: ['פעם קודמת {exercise} {lastKg}×{lastReps}. היום היעד {targetKg}. חימום קצר ואתה בפנים.', '{muscle}, {mins} דק׳. חימום קצר ומתחילים.', 'יום אימון. חימום קצר ומתחילים.']
       },
       warmup: {

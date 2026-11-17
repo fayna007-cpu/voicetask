@@ -1339,7 +1339,8 @@
   function fillNotify(type, part, vars, seed) {
     var list = CP && CP.COPY.notify[type] && CP.COPY.notify[type][part]; if (!list) return '';
     var ok = W.fillable(list, vars); if (!ok.length) return '';
-    var t = CP.pick(ok, -1).text;
+    var rich = ok.filter(function (t) { return /\{/.test(t); });          // facts-first: a fact-bearing variant wins; the plain fallback only when none fills
+    var t = CP.pick(rich.length ? rich : ok, -1).text;
     try { return W.plural(CP.fill(t, vars)); } catch (_) { return ''; }
   }
   // the filled push entries for the next window: {id,title,body,fireAt(ISO),payload}. The push server never sees this data.
