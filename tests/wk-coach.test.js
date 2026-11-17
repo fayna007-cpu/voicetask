@@ -5,6 +5,8 @@ const J = (x) => JSON.stringify(x);
 const LRI = '⁦', PDI = '⁩', iso = (s) => LRI + s + PDI;
 const V = { target: iso('28×8'), done: iso('26×8'), pr: 'חזה ' + iso('30×3'), n: iso('2'), rest: iso('90') };
 const BAN = /אשם|עצלן|עצלות|כישלון|נכשלת|פספסת|התבטלת|בושה|חבל שלא|למה לא|אכזבת|חלש|פתטי|מגעיל|מאכזב|מביך/;
+// polish 1 · S5: no pressure / gimmick phrasing (facts first, one restrained human line)
+const PRESSURE = /אתה יכול יותר|זה לא הרף שלך|זה לא כל מה שיש לך|למה מחכים|תן הכל|אל תחסוך|בלי מיקוח|לא באנו|תחזור חזק|עכשיו תרצה|אפשר יותר|אל תרפה|לא עוצרים|הכל על השולחן|לך על זה|!/;
 const visible = (s) => s.replace(/[⁦-⁩]/g, '');
 
 check('judge: exceed / met / under on reps; weight-only and reps-only differences; bodyweight (w null)', () => {
@@ -18,9 +20,9 @@ check('modes: calm / coach / fire each with a label, a hint and 3+ variants for 
   const bad = []; ['calm', 'coach', 'fire'].forEach((m) => { if (!C.MODES[m].label || !C.MODES[m].hint) bad.push(m); C.KINDS.forEach((k) => { if (!(C.MODES[m][k] && new Set(C.MODES[m][k]).size >= 3)) bad.push(m + '.' + k); }); });
   return bad.length ? J(bad) : C.DEFAULT === 'coach' ? '' : 'default';
 });
-check('every line fits the slot: <= 62 visible chars after fill (isolates not counted); no banned shaming words; no emoji', () => {
+check('every line fits the slot: <= 62 visible chars after fill (isolates not counted); no banned shaming words; no pressure / gimmick phrasing or "!"; no emoji', () => {
   const bad = [];
-  ['calm', 'coach', 'fire'].forEach((m) => C.KINDS.forEach((k) => C.MODES[m][k].forEach((t) => { const r = visible(C.fill(t, V)); if (r.length > 62) bad.push(`long ${m}.${k}: ${r}`); if (BAN.test(r)) bad.push(`ban ${m}.${k}: ${r}`); if (/\p{Extended_Pictographic}/u.test(r)) bad.push(`emoji ${m}.${k}`); })));
+  ['calm', 'coach', 'fire'].forEach((m) => C.KINDS.forEach((k) => C.MODES[m][k].forEach((t) => { const r = visible(C.fill(t, V)); if (r.length > 62) bad.push(`long ${m}.${k}: ${r}`); if (PRESSURE.test(r)) bad.push(`pressure ${m}.${k}: ${r}`); if (BAN.test(r)) bad.push(`ban ${m}.${k}: ${r}`); if (/\p{Extended_Pictographic}/u.test(r)) bad.push(`emoji ${m}.${k}`); })));
   return bad.join(' | ');
 });
 check('line(): only variants whose placeholders exist; no "{" ever returned; empty when none can be filled', () => {

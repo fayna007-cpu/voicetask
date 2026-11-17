@@ -379,11 +379,31 @@
     var i = ids.indexOf(last ? last.dayId : p.lastDay);
     return p.days[i < 0 ? 0 : (i + 1) % ids.length];
   }
-  // Warm-up: ~40% x 8, 60% x 5, 80% x 3 of the first work target, snapped; never counted as work sets.
+  // exercises done (>= 1 logged set) of all in the session: "X מתוך Y תרגילים בוצעו" + the stored partial flag
+  function exProgress(s) {
+    var ex = (s && s.exercises) || [], d = ex.filter(function (e) { return e && e.sets && e.sets.length; }).length;
+    return { done: d, total: ex.length, partial: d < ex.length, sets: ex.reduce(function (a, e) { return a + (e && e.sets ? e.sets.length : 0); }, 0) };
+  }
+  // Warm-up: the ONE ramp config (share of the first working weight, reps), snapped to the exercise's step; never counted as work sets.
+  var WARMUP_RAMP = [[0.4, 8], [0.6, 5], [0.8, 3]], WARMUP_BW_SHARE = 0.5;
+  // the exercise's setting: 'on' / 'off' / 'auto' (old data: true = on, false / missing = auto)
+  function warmupMode(ex) { var v = ex && ex.warmup; return v === true || v === 'on' ? 'on' : v === 'off' ? 'off' : 'auto'; }
+  // which exercises get a warm-up: 'on' always; 'auto' = the FIRST weighted exercise of each muscle group; 'off' never
+  function warmupIdx(exercises, cat) {
+    var seen = {}, out = [];
+    (exercises || []).forEach(function (e, i) {
+      var m = muscleKey(e, cat), bw = e.equip === 'bodyweight' || !e.step || !e.unit, mode = warmupMode(e);   // the live screen's bodyweight rule
+      if (mode === 'on') out.push(i); else if (mode === 'auto' && !bw && !seen[m]) out.push(i);
+      if (!bw) seen[m] = true;
+    });
+    return out;
+  }
+  // bodyweight (only when set to 'on'): no weight ramp; one light set at ~50% of the target reps
+  function warmupBw(reps) { return reps > 0 ? [{ w: null, r: Math.max(1, Math.round(reps * WARMUP_BW_SHARE)) }] : []; }
   function warmupSets(w, step) {
     if (!(w > 0) || !step) return [];
     var out = [];
-    [[0.4, 8], [0.6, 5], [0.8, 3]].forEach(function (f) { var x = snap(w * f[0], step); if (x < w && !out.some(function (o) { return o.w === x; })) out.push({ w: x, r: f[1] }); });
+    WARMUP_RAMP.forEach(function (f) { var x = snap(w * f[0], step); if (x < w && !out.some(function (o) { return o.w === x; })) out.push({ w: x, r: f[1] }); });
     return out;
   }
   // Epley e1RM, only from sets of 2-10 reps (an ESTIMATE); null otherwise.
@@ -430,7 +450,13 @@
     var i = parseInt(fnv(String(seed)), 16) % n; if (n > 1 && i === avoid) i = (i + 1) % n;
     return { i: i, text: list[i] };
   }
-  function fill(tpl, vars) { return String(tpl).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? vars[k] : ''; }); }
+  // counts read as Hebrew: a lone 1 (plain, <bdi>-wrapped or isolated) before a plural noun -> the singular form ("1 סטים" -> "סט אחד")
+  var ONE_FORMS = { 'סטים': 'סט אחד', 'תרגילים': 'תרגיל אחד', 'חזרות': 'חזרה אחת', 'ימים': 'יום אחד', 'אימונים': 'אימון אחד' };
+  function isOne(v) { return String(v).replace(/<[^>]*>/g, '').replace(/[⁦-⁩\s]/g, '') === '1'; }
+  function plural(text) {
+    return String(text).replace(/(^|[^\d.,:×*+\-\/])((?:<bdi[^>]*>|⁦)?1(?:<\/bdi>|⁩)?) (סטים|תרגילים|חזרות|ימים|אימונים)(?![֐-׿])/g, function (m, pre, n, noun) { return pre + ONE_FORMS[noun]; });
+  }
+  function fill(tpl, vars) { return plural(String(tpl).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? vars[k] : ''; })); }
   // The coach line after a workout: ONE line with numbers, from the strongest fact (PR > progress > steady > first).
   function coachKind(session, prs, last) {
     if (prs && prs.length) return 'pr';
@@ -476,6 +502,8 @@
   // ── A2 part 2: the live coach, the rest-end alert, read-modify-write storage, prefs ──
   var LRI = '⁦', PDI = '⁩';
   function iso(s) { return LRI + s + PDI; }                               // numerals inside plain text (the coach slot): an LTR isolate
+  // a coach number: a bodyweight value always carries its unit (never a bare "8" at the end of a line)
+  function coachNum(text, w) { return iso(text) + (w == null && text ? ' ' + TEXT.ui.reps : ''); }
   function targetText(t) { return t ? (t.w == null ? String(t.r) : fmtNum(t.w) + '×' + t.r) : ''; }
   // is THIS set a personal record against earlier sessions? (the prsFor rules: kg -> Epley e1RM on the first part; else reps at the same load)
   // -> "חזה 30×3" or null; the first time an exercise is done is never a record
@@ -500,11 +528,11 @@
   function coachMoment(state, ctx) {
     if (!state || !ctx) return null;
     var seen = ctx.seen || {};
-    if (ctx.atStart) return seen.start ? null : { kind: 'start', vars: ctx.firstTarget ? { target: iso(targetText(ctx.firstTarget)) } : {} };
+    if (ctx.atStart) return seen.start ? null : { kind: 'start', vars: ctx.firstTarget ? { target: coachNum(targetText(ctx.firstTarget), ctx.firstTarget.w) } : {} };
     if (ctx.pr) return { kind: 'pr', vars: { pr: ctx.pr } };
     if (ctx.set && ctx.target && ctx.target.r != null && typeof ctx.judge === 'function') {
       var k = ctx.judge({ w: ctx.target.w, r: ctx.target.r }, { w: ctx.set.w, r: ctx.set.r });
-      return { kind: k, vars: { target: iso(targetText(ctx.target)), done: iso(setText(ctx.set)) } };
+      return { kind: k, vars: { target: coachNum(targetText(ctx.target), ctx.target.w), done: coachNum(setText(ctx.set), ctx.set.w) } };
     }
     return null;                                                          // lastSet / halfway are ARRIVAL lines (arrivalMoment)
   }
@@ -584,9 +612,10 @@
       delDay: 'להסיר את היום?', addEx: '+ תרגיל', moveUp: 'הזז למעלה', moveDown: 'הזז למטה', discard: 'לצאת בלי לשמור?', noEx: 'אין עדיין תרגילים ביום הזה',
       exercise: 'תרגיל', exName: 'שם התרגיל', newEx: 'תרגיל חדש', muscleT: 'שריר', equipT: 'ציוד', unitT: 'יחידה', step: 'קפיצה', schemeT: 'שיטה',
       setsN: 'סטים', setN: function (i) { return 'סט ' + i; }, startW: 'משקל התחלה', restT: 'מנוחה', restAuto: 'אוטומטי', sec: 'שנ׳', warmT: 'חימום',
-      warmOn: 'סטי חימום לפני התרגיל', saveEx: 'שמור תרגיל', removeEx: 'הסר תרגיל', delEx: 'להסיר את התרגיל?', needName: 'צריך שם לתרגיל',
+      warmOn: 'סטי חימום לפני התרגיל', weightT: 'משקל', warmEditHint: 'לאימון הזה בלבד', warmModes: { auto: 'אוטומטי', on: 'תמיד', off: 'בלי' },
+      warmModeHint: { auto: 'לתרגיל הראשון עם משקל בכל קבוצת שרירים', on: 'לפני הסט הראשון (משקל גוף: סט קל בחצי מהחזרות)', off: 'בלי סטי חימום לתרגיל הזה' }, saveEx: 'שמור תרגיל', removeEx: 'הסר תרגיל', delEx: 'להסיר את התרגיל?', needName: 'צריך שם לתרגיל',
       range: function (i) { return 'סט ' + i + ' · טווח חזרות'; }, min: 'מינימום', max: 'מקסימום', presets: 'מוכנים',
-      ready: 'מוכן?', start: 'התחל', next: 'הבא', lockerT: 'תא ציוד', warmPreview: function (n) { return 'חימום · ' + n + ' סטים'; },
+      ready: 'מוכן?', start: 'התחל', next: 'הבא', lockerT: 'תא ציוד', warmPreview: function (n) { return 'חימום · ' + (isOne(n) ? 'סט אחד' : n + ' סטים'); }, noWarmBw: 'אין חימום: משקל גוף',
       feel: 'איך אתה מרגיש?', sleep: 'שינה', energy: 'אנרגיה', pain: 'כאבים', modeT: 'היום', modes: { full: 'מלא', light: 'קל יותר', short: 'קצר' },
       modeHint: { full: 'כל הסטים, היעדים הרגילים', light: 'היעדים פחות 10%', short: '2 סטים לכל תרגיל' }, suggested: 'הצעה',
       reps: 'חזרות', perHand: 'לכל יד', target: 'יעד', lastTime: 'בפעם שעברה', first: 'פעם ראשונה, מתחילים מהמשקל שהגדרת',
@@ -596,30 +625,32 @@
       pickEx: 'הוסף תרגיל', edit: 'עריכה', keep: 'שמור', warmSkip: 'דלג על החימום', warmDone: 'סט חימום בוצע',
       wake: 'השאר את המסך דולק', memFull: 'הזיכרון מלא. האימון נשמר רק כאן עד שתסיים',
       leave: 'לצאת? האימון נשמר, ותוכל להמשיך מאיפה שעצרת.', noSets: 'עוד לא נרשם אף סט. לסגור בלי לשמור?',
-      sumT: 'סיכום', duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
+      sumT: 'סיכום', setsW: function (n) { return n === 1 ? 'סט' : 'סטים'; }, duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
       backLive: 'חזרה לאימון', saveW: 'שמור אימון', existsQ: 'כבר שמרת היום אימון כזה', replace: 'החלף את הקיים', both: 'שמור את שניהם',
       saveErr: 'לא הצלחתי לשמור, אין מקום בזיכרון. האימון עדיין כאן',
       cmpFirst: 'פעם ראשונה', cmpSame: 'כמו בפעם שעברה',
       cmpWas: function (a, b) { return 'בפעם הקודמת ' + a + ' ← עכשיו ' + b; }, cmpNow: function (b) { return 'עכשיו ' + b; },
       factUp: function (l, d, u) { return l + ': <bdi dir="ltr">+' + d + '</bdi>' + (u ? ' ' + u : '') + ' מהפעם הקודמת'; },
-      factSets: function (n, m) { return n + ' סטים ב-' + m + ' דק׳'; },
+      factSets: function (n, m) { return (isOne(n) ? 'סט אחד' : n + ' סטים') + ' ב-' + m + ' דק׳'; },
 cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       cmpReps: function (d) { return d > 0 ? '+' + (d === 1 ? 'חזרה אחת' : d + ' חזרות') : (d === -1 ? 'חזרה אחת פחות' : -d + ' חזרות פחות'); },
-      prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + r + ' חזרות' + (w != null ? ' ב-' + w + ' ' + u : ''); },
+      prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + (isOne(r) ? 'חזרה אחת' : r + ' חזרות') + (w != null ? ' ב-' + w + ' ' + u : ''); },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
       rx: { exceed: 'מעל היעד', met: 'ביעד', under: 'מתחת ליעד', pr: 'שיא אישי' },   // the row tag = the same judgement as the coach
       doneSetN: function (n) { return 'סיימתי סט ' + n; }, nextExBtn: 'לתרגיל הבא ←', skipRestBtn: 'דלג על המנוחה', options: 'אפשרויות', addNote: 'הוסף הערה',
-      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + n + ' סטים נרשמו, והם יישמרו בסיכום.'; }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
+      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + (isOne(n) ? 'סט אחד נרשם, והוא יישמר בסיכום.' : n + ' סטים נרשמו, והם יישמרו בסיכום.'); },
+      finishHere: 'סיים אימון כאן', exDoneOf: function (x, y) { return x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים') + (isOne(x) ? ' בוצע' : ' בוצעו'); }, setsLogged: function (n) { return isOne(n) ? 'סט אחד נרשם' : n + ' סטים נרשמו'; },
+      savePartial: 'סיים ושמור כאימון חלקי', discardW: 'בטל בלי לשמור', partialT: function (x, y) { return 'אימון חלקי · ' + x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים'); }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
       sameAsLast: '= כמו הסט הקודם', undoToast: function (n) { return 'נרשם סט ' + n; }, undoBtn: '↶ בטל', peekT: 'שלושת האחרונים',
       restDone: function (n) { return 'המנוחה נגמרה · סט ' + n; }, restDoneNotif: function (n) { return 'המנוחה נגמרה · סט ' + n + ' מחכה'; },
-      openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + sets + ' סטים נרשמו. מה לעשות איתו?'; },
+      openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + (isOne(sets) ? 'סט אחד נרשם' : sets + ' סטים נרשמו') + '. מה לעשות איתו?'; },
       openResume: 'המשך באימון הפתוח', openFinish: 'סיים אותו', openDelete: 'מחק ללא שמירה', cancelWorkout: 'בטל אימון (ללא שמירה)',
-      cancelWorkoutQ: function (n) { return n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },
+      cancelWorkoutQ: function (n) { return n === 1 ? 'לבטל את האימון? סט אחד שנרשם יימחק ולא יישמר.' : n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },
       coachOff: 'כבוי', coachOffHint: 'בלי משפטים. הסימונים נשארים', coachModeT: 'המאמן', soundT: 'צליל', hapticT: 'רטט עדין (אם הטלפון תומך)', menuT: 'הגדרות האימון',
       soundTest: 'בדוק צליל', soundHint: 'לא שמעת? בדוק את מתג השקט בצד הטלפון', soundOk: 'הצליל נבדק',
       hapticTest: 'בדוק רטט', hapticHint: 'לא הרגשת? בדוק שרטט המערכת מופעל בהגדרות הטלפון',
       silentT: 'צליל גם במצב שקט (ניסיוני)', silentHint: 'עלול לעצור מוזיקה שמתנגנת ברקע', mascotT: 'המאמן',
-      nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + ' סטים'; },
+      nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + (isOne(y) ? ' סט' : ' סטים'); },
       testBanner: 'מצב בדיקה · לא נשמר', testStart: 'אימון בדיקה', testClose: 'סגור', testMode: 'מצב בדיקת אימון', testModeSub: 'אימון שלם בלי לשמור כלום',
       testKeep: 'לשמור את השינויים בהערות, בקפיצות ובתרגילים שהוספת?', settingsSection: 'אימונים',
       typeW: 'הקלד משקל', badW: 'משקל לא תקין', stepT: 'קפיצה', addPart: '+ חלק', partN: function (i) { return 'חלק ' + i; }, removePart: 'הסר חלק',
@@ -646,7 +677,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       pr: ['שיא חדש ב{ex}: {val}. ככה בונים כוח', '{ex}: {val}, שיא. רשמתי', 'שברת שיא ב{ex}, {val}. יפה מאוד'],
       up: ['{ex}: {delta} מהפעם שעברה. ההתקדמות אמיתית', '{delta} ב{ex}. עוד צעד קדימה', '{ex} עלה ב-{delta}. בדיוק ככה'],
       same: ['{n} סטים, יציב כמו בפעם שעברה. בפעם הבאה עוד חזרה', '{n} סטים בכיס. יציבות זה כוח', 'שמרת על הקצב: {n} סטים'],
-      first: ['אימון ראשון: {n} סטים. מכאן רק מודדים ועולים', '{n} סטים ראשונים. בפעם הבאה יהיה למה להשוות', 'התחלה טובה: {n} סטים']
+      first: ['אימון ראשון: {n} סטים. מכאן רק מודדים ועולים', 'אימון ראשון נרשם: {n} סטים. בפעם הבאה יהיה למה להשוות', 'התחלה טובה: {n} סטים']
     }
   };
 
@@ -654,7 +685,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     lastTimeBefore: lastTimeBefore, lastNBefore: lastNBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
-    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
+    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, coachNum: coachNum, plural: plural, isOne: isOne, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
