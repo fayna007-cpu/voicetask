@@ -2245,3 +2245,23 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 @keyframes wk-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 .wk-sum-m{flex-basis:84px;width:84px;height:84px}
 @media (prefers-reduced-motion:reduce){.wk-live[data-mode=ready] .wk-m-pv-c::before{animation:none}}
+/* Session 2 · A4 the REST screen: big gold ring, countdown, labeled ±15, last-set undo, next-set card */
+.wk-rest-card{align-items:stretch;gap:var(--wk-s4)}
+.wk-rest-h{text-align:center;font-size:var(--wk-fs-body);font-weight:700;color:var(--wk-mut)}
+.wk-rest-card .wk-rest{justify-content:center;margin:var(--wk-s2) 0}
+.wk-ring-xl{width:272px;height:272px;max-width:78vw;max-height:78vw}
+.wk-ring-xl .focus-ring-progress,.wk-ring-xl .focus-ring-bg{stroke-width:8}
+.wk-ring-xl .focus-ring-bg{stroke:rgba(212,176,106,.16)}
+.wk-ring-xl .focus-ring-progress{stroke:var(--wk-gold)}
+.wk-ring-xl .wk-ring-t{display:flex;flex-direction:column;align-items:center;gap:2px}
+.wk-ring-xl .wk-ring-t>bdi{font-size:76px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums;color:var(--wk-ink)}
+.wk-ring-of{font-size:13px;color:var(--wk-mut);font-variant-numeric:tabular-nums}
+.wk-rest-adj{display:flex;gap:var(--wk-s2);justify-content:center}
+.wk-rest-adj .wk-rest-b{width:auto;height:48px;min-height:48px;flex:1 1 0;max-width:180px;padding:0 var(--wk-s3);border-radius:24px;border:1px solid var(--wk-line);background:none;color:var(--wk-ink);font-family:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.wk-rest-adj .wk-rest-b:active{background:var(--surface2)}
+.wk-rest-last{display:flex;align-items:center;justify-content:space-between;gap:var(--wk-s2);min-height:44px;border-top:1px solid var(--border);padding-top:var(--wk-s2)}
+.wk-rest-undo{flex:0 0 auto}
+.wk-rest-next{border-top:1px solid var(--border);padding-top:var(--wk-s3);text-align:center}
+.wk-rest-next-h{font-size:13px;color:var(--wk-mut);margin-bottom:var(--wk-s1)}
+.wk-rest-nt{font-size:24px;font-weight:800;color:var(--wk-ink);font-variant-numeric:tabular-nums}
+.wk-rest-coach{margin-top:var(--wk-s2);color:var(--wk-gold)}

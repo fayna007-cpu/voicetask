@@ -926,11 +926,18 @@
     }).join('');
     var act = '', resting = state.rest && state.rest.endsAt > Date.now(), ended = !resting && state.rest && ui.restTouched !== state.rest.endsAt && Date.now() - state.rest.endsAt < 5 * 60e3;
     if (active && !ui.editing && resting) {
-      // REST = a hero inside the set card: "הסט הבא" + the next target, big; the ring; -15 / +15 (the bar holds "דלג על המנוחה")
-      var nt = t[Math.min(ex.sets.length, t.length - 1)];
-      act = '<div class="wk-lv-set active wk-rest-card"><div class="wk-lv-n">' + S.restNext + '</div>'
-        + '<div class="wk-lv-target">' + (bw ? '' : num(nt.w) + '<span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + num(nt.aim) + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
-        + '<div class="wk-rest"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">−15</button><div class="wk-ring"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span>' + S.rest + '</span></div></div><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">+15</button></div></div>';
+      // REST SCREEN: the finished set in the header; a big gold ring + countdown "מתוך 01:30"; labeled ±15; the last set with undo;
+      // a next-set card (the upcoming target + a last-set coach line). The dock holds "אני מוכן, דלג על המנוחה".
+      var nIdx = ex.sets.length, nt = t[Math.min(nIdx, t.length - 1)], last = ex.sets[nIdx - 1];
+      var total = Math.max(1, Math.round((state.rest.total || 0))), isLastNext = nIdx + 1 >= n;
+      var tgt = function (o, big) { return '<div class="' + (big ? 'wk-rest-nt' : 'wk-lv-cap') + '">' + (bw ? num(o.aim == null ? o.r : o.aim) + ' ' + S.reps : num(o.w) + ' ' + u + ' × ' + num(o.aim == null ? o.r : o.aim)) + '</div>'; };
+      act = '<div class="wk-lv-set active wk-rest-card">'
+        + '<div class="wk-rest-h">' + S.restFinished(h(ex.label), num(nIdx)) + '</div>'
+        + '<div class="wk-rest"><div class="wk-ring wk-ring-xl"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span class="wk-ring-of">' + S.restOf(W.iso(clock(total))) + '</span></div></div></div>'
+        + '<div class="wk-rest-adj"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">' + S.restMinus + '</button><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">' + S.restPlus + '</button></div>'
+        + (last ? '<div class="wk-rest-last"><span class="wk-lv-cap">' + S.restLastSet + ' ' + setTxt(last) + '</span><button class="wk-chip wk-rest-undo" onclick="WorkoutLive.undoSet()">' + S.undo + '</button></div>' : '')
+        + '<div class="wk-rest-next"><div class="wk-rest-next-h">' + S.nextSetOf(num(nIdx + 1), num(n)) + '</div>' + tgt(nt, true)
+        + (isLastNext ? '<div class="wk-lv-cap wk-rest-coach">' + S.restLastCoach + '</div>' : '') + '</div></div>';
     } else if (active && !ui.editing) {
       var c = cur(), tg = t[Math.min(ex.sets.length, t.length - 1)];
       // the HERO is the set you are about to log (weight × reps, live with the steppers); the target is one muted line
@@ -981,7 +988,7 @@
     var i = ui.view, ex = state.exercises[i], resting = state.rest && state.rest.endsAt > Date.now();
     var active = ex && !ex.skipped && (ex.sets.length < Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length) || ui.extra[i]) && !ui.editing;
     var others = state.exercises.filter(function (e, k) { return k !== i && !exDone(e); }).length;
-    if (resting && active) return { label: S.skipRestBtn, fn: 'WorkoutLive.restSkip()', cls: 'wk-skip' };
+    if (resting && active) return { label: S.restReady, fn: 'WorkoutLive.restSkip()', cls: 'wk-skip' };
     if (active) {
       var lastOfEx = ex.sets.length + 1 >= Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length + (ui.extra[i] ? 1 : 0)) && !ui.extra[i];
       if (lastOfEx && !others) return { label: S.finish, fn: 'WorkoutLive.logSet(\'finish\')', cls: 'wk-done' };
