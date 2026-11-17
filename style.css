@@ -2182,3 +2182,40 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-sum-hero{flex-wrap:wrap;row-gap:var(--wk-s2)}
 @media (max-width:380px){.wk-sum-hero{gap:var(--wk-s4)}.wk-sum-m{flex-basis:96px;width:96px;height:96px}.wk-sum-k b{font-size:48px}}
 .wk-warm-none{margin:0 0 var(--wk-s3);min-height:20px}
+/* ═══ Session 1 · the HOME hero: the today/next workout invites, changing shape through the day. wk- only, append-only. ═══ */
+.wk-hero{border-radius:28px;margin:0 0 8px;padding:20px;overflow:hidden;position:relative}
+.wk-hero::before{display:none}                                           /* the hero owns its surface, not the state stripe */
+.wk-hero .wk-card-top{color:#9A968C;margin-bottom:10px}
+.wk-hero .wk-card-cap{font-size:13px;font-weight:700;color:#D4B06A;letter-spacing:.02em;margin-bottom:4px}
+.wk-hero .wk-card-h{font-size:34px;font-weight:800;line-height:1.12;color:#F3EEE3}
+.wk-hero .wk-card-d{font-size:15px;line-height:1.5;color:#C9C3B6;margin-top:8px}
+.wk-hero .wk-card-d bdi{color:#D4B06A;font-weight:700}                    /* the key number carries the gold */
+.wk-hero .wk-card-meta{font-size:13px;color:#9A968C;margin-top:10px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+/* OPEN: warm dark gradient, gold rim, a breathing CTA */
+.wk-st-open.wk-hero{background:linear-gradient(160deg,#2B2415,#17140D 55%,#121214);border:1px solid rgba(212,176,106,.28)}
+.wk-st-open.wk-hero .wk-card-btn.primary{min-height:58px;border-radius:29px;border:none;margin-top:16px;background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;font-size:17px;font-weight:800;box-shadow:0 6px 22px rgba(201,164,92,.35);animation:wk-hero-glow 3.2s ease-in-out infinite}
+.wk-st-open.wk-hero .wk-card-warm{display:block;width:100%;margin-top:8px;color:#9A968C;font-weight:600;background:none;border:none}
+@keyframes wk-hero-glow{0%,100%{box-shadow:0 6px 18px rgba(201,164,92,.28)}50%{box-shadow:0 8px 30px rgba(227,197,138,.5)}}
+/* LOCKED: dark, thin gold border, lock in a gold ring, the countdown in tabular numerals */
+.wk-st-locked.wk-hero{background:#141210;border:1px solid rgba(212,176,106,.22)}
+.wk-st-locked.wk-hero .wk-card-cap{color:#9A968C}
+.wk-st-locked.wk-hero .wk-card-cd{color:#D4B06A;font-variant-numeric:tabular-nums}
+.wk-st-locked.wk-hero .wk-card-cd bdi{font-variant-numeric:tabular-nums}
+/* IN PROGRESS: a conic ring badge "N/M" */
+.wk-st-progress.wk-hero{background:linear-gradient(160deg,#20201A,#16140F);border:1px solid rgba(212,176,106,.2)}
+.wk-ring-badge{width:60px;height:60px;border-radius:50%;margin:12px 0 4px;display:flex;align-items:center;justify-content:center;background:conic-gradient(#D4B06A calc(var(--f,0)*360deg),rgba(212,176,106,.18) 0)}
+.wk-ring-badge span{width:46px;height:46px;border-radius:50%;background:#16140F;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#F3EEE3;font-variant-numeric:tabular-nums}
+/* DONE: calm green, the real volume large */
+.wk-st-done.wk-hero{background:linear-gradient(160deg,#16211A,#121614);border:1px solid rgba(143,209,168,.24)}
+.wk-st-done.wk-hero .wk-card-cap{color:#8FD1A8}
+.wk-st-done.wk-hero .wk-card-h{color:#EAF4EC}
+.wk-st-done.wk-hero .wk-card-d bdi{color:#8FD1A8}
+/* the two fact sub-cards under the hero */
+.wk-hero-extra{display:flex;gap:8px;margin:0 0 10px}
+.wk-sub{flex:1 1 0;min-width:0;padding:12px 14px;border-radius:16px;background:var(--surface,#1a1a1f);border:1px solid var(--border,rgba(255,255,255,.08));display:flex;flex-direction:column;gap:8px}
+.wk-sub-dots{display:flex;gap:5px}
+.wk-dot{width:9px;height:9px;border-radius:50%;background:rgba(212,176,106,.22)}
+.wk-dot.on{background:#D4B06A}
+.wk-sub-k{font-size:18px;color:#D4B06A}
+.wk-sub-t{font-size:12px;color:#9A968C;line-height:1.4}
+@media (prefers-reduced-motion:reduce){.wk-st-open.wk-hero .wk-card-btn.primary{animation:none}}

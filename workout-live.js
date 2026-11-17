@@ -1167,6 +1167,43 @@
   // ── WorkoutHome: the HOME card of a workout routine (null = the regular card renders, byte-identical) ──
   var C = T.card;
   function programFor(r) { return programById(r && r.programId || null); }
+  // ONE brief per render (cached ~1.5 s): the home hero + the notification journey read the same numbers
+  var briefCache = null, briefAt = 0;
+  function homeBrief() {
+    var now = Date.now(); if (briefCache && now - briefAt < 1500) return briefCache;
+    var insts = [];
+    try {
+      allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }).forEach(function (r) {
+        (window.listRoutineInstances ? window.listRoutineInstances(r) : []).forEach(function (i) { insts.push({ routineId: String(r.id), dt: i.dt, completed: i.completed, skipped: i.skipped }); });
+      });
+    } catch (_) { }
+    var dft = readDraft();
+    try {
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ }, now) : null;
+    } catch (_) { briefCache = null; }
+    briefAt = now; return briefCache;
+  }
+  // the hero's muted meta line "52 דק׳ · 6 תרגילים · 18 סטים" (from the plan; each part only if known)
+  function heroMeta(b) {
+    var w = b && b.workout; if (!w) return '';
+    var parts = [w.mins ? num(w.mins) + ' ' + S.minutes('').trim() : '', w.exercises ? W.plural(num(w.exercises) + ' תרגילים') : '', w.sets ? W.plural(num(w.sets) + ' סטים') : ''].filter(Boolean);
+    return parts.length ? '<div class="wk-card-meta">' + parts.join(' · ') + '</div>' : '';
+  }
+  // under the hero: weekly dots + the streak, and the last personal record — small, muted, facts only
+  function heroSub(b) {
+    if (!b || !b.facts) return '';
+    var f = b.facts, wk = '';
+    if (f.weekPlanned > 0) {
+      var dots = '';
+      for (var i = 0; i < Math.min(7, f.weekPlanned); i++) dots += '<i class="wk-dot' + (i < f.weekDone ? ' on' : '') + '"></i>';
+      wk = '<div class="wk-sub"><div class="wk-sub-dots">' + dots + '</div><div class="wk-sub-t">' + (f.streakWeeks > 1 ? W.plural(num(f.streakWeeks) + ' שבועות ברצף') : S.weekProg(num(f.weekDone), num(f.weekPlanned))) + '</div></div>';
+    }
+    var pr = '';
+    if (b.targets && b.targets.exercise && (f.prCount || f.nearPR)) {
+      pr = '<div class="wk-sub"><div class="wk-sub-k">' + (f.nearPR ? '◎' : '★') + '</div><div class="wk-sub-t">' + h(f.nearPR ? S.nearPRL(h(b.targets.exercise)) : S.lastPRL) + '</div></div>';
+    }
+    return wk || pr ? '<div class="wk-hero-extra">' + wk + pr + '</div>' : '';
+  }
   function card(inst, r) {
     if (!enabled() || !r || r.kind !== 'workout' || !inst || !inst.datetime) return null;
     var now = Date.now(), dft = readDraft(), mine = dft && String(dft.s.routineId) === String(r.id) && dft.s.dateStr === inst.dateStr;
@@ -1207,10 +1244,17 @@
     var sec = st !== 'done' && st !== 'progress' ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
       + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
+    // the hero: the brief's today/next instance in a focus state; a caption, the plan meta, a gold key number, two fact sub-cards
+    var b = homeBrief(), isHero = b && b.instance && String(b.instance.routineId) === String(r.id) && b.instance.dt === inst.dateStr && (st === 'open' || st === 'locked' || st === 'progress' || st === 'done');
+    var cap = isHero ? '<div class="wk-card-cap">' + h(st === 'open' ? C.todayCap : st === 'locked' ? C.unlockCap(num(time)) : st === 'progress' ? C.todayCap : S.sumT) + '</div>' : '';
+    var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
+    if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span>' + num(dn) + '/' + num(tot) + '</span></div>'; }
+    var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
+    var sub = isHero ? heroSub(b) : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
-    return '<div class="wk-card wk-st-' + st + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
+    return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
       + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
-      + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + cd + btn + sec + '</div>';
+      + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
   function copyVars(st, r, inst, dt, dayName, d, dft, done, prs, now, cdSpan, unlockAt) {
