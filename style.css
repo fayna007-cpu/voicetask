@@ -2277,3 +2277,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-hero-pad{height:76px}                 /* reserve space so the fact cards clear the mic FAB (320-430) */
 .wk-notif-ctrl,#wkNotifBox .settings-row>.wk-time{margin-inline-end:8px}
 #wkNotifBox .settings-row{gap:8px}
+/* Session 2 · A5 the READY CTA: a 62px gold pill (gold = the workout CTA) with a breathing glow */
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big{min-height:62px;height:62px;border-radius:31px;font-size:18px;font-weight:800;background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 22px rgba(201,164,92,.35)}
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{box-shadow:0 0 26px rgba(227,197,138,.5);opacity:.3;animation:wk-hero-glow 3.2s ease-in-out infinite}
+.wk-live[data-mode=ready] .wk-ready-h .wk-pill{border-color:var(--wk-line);color:var(--wk-gold)}
