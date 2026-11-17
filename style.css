@@ -2219,3 +2219,5 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-sub-k{font-size:18px;color:#D4B06A}
 .wk-sub-t{font-size:12px;color:#9A968C;line-height:1.4}
 @media (prefers-reduced-motion:reduce){.wk-st-open.wk-hero .wk-card-btn.primary{animation:none}}
+/* Session 1 · the workout-notifications settings row: a native time input styled to the sheet */
+.wk-time{background:var(--surface2,#222);color:var(--text);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:10px;padding:6px 10px;font-family:inherit;font-size:15px;min-height:36px}

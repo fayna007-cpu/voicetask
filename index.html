@@ -1828,6 +1828,13 @@ function _v2RouteAction(action,type,id){
     mppSpawnFromPayload({type,id});
     return true;
   }
+  // Workout (Session 1): any tap/action lands on the READY screen preloaded (never auto-starts a session).
+  // "warm" focuses the warm-up; "mute" silences the rest of today. id = <routineId>__<dateStr>.
+  if(type==='workout'){
+    const parts=String(id).split('__');
+    try{window.WorkoutHome&&WorkoutHome.openFromNotif(parts[0],parts.slice(1).join('__'),action);}catch(e){console.error('[v2:route] workout open failed',e);}
+    return true;
+  }
   console.warn('[v2:route] unhandled action/type combo');
   return false;
 }
@@ -2323,6 +2330,12 @@ function buildSmartPushBatch(windowMs){
       const bid=parts[parts.length-1];const stage=parts.length>=3?parts[1]:'primary';
       return{type:'bill',id:bid,stage};
     }
+    if(id.startsWith('wk_')){
+      // wk_<stage>_<routineId>_<dateStr>  (routineId / stage carry no underscore; dateStr is an ISO string)
+      const rest=id.slice(3),i1=rest.indexOf('_');if(i1<0)return null;
+      const stage=rest.slice(0,i1),r2=rest.slice(i1+1),i2=r2.indexOf('_');if(i2<0)return null;
+      return{type:'workout',id:r2.slice(0,i2)+'__'+r2.slice(i2+1),stage};
+    }
     return null;// morning_ (daily briefing) and others — no per-item payload
   }
   const V2_DEFAULT_ACTIONS=[{action:'done',title:'✓ בוצע'},{action:'snooze',title:'⏰ דחה'}];
@@ -2570,6 +2583,14 @@ function buildSmartPushBatch(windowMs){
       if(shifted.getTime()!==new Date(e.fireAt).getTime())e.fireAt=shifted.toISOString();
     }
   }
+  // Workout journey (Session 1): WkBrief supplies the fire times + copy, already quiet-hours-filtered and capped 3/day.
+  // The push server never sees the data — only the rendered title/body + a {type:'workout'} deep-link payload.
+  try{
+    if(window.WorkoutHome&&WorkoutHome.notifs){
+      const wacts=[{action:'warm',title:'התחל חימום'},{action:'mute',title:'השתק את היום'}];
+      WorkoutHome.notifs(now.getTime(),WIN).forEach(n=>queue(n.id,n.title,n.body,new Date(n.fireAt),{payload:n.payload,actions:wacts}));
+    }
+  }catch(_){}
   return batch;
 }
 let _calCache=[];

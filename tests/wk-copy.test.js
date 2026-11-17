@@ -1,6 +1,6 @@
 const assert=require('assert');const {COPY,pick,fill}=require('../wk-copy.js');   // copied from alfred-archive; only this path changed (tests/ lives one level down)
-const ALLOWED=new Set('name day time unlock countdown last target pr elapsed duration sets setN exN exTotal n mins'.split(' '));
-const SAMPLE={name:'אימון B',day:'שלישי',time:'18:00',unlock:'17:30',countdown:'01:42:10',last:'חזה 28×3, 24×8',target:'28×3',pr:'חזה 30×3',elapsed:'24:10',duration:'52',sets:'14',setN:'3',exN:'2',exTotal:'6',n:'3',mins:'20'};
+const ALLOWED=new Set('name day time unlock countdown last target pr elapsed duration sets setN exN exTotal n mins muscle streak hint exercise lastKg lastReps targetKg done planned'.split(' '));
+const SAMPLE={name:'אימון B',day:'שלישי',time:'18:00',unlock:'17:30',countdown:'01:42:10',last:'חזה 28×3, 24×8',target:'28×3',pr:'חזה 30×3',elapsed:'24:10',duration:'52',sets:'14',setN:'3',exN:'2',exTotal:'6',n:'3',mins:'20',muscle:'חזה',streak:'3',hint:'20 דק׳, 6 תרגילים',exercise:'חזה',lastKg:'20',lastReps:'6',targetKg:'22',done:'2',planned:'3'};
 const BAN=/אשם|עצלן|עצלות|כישלון|נכשלת|פספסת|התבטלת|בושה|חבל שלא|למה לא|אכזבת/;
 const PRESSURE=/אתה יכול יותר|זה לא הרף שלך|זה לא כל מה שיש לך|למה מחכים|תן הכל|אל תחסוך|בלי מיקוח|לא באנו|לעבור את|עוברים אותו|עומד להישבר|מזיזים אותו|לך על זה|!/;   // polish 1: facts first, no pressure
 const emoji=s=>(s.match(/\p{Extended_Pictographic}/gu)||[]).length;
