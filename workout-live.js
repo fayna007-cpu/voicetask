@@ -1246,9 +1246,9 @@
     setTimeout(ensureTicker, 0);
     // the hero: the brief's today/next instance in a focus state; a caption, the plan meta, a gold key number, two fact sub-cards
     var b = homeBrief(), isHero = b && b.instance && String(b.instance.routineId) === String(r.id) && b.instance.dt === inst.dateStr && (st === 'open' || st === 'locked' || st === 'progress' || st === 'done');
-    var cap = isHero ? '<div class="wk-card-cap">' + h(st === 'open' ? C.todayCap : st === 'locked' ? C.unlockCap(num(time)) : st === 'progress' ? C.todayCap : S.sumT) + '</div>' : '';
+    var cap = isHero ? '<div class="wk-card-cap">' + (st === 'locked' ? C.unlockCap(num(time)) : h(st === 'done' ? S.sumT : C.todayCap)) + '</div>' : '';
     var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
-    if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span>' + num(dn) + '/' + num(tot) + '</span></div>'; }
+    if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>'; }
     var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
     var sub = isHero ? heroSub(b) : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
