@@ -572,9 +572,32 @@
     sound('tick'); haptic(); render(); reveal(); undoToast(slot + 1);
     if (then === 'finish') { finishOpen(); return; }                       // the final set of the final exercise: straight to the summary
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
-    var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: W.isPR(done, ex, sessions()), judge: CO && CO.judge, seen: ui.coachSeen });
+    var pr = W.isPR(done, ex, sessions());
+    var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: pr, judge: CO && CO.judge, seen: ui.coachSeen });
     if (m) coachSay(m); else { ui.coachLine = null; coachFallback(); }     // no target -> no judgement, the slot shows the next target
+    if (pr) { var pi = W.prInfo(done, ex, sessions()); if (pi) showPR(pi, ex.label); }   // the gold PR MOMENT
   }
+  // ── the PR MOMENT: a warm gold full-bleed moment; the character, the record, the delta; closes on tap or after 3 s ──
+  var prM = null, prTimer = 0;
+  function prEl() {
+    var e = $('wkPr'); if (e) return e;
+    e = document.createElement('div'); e.id = 'wkPr'; e.className = 'wk-prm'; e.dir = 'rtl'; e.setAttribute('role', 'dialog'); e.setAttribute('aria-live', 'assertive');
+    e.innerHTML = '<div class="wk-prm-m" id="wkPrM" aria-hidden="true"></div><div class="wk-prm-t">' + S.prMomentT + '</div><div class="wk-prm-ex" id="wkPrEx"></div><div class="wk-prm-n"><bdi dir="ltr" id="wkPrN"></bdi></div><div class="wk-prm-d" id="wkPrD"></div><div class="wk-prm-sub" id="wkPrSub"></div><div class="wk-prm-hint">' + S.prHint + '</div>';
+    e.addEventListener('click', hidePR); document.body.appendChild(e); return e;
+  }
+  function showPR(info, label) {
+    var e = prEl();
+    $('wkPrEx').textContent = label;
+    $('wkPrN').textContent = info.set.replace(/[⁦-⁩]/g, '');
+    var d = $('wkPrD'); d.innerHTML = info.kind === 'e1rm' && info.prev > 0 ? S.prDeltaKg(num(info.deltaKg)) : info.kind === 'reps' && info.deltaReps > 0 && info.prev > 0 ? S.prDeltaReps(num(info.deltaReps)) : '';
+    d.hidden = !d.innerHTML;
+    var sub = $('wkPrSub'); sub.textContent = info.streak >= 2 ? S.prStreak(info.streak) : '';   // only when the streak is real
+    sub.hidden = !sub.textContent;
+    e.classList.add('on'); haptic();
+    try { if (!prM && window.WkMascot) prM = window.WkMascot.mount($('wkPrM'), { mode: 'fire' }); if (prM) prM.set('pr'); } catch (_) { }
+    clearTimeout(prTimer); prTimer = setTimeout(hidePR, 3000);            // closes on tap OR after 3 s (both themes)
+  }
+  function hidePR() { var e = $('wkPr'); if (e) e.classList.remove('on'); clearTimeout(prTimer); }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
   function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) { } }
   // "= כמו הסט הקודם": the previous set of this exercise prefills the active one (a combined set keeps its parts)
@@ -1419,7 +1442,7 @@
     warmEdit: warmEdit, warmSave: warmSave, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
-    state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
+    showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
   function injectSettings() {
     if ($('wkTestRow') || !enabled()) return;
