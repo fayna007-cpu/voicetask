@@ -622,7 +622,8 @@
       first: ['פעם ראשונה עם {day}. מתחילים רגוע', '{day} בפעם הראשונה. נבנה בסיס', 'אימון ראשון ב{day}. בלי לחץ'],
       unlocks: 'נפתח בעוד', openNow: 'פתח עכשיו', prepare: 'הכן אותי', start: 'התחל אימון', resume: 'המשך אימון', postpone: 'דחייה', skip: 'דלג',
       pr: function (t) { return 'שיא: ' + t; }, greetToday: function (t) { return 'היום אימון ב-' + t; }, greetOpen: 'האימון פתוח',
-      todayCap: 'האימון של היום', warmupLink: 'או התחל בחימום', unlockCap: function (t) { return 'נפתח ב-' + t; }
+      todayCap: 'האימון של היום', warmupLink: 'או התחל בחימום', unlockCap: function (t) { return 'נפתח ב-' + t; },
+      volumeWord: 'נפח כולל', whatsNext: function (x) { return 'מה הלאה: ' + x; }, nextExLabel: function (x) { return 'הבא: ' + x; }
     },
     ui: {
       close: 'סגור', back: 'חזרה', save: 'שמור', cancel: 'ביטול', ok: 'אישור', none: 'אין', remove: 'הסר', more: 'עוד',

@@ -1268,19 +1268,25 @@
     var arg = js({ routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }), go = 'event.stopPropagation();Workout.start(' + arg + ')';
     var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
+    setTimeout(ensureTicker, 0);
+    // the hero (computed early so the states below can use it): the brief's today/next instance in a focus state
+    var b = homeBrief(), isHero = b && b.instance && String(b.instance.routineId) === String(r.id) && b.instance.dt === inst.dateStr && (st === 'open' || st === 'locked' || st === 'progress' || st === 'done');
+    // in-progress: the NEXT exercise still to do (from the draft)
+    var nextExName = '';
+    if (isHero && st === 'progress' && dft) { var xs = dft.s.exercises, from = dft.s.exIdx == null ? 0 : dft.s.exIdx; for (var qi = 1; qi <= xs.length; qi++) { var jj = (from + qi) % xs.length, ee = xs[jj]; if (!ee.skipped && ee.sets.length < ((ee.scheme && ee.scheme.sets) || 3)) { nextExName = ee.label; break; } } }
     var btn = st === 'tomorrow' ? '<button class="wk-card-btn ghost" onclick="' + go + '">' + cta(C.prepare) + '</button>'
       : st === 'open' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.start) + '</button>'
       : st === 'progress' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.resume) + '</button>' : '';
-    var sec = st !== 'done' && st !== 'progress' ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
+    // the hero open state drops the דחייה/דלג row (it owns the screen); other states keep it
+    var sec = st !== 'done' && st !== 'progress' && !(isHero && st === 'open') ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
       + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
-    setTimeout(ensureTicker, 0);
-    // the hero: the brief's today/next instance in a focus state; a caption, the plan meta, a gold key number, two fact sub-cards
-    var b = homeBrief(), isHero = b && b.instance && String(b.instance.routineId) === String(r.id) && b.instance.dt === inst.dateStr && (st === 'open' || st === 'locked' || st === 'progress' || st === 'done');
     var cap = isHero ? '<div class="wk-card-cap">' + (st === 'locked' ? C.unlockCap(num(time)) : h(st === 'done' ? S.sumT : C.todayCap)) + '</div>' : '';
     var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
-    if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>'; }
+    if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-prog-row"><div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>' + (nextExName ? '<div class="wk-card-next">' + S.nextExLabel(h(nextExName)) + '</div>' : '') + '</div>'; }
+    // done: lead with the real volume + "מה הלאה"
+    if (isHero && st === 'done' && done) { meta = '<div class="wk-card-vol"><b>' + num(Math.round(W.volume(done))) + '</b> ' + T.unit.kg + ' · ' + S.volumeWord + '</div>' + (d ? '<div class="wk-card-next">' + S.whatsNext(h(d.name)) + '</div>' : ''); }
     var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
-    var sub = isHero ? heroSub(b) : '';
+    var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
     return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
       + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
@@ -1473,9 +1479,9 @@
     var toggle = function (on, fn) { return '<label class="rtoggle"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + fn + '"><span class="rtoggle-sl"></span></label>'; };
     var html = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🔔</div><div class="settings-row-body"><div class="settings-row-title">' + S.notifOnT + '</div><div class="settings-row-sub">' + S.notifOnSub + '</div></div>' + toggle(c.on, 'WorkoutLive.notifSet(\'on\',this.checked)') + '</div>';
     if (c.on) {
-      html += row(S.notifEvening, '', '<input type="time" class="wk-time" value="' + c.evening + '" onchange="WorkoutLive.notifSet(\'evening\',this.value)">')
-        + row(S.notifMorning, '', '<input type="time" class="wk-time" value="' + c.morning + '" onchange="WorkoutLive.notifSet(\'morning\',this.value)">');
-      html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
+      // the evening / morning time chip lives INSIDE its own toggle row (no duplicated rows)
+      var timeFor = function (k) { return k === 'eveningBefore' ? '<input type="time" class="wk-time" value="' + c.evening + '" onchange="WorkoutLive.notifSet(\'evening\',this.value)" onclick="event.stopPropagation()">' : k === 'morning' ? '<input type="time" class="wk-time" value="' + c.morning + '" onchange="WorkoutLive.notifSet(\'morning\',this.value)" onclick="event.stopPropagation()">' : ''; };
+      html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', timeFor(k) + toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
     }
     nbox.innerHTML = html;
   }

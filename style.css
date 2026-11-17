@@ -2265,3 +2265,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-rest-next-h{font-size:13px;color:var(--wk-mut);margin-bottom:var(--wk-s1)}
 .wk-rest-nt{font-size:24px;font-weight:800;color:var(--wk-ink);font-variant-numeric:tabular-nums}
 .wk-rest-coach{margin-top:var(--wk-s2);color:var(--wk-gold)}
+/* Session 2 · B1 Session-1 hero fixes: progress gold CTA + next, done volume-first, clearer dots, FAB reserve */
+.wk-st-progress.wk-hero .wk-card-btn.primary{background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 18px rgba(201,164,92,.3);animation:none}
+.wk-prog-row{display:flex;align-items:center;gap:var(--wk-s3);margin:var(--wk-s2) 0}
+.wk-card-next{font-size:14px;color:var(--wk-mut);font-weight:600}
+.wk-card-vol{font-size:14px;color:var(--wk-mut);margin:var(--wk-s2) 0 2px}
+.wk-card-vol b{font-size:34px;font-weight:800;color:var(--wk-green);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.wk-st-done.wk-hero .wk-card-next{color:var(--wk-green)}
+.wk-dot{width:11px;height:11px;background:rgba(212,176,106,.28)}
+.wk-dot.on{background:#D4B06A;box-shadow:0 0 6px rgba(212,176,106,.5)}
+.wk-hero-pad{height:76px}                 /* reserve space so the fact cards clear the mic FAB (320-430) */
+.wk-notif-ctrl,#wkNotifBox .settings-row>.wk-time{margin-inline-end:8px}
+#wkNotifBox .settings-row{gap:8px}
