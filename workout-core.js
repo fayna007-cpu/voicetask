@@ -601,7 +601,8 @@
       last: ['בפעם שעברה {ex} {set}, היום יש מה לשבור', 'בפעם שעברה {ex} {set}. ממשיכים משם', '{ex} {set} בפעם שעברה. היום עוד קצת'],
       first: ['פעם ראשונה עם {day}. מתחילים רגוע', '{day} בפעם הראשונה. נבנה בסיס', 'אימון ראשון ב{day}. בלי לחץ'],
       unlocks: 'נפתח בעוד', openNow: 'פתח עכשיו', prepare: 'הכן אותי', start: 'התחל אימון', resume: 'המשך אימון', postpone: 'דחייה', skip: 'דלג',
-      pr: function (t) { return 'שיא: ' + t; }, greetToday: function (t) { return 'היום אימון ב-' + t; }, greetOpen: 'האימון פתוח'
+      pr: function (t) { return 'שיא: ' + t; }, greetToday: function (t) { return 'היום אימון ב-' + t; }, greetOpen: 'האימון פתוח',
+      todayCap: 'האימון של היום', warmupLink: 'או התחל בחימום', unlockCap: function (t) { return 'נפתח ב-' + t; }
     },
     ui: {
       close: 'סגור', back: 'חזרה', save: 'שמור', cancel: 'ביטול', ok: 'אישור', none: 'אין', remove: 'הסר', more: 'עוד',
@@ -653,11 +654,14 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + (isOne(y) ? ' סט' : ' סטים'); },
       testBanner: 'מצב בדיקה · לא נשמר', testStart: 'אימון בדיקה', testClose: 'סגור', testMode: 'מצב בדיקת אימון', testModeSub: 'אימון שלם בלי לשמור כלום',
       testKeep: 'לשמור את השינויים בהערות, בקפיצות ובתרגילים שהוספת?', settingsSection: 'אימונים',
+      notifSection: 'התראות אימון', notifOnT: 'התראות אימון', notifOnSub: 'תזכורות לפני ובזמן האימון', notifEvening: 'ערב קודם', notifMorning: 'בוקר האימון',
+      notifType: { eveningBefore: 'ערב לפני', morning: 'בוקר האימון', warmup: 'חימום (45 דק׳ לפני)', unlock: 'פתיחת האימון', rescue: 'תזכורת אחרונה', fridayTeaser: 'סיכום שישי' },
       typeW: 'הקלד משקל', badW: 'משקל לא תקין', stepT: 'קפיצה', addPart: '+ חלק', partN: function (i) { return 'חלק ' + i; }, removePart: 'הסר חלק',
       swap: 'החלף', swapT: function (m) { return 'החלפה · ' + m; }, remember: 'זכור כברירת מחדל', addVariant: 'הוסף', variantName: 'תרגיל אחר מאותה קבוצה',
       swappedFrom: function (l) { return 'במקום ' + l; }, noteT: function (m) { return 'הערה · ' + m; }, noteEdit: 'הערה', noteHint: 'הערה קבועה לקבוצת השריר', noteGroup: 'הערה לקבוצת השריר',
       locked: 'האימון של היום כבר הושלם', lockedSheet: 'האימון של היום כבר הושלם. נתראה באימון הבא',
-      lockerN: function (n) { return 'תא ' + n; }, kindT: 'סוג', kinds: { regular: 'רגיל', workout: 'אימון' }, minutes: function (n) { return n + ' דק׳'; }, open: 'יש אימון פתוח', resume: 'המשך', saveOld: 'שמור', delOld: 'מחק', delConfirm: 'למחוק את האימון הפתוח?',
+      lockerN: function (n) { return 'תא ' + n; }, kindT: 'סוג', kinds: { regular: 'רגיל', workout: 'אימון' }, minutes: function (n) { return n + ' דק׳'; },
+      weekProg: function (d, p) { return d + ' מתוך ' + p + ' השבוע'; }, nearPRL: function (ex) { return 'מחר שיא אפשרי ב' + ex; }, lastPRL: 'השיא האחרון שלך', open: 'יש אימון פתוח', resume: 'המשך', saveOld: 'שמור', delOld: 'מחק', delConfirm: 'למחוק את האימון הפתוח?',
       markQ: 'לסמן את השגרה כבוצעה?', mark: 'סמן כבוצעה', notNow: 'לא עכשיו', attachQ: 'לצרף לשגרה של היום?', attach: 'צרף', without: 'בלי', marked: 'סומן. כל הכבוד',
       asstStart: 'פותח את האימון.', asstNone: 'עוד אין תוכנית אימון. פותח את התוכניות.', asstNext: function (d, p, w) { return 'האימון הבא: ' + d + ' (' + p + ')' + (w ? ', ' + w : '') + '.'; },
       asstWhen: function (t) { return 'בשגרה: ' + t; }, asstOff: 'האימון החי כבוי כרגע.'
