@@ -293,6 +293,14 @@
     if (resting && ui.mRestFor !== r.endsAt) { ui.mRestFor = r.endsAt; ui.mCount = 0; setTimeout(function () { try { if (mascot && state && state.rest && state.rest.endsAt === r.endsAt) mascot.look(0, 1, 2600); } catch (_) { } }, 1300); }
     if (resting && left >= 1 && left <= 3 && ui.mCount !== left) { ui.mCount = left; try { mascot.set('count'); } catch (_) { } }
   }
+  // the REST character: 96 px in its fixed reserved slot (CLS 0); lazy, breathes with the ring; one instance reused
+  var restM = null;
+  function restMount() {
+    var el = $('wkRestChar'); if (!el) { restKill(); return; }
+    if (el.firstChild) { try { if (restM) restM.breathe(true); } catch (_) { } return; }
+    afterPaint(function () { var e = $('wkRestChar'); if (!e || e.firstChild || !window.WkMascot) return; try { restM = window.WkMascot.mount(e, { mode: mascotMode() }); restM.breathe(true); } catch (_) { restM = null; } });
+  }
+  function restKill() { if (restM) { try { restM.destroy(); } catch (_) { } restM = null; } }
   // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
   var sumM = null;
   function sumMount() {
@@ -825,7 +833,7 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); }   // the slot is never left empty on a re-render
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) restMount(); else restKill(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
@@ -952,6 +960,7 @@
       var total = Math.max(1, Math.round((state.rest.total || 0))), isLastNext = nIdx + 1 >= n;
       var tgt = function (o, big) { return '<div class="' + (big ? 'wk-rest-nt' : 'wk-lv-cap') + '">' + (bw ? num(o.aim == null ? o.r : o.aim) + ' ' + S.reps : num(o.w) + ' ' + u + ' × ' + num(o.aim == null ? o.r : o.aim)) + '</div>'; };
       act = '<div class="wk-lv-set active wk-rest-card">'
+        + '<div class="wk-rest-char" id="wkRestChar" aria-hidden="true"></div>'   // the 96px rest character (fixed reserved slot -> CLS 0)
         + '<div class="wk-rest-h">' + S.restFinished(h(ex.label), num(nIdx)) + '</div>'
         + '<div class="wk-rest"><div class="wk-ring wk-ring-xl"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span class="wk-ring-of">' + S.restOf(W.iso(clock(total))) + '</span></div></div></div>'
         + '<div class="wk-rest-adj"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">' + S.restMinus + '</button><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">' + S.restPlus + '</button></div>'

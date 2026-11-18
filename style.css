@@ -2299,3 +2299,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-ready-links .wk-lv-link{min-height:44px;color:var(--wk-mut);font-weight:600}
 .wk-ready-links .wk-sep{color:var(--wk-mut)}
 .wk-ready-checks{margin:var(--wk-s2) 0}
+/* Session 3 · A2 the REST character: 96px in a fixed reserved slot (CLS 0); the top coach-slot mascot hides during rest */
+.wk-rest-char{width:96px;height:96px;flex:0 0 96px;margin:0 auto var(--wk-s1)}
+.wk-rest-char .wkm-bubble{display:none}
+.wk-lv-scroll:has(.wk-rest-char) .wk-coach-slot .wk-mascot{visibility:hidden}
