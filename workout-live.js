@@ -1154,7 +1154,7 @@
       if (a) {
         W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
         sound('rest'); var first = a.kind === 'end' && ui.chimed !== r.endsAt;
-        if (a.kind === 'end') { acquireWake(); if (first) ui.chimed = r.endsAt; }
+        if (a.kind === 'end') { acquireWake(); if (first) { ui.chimed = r.endsAt; haptic(); } }   // A12b: a best-effort haptic paired to the rest-end event (foreground, once)
         if (first) render(); else renderDock();                             // the rest card turns back into the set (once)
         if (first) coachArrive(true);
       }
