@@ -521,6 +521,26 @@
     }
     return hit ? ex.label + ' ' + iso(set.w == null ? String(r) : fmtNum(set.w) + '×' + r) : null;
   }
+  // a personal record with its delta vs the previous best, for the PR moment. null when not a record.
+  // kg -> {kind:'e1rm', set, deltaKg, prev, streak}; bodyweight/same-load -> {kind:'reps', set, deltaReps, prev}
+  function prInfo(set, ex, history) {
+    if (!isPR(set, ex, history)) return null;
+    var k = labelKey(ex.label), prev = [], perSession = [];
+    (history || []).forEach(function (s) { var hit = (s.exercises || []).filter(function (x) { return labelKey(x.label) === k; }); if (!hit.length) return; var sets = hit.reduce(function (a, x) { return a.concat(x.sets || []); }, []); prev = prev.concat(sets); perSession.push({ date: s.date, sets: sets }); });
+    var kg = ex.unit === 'kg' || (ex.unit === undefined && set.w != null), r = firstR(set), out = { set: setText(set) };
+    if (kg && set.w != null && e1rm(set.w, r) != null) {
+      var now = e1rm(set.w, r), was = prev.reduce(function (m, x) { var v = e1rm(x.w, firstR(x)); return v != null && v > m ? v : m; }, 0);
+      out.kind = 'e1rm'; out.deltaKg = Math.round((now - was) * 10) / 10; out.prev = was;
+      // a streak: count the most-recent sessions whose best e1RM strictly climbs
+      var tops = sortRecent(perSession.slice()).map(function (s) { return s.sets.reduce(function (m, x) { var v = e1rm(x.w, firstR(x)); return v != null && v > m ? v : m; }, 0); });
+      var streak = 1; for (var i = 0; i < tops.length - 1; i++) { if (tops[i] > tops[i + 1] && tops[i + 1] > 0) streak++; else break; }
+      out.streak = now > (tops[0] || 0) ? streak + 1 : streak;
+    } else {
+      var same = prev.filter(function (p) { return (p.w == null && set.w == null) || p.w === set.w; });
+      out.kind = 'reps'; out.deltaReps = r - (same.length ? Math.max.apply(null, same.map(firstR)) : 0); out.prev = same.length ? Math.max.apply(null, same.map(firstR)) : 0;
+    }
+    return out;
+  }
   function plannedSets(e) { return e.skipped ? e.sets.length : Math.max((e.scheme && e.scheme.sets) || 3, e.sets.length); }
   // the coach's moment after an action -> {kind, vars} | null. Priority: pr > exceed|under|met (judged against the set's
   // target, done = the TOTAL reps of a combined set) > lastSet (arriving at an exercise's last set) > halfway (once) > start (once).
@@ -602,7 +622,8 @@
       first: ['פעם ראשונה עם {day}. מתחילים רגוע', '{day} בפעם הראשונה. נבנה בסיס', 'אימון ראשון ב{day}. בלי לחץ'],
       unlocks: 'נפתח בעוד', openNow: 'פתח עכשיו', prepare: 'הכן אותי', start: 'התחל אימון', resume: 'המשך אימון', postpone: 'דחייה', skip: 'דלג',
       pr: function (t) { return 'שיא: ' + t; }, greetToday: function (t) { return 'היום אימון ב-' + t; }, greetOpen: 'האימון פתוח',
-      todayCap: 'האימון של היום', warmupLink: 'או התחל בחימום', unlockCap: function (t) { return 'נפתח ב-' + t; }
+      todayCap: 'האימון של היום', warmupLink: 'או התחל בחימום', unlockCap: function (t) { return 'נפתח ב-' + t; },
+      volumeWord: 'נפח כולל', whatsNext: function (x) { return 'מה הלאה: ' + x; }, nextExLabel: function (x) { return 'הבא: ' + x; }
     },
     ui: {
       close: 'סגור', back: 'חזרה', save: 'שמור', cancel: 'ביטול', ok: 'אישור', none: 'אין', remove: 'הסר', more: 'עוד',
@@ -640,10 +661,14 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       rx: { exceed: 'מעל היעד', met: 'ביעד', under: 'מתחת ליעד', pr: 'שיא אישי' },   // the row tag = the same judgement as the coach
       doneSetN: function (n) { return 'סיימתי סט ' + n; }, nextExBtn: 'לתרגיל הבא ←', skipRestBtn: 'דלג על המנוחה', options: 'אפשרויות', addNote: 'הוסף הערה',
       finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + (isOne(n) ? 'סט אחד נרשם, והוא יישמר בסיכום.' : n + ' סטים נרשמו, והם יישמרו בסיכום.'); },
+      prMomentT: 'שיא חדש', prHint: 'הקש להמשך', prDeltaKg: function (d) { return '+' + d + ' ק״ג מהפעם הקודמת'; }, prDeltaReps: function (d) { return '+' + d + ' חזרות מהפעם הקודמת'; },
+      prStreak: function (n) { return n === 2 ? 'שיא שני ברצף' : n === 3 ? 'שיא שלישי ברצף' : n + ' שיאים ברצף'; },
       finishHere: 'סיים אימון כאן', exDoneOf: function (x, y) { return x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים') + (isOne(x) ? ' בוצע' : ' בוצעו'); }, setsLogged: function (n) { return isOne(n) ? 'סט אחד נרשם' : n + ' סטים נרשמו'; },
       savePartial: 'סיים ושמור כאימון חלקי', discardW: 'בטל בלי לשמור', partialT: function (x, y) { return 'אימון חלקי · ' + x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים'); }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
       sameAsLast: '= כמו הסט הקודם', undoToast: function (n) { return 'נרשם סט ' + n; }, undoBtn: '↶ בטל', peekT: 'שלושת האחרונים',
       restDone: function (n) { return 'המנוחה נגמרה · סט ' + n; }, restDoneNotif: function (n) { return 'המנוחה נגמרה · סט ' + n + ' מחכה'; },
+      restFinished: function (ex, n) { return ex + ' · סט ' + n + ' הסתיים'; }, restOf: function (t) { return 'מתוך ' + t; }, restMinus: '15 שניות פחות', restPlus: '15 שניות יותר',
+      restLastSet: 'הסט האחרון:', nextSetOf: function (a, b) { return 'הסט הבא · ' + a + ' מתוך ' + b; }, restLastCoach: 'הסט האחרון בתרגיל.', restReady: 'אני מוכן, דלג על המנוחה',
       openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + (isOne(sets) ? 'סט אחד נרשם' : sets + ' סטים נרשמו') + '. מה לעשות איתו?'; },
       openResume: 'המשך באימון הפתוח', openFinish: 'סיים אותו', openDelete: 'מחק ללא שמירה', cancelWorkout: 'בטל אימון (ללא שמירה)',
       cancelWorkoutQ: function (n) { return n === 1 ? 'לבטל את האימון? סט אחד שנרשם יימחק ולא יישמר.' : n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },
@@ -693,6 +718,6 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,
-    iso: iso, targetText: targetText, isPR: isPR, coachMoment: coachMoment, arrivalMoment: arrivalMoment, coachAllowed: coachAllowed, pickMoment: pickMoment, COACH_PRI: COACH_PRI, EVENT_KINDS: EVENT_KINDS, tally: tally, restAlertSchedule: restAlertSchedule, dueAlert: dueAlert,
+    iso: iso, targetText: targetText, isPR: isPR, prInfo: prInfo, coachMoment: coachMoment, arrivalMoment: arrivalMoment, coachAllowed: coachAllowed, pickMoment: pickMoment, COACH_PRI: COACH_PRI, EVENT_KINDS: EVENT_KINDS, tally: tally, restAlertSchedule: restAlertSchedule, dueAlert: dueAlert,
     updateJSON: updateJSON, COACH_MODES: COACH_MODES, readPrefs: readPrefs, fillable: fillable };
 });

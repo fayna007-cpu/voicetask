@@ -20,7 +20,7 @@
       },
       locked: {
         headline: ['נפתח בעוד {countdown}', 'עוד {countdown} והאימון נפתח', 'הנעילה נשברת ב-{unlock}'],
-        line: ['אימון ב-{time}. בפעם שעברה {last}', 'ב-{time} · בפעם שעברה {last}', 'מתכוננים ל-{time}. נקודת הפתיחה: {last}'],
+        line: ['בפעם שעברה {last}', 'נקודת הפתיחה: {last}', '{last} בפעם הקודמת'],
         cta: 'פתח עכשיו'
       },
       open: {
@@ -59,7 +59,7 @@
         body: ['{streak} שבועות ברצף. {hint}. הכול מוכן.', 'מחר {muscle}. {hint}', 'הכול מוכן למחר.']
       },
       morning: {
-        title: ['הגיע הזמן. {muscle}', '{muscle}, {mins} דק׳', 'היום אימון'],
+        title: ['הגיע הזמן. {muscle}, {mins} דק׳', '{muscle}, {mins} דק׳', 'היום אימון'],
         body: ['פעם קודמת {exercise} {lastKg}×{lastReps}. היום היעד {targetKg}. חימום קצר ואתה בפנים.', '{muscle}, {mins} דק׳. חימום קצר ומתחילים.', 'יום אימון. חימום קצר ומתחילים.']
       },
       warmup: {

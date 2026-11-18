@@ -2221,3 +2221,63 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 @media (prefers-reduced-motion:reduce){.wk-st-open.wk-hero .wk-card-btn.primary{animation:none}}
 /* Session 1 · the workout-notifications settings row: a native time input styled to the sheet */
 .wk-time{background:var(--surface2,#222);color:var(--text);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:10px;padding:6px 10px;font-family:inherit;font-size:15px;min-height:36px}
+/* ═══ Session 2 · design foundation: ONE wk- token set (colors / motion / spring). Gold = workout/achievement only. ═══ */
+.wk-live,.wk-pick,.wk-card,.wk-prompt,.wk-resume,.wk-prm{
+  --wk-bg:#0B0B0D;--wk-card:#141417;--wk-gold:#D4B06A;--wk-gold-a:#E3C58A;--wk-gold-b:#C9A45C;
+  --wk-ink:#F4F0E8;--wk-mut:#9A968C;--wk-green:#8FD1A8;--wk-warn:#E58A6B;--wk-line:rgba(212,176,106,.18);
+  --wk-m1:150ms;--wk-m2:250ms;--wk-m3:400ms;--wk-out:cubic-bezier(.2,.8,.2,1);--wk-spring:cubic-bezier(.34,1.56,.64,1)}
+/* Session 2 · the PR MOMENT: a warm gold full-bleed moment on a new personal record */
+.wk-prm{position:fixed;inset:0;z-index:700;display:none;flex-direction:column;align-items:center;justify-content:center;gap:var(--wk-s3);text-align:center;padding:calc(var(--sat) + 24px) 24px calc(var(--sab) + 24px);background:radial-gradient(130% 90% at 50% 38%,#3A2E12 0%,#1A150A 45%,var(--wk-bg) 100%);color:var(--wk-ink);opacity:0;transition:opacity var(--wk-m2) var(--wk-out)}
+.wk-prm.on{display:flex;opacity:1}
+.wk-prm::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 40% at 50% 40%,oklch(0.9 0.12 85 / .35),transparent 70%);opacity:0;animation:wk-prflash var(--wk-m3) var(--wk-out) both}
+@keyframes wk-prflash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.wk-prm-m{width:160px;height:160px;flex:0 0 160px}
+.wk-prm-t{font-size:15px;font-weight:800;letter-spacing:.14em;color:var(--wk-gold)}
+.wk-prm-ex{font-size:36px;font-weight:800;line-height:1.1;color:var(--wk-ink)}
+.wk-prm-n{font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.wk-prm-d{font-size:17px;font-weight:700;color:var(--wk-green);font-variant-numeric:tabular-nums}
+.wk-prm-sub{font-size:14px;color:var(--wk-mut)}
+.wk-prm-hint{position:absolute;bottom:calc(var(--sab) + 20px);font-size:13px;color:var(--wk-mut)}
+@media (prefers-reduced-motion:reduce){.wk-prm{transition:none}.wk-prm::after{animation:none}}
+/* Session 2 · coach-stage scaling: ready 140 (halo), summary 84, PR 160 */
+.wk-live[data-mode=ready] .wk-m-pv-c{flex-basis:140px;width:140px;height:140px;position:relative}
+.wk-live[data-mode=ready] .wk-m-pv-c::before{content:'';position:absolute;inset:-26px;border-radius:50%;background:radial-gradient(circle,oklch(0.72 0.12 85 / .22),transparent 68%);pointer-events:none;animation:wk-float 4s ease-in-out infinite}
+@keyframes wk-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.wk-sum-m{flex-basis:84px;width:84px;height:84px}
+@media (prefers-reduced-motion:reduce){.wk-live[data-mode=ready] .wk-m-pv-c::before{animation:none}}
+/* Session 2 · A4 the REST screen: big gold ring, countdown, labeled ±15, last-set undo, next-set card */
+.wk-rest-card{align-items:stretch;gap:var(--wk-s4)}
+.wk-rest-h{text-align:center;font-size:var(--wk-fs-body);font-weight:700;color:var(--wk-mut)}
+.wk-rest-card .wk-rest{justify-content:center;margin:var(--wk-s2) 0}
+.wk-ring-xl{width:272px;height:272px;max-width:78vw;max-height:78vw}
+.wk-ring-xl .focus-ring-progress,.wk-ring-xl .focus-ring-bg{stroke-width:8}
+.wk-ring-xl .focus-ring-bg{stroke:rgba(212,176,106,.16)}
+.wk-ring-xl .focus-ring-progress{stroke:var(--wk-gold)}
+.wk-ring-xl .wk-ring-t{display:flex;flex-direction:column;align-items:center;gap:2px}
+.wk-ring-xl .wk-ring-t>bdi{font-size:76px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums;color:var(--wk-ink)}
+.wk-ring-of{font-size:13px;color:var(--wk-mut);font-variant-numeric:tabular-nums}
+.wk-rest-adj{display:flex;gap:var(--wk-s2);justify-content:center}
+.wk-rest-adj .wk-rest-b{width:auto;height:48px;min-height:48px;flex:1 1 0;max-width:180px;padding:0 var(--wk-s3);border-radius:24px;border:1px solid var(--wk-line);background:none;color:var(--wk-ink);font-family:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.wk-rest-adj .wk-rest-b:active{background:var(--surface2)}
+.wk-rest-last{display:flex;align-items:center;justify-content:space-between;gap:var(--wk-s2);min-height:44px;border-top:1px solid var(--border);padding-top:var(--wk-s2)}
+.wk-rest-undo{flex:0 0 auto}
+.wk-rest-next{border-top:1px solid var(--border);padding-top:var(--wk-s3);text-align:center}
+.wk-rest-next-h{font-size:13px;color:var(--wk-mut);margin-bottom:var(--wk-s1)}
+.wk-rest-nt{font-size:24px;font-weight:800;color:var(--wk-ink);font-variant-numeric:tabular-nums}
+.wk-rest-coach{margin-top:var(--wk-s2);color:var(--wk-gold)}
+/* Session 2 · B1 Session-1 hero fixes: progress gold CTA + next, done volume-first, clearer dots, FAB reserve */
+.wk-st-progress.wk-hero .wk-card-btn.primary{background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 18px rgba(201,164,92,.3);animation:none}
+.wk-prog-row{display:flex;align-items:center;gap:var(--wk-s3);margin:var(--wk-s2) 0}
+.wk-card-next{font-size:14px;color:var(--wk-mut);font-weight:600}
+.wk-card-vol{font-size:14px;color:var(--wk-mut);margin:var(--wk-s2) 0 2px}
+.wk-card-vol b{font-size:34px;font-weight:800;color:var(--wk-green);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.wk-st-done.wk-hero .wk-card-next{color:var(--wk-green)}
+.wk-dot{width:11px;height:11px;background:rgba(212,176,106,.28)}
+.wk-dot.on{background:#D4B06A;box-shadow:0 0 6px rgba(212,176,106,.5)}
+.wk-hero-pad{height:76px}                 /* reserve space so the fact cards clear the mic FAB (320-430) */
+.wk-notif-ctrl,#wkNotifBox .settings-row>.wk-time{margin-inline-end:8px}
+#wkNotifBox .settings-row{gap:8px}
+/* Session 2 · A5 the READY CTA: a 62px gold pill (gold = the workout CTA) with a breathing glow */
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big{min-height:62px;height:62px;border-radius:31px;font-size:18px;font-weight:800;background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 22px rgba(201,164,92,.35)}
+.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{box-shadow:0 0 26px rgba(227,197,138,.5);opacity:.3;animation:wk-hero-glow 3.2s ease-in-out infinite}
+.wk-live[data-mode=ready] .wk-ready-h .wk-pill{border-color:var(--wk-line);color:var(--wk-gold)}

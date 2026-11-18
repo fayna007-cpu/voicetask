@@ -1,4 +1,4 @@
-const V = 'alfred-v42';
+const V = 'alfred-v43';
 const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './workout-live.js'];
 
 // ═══════════════════════════════════════════════════════════════════
