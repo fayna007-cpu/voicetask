@@ -2016,7 +2016,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-live[data-mode=live] .wk-lv-dock{height:auto;border-top:1px solid var(--border)}
 .wk-lv-dock>.wk-big{min-height:56px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead)}
 /* the primary bar button (the set action); flashes + pulses once the rest ends */
-.wk-lv-dock .wk-done.wk-primary{width:100%;height:56px;min-height:56px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead);font-weight:800;box-shadow:var(--wk-sh2);animation:none}
+.wk-lv-dock .wk-primary{width:100%;height:64px;min-height:64px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead);font-weight:800;box-shadow:var(--wk-sh2);animation:none}
 .wk-lv-dock .wk-done.wk-primary.wk-flash{animation:wk-ring-flash var(--wk-t3) var(--wk-ease) 3,wk-pulse 1.6s ease-in-out 1.44s infinite}
 .wk-lv-dock .wk-skip{background:var(--surface3);color:var(--text)}
 /* header: the labeled options control */
@@ -2118,13 +2118,13 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 /* the ONE surface: the active set / the rest hero */
 .wk-live .wk-lv-sets .wk-lv-set.active,.wk-live .wk-lv-sets .wk-lv-set.edit{background:var(--surface);border:1px solid var(--border);border-radius:var(--wk-r2);padding:var(--wk-s5) var(--wk-s4);margin:var(--wk-s2) 0}
 .wk-live .wk-lv-sets .wk-lv-set.active+.wk-lv-set{border-top:none}
-.wk-hero{font-size:clamp(48px,15vw,60px);color:var(--text)}
+.wk-hero{font-size:clamp(56px,18.5vw,72px);font-weight:800;color:var(--text)}
 .wk-hero bdi{font-weight:800}
 .wk-hero-t{text-align:center;margin-top:calc(-1 * var(--wk-s2))}
 .wk-live .wk-lv-set.active>.wk-lv-n{text-align:center;font-size:13px}
 /* the steppers recede: the numbers live in the hero, the controls stay thumb-sized */
 .wk-live .wk-lv-set.active .wk-stp{background:none;padding:0}
-.wk-live .wk-lv-set.active .wk-stp-v{font-size:20px;min-width:72px;color:var(--muted)}
+.wk-live .wk-lv-set.active .wk-stp-v{font-size:24px;min-width:72px;color:var(--muted)}
 .wk-live .wk-lv-set.active .wk-stp-b{width:56px;height:56px;font-size:24px;background:var(--surface2)}
 .wk-live .wk-lv-set.active .wk-chips .wk-chip{background:none;color:var(--muted);border-color:var(--border)}
 /* rows recede */
@@ -2154,7 +2154,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-sum-k b{font-size:56px;font-weight:800;line-height:1.05;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-1px}
 .wk-live .wk-coach{background:none;border:none;border-radius:0;padding:0 0 var(--wk-s4);margin:0 0 var(--wk-s4);border-bottom:1px solid var(--border);color:var(--muted);font-weight:500}
 .wk-live .wk-coach .wk-fact{color:var(--text)}
-.wk-dock-row .wk-big{min-height:56px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead);margin:0}
+.wk-dock-row .wk-big{min-height:64px;height:64px;border-radius:var(--wk-r3);font-size:var(--wk-fs-lead);margin:0}
 /* polish 1 · self-critique fixes: (1) content never looks cut under the sticky coach line (a short fade); (2) the summary drops the
    progress chrome and the raised locker box; (3) the secondary in the bar recedes so the primary owns it */
 .wk-lv-scroll>.wk-coach-slot::after{content:'';position:absolute;left:0;right:0;top:100%;height:16px;background:linear-gradient(var(--bg),transparent);pointer-events:none}
