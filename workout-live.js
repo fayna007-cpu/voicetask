@@ -1303,12 +1303,22 @@
     // in-progress: the NEXT exercise still to do (from the draft)
     var nextExName = '';
     if (isHero && st === 'progress' && dft) { var xs = dft.s.exercises, from = dft.s.exIdx == null ? 0 : dft.s.exIdx; for (var qi = 1; qi <= xs.length; qi++) { var jj = (from + qi) % xs.length, ee = xs[jj]; if (!ee.skipped && ee.sets.length < ((ee.scheme && ee.scheme.sets) || 3)) { nextExName = ee.label; break; } } }
-    var btn = st === 'tomorrow' ? '<button class="wk-card-btn ghost" onclick="' + go + '">' + cta(C.prepare) + '</button>'
+    var btn = st === 'tomorrow' || st === 'far' ? '<button class="wk-card-btn ghost wk-prep" onclick="' + go + '">' + cta(C.prepare) + '</button>'
       : st === 'open' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.start) + '</button>'
       : st === 'progress' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.resume) + '</button>' : '';
-    // the hero open state drops the דחייה/דלג row (it owns the screen); other states keep it
-    var sec = st !== 'done' && st !== 'progress' && !(isHero && st === 'open') ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
-      + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
+    // A9: דחייה / דלג are never a loud row — a quiet "⋯" options control in every non-done state holds them
+    var opts = st !== 'done' ? '<details class="wk-card-opts" onclick="event.stopPropagation()"><summary aria-label="' + S.cardOpts + '">⋯</summary>'
+      + '<div class="wk-card-menu"><button class="wk-card-link" onclick="event.stopPropagation();this.closest(\'details\').open=false;openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
+      + '<button class="wk-card-link" onclick="event.stopPropagation();this.closest(\'details\').open=false;skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div></details>' : '';
+    var sec = '';
+    // A8: upcoming (tomorrow / far) cards speak the hero language — dark + gold hairline, facts-first title, time once, "הכן אותי" pill
+    var isUp = st === 'tomorrow' || st === 'far', cc0 = cat();
+    if (isUp) {
+      var mus = d && d.exercises[0] ? muscleName(W.muscleKey(d.exercises[0], cc0)) : '';
+      head = st === 'tomorrow' ? h(S.upTomorrow(mus)) : h(S.upInDays(num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))), mus));
+      var ue = d && d.exercises.filter(function (e) { var ll = lastOf(e.label); return ll && ll.sets.length; })[0], ul = ue && lastOf(ue.label);
+      if (ul) data = S.upStart(h(ue.label) + ' ' + setTxt(ul.sets[0]));
+    }
     var cap = isHero ? '<div class="wk-card-cap">' + (st === 'locked' ? C.unlockCap(num(time)) : h(st === 'done' ? S.sumT : C.todayCap)) + '</div>' : '';
     var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
     if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-prog-row"><div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>' + (nextExName ? '<div class="wk-card-next">' + C.nextExLabel(h(nextExName)) + '</div>' : '') + '</div>'; }
@@ -1317,8 +1327,8 @@
     var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
-    return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
+    return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
+      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r"><span class="wk-card-time">' + num(time) + '</span>' + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)

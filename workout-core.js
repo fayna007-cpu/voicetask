@@ -648,6 +648,7 @@
       wake: 'השאר את המסך דולק', memFull: 'הזיכרון מלא. האימון נשמר רק כאן עד שתסיים',
       leave: 'לצאת? האימון נשמר, ותוכל להמשיך מאיפה שעצרת.', noSets: 'עוד לא נרשם אף סט. לסגור בלי לשמור?',
       less: 'פחות', readySwitch: 'החלף', readyKey: function (t) { return 'היעד הראשון: ' + t; }, exMore: function (n) { return 'ועוד ' + n + ' תרגילים'; }, readyWarm: 'חימום', readyChecks: 'בדיקות', readyEdit: 'ערוך תוכנית',
+      cardOpts: 'אפשרויות', upTomorrow: function (m) { return m ? 'מחר · ' + m : 'מחר'; }, upInDays: function (n, m) { return 'בעוד ' + n + ' ימים' + (m ? ' · ' + m : ''); }, upStart: function (x) { return 'נקודת הפתיחה: ' + x; },
       sumT: 'סיכום', setsW: function (n) { return n === 1 ? 'סט' : 'סטים'; }, duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
       backLive: 'חזרה לאימון', saveW: 'שמור אימון', existsQ: 'כבר שמרת היום אימון כזה', replace: 'החלף את הקיים', both: 'שמור את שניהם',
       saveErr: 'לא הצלחתי לשמור, אין מקום בזיכרון. האימון עדיין כאן',
