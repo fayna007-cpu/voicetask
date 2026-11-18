@@ -2281,3 +2281,21 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big{min-height:62px;height:62px;border-radius:31px;font-size:18px;font-weight:800;background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 22px rgba(201,164,92,.35)}
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{box-shadow:0 0 26px rgba(227,197,138,.5);opacity:.3;animation:wk-hero-glow 3.2s ease-in-out infinite}
 .wk-live[data-mode=ready] .wk-ready-h .wk-pill{border-color:var(--wk-line);color:var(--wk-gold)}
+/* Session 3 · A1 the READY rework: caption, switcher chip, ONE coach card, exercise-list card, bottom links */
+.wk-ready-cap{margin:0 0 var(--wk-s1)}
+.wk-ready-h{display:flex;align-items:center;justify-content:space-between;gap:var(--wk-s3)}
+.wk-ready-name{font-size:34px;font-weight:800;line-height:1.1}
+.wk-switch{flex:0 0 auto;border:1px solid var(--wk-line);background:none;color:var(--wk-gold);font-weight:700;white-space:nowrap}
+.wk-ready-coach{align-items:stretch}
+.wk-ready-coach .wk-m-pv-c{flex-basis:140px;width:140px;height:140px}
+.wk-ready-key{font-size:var(--wk-fs-body);color:var(--wk-mut);margin:var(--wk-s1) 0 var(--wk-s2)}
+.wk-gold-n{color:var(--wk-gold);font-weight:800;font-variant-numeric:tabular-nums}
+.wk-ready-ex .wk-ex-row{display:flex;align-items:center;justify-content:space-between;gap:var(--wk-s2);min-height:44px;border-top:1px solid var(--border);font-variant-numeric:tabular-nums}
+.wk-ready-ex .wk-ex-row:first-child{border-top:none}
+.wk-ex-name{font-weight:700;color:var(--wk-ink)}
+.wk-ex-last{font-size:13px;color:var(--wk-mut)}
+.wk-ex-more{min-height:44px;color:var(--wk-gold);font-weight:700;justify-content:center}
+.wk-ready-links{display:flex;align-items:center;justify-content:center;gap:var(--wk-s2);margin:var(--wk-s4) 0 var(--wk-s2);flex-wrap:wrap}
+.wk-ready-links .wk-lv-link{min-height:44px;color:var(--wk-mut);font-weight:600}
+.wk-ready-links .wk-sep{color:var(--wk-mut)}
+.wk-ready-checks{margin:var(--wk-s2) 0}

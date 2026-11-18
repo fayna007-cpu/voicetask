@@ -459,6 +459,8 @@
     else if (k === 'day') R.dayId = v;
     else if (k === 'warm') R.warmOpen = !R.warmOpen;
     else if (k === 'feelOpen') R.feelOpen = !R.feelOpen;
+    else if (k === 'exOpen') R.exOpen = !R.exOpen;
+    else if (k === 'checksOpen') R.checksOpen = !R.checksOpen;
     else if (k === 'mode') { R.mode = v; R.modeTouched = true; }
     else if (k === 'coach') { R.coachMode = v; setPref('coachMode', v); }
     else if (k === 'sleep' || k === 'energy' || k === 'pain') { R.feel[k] = v; if (!R.modeTouched) R.mode = suggestMode(R.feel); }
@@ -894,24 +896,42 @@
     var wi = -1; d.exercises.some(function (e, i) { if (!isBw(e)) { wi = i; return true; } return false; });
     var wex = wi > -1 ? d.exercises[wi] : null, wl = wex && lastOf(wex.label), wt = wex && W.targetsFor(wex, wl && wl.sets, [], { scale: R.mode === 'light' ? 0.9 : 1 })[0], ws = wt ? W.warmupSets(wt.w, wex.step) : [];
     var feel = function (k) { return line(S[k], '<div class="wk-chips wk-five">' + [1, 2, 3, 4, 5].map(function (n) { return '<button class="wk-chip' + (R.feel[k] === n ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'' + k + '\',' + n + ')">' + n + '</button>'; }).join('') + '</div>'); };
-    return (ui.ctx && ui.ctx.test ? '<div class="wk-test-strip">' + S.testBanner + '</div>' : '') + '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
+    // the KEY NUMBER (gold): the first weighted exercise's first-set target, or the first exercise's reps
+    var keyT = wt ? (wex ? num(wt.w) + ' ' + unitTxt(wex) + ' × ' + num(wt.aim) : '') : (d.exercises[0] ? num((W.targetsFor(d.exercises[0], lastOf(d.exercises[0].label) && lastOf(d.exercises[0].label).sets, [])[0] || {}).aim || '') + ' ' + S.reps : '');
+    // the exercise list card: 3 rows + "ועוד N תרגילים" expanding in place
+    var exRow = function (e) { var l = lastOf(e.label); return '<div class="wk-ex-row"><span class="wk-ex-name">' + h(e.label) + '</span><span class="wk-ex-last">' + (l && l.sets.length ? setTxt(l.sets[0]) : S.first) + '</span></div>'; };
+    var exShown = R.exOpen ? d.exercises : d.exercises.slice(0, 3), exMore = d.exercises.length - 3;
+    return (ui.ctx && ui.ctx.test ? '<div class="wk-test-strip">' + S.testBanner + '</div>' : '')
+      + '<div class="wk-card-cap wk-ready-cap">' + C.todayCap + '</div>'
+      + '<div class="wk-ready-h"><div class="wk-lv-title wk-ready-name">' + h(d.name) + '</div><button class="wk-pill wk-switch" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">⇄ ' + S.readySwitch + '</button></div>'
       + (p.days.length > 1 ? '<div class="wk-chips wk-days">' + p.days.map(function (x) { return '<button class="wk-chip' + (x.id === d.id ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'day\',' + js(x.id) + ')">' + h(x.name) + (x.id === R.nextId ? ' · ' + S.next : '') + '</button>'; }).join('') + '</div>' : '')
-      + '<div class="wk-lv-cap wk-exlist">' + d.exercises.map(function (e) { return h(e.label); }).join(' · ') + '</div>'
-      + (CP && !d.exercises.some(function (e) { return lastOf(e.label); }) ? '<div class="wk-lv-cap wk-cue">' + h(CP.COPY.label.firstSessionHint) + '</div>' : '')
+      // ONE coach card: the 140px stage + a coach line + the key number in gold + the coach-mode chips
+      + '<div class="wk-ready-coach wk-lv-group">'
+        + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
+        + (keyT ? '<div class="wk-ready-key">' + S.readyKey('<b class="wk-gold-n">' + keyT + '</b>') + '</div>' : '')
+        + '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
+        + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div></div>'
+      // the exercise list card
+      + '<div class="wk-ready-ex wk-lv-group">' + exShown.map(exRow).join('')
+        + (exMore > 0 ? '<button class="wk-row wk-ex-more" onclick="WorkoutLive.readySet(\'exOpen\')" aria-expanded="' + !!R.exOpen + '">' + (R.exOpen ? S.less : S.exMore(num(exMore))) + ' ' + (R.exOpen ? '▴' : '▾') + '</button>' : '') + '</div>'
       + W.notesFor(d.exercises, cat()).map(function (n) { return '<div class="wk-note-line wk-note-ro"><span class="wk-note-g">📝 ' + muscleName(n.muscle) + '</span><span>' + h(n.text) + '</span></div>'; }).join('')
       + group(line(S.lockerT, stepper('rlk', R.locker == null ? S.none : R.locker, '', 'wkLk', 1)))
-      // the coach: רגוע / מאמן / אש / כבוי (the owner's choice, remembered) + a sound check
-      + group('<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
-        + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div>'
-        + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
-        + checksHtml())
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
         + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return num(x.w) + ' ' + unitTxt(wex) + ' × ' + num(x.r); }).join(' · ') + '</div>' : '')) : '')
       + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
         + (R.feelOpen ? feel('sleep') + feel('energy') + feel('pain')
           + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, dayModes())
-          + '<div class="wk-lv-cap">' + S.modeHint[R.mode] + (Object.keys(R.feel).length && !R.modeTouched ? ' · ' + S.suggested : '') + '</div>' : ''));
+          + '<div class="wk-lv-cap">' + S.modeHint[R.mode] + (Object.keys(R.feel).length && !R.modeTouched ? ' · ' + S.suggested : '') + '</div>' : ''))
+      // the בדיקות checks, collapsed behind the bottom link
+      + (R.checksOpen ? '<div class="wk-ready-checks">' + checksHtml() + '</div>' : '')
+      // bottom row: חימום · בדיקות · ערוך תוכנית
+      + '<div class="wk-ready-links">'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readyWarm()">' + S.readyWarm + '</button><span class="wk-sep">·</span>'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readySet(\'checksOpen\')">' + S.readyChecks + '</button><span class="wk-sep">·</span>'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readyEdit()">' + S.readyEdit + '</button></div>';
   }
+  function readyWarm() { var R = ui.ready; if (!R.warmOpen) { R.warmOpen = true; render(); } ui.warmFocus = true; var sc = $('wkLvScroll'), w = document.querySelector('#wkLvMain .wk-warm, #wkLvMain .wk-row'); if (w && sc) sc.scrollTop = w.offsetTop - 60; }
+  function readyEdit() { var R = ui.ready; if (R.programId) editProgram(R.programId); }
   function liveHtml() {
     var i = ui.view, ex = state.exercises[i], l = lastOf(ex.label), t = targets(i), u = unitTxt(ex), bw = isBw(ex);
     var n = Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length), active = !ex.skipped && (ex.sets.length < n || ui.extra[i]);
@@ -1453,7 +1473,7 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
-    warmEdit: warmEdit, warmSave: warmSave, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
+    warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
