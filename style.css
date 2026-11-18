@@ -2274,6 +2274,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-st-done.wk-hero .wk-card-next{color:var(--wk-green)}
 .wk-dot{width:11px;height:11px;background:rgba(212,176,106,.28)}
 .wk-dot.on{background:#D4B06A;box-shadow:0 0 6px rgba(212,176,106,.5)}
+.wk-dot.today{box-shadow:0 0 0 2px var(--wk-bg,#0B0B0D),0 0 0 3.5px #D4B06A}   /* A10: today's session — a clear gold ring, filled or not */
 .wk-hero-pad{height:76px}                 /* reserve space so the fact cards clear the mic FAB (320-430) */
 .wk-notif-ctrl,#wkNotifBox .settings-row>.wk-time{margin-inline-end:8px}
 #wkNotifBox .settings-row{gap:8px}

@@ -193,7 +193,7 @@
       if (lock.blocked) { say(lock.line); return; }
       if (lock.inst) o = Object.assign({}, o, lock.inst);
     }
-    ui.ctx = { routineId: o.test || o.routineId == null ? null : String(o.routineId), dateStr: o.test ? null : o.dateStr || null, programId: o.programId || null, test: !!o.test };
+    ui.ctx = { routineId: o.test || o.routineId == null ? null : String(o.routineId), dateStr: o.test ? null : o.dateStr || null, programId: o.programId || null, test: !!o.test, warm: !!o.warm };
     if (!store().programs.length) { ui.after = 'ready'; ui.stack = []; ui.mode = 'programs'; show(); return; }
     openReady();
   }
@@ -212,8 +212,9 @@
     var c = ui.ctx || {}, r = c.routineId ? routineOf(c.routineId) : null;
     var p = programById(c.programId || (r && r.programId) || null); if (!p) { ui.mode = 'programs'; show(); return; }
     var d = W.nextDay(p, sessions()), prev = W.sortRecent(sessions()).filter(function (s) { return s.programId === p.id && s.locker != null; })[0];
-    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: false, feelOpen: false, feel: {}, mode: 'full', modeTouched: false, coachMode: prefs().coachMode };
+    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: !!c.warm, feelOpen: false, feel: {}, mode: 'full', modeTouched: false, coachMode: prefs().coachMode };
     ui.stack = []; ui.mode = 'ready'; show();
+    if (c.warm) setTimeout(readyWarm, 0);   // A10: the card's "או התחל בחימום" opens ready focused on the warm-up — the same path as the notification warm action
   }
   function begin() {
     var R = ui.ready, p = programById(R.programId), d = p && p.days.filter(function (x) { return x.id === R.dayId; })[0];
@@ -1284,8 +1285,8 @@
     if (!b || !b.facts) return '';
     var f = b.facts, wk = '';
     if (f.weekPlanned > 0) {
-      var dots = '';
-      for (var i = 0; i < Math.min(7, f.weekPlanned); i++) dots += '<i class="wk-dot' + (i < f.weekDone ? ' on' : '') + '"></i>';
+      var dots = '', tdy = Math.min(f.weekDone, Math.min(7, f.weekPlanned) - 1);   // A10: the first not-yet-done dot is today's session (clamped); marked distinctly
+      for (var i = 0; i < Math.min(7, f.weekPlanned); i++) dots += '<i class="wk-dot' + (i < f.weekDone ? ' on' : '') + (i === tdy && f.weekDone < f.weekPlanned ? ' today' : '') + '"></i>';
       wk = '<div class="wk-sub"><div class="wk-sub-dots">' + dots + '</div><div class="wk-sub-t">' + (f.streakWeeks > 1 ? W.plural(num(f.streakWeeks) + ' שבועות ברצף') : S.weekProg(num(f.weekDone), num(f.weekPlanned))) + '</div></div>';
     }
     var pr = '';
@@ -1325,7 +1326,8 @@
       var cl = copyLine(seed + '|l', st === 'done' && prs.length && K.linePR ? K.linePR : K.line, cv); if (cl) data = cl;
     }
     var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
-    var arg = js({ routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }), go = 'event.stopPropagation();Workout.start(' + arg + ')';
+    var argO = { routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }, arg = js(argO), go = 'event.stopPropagation();Workout.start(' + arg + ')';
+    var goWarm = 'event.stopPropagation();Workout.start(' + js(Object.assign({ warm: true }, argO)) + ')';   // A10: warm-up focus path, identical to the notification warm action
     var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
@@ -1350,16 +1352,17 @@
       var ue = d && d.exercises.filter(function (e) { var ll = lastOf(e.label); return ll && ll.sets.length; })[0], ul = ue && lastOf(ue.label);
       if (ul) data = S.upStart(h(ue.label) + ' ' + setTxt(ul.sets[0]));
     }
-    var cap = isHero ? '<div class="wk-card-cap">' + (st === 'locked' ? C.unlockCap(num(time)) : h(st === 'done' ? S.sumT : C.todayCap)) + '</div>' : '';
+    // A10: the locked caption is a plain label (no time) — the time/countdown lives once in the headline + the 🔒 row, so no clock time is repeated
+    var cap = isHero ? '<div class="wk-card-cap">' + h(st === 'done' ? S.sumT : C.todayCap) + '</div>' : '';
     var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
     if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-prog-row"><div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>' + (nextExName ? '<div class="wk-card-next">' + C.nextExLabel(h(nextExName)) + '</div>' : '') + '</div>'; }
     // done: lead with the real volume + "מה הלאה"
     if (isHero && st === 'done' && done) { meta = '<div class="wk-card-vol"><b>' + num(Math.round(W.volume(done))) + '</b> ' + T.unit.kg + ' · ' + C.volumeWord + '</div>' + (d ? '<div class="wk-card-next">' + C.whatsNext(h(d.name)) + '</div>' : ''); }
-    var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
+    var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + goWarm + '">' + C.warmupLink + '</button>' : '';
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
     return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r"><span class="wk-card-time">' + num(time) + '</span>' + opts + '</span></div>'
+      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
