@@ -2323,3 +2323,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 @media (prefers-reduced-motion:reduce){.wk-fab-tuck{transition:none}}
 /* A5 structural: a bottom gutter so no card ever rests in the FAB's position (FAB 64 + its 16 bottom offset + margin) */
 .wk-fab-gutter{height:calc(64px + 24px);width:100%;pointer-events:none}
+/* Session 3 · A6 Summary: hero PR block (84px char) + 3 stat tiles (volume leads), "לפעם הבאה" card */
+.wk-sum-hero{align-items:center;gap:var(--wk-s4)}
+.wk-sum-lead{flex:1 1 auto;min-width:0}
+.wk-sum-pr{font-size:18px;font-weight:700;color:var(--wk-ink)}
+.wk-sum-pr .wk-gold-n{font-size:24px}
+.wk-sum-tiles{display:flex;gap:var(--wk-s2);margin:var(--wk-s3) 0}
+.wk-stat{flex:1 1 0;min-width:0;padding:var(--wk-s3) var(--wk-s2);border-radius:var(--wk-r2);background:var(--card,#141417);border:1px solid var(--border,rgba(255,255,255,.08));text-align:center;display:flex;flex-direction:column;gap:2px}
+.wk-stat b{font-size:28px;font-weight:800;line-height:1;color:var(--wk-ink);font-variant-numeric:tabular-nums}
+.wk-stat span{font-size:12px;color:var(--wk-mut)}
+.wk-stat-gold b{color:var(--wk-green)}
+.wk-stat-gold{border-color:rgba(143,209,168,.3)}
+.wk-next-t{font-size:16px;font-weight:700;color:var(--wk-gold);font-variant-numeric:tabular-nums;margin:2px 0}

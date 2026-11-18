@@ -1041,11 +1041,9 @@
     return { html: S.factSets(cnt(n), num(Math.max(1, Math.round(W.durationSec(state, Date.now()) / 60)))) };
   }
   function cmpLine(ex) {
-    var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
-    if (!b) d = S.cmpFirst;
-    else if (a.w != null && b.w != null && a.w !== b.w) d = '<bdi dir="ltr">' + h(S.cmpKg(W.snap(a.w - b.w, 0), '').trim()) + '</bdi> ' + u;   // "+4.5" isolated
-    else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
-    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + (b ? S.cmpWas(setTxt(b), setTxt(a)) : S.cmpNow(setTxt(a))) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
+    var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0];
+    // A6: the "+X ק״ג" delta is NOT duplicated here (it leads in the top coach line); the row just shows then -> now
+    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + (b ? S.cmpWas(setTxt(b), setTxt(a)) : S.cmpNow(setTxt(a))) + '</span></div>';
   }
   // the end of a TEST run: nothing is saved; edits made during it (notes, steps, variants, a remembered swap) only if the owner confirms
   function closeTest() {
@@ -1070,17 +1068,39 @@
     state.exercises.forEach(function (e, i) { var t = targets(i); e.sets.forEach(function (x, k) { var tg = t[k]; pairs.push({ set: x, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null }); }); });
     return CO ? W.tally(pairs, CO.judge) : { ok: 0, of: 0 };
   }
+  // the weekly volume change vs last week (this week incl. the just-finished session); null when there is no prior week
+  function weekPct(s) {
+    var tz = W.TZ, wk = W.weekRange(new Date(state.startedAt), tz), prev = W.weekRange(W.addDaysYmd(wk.start, -7), tz);
+    var vol = function (range) { return (sessions() || []).filter(function (x) { return x && x.source === 'live'; }).reduce(function (a, x) { var ms = new Date(x.dateStr || x.date).getTime(); return ms >= range.startMs && ms < range.endMs ? a + W.volume(x) : a; }, 0); };
+    var thisW = vol(wk) + W.volume(s), lastW = vol(prev);
+    return lastW > 0 ? Math.round((thisW - lastW) / lastW * 100) : null;
+  }
+  // "לפעם הבאה": the next target for the top exercise + the next planned reminder (if a future instance exists)
+  function nextTimeCard(done) {
+    var ex = done.filter(function (e) { return !isBw(e); })[0] || done[0]; if (!ex) return '';
+    var t = W.targetsFor(ex, ex.sets, [])[0], tgt = t ? (isBw(ex) ? num(t.aim) + ' ' + S.reps : num(t.w) + ' ' + unitTxt(ex) + ' × ' + num(t.aim)) : '';
+    var when = '';
+    try { var b = homeBrief(); if (b && b.instance && b.notifications && b.notifications[0]) { var nx = b.notifications.filter(function (nn) { return nn.instance; })[0]; if (nx) when = num(new Date(nx.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ })); } } catch (_) { }
+    return group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : ''));
+  }
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
     var prs = W.prsFor(s, sessions()), fin = finishLine(), tl = tallyNow();
     var cnt = function (v) { return '<bdi dir="ltr" data-wk-count="' + v + '">' + v + '</bdi>'; };   // counted up once (staggered)
     var ft = topFact(done, tl, n, cnt);
-    // the summary's ONE hero: sets + time as big numbers (labels small and muted)
-    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '') + '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>'
-      + '<div class="wk-sum-k"><b><bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi></b> ' + S.duration + '</div></div>'
-      + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '') + '</div>'
-      // the TOP line opens with a real number (the biggest weight gain vs last time, else the on-target tally, else sets in minutes) + the coach's line
+    var vol = Math.round(W.volume(s)), pct = weekPct(s), pr0 = prs[0];
+    var prTxt = pr0 ? (pr0.kind === 'e1rm' ? h(pr0.label) + ' ~' + num(pr0.value) + ' ' + T.unit.kg : h(pr0.label) + ' ' + num(pr0.w == null ? pr0.r : pr0.w + '×' + pr0.r)) : '';
+    var tile = function (val, label, gold) { return '<div class="wk-stat' + (gold ? ' wk-stat-gold' : '') + '"><b>' + val + '</b><span>' + label + '</span></div>'; };
+    // A6 hero PR block: the 84px character + (a new record headline if any, else the sets); volume LEADS the 3 stat tiles
+    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '')
+      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr">' + S.sumPrHero('<b class="wk-gold-n">' + prTxt + '</b>') + '</div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
+      + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '')
+      + '<div class="wk-sum-tiles">' + tile('<bdi dir="ltr" data-wk-count="' + vol + '">' + num(vol) + '</bdi>', S.sumVolume, true)
+        + tile('<bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi>', S.sumTime)
+        + tile(pct == null ? '—' : '<bdi dir="ltr">' + (pct >= 0 ? '+' : '') + pct + '%</bdi>', S.sumVsWeek) + '</div></div>'
+      // the coach's line (the +X number lives here, NOT duplicated in the table below)
       + '<div class="wk-coach"><b class="wk-fact">' + ft.html + '</b>' + (fin ? ' ' + h(fin) : '') + '</div>'
+      + nextTimeCard(done)
       + (tl.of && !ft.tally ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
