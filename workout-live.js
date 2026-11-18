@@ -1460,9 +1460,24 @@
     try { if (window.Workout) window.Workout.start({ routineId: String(routineId), dateStr: dateStr || null, warm: action === 'warm' }); } catch (_) { }
   }
   // one extra line in the greeting area on a workout day
+  // A10b: the "no program" and "rest day" hero states, in the same language. '' when today has a workout (a normal card renders).
+  function heroState() {
+    if (!enabled()) return '';
+    var wr = allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }); if (!wr.length) return '';
+    var hasProg = wr.some(function (r) { return programById(r.programId); });
+    if (!hasProg) return '<div class="wk-card wk-hero wk-state-empty" data-wk-state="noprogram"><div class="wk-card-cap">' + C.todayCap + '</div><div class="wk-card-h">' + S.noProgT + '</div><div class="wk-card-d">' + S.noProgSub + '</div><button class="wk-card-btn ghost wk-prep" onclick="event.stopPropagation();WorkoutLive.openPrograms()">' + S.noProgCta + '</button></div>';
+    var b = homeBrief();
+    if (b && b.phase === 'rest' && b.instance) {
+      var mus = b.workout && b.workout.muscles && b.workout.muscles[0] ? muscleName(b.workout.muscles[0]) : '';
+      var when = num(new Date(b.instance.dt).toLocaleDateString('he-IL', { weekday: 'long', timeZone: W.TZ }).replace(/^יום\s+/, '') + ' ' + new Date(b.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }));
+      return '<div class="wk-card wk-hero wk-state-rest" data-wk-state="restday"><div class="wk-card-cap">' + C.todayCap + '</div><div class="wk-card-h">' + h(S.restDayT(mus)) + '</div><div class="wk-card-d">' + S.restDaySub(when) + '</div></div>';
+    }
+    return '';
+  }
   function greeting(subEl) {
-    var old = $('wkGreet'); if (old) old.remove();
+    var old = $('wkGreet'); if (old) old.remove(); var oh = $('wkHeroState'); if (oh) oh.remove();
     if (!enabled() || !subEl) return;
+    var hs = heroState(); if (hs) { var hel = document.createElement('div'); hel.id = 'wkHeroState'; hel.dir = 'rtl'; hel.innerHTML = hs; var list = document.getElementById('list'); if (list) list.parentNode.insertBefore(hel, list); }
     var t = todayWorkoutInstance(); if (!t) return;
     var r = routineOf(t.routineId), st = W.cardState({ now: Date.now(), dt: t.dateStr, unlockMin: r && r.wkUnlockMin });
     var time = new Date(t.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
@@ -1523,7 +1538,7 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
-    warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
+    warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, openPrograms: openPrograms, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
@@ -1564,6 +1579,6 @@
     renderNotifBox();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
-  window.WorkoutHome = { card: card, greeting: greeting, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif };
+  window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

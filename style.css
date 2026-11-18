@@ -2335,3 +2335,8 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-stat-gold b{color:var(--wk-green)}
 .wk-stat-gold{border-color:rgba(143,209,168,.3)}
 .wk-next-t{font-size:16px;font-weight:700;color:var(--wk-gold);font-variant-numeric:tabular-nums;margin:2px 0}
+/* Session 3 · A10b no-program + rest-day hero states (same hero language) */
+.wk-state-empty,.wk-state-rest{background:#141210;border:1px solid rgba(212,176,106,.22);border-radius:24px;margin:0 8px 8px;padding:20px}
+.wk-state-empty .wk-card-h,.wk-state-rest .wk-card-h{font-size:24px;font-weight:800;color:#F3EEE3}
+.wk-state-empty .wk-card-d,.wk-state-rest .wk-card-d{color:#9A968C;margin-top:6px}
+.wk-state-empty .wk-prep{min-height:48px;margin-top:14px;width:auto;padding:0 22px;border:1px solid var(--wk-line);background:none;color:var(--wk-gold);font-weight:700}
