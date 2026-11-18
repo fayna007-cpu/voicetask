@@ -1220,6 +1220,17 @@
   function saveOld() { var r = readDraft(); if (!r) return; draft = r.d; state = r.s; testQ = state.test ? [] : null; ui.effort = null; ui.locker = state.locker; ui.exists = false; ui.err = ''; hideBanner(); ui.stack = []; ui.mode = 'finish'; show(); }
   function delOld() { if (!confirm(S.delConfirm)) return; drop(KEY_D); hideBanner(); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', banner); else banner();
+  // A5: the mic/coach FAB must never cover card content — it auto-docks (tucks away) while scrolling, returns when idle.
+  // Structural + global: a wk- class on the existing FAB, no card-by-card fix, no restructure. Reduced motion = instant.
+  (function fabTuck() {
+    var t = 0, on = false, el = function () { return document.getElementById('asstFab'); };
+    var move = function () { var f = el(); if (!f) return; if (!on) { on = true; f.classList.add('wk-fab-tuck'); } clearTimeout(t); t = setTimeout(function () { on = false; var g = el(); if (g) g.classList.remove('wk-fab-tuck'); }, 650); };
+    // an always-present bottom gutter in the scroll container (sibling after #list, survives render()) so no card ever
+    // sits in the FAB's rest position — the structural guarantee; the tuck above is only an extra while scrolling
+    var gutter = function () { var app = document.getElementById('app'); if (!app || document.getElementById('wkFabGutter')) return; var g = document.createElement('div'); g.id = 'wkFabGutter'; g.className = 'wk-fab-gutter'; g.setAttribute('aria-hidden', 'true'); app.appendChild(g); };
+    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+  })();
   // the audio context is created (suspended) in idle time, so a tap only resumes it (creating it costs ~50 ms)
   (window.requestIdleCallback || function (f) { return setTimeout(f, 1500); })(function () { if (enabled()) audio(false); });
 

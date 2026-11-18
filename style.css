@@ -2318,3 +2318,8 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-up .wk-card-d{color:#C9C3B6;margin-top:6px}
 .wk-up .wk-card-d bdi{color:#D4B06A;font-weight:700}
 .wk-up .wk-prep{min-height:44px;margin-top:12px;width:auto;padding:0 20px;border:1px solid var(--wk-line);background:none;color:var(--wk-gold);font-weight:700}
+/* Session 3 · A5 the FAB auto-docks while scrolling so it never covers card content (any width 320-430) */
+.wk-fab-tuck{transform:translateY(135%) scale(.8)!important;opacity:.25!important;pointer-events:none!important;transition:transform .25s ease,opacity .25s ease}
+@media (prefers-reduced-motion:reduce){.wk-fab-tuck{transition:none}}
+/* A5 structural: a bottom gutter so no card ever rests in the FAB's position (FAB 64 + its 16 bottom offset + margin) */
+.wk-fab-gutter{height:calc(64px + 24px);width:100%;pointer-events:none}
