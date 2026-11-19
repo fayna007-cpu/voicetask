@@ -2376,6 +2376,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-ins-btn{min-height:44px;padding:0 18px;border-radius:22px;border:1px solid rgba(212,176,106,.4);background:none;color:#D4B06A;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer}
 .wk-ins-btn.primary{background:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;border:none}
 .wk-sub-tap{cursor:pointer;font-family:inherit;text-align:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+/* B5: summary weekly muscle bars (vs the 10-20 band) + the insight-driven "לפעם הבאה" story line */
+.wk-mb-row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.wk-mb-l{flex:0 0 68px;font-size:13px;color:var(--wk-ink,#F4F0E8)}
+.wk-mb-track{flex:1 1 auto;position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+.wk-mb-band{position:absolute;top:0;bottom:0;left:50%;width:50%;background:rgba(143,209,168,.14)}
+.wk-mb-fill{position:absolute;top:0;bottom:0;right:0;border-radius:5px}
+.wk-mb-in{background:#8FD1A8}.wk-mb-under{background:#D4B06A}.wk-mb-over{background:#E58A6B}
+.wk-mb-n{flex:0 0 28px;text-align:center;font-size:13px;font-weight:700;color:var(--wk-mut,#9A968C);font-variant-numeric:tabular-nums}
+.wk-next-story{font-size:13px;color:#B8B4AC;line-height:1.5;margin-top:4px}
 /* Session 3 · A10b no-program + rest-day hero states (same hero language) */
 .wk-state-empty,.wk-state-rest{background:#141210;border:1px solid rgba(212,176,106,.22);border-radius:24px;margin:0 8px 8px;padding:20px}
 .wk-state-empty .wk-card-h,.wk-state-rest .wk-card-h{font-size:24px;font-weight:800;color:#F3EEE3}

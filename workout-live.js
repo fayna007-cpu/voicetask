@@ -1082,7 +1082,26 @@
     var t = W.targetsFor(ex, ex.sets, [])[0], tgt = t ? (isBw(ex) ? num(t.aim) + ' ' + S.reps : num(t.w) + ' ' + unitTxt(ex) + ' × ' + num(t.aim)) : '';
     var when = '';
     try { var b = homeBrief(); if (b && b.instance && b.notifications && b.notifications[0]) { var nx = b.notifications.filter(function (nn) { return nn.instance; })[0]; if (nx) when = num(new Date(nx.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ })); } } catch (_) { }
-    return '<div class="wk-sum-next">' + group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : '')) + '</div>';
+    // B5: the "לפעם הבאה" story line is driven by a plateau / near-PR insight when one exists
+    var story = '';
+    try { var r = window.WkInsights && WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }); var si = r && r.insights && r.insights.filter(function (i) { return i.type === 'plateau' || i.type === 'nearPR'; })[0]; if (si) story = '<div class="wk-next-story">' + h(si.headline) + ' · ' + h(si.detail) + '</div>'; } catch (_) { }
+    return '<div class="wk-sum-next">' + group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + story + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : '')) + '</div>';
+  }
+  // B5: weekly hard sets per muscle vs the 10-20 band, including this just-finished session
+  function muscleBars(cur) {
+    var LO = 10, HI = 20, all = sessions(), wr = W.weekRange(new Date(Date.now())), by = {};
+    var add = function (s) { if (!s || s.test || s.source === 'test') return; var d = s.dateStr || s.date; if (d < wr.start || d > wr.end) return; (s.exercises || []).forEach(function (e) { var m = W.muscleKey(e, cat()); by[m] = (by[m] || 0) + (e.sets ? e.sets.length : 0); }); };
+    all.forEach(add);
+    if (cur && cur.exercises && !cur.test && !(state && state.test)) cur.exercises.forEach(function (e) { var m = W.muscleKey(e, cat()); by[m] = (by[m] || 0) + (e.sets ? e.sets.length : 0); });   // this session isn't saved yet at the summary (a test run never counts)
+    var keys = Object.keys(by).filter(function (m) { return by[m] > 0; }).sort(function (a, b) { return by[b] - by[a]; });
+    if (!keys.length) return '';
+    var bars = keys.map(function (m) {
+      var n = by[m], state = n < LO ? 'under' : n > HI ? 'over' : 'in', pct = Math.min(100, Math.round(n / HI * 100));
+      return '<div class="wk-mb-row"><div class="wk-mb-l">' + h(muscleName(m)) + '</div>'
+        + '<div class="wk-mb-track"><span class="wk-mb-band" aria-hidden="true"></span><span class="wk-mb-fill wk-mb-' + state + '" style="width:' + pct + '%"></span></div>'
+        + '<div class="wk-mb-n"><bdi dir="ltr">' + n + '</bdi></div></div>';
+    }).join('');
+    return '<div class="wk-sum-muscles">' + group('<div class="wk-lv-cap">' + S.sumMuscleT + '</div>' + bars) + '</div>';
   }
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
@@ -1102,6 +1121,7 @@
       // the coach's line (the +X number lives here, NOT duplicated in the table below)
       + '<div class="wk-coach"><b class="wk-fact">' + ft.html + '</b>' + (fin ? ' ' + h(fin) : '') + '</div>'
       + nextTimeCard(done)
+      + muscleBars(s)
       + (tl.of && !ft.tally ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
