@@ -1270,7 +1270,8 @@
     } catch (_) { }
     var dft = readDraft();
     try {
-      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ }, now) : null;
+      var nc = readNotif();   // A14: the configurable evening/morning times feed the schedule (not hard-coded in the brief)
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning } }, now) : null;
     } catch (_) { briefCache = null; }
     briefAt = now; return briefCache;
   }

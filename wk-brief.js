@@ -132,12 +132,14 @@
     var WIN = now + 2 * DAY, out = [];
     var localH = function (ms) { return +new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date(ms)).slice(0, 2); };
     var at = function (ymd, h, m) { var d = new Date(ymd + 'T00:00:00'); return dateMs(ymd) + (h * 60 + (m || 0)) * 60000 - tzOffset(ymd, tz); };
+    var hm = function (s, dh, dm) { var m = /^(\d\d):(\d\d)$/.exec(String(s || '')); return m ? { h: +m[1], m: +m[2] } : { h: dh, m: dm }; };   // A14: configurable times
+    var ev = hm(o.notif && o.notif.evening, 20, 0), mo = hm(o.notif && o.notif.morning, 9, 0);
     insts.forEach(function (x) {
       if (x.ms < now || x.ms > WIN || x.i.completed) return;
       var muscle = brMuscle(o, x.r, now);
       var add = function (type, ms) { if (ms > now && ms <= WIN) out.push({ type: type, fireAt: ms, instance: { routineId: String(x.r.id), dt: x.i.dt }, muscle: muscle }); };
-      add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), 20, 0));
-      add('morning', at(x.ymd, 9, 0));
+      add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), ev.h, ev.m));
+      add('morning', at(x.ymd, mo.h, mo.m));
       add('warmup', x.ms - 45 * 60000);
       add('unlock', x.ms);
       add('rescue', x.ms + 60 * 60000);
