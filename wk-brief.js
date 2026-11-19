@@ -149,12 +149,15 @@
     // B3 weekly review at Saturday 20:00 (configurable), once in the window -> deep-links to the insights screen
     var rev = hm(o.notif && o.notif.review, 20, 0), tday = W.ymdIn(new Date(now), tz);
     for (var kk = 0; kk < 3; kk++) { var yy = W.addDaysYmd(tday, kk); if (new Date(yy + 'T12:00:00').getDay() === 6) { var rms = at(yy, rev.h, rev.m); if (rms > now && rms <= WIN) out.push({ type: 'weeklyReview', fireAt: rms, instance: null, muscle: null }); break; } }
+    // B4 backup reminder at Sunday 10:00 (configurable), only when >=1 real (non-test) session exists; deep-links to the export
+    var bk = hm(o.notif && o.notif.backup, 10, 0), hasReal = (o.sessions || []).some(function (s) { return s && !s.test && s.source !== 'test'; });
+    if (hasReal) for (var kb = 0; kb < 3; kb++) { var yb = W.addDaysYmd(tday, kb); if (new Date(yb + 'T12:00:00').getDay() === 0) { var bms = at(yb, bk.h, bk.m); if (bms > now && bms <= WIN) out.push({ type: 'backup', fireAt: bms, instance: null, muscle: null }); break; } }
     out = out.filter(function (n) { var h = localH(n.fireAt); return !(h >= 22 || h < 7); });   // quiet hours: drop
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);
   }
   // when a day has more than 3, keep the ones nearest to acting; warm-up is the cuttable one (the cut list)
-  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6 };
+  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6, backup: 7 };
   function capPerDay(list, tz) {
     var byDay = {};
     list.forEach(function (n) { var k = W.ymdIn(new Date(n.fireAt), tz); (byDay[k] = byDay[k] || []).push(n); });
