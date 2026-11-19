@@ -2374,7 +2374,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-ins-d{font-size:13px;color:#B8B4AC;line-height:1.5}
 .wk-ins-acts{margin-top:6px}
 .wk-ins-btn{min-height:44px;padding:0 18px;border-radius:22px;border:1px solid rgba(212,176,106,.4);background:none;color:#D4B06A;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer}
-.wk-ins-btn.primary{background:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;border:none}
+.wk-ins-btn.primary{background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;border:none}
 .wk-sub-tap{cursor:pointer;font-family:inherit;text-align:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 /* B5: summary weekly muscle bars (vs the 10-20 band) + the insight-driven "לפעם הבאה" story line */
 .wk-mb-row{display:flex;align-items:center;gap:10px;margin:8px 0}

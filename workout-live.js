@@ -1477,6 +1477,8 @@
   function removeFromBrief(id) { W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return x.id !== id; }); }); try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { } }
   // ── B2: the insights screen (entry: the home "שיא" fact card + the workouts menu; nav is NOT restructured) ──
   var insActions = {};
+  // B2/A7: escape, then bidi-isolate numeric runs so Latin numerals read correctly inside the RTL Hebrew insight copy
+  function insNum(s) { return h(s).replace(/[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }
   function insightsData() { try { return window.WkInsights ? window.WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }) : null; } catch (_) { return null; } }
   function sparkSvg(spark) {
     if (!spark || spark.length < 2) return '';
@@ -1498,7 +1500,7 @@
         : '<button class="wk-ins-btn primary" onclick="WorkoutHome.addToBriefById(' + js(id) + ')">' + h(S.addBrief) + '</button>') + '</div>';
     }
     return '<div class="wk-ins-card wk-ins-' + ins.type + '"><div class="wk-ins-tag">' + h(label) + '</div>'
-      + '<div class="wk-ins-h">' + h(ins.headline) + '</div><div class="wk-ins-d">' + h(ins.detail) + '</div>' + act + '</div>';
+      + '<div class="wk-ins-h">' + insNum(ins.headline) + '</div><div class="wk-ins-d">' + insNum(ins.detail) + '</div>' + act + '</div>';
   }
   function insightsHtml() {
     insActions = {};
@@ -1508,15 +1510,15 @@
     if (!hasProg) return head + '<div class="wk-ins-cap">' + h(S.insTitle) + '</div><div class="wk-ins-title">' + h(S.insNeutral) + '</div><div class="wk-ins-empty">' + h(S.insNoProg) + '</div>';
     var r = insightsData(); if (!r || r.error) return head + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>';
     var test = prefs().testMode ? '<div class="wk-ins-note">' + h(S.insTestNote) + '</div>' : '';
-    var cap = '<div class="wk-ins-cap">' + h(S.insWeek(r.week)) + '</div>';
-    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + h(S.insEmpty(r.needMore)) + '</div>';
+    var cap = '<div class="wk-ins-cap">' + insNum(S.insWeek(r.week)) + '</div>';
+    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + insNum(S.insEmpty(r.needMore)) + '</div>';
     var top = r.insights[0], title = top ? top.headline : S.insNeutral;
     var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
     var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
-      + '<div class="wk-ins-trend-pct">' + h((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
-      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence) + '">' + h(trend.evidence) + '</div></div>' : '';
+      + '<div class="wk-ins-trend-pct">' + insNum((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
+      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence) + '">' + insNum(trend.evidence) + '</div></div>' : '';
     var cards = r.insights.filter(function (i) { return i.type !== 'trend'; }).map(insightCard).join('');
-    return head + cap + '<div class="wk-ins-title">' + h(title) + '</div>' + test + trendCard + cards;
+    return head + cap + '<div class="wk-ins-title">' + insNum(title) + '</div>' + test + trendCard + cards;
   }
   function openInsights() {
     var el = $('wkInsights'); if (!el) { el = document.createElement('div'); el.id = 'wkInsights'; el.className = 'wk-ins'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
