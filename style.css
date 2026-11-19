@@ -1332,7 +1332,7 @@ select.rfi{appearance:none;-webkit-appearance:none;cursor:pointer;background-ima
 .bills-sum-card.ok .bills-sum-num{color:oklch(0.72 0.2 145)}
 .bills-sum-lbl{font-size:10px;color:var(--muted);margin-top:2px;font-weight:600}
 
-.bill-card{background:var(--surface2);border-radius:16px;padding:14px 16px;margin:0 16px 10px;cursor:pointer;touch-action:manipulation}
+.bill-card{background:var(--surface2);border-radius:20px;padding:14px 16px;margin:0 16px 10px;cursor:pointer;touch-action:manipulation}   /* A4: shared 20-28 radius band (was 16), harmonized with the workout card; no content/behavior change */
 .bill-card:active{background:var(--surface)}
 .bill-card.overdue{background:oklch(0.55 0.18 25 / 0.08)}
 .bill-card.paid{opacity:0.6}
