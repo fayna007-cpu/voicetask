@@ -1292,7 +1292,7 @@
     }
     var pr = '';
     if (b.targets && b.targets.exercise && (f.prCount || f.nearPR)) {
-      pr = '<div class="wk-sub"><div class="wk-sub-k">' + (f.nearPR ? '◎' : '★') + '</div><div class="wk-sub-t">' + h(f.nearPR ? S.nearPRL(h(b.targets.exercise)) : S.lastPRL) + '</div></div>';
+      pr = '<button class="wk-sub wk-sub-tap" onclick="event.stopPropagation();WorkoutHome.openInsights()" aria-label="' + h(S.insOpen) + '"><div class="wk-sub-k">' + (f.nearPR ? '◎' : '★') + '</div><div class="wk-sub-t">' + h(f.nearPR ? S.nearPRL(h(b.targets.exercise)) : S.lastPRL) + '</div></button>';
     }
     return wk || pr ? '<div class="wk-hero-extra">' + wk + pr + '</div>' : '';
   }
@@ -1430,6 +1430,55 @@
   }
   function briefUndo() { if (lastBriefAdd) { var id = lastBriefAdd; lastBriefAdd = null; removeFromBrief(id); try { if (typeof closeToast === 'function') closeToast(); } catch (_) { } } }
   function removeFromBrief(id) { W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return x.id !== id; }); }); try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { } }
+  // ── B2: the insights screen (entry: the home "שיא" fact card + the workouts menu; nav is NOT restructured) ──
+  var insActions = {};
+  function insightsData() { try { return window.WkInsights ? window.WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }) : null; } catch (_) { return null; } }
+  function sparkSvg(spark) {
+    if (!spark || spark.length < 2) return '';
+    var w = 240, hg = 84, pad = 8, min = Math.min.apply(null, spark), max = Math.max.apply(null, spark), rng = max - min || 1;
+    var xs = spark.map(function (v, i) { return pad + i * (w - 2 * pad) / (spark.length - 1); });
+    var ys = spark.map(function (v) { return hg - pad - (v - min) / rng * (hg - 2 * pad); });
+    var line = xs.map(function (x, i) { return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ');
+    var area = 'M' + xs[0].toFixed(1) + ' ' + (hg - pad) + ' ' + xs.map(function (x, i) { return 'L' + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ') + ' L' + xs[xs.length - 1].toFixed(1) + ' ' + (hg - pad) + ' Z';
+    return '<svg class="wk-spark" viewBox="0 0 ' + w + ' ' + hg + '" preserveAspectRatio="none" aria-hidden="true">'
+      + '<path class="wk-spark-fill" d="' + area + '"/><path class="wk-spark-line" d="' + line + '"/>'
+      + '<circle class="wk-spark-dot" cx="' + xs[xs.length - 1].toFixed(1) + '" cy="' + ys[ys.length - 1].toFixed(1) + '" r="4"/></svg>';
+  }
+  function insightCard(ins) {
+    var label = (S.insLabel && S.insLabel[ins.type]) || ins.type, act = '';
+    if (ins.action && ins.action.kind === 'addToBrief') {
+      var id = briefKey(ins.action); insActions[id] = ins.action;
+      act = '<div class="wk-ins-acts">' + (inBrief(id)
+        ? '<button class="wk-ins-btn" onclick="WorkoutHome.removeFromBrief(' + js(id) + ');WorkoutHome.openInsights()">' + h(S.removeBrief) + '</button>'
+        : '<button class="wk-ins-btn primary" onclick="WorkoutHome.addToBriefById(' + js(id) + ')">' + h(S.addBrief) + '</button>') + '</div>';
+    }
+    return '<div class="wk-ins-card wk-ins-' + ins.type + '"><div class="wk-ins-tag">' + h(label) + '</div>'
+      + '<div class="wk-ins-h">' + h(ins.headline) + '</div><div class="wk-ins-d">' + h(ins.detail) + '</div>' + act + '</div>';
+  }
+  function insightsHtml() {
+    insActions = {};
+    var head = '<div class="wk-ins-top"><button class="wk-ins-x" aria-label="' + h(S.insClose) + '" onclick="WorkoutHome.closeInsights()">✕</button></div>';
+    if (!enabled()) return head;
+    var hasProg = allRoutines().some(function (r) { return r.kind === 'workout' && programById(r.programId); });
+    if (!hasProg) return head + '<div class="wk-ins-cap">' + h(S.insTitle) + '</div><div class="wk-ins-title">' + h(S.insNeutral) + '</div><div class="wk-ins-empty">' + h(S.insNoProg) + '</div>';
+    var r = insightsData(); if (!r || r.error) return head + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>';
+    var test = prefs().testMode ? '<div class="wk-ins-note">' + h(S.insTestNote) + '</div>' : '';
+    var cap = '<div class="wk-ins-cap">' + h(S.insWeek(r.week)) + '</div>';
+    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + h(S.insEmpty(r.needMore)) + '</div>';
+    var top = r.insights[0], title = top ? top.headline : S.insNeutral;
+    var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
+    var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
+      + '<div class="wk-ins-trend-pct">' + h((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
+      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence) + '">' + h(trend.evidence) + '</div></div>' : '';
+    var cards = r.insights.filter(function (i) { return i.type !== 'trend'; }).map(insightCard).join('');
+    return head + cap + '<div class="wk-ins-title">' + h(title) + '</div>' + test + trendCard + cards;
+  }
+  function openInsights() {
+    var el = $('wkInsights'); if (!el) { el = document.createElement('div'); el.id = 'wkInsights'; el.className = 'wk-ins'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
+    el.innerHTML = insightsHtml(); el.classList.add('on');
+  }
+  function closeInsights() { var el = $('wkInsights'); if (el) el.classList.remove('on'); }
+  function addToBriefById(id) { var a = insActions[id]; if (a) { addToBrief(a); openInsights(); } }
   // one notify string: the first variant whose placeholders the vars fill (the plain fallback always qualifies)
   function fillNotify(type, part, vars, seed) {
     var list = CP && CP.COPY.notify[type] && CP.COPY.notify[type][part]; if (!list) return '';
@@ -1599,6 +1648,7 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
-    addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey };
+    addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

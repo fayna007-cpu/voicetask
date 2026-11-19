@@ -84,7 +84,7 @@
       : L.resumeLine('sheet') + '<button class="rform-save" id="wkStart" onclick="Workout.start()">' + (L.hasDraft() ? S.resume : S.start) + '</button>'
         // test mode (settings): a secondary "אימון בדיקה" — the full flow, nothing saved
         + (L.testOn && L.testOn() ? '<button class="wk-test-btn" id="wkTestStart" onclick="Workout.start({test:true})">🧪 ' + W.TEXT.ui.testStart + '</button>' : '')
-        + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.programs()">' + S.programs + '</button></div>';
+        + '<div class="wk-note" style="text-align:center"><button class="wk-lv-link" onclick="WorkoutLive.programs()">' + S.programs + '</button> · <button class="wk-lv-link" onclick="WorkoutHome.openInsights()">' + W.TEXT.ui.insOpen + '</button></div>';
   }
   function renderHistory() {
     var el = $('wkHistory'); if (!el) return;
