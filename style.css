@@ -2281,6 +2281,8 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 /* Session 2 · A5 the READY CTA: a 62px gold pill (gold = the workout CTA) with a breathing glow */
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big{min-height:62px;height:62px;border-radius:31px;font-size:18px;font-weight:800;background-color:#C9A45C;background-image:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1507;box-shadow:0 6px 22px rgba(201,164,92,.35)}
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{box-shadow:0 0 26px rgba(227,197,138,.5);opacity:.3;animation:wk-hero-glow 3.2s ease-in-out infinite}
+/* A13: this gold override out-specifies the wk-breathe reduced-motion rule above — restore the fallback at equal specificity */
+@media (prefers-reduced-motion:reduce){.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{animation:none}}
 .wk-live[data-mode=ready] .wk-ready-h .wk-pill{border-color:var(--wk-line);color:var(--wk-gold)}
 /* Session 3 · A1 the READY rework: caption, switcher chip, ONE coach card, exercise-list card, bottom links */
 .wk-ready-cap{margin:0 0 var(--wk-s1)}
@@ -2336,6 +2338,13 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-stat-gold b{color:var(--wk-green)}
 .wk-stat-gold{border-color:rgba(143,209,168,.3)}
 .wk-next-t{font-size:16px;font-weight:700;color:var(--wk-gold);font-variant-numeric:tabular-nums;margin:2px 0}
+/* A13: the summary builds up once — its blocks rise+fade in a short stagger (gated to the first render in JS) */
+.wk-sum-in>.wk-sum-hero{animation:wk-sum-rise var(--wk-m3) var(--wk-out) both}
+.wk-sum-in>.wk-sum-tiles{animation:wk-sum-rise var(--wk-m3) var(--wk-out) 90ms both}
+.wk-sum-in>.wk-coach{animation:wk-sum-rise var(--wk-m3) var(--wk-out) 180ms both}
+.wk-sum-in>.wk-sum-next,.wk-sum-in>.wk-tally{animation:wk-sum-rise var(--wk-m3) var(--wk-out) 260ms both}
+@keyframes wk-sum-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wk-sum-in>.wk-sum-hero,.wk-sum-in>.wk-sum-tiles,.wk-sum-in>.wk-coach,.wk-sum-in>.wk-sum-next,.wk-sum-in>.wk-tally{animation:none}}
 /* Session 3 · A10b no-program + rest-day hero states (same hero language) */
 .wk-state-empty,.wk-state-rest{background:#141210;border:1px solid rgba(212,176,106,.22);border-radius:24px;margin:0 8px 8px;padding:20px}
 .wk-state-empty .wk-card-h,.wk-state-rest .wk-card-h{font-size:24px;font-weight:800;color:#F3EEE3}

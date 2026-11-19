@@ -835,7 +835,7 @@
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
     pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) restMount(); else restKill(); }   // the slot is never left empty on a re-render
-    if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
+    if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); var ex = main.querySelector('.wk-lv-ex'); if (ex) ex.classList.add('wk-sum-in'); }   // A13: the summary builds up once (CSS stagger; reduced-motion = no animation); not re-run on later re-renders
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
   // the summary's numbers count up once, staggered (480 ms each, 80 ms apart; text nodes only; reduced motion = no animation)
@@ -1082,7 +1082,7 @@
     var t = W.targetsFor(ex, ex.sets, [])[0], tgt = t ? (isBw(ex) ? num(t.aim) + ' ' + S.reps : num(t.w) + ' ' + unitTxt(ex) + ' × ' + num(t.aim)) : '';
     var when = '';
     try { var b = homeBrief(); if (b && b.instance && b.notifications && b.notifications[0]) { var nx = b.notifications.filter(function (nn) { return nn.instance; })[0]; if (nx) when = num(new Date(nx.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ })); } } catch (_) { }
-    return group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : ''));
+    return '<div class="wk-sum-next">' + group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : '')) + '</div>';
   }
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
