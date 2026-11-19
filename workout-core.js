@@ -651,6 +651,7 @@
       cardOpts: 'אפשרויות', upTomorrow: function (m) { return m ? 'מחר · ' + m : 'מחר'; }, upInDays: function (n, m) { return 'בעוד ' + n + ' ימים' + (m ? ' · ' + m : ''); }, upStart: function (x) { return 'נקודת הפתיחה: ' + x; },
       sumVolume: 'נפח', sumTime: 'זמן', sumVsWeek: 'מול שבוע שעבר', sumPrHero: function (x) { return 'שיא חדש · ' + x; }, nextTimeT: 'לפעם הבאה', nextTargetL: function (ex, t) { return ex + ': ' + t; }, plannedAt: function (t) { return 'התזכורת הבאה: ' + t; },
       sumMuscleT: 'נפח לפי שריר השבוע', muscleSets: function (n) { return n + (isOne(n) ? ' סט' : ' סטים'); },
+      restEndT: 'המנוחה הסתיימה', restEndBody: function (ex, n, tgt) { return ex + ' · סט ' + n + (tgt ? ': ' + tgt : ''); },
       noProgT: 'עוד אין תוכנית אימון', noProgSub: 'נבנה אחת ונתחיל', noProgCta: 'צור תוכנית', restDayT: function (m) { return m ? 'יום מנוחה. מחר: ' + m : 'יום מנוחה'; }, restDaySub: function (t) { return 'האימון הבא: ' + t; },
       sumT: 'סיכום', setsW: function (n) { return n === 1 ? 'סט' : 'סטים'; }, duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
       backLive: 'חזרה לאימון', saveW: 'שמור אימון', existsQ: 'כבר שמרת היום אימון כזה', replace: 'החלף את הקיים', both: 'שמור את שניהם',

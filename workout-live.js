@@ -378,7 +378,7 @@
       if (state && state.test) { if (logged && !confirm(S.leave)) return; if (!logged) { drop(KEY_D); draft = null; state = null; testQ = null; } hide(); refreshAll(); return; }
       if (logged) { if (!confirm(S.leave)) return; }
       else { drop(KEY_D); draft = null; state = null; }
-      hide(); refreshAll(); return;
+      restPushCancel(); hide(); refreshAll(); return;   // B6: leaving/discarding the workout cancels the rest-end push
     }
     if (ui.mode === 'programs' && ui.after === 'ready') { ui.after = null; hide(); refreshAll(); return; }
     back();
@@ -582,6 +582,8 @@
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
     sound('tick'); haptic(); render(); reveal(); undoToast(slot + 1);
     if (then === 'finish') { finishOpen(); return; }                       // the final set of the final exercise: straight to the summary
+    if (state.rest && state.rest.endsAt > Date.now()) restPushSchedule();   // B6: schedule the lock-screen rest-end push
+
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
     var pr = W.isPR(done, ex, sessions());
     var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: pr, judge: CO && CO.judge, seen: ui.coachSeen });
@@ -700,7 +702,7 @@
   function delSet() { var e = ui.editing; dispatch({ type: 'DELETE_SET', ex: e.ex, i: e.i }); ui.editing = null; ui.pend = {}; render(); }
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
-  function restSkip() { dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }
+  function restSkip() { restPushCancel(); dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }   // B6: skipping rest cancels the scheduled push
   // the warm-up rows of exercise i: [] when it gets none (setting / auto rule), skipped, or no first target; edits apply to this session only
   function warmRows(i) {
     var ex = state.exercises[i], w = ui.warm[i] || {}; if (w.skip || W.warmupIdx(state.exercises, cat()).indexOf(i) < 0) return [];
@@ -730,6 +732,7 @@
   }
   function addEx(i) { var e = ui['_add' + i]; if (!e) return; dispatch({ type: 'ADD_EXERCISE', exercise: copy(e) }); pickClose(); ui.view = state.exIdx; render(); }
   function finishOpen() {
+    restPushCancel();   // B6: ending the workout cancels any pending rest-end push
     var logged = state.exercises.some(function (e) { return e.sets.length; });
     if (!logged) { if (confirm(S.noSets)) { drop(KEY_D); draft = null; state = null; hide(); refreshAll(); } return; }
     ui.locker = state.locker; ui.exists = false; ui.err = ''; go('finish');
@@ -1174,7 +1177,7 @@
       if (a) {
         W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
         sound('rest'); var first = a.kind === 'end' && ui.chimed !== r.endsAt;
-        if (a.kind === 'end') { acquireWake(); if (first) { ui.chimed = r.endsAt; haptic(); } }   // A12b: a best-effort haptic paired to the rest-end event (foreground, once)
+        if (a.kind === 'end') { acquireWake(); if (first) { ui.chimed = r.endsAt; haptic(); restPushCancel(); } }   // A12b: haptic paired to the rest-end; B6: foreground = suppress the push (the in-app alert handled it)
         if (first) render(); else renderDock();                             // the rest card turns back into the set (once)
         if (first) coachArrive(true);
       }
@@ -1207,6 +1210,27 @@
     }, wait);
   }
 
+  // ── B6: a lock-screen push at rest END via the server scheduler (reaches iOS where JS is frozen while locked) ──
+  // The scheduler is injectable (window.__wkRestSched) so it can be mocked in tests. The live /schedule worker is a 1-minute
+  // cron with only a bulk /cleanup (no per-id cancel, no seconds-scale fire) — insufficient for a short rest, so the worker
+  // needs a change (alfred-archive/session3-worker-checklist.md); NOT deployed. The in-app alert stays the guaranteed path.
+  var restSchedDefault = {
+    schedule: function (n) { try { if (!(window.Notification && Notification.permission === 'granted')) return; if (typeof window.wkSchedulePush === 'function') window.wkSchedulePush(n); } catch (_) { } },
+    cancel: function (id) { try { if (typeof window.wkCancelPush === 'function') window.wkCancelPush(id); } catch (_) { } }
+  };
+  function restSched() { return window.__wkRestSched || restSchedDefault; }
+  function restPushId() { var c = ui.ctx || {}; return 'wk_restend_' + (c.routineId || 'free') + '_' + (state ? state.startedAt : 0); }
+  function restPushSchedule() {
+    if (!state || !state.rest || ui.mode !== 'live' || state.test) return;   // never a real push for a test run
+    var ex = state.exercises[ui.view]; if (!ex) return;
+    var ts = targets(ui.view), tg = ts[Math.min(ex.sets.length, ts.length - 1)];
+    var plain = function (s) { return String(s).replace(/<[^>]+>/g, '').replace(/[⁦-⁩]/g, ''); };   // a push body is plain text, not in-app HTML
+    var tgt = tg ? (isBw(ex) ? tg.aim + ' ' + S.reps : tg.w + ' ' + unitTxt(ex) + ' × ' + tg.aim) : '';
+    var c = ui.ctx || {};
+    try { restSched().schedule({ id: restPushId(), fireAt: new Date(state.rest.endsAt).toISOString(), title: S.restEndT, body: plain(S.restEndBody(ex.label, ex.sets.length + 1, tgt)),
+      payload: { type: 'workout', id: (c.routineId || '') + '__' + (c.dateStr || ''), stage: 'restEnd' } }); } catch (_) { }   // B6b: never surfaces an error
+  }
+  function restPushCancel() { try { restSched().cancel(restPushId()); } catch (_) { } }
   // ── wake lock (feature-detected) + one-time hint ──
   function acquireWake() {
     if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (l) { wake = l; }).catch(function () { }); return; }
