@@ -1832,6 +1832,9 @@ function _v2RouteAction(action,type,id){
   // Workout (Session 1): any tap/action lands on the READY screen preloaded (never auto-starts a session).
   // "warm" focuses the warm-up; "mute" silences the rest of today. id = <routineId>__<dateStr>.
   if(type==='workout'){
+    // B3/B4: instance-less deep links — the weekly review opens the insights screen, the backup reminder opens the export
+    if(id==='insights'){try{window.WorkoutHome&&WorkoutHome.openInsights();}catch(e){console.error('[v2:route] insights open failed',e);}return true;}
+    if(id==='backup'){try{if(typeof exportData==='function')exportData();}catch(e){console.error('[v2:route] backup open failed',e);}return true;}
     const parts=String(id).split('__');
     try{window.WorkoutHome&&WorkoutHome.openFromNotif(parts[0],parts.slice(1).join('__'),action);}catch(e){console.error('[v2:route] workout open failed',e);}
     return true;

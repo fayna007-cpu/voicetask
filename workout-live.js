@@ -1270,8 +1270,8 @@
     } catch (_) { }
     var dft = readDraft();
     try {
-      var nc = readNotif();   // A14: the configurable evening/morning times feed the schedule (not hard-coded in the brief)
-      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning } }, now) : null;
+      var nc = readNotif();   // A14/B3/B4: the configurable times feed the schedule (not hard-coded in the brief)
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, review: nc.review, backup: nc.backup } }, now) : null;
     } catch (_) { briefCache = null; }
     briefAt = now; return briefCache;
   }
@@ -1410,9 +1410,10 @@
   function readNotif() {
     var raw = load(KEY_NOTIF, null), p = raw && typeof raw === 'object' ? raw : {};
     var types = p.types && typeof p.types === 'object' ? p.types : {};
-    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser'], t = {};
+    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
     T6.forEach(function (k) { t[k] = types[k] !== false; });
-    return { on: p.on !== false, evening: /^\d\d:\d\d$/.test(p.evening) ? p.evening : '20:00', morning: /^\d\d:\d\d$/.test(p.morning) ? p.morning : '09:00', types: t, muteDay: p.muteDay || null };
+    var hm = function (s, d) { return /^\d\d:\d\d$/.test(s) ? s : d; };
+    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
   }
   function setNotif(fn) { W.updateJSON(localStorage, KEY_NOTIF, {}, function (p) { p = p && typeof p === 'object' ? p : {}; fn(p); return p; }); }
   // ── B1b: insight suggestions added to the brief — reversible (undo toast) + removable anytime; NEVER auto-applied to any target ──
@@ -1499,8 +1500,10 @@
       var title = fillNotify(n.type, 'title', vars, seed), body = fillNotify(n.type, 'body', vars, seed);
       if (!title && !body) return;
       var rid = n.instance ? n.instance.routineId : '', id = 'wk_' + n.type + '_' + rid + '_' + ds;
+      // deep-link target: an instance -> the ready screen; weeklyReview -> insights; backup -> the export (B3/B4)
+      var pid = n.instance ? rid + '__' + ds : (n.type === 'weeklyReview' ? 'insights' : n.type === 'backup' ? 'backup' : '');
       out.push({ id: id, title: title, body: body, fireAt: new Date(n.fireAt).toISOString(),
-        payload: { type: 'workout', id: rid + (n.instance ? '__' + ds : ''), stage: n.type, warm: n.type === 'warmup' } });
+        payload: { type: 'workout', id: pid, stage: n.type, warm: n.type === 'warmup' } });
     });
     return out;
   }
@@ -1516,6 +1519,13 @@
     if (t.lastReps != null) v.lastReps = num(t.lastReps);
     if (t.targetKg != null) v.targetKg = num(t.targetKg);
     if (f.weekPlanned > 0) { v.done = num(f.weekDone); v.planned = num(f.weekPlanned); }
+    // B3 weekly review: {n} workouts this week, {x} PRs this week, {insight} = the top real insight
+    if (n.type === 'weeklyReview') {
+      var all2 = sessions(), wr2 = W.weekRange(new Date(Date.now())), prs = 0, wdone = 0;
+      all2.forEach(function (s) { if (!s || s.test || s.source === 'test') return; var d = s.dateStr || s.date; if (d >= wr2.start && d <= wr2.end) { wdone++; prs += (W.prsFor(s, all2.filter(function (p) { return p.id !== s.id && (p.dateStr || p.date) <= d; })) || []).length; } });
+      v.n = num(wdone); v.x = num(prs);
+      try { var ti = window.WkInsights && WkInsights.top(all2, Date.now(), { tz: tz, catalog: cat() }); if (ti && ti.headline) v.insight = h(ti.headline); } catch (_) { }
+    }
     // {hint}: a near-PR beats the plain plan line; only when its own placeholders are present
     if (f.nearPR && t.exercise) v.hint = 'שיא אפשרי ב' + h(t.exercise);
     else if (w.mins && w.exercises) v.hint = W.plural(num(w.mins) + ' דק׳, ' + num(w.exercises) + ' תרגילים');

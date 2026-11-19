@@ -29,7 +29,7 @@
     var hasDraft = function (x) { return o.draft && !o.draft.test && String(o.draft.routineId) === String(x.r.id) && o.draft.dateStr === x.i.dt && !isDone(x); };
     var todayInst = todays.filter(hasDraft)[0] || todays.filter(function (x) { return !isDone(x); })[0] || todays[0];
     var pick = todayInst || insts.filter(function (x) { return x.ymd >= today; })[0] || null;
-    if (!pick) return brief;
+    if (!pick) { brief.notifications = notifications(o, insts, now, tz); return brief; }   // the weekly summaries (friday/weekly review) fire from history even with no upcoming instance
     brief.instance = { routineId: String(pick.r.id), dt: pick.i.dt }; brief.isToday = pick === todayInst;
 
     var saved = (o.sessions || []).some(function (s) { return s && s.source === 'live' && String(s.routineId) === String(pick.r.id) && s.dateStr === pick.i.dt; });
@@ -146,12 +146,15 @@
     });
     // Friday teaser (summary) at 18:00, once in the window
     var fri = nextFriday(now, tz); if (fri > now && fri <= WIN) out.push({ type: 'fridayTeaser', fireAt: fri, instance: null, muscle: null });
+    // B3 weekly review at Saturday 20:00 (configurable), once in the window -> deep-links to the insights screen
+    var rev = hm(o.notif && o.notif.review, 20, 0), tday = W.ymdIn(new Date(now), tz);
+    for (var kk = 0; kk < 3; kk++) { var yy = W.addDaysYmd(tday, kk); if (new Date(yy + 'T12:00:00').getDay() === 6) { var rms = at(yy, rev.h, rev.m); if (rms > now && rms <= WIN) out.push({ type: 'weeklyReview', fireAt: rms, instance: null, muscle: null }); break; } }
     out = out.filter(function (n) { var h = localH(n.fireAt); return !(h >= 22 || h < 7); });   // quiet hours: drop
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);
   }
   // when a day has more than 3, keep the ones nearest to acting; warm-up is the cuttable one (the cut list)
-  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5 };
+  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6 };
   function capPerDay(list, tz) {
     var byDay = {};
     list.forEach(function (n) { var k = W.ymdIn(new Date(n.fireAt), tz); (byDay[k] = byDay[k] || []).push(n); });
