@@ -1415,6 +1415,21 @@
     return { on: p.on !== false, evening: /^\d\d:\d\d$/.test(p.evening) ? p.evening : '20:00', morning: /^\d\d:\d\d$/.test(p.morning) ? p.morning : '09:00', types: t, muteDay: p.muteDay || null };
   }
   function setNotif(fn) { W.updateJSON(localStorage, KEY_NOTIF, {}, function (p) { p = p && typeof p === 'object' ? p : {}; fn(p); return p; }); }
+  // ── B1b: insight suggestions added to the brief — reversible (undo toast) + removable anytime; NEVER auto-applied to any target ──
+  var KEY_BRIEF = 'vt_wk_brief', lastBriefAdd = null;
+  function briefAdds() { var a = load(KEY_BRIEF, []); return Array.isArray(a) ? a : []; }
+  function briefKey(ac) { return ac.exercise + '|' + (ac.suggest ? (ac.suggest.w == null ? 'bw' : ac.suggest.w) + 'x' + ac.suggest.r : (ac.label || '')); }
+  function inBrief(id) { return briefAdds().some(function (x) { return x.id === id; }); }
+  function addToBrief(ac) {
+    if (!ac || ac.kind !== 'addToBrief' || !ac.exercise) return;
+    var id = briefKey(ac);
+    W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { a = Array.isArray(a) ? a : []; if (!a.some(function (x) { return x.id === id; })) a.push({ id: id, exercise: ac.exercise, suggest: ac.suggest || null, label: ac.label || '', at: Date.now() }); return a; });
+    lastBriefAdd = id;
+    try { if (typeof toast === 'function') toast(h(S.addedBrief) + ' · <button class="wk-toast-undo" onclick="WorkoutHome.briefUndo()">' + h(S.briefUndo) + '</button>', 5000); } catch (_) { }
+    try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { }
+  }
+  function briefUndo() { if (lastBriefAdd) { var id = lastBriefAdd; lastBriefAdd = null; removeFromBrief(id); try { if (typeof closeToast === 'function') closeToast(); } catch (_) { } } }
+  function removeFromBrief(id) { W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return x.id !== id; }); }); try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { } }
   // one notify string: the first variant whose placeholders the vars fill (the plain fallback always qualifies)
   function fillNotify(type, part, vars, seed) {
     var list = CP && CP.COPY.notify[type] && CP.COPY.notify[type][part]; if (!list) return '';
@@ -1583,6 +1598,7 @@
     renderNotifBox();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
-  window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif };
+  window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
+    addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();
