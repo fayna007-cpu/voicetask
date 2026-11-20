@@ -1703,7 +1703,7 @@
     box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(nsec, nbox);
     renderNotifBox();
   }
-  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser'];
+  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'];
   function renderNotifBox() {
     var nbox = $('wkNotifBox'); if (!nbox) return; var c = readNotif();
     var row = function (title, sub, ctrl) { return '<div class="settings-row"><div class="settings-row-body"><div class="settings-row-title">' + title + '</div>' + (sub ? '<div class="settings-row-sub">' + sub + '</div>' : '') + '</div>' + ctrl + '</div>'; };
@@ -1711,7 +1711,8 @@
     var html = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🔔</div><div class="settings-row-body"><div class="settings-row-title">' + S.notifOnT + '</div><div class="settings-row-sub">' + S.notifOnSub + '</div></div>' + toggle(c.on, 'WorkoutLive.notifSet(\'on\',this.checked)') + '</div>';
     if (c.on) {
       // the evening / morning time chip lives INSIDE its own toggle row (no duplicated rows)
-      var timeFor = function (k) { return k === 'eveningBefore' ? '<input type="time" class="wk-time" value="' + c.evening + '" onchange="WorkoutLive.notifSet(\'evening\',this.value)" onclick="event.stopPropagation()">' : k === 'morning' ? '<input type="time" class="wk-time" value="' + c.morning + '" onchange="WorkoutLive.notifSet(\'morning\',this.value)" onclick="event.stopPropagation()">' : ''; };
+      var tinp = function (key, val) { return '<input type="time" class="wk-time" value="' + val + '" onchange="WorkoutLive.notifSet(\'' + key + '\',this.value)" onclick="event.stopPropagation()">'; };
+      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
       html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', timeFor(k) + toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
     }
     nbox.innerHTML = html;
@@ -1719,7 +1720,7 @@
   function notifSet(key, val) {
     setNotif(function (p) {
       if (key === 'on') p.on = !!val;
-      else if (key === 'evening' || key === 'morning') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
+      else if (key === 'evening' || key === 'morning' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
       else if (key.slice(0, 2) === 't:') { p.types = p.types || {}; p.types[key.slice(2)] = !!val; }
     });
     renderNotifBox();
