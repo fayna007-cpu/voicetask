@@ -306,14 +306,13 @@
   function restKill() { if (restM) { try { restM.destroy(); } catch (_) { } restM = null; } }
   // F8: the rest card must fit above the dock WITHOUT scroll — shrink the ring (compact), then drop the 96px character slot (tight)
   function fitRest() {
-    afterPaint(function () {
-      var sc = $('wkLvScroll'), card = document.querySelector('#wkLvMain .wk-rest-card'); if (!sc || !card) return;
-      card.classList.remove('wk-rest-compact', 'wk-rest-tight');
-      var over = function () { return card.offsetHeight > sc.clientHeight + 2; };   // compact only when the rest CARD itself can't fit (not because warm-up sits above it)
-      if (over()) card.classList.add('wk-rest-compact');
-      if (over()) card.classList.add('wk-rest-tight');
-      sc.scrollTop = Math.max(0, card.offsetTop - 4);   // bring the rest card to the top so char/ring/next-set read top-down, above the dock
-    });
+    // SYNC (before paint) so resizing the ring never causes a layout shift — CLS stays 0 (A2/motion)
+    var sc = $('wkLvScroll'), card = document.querySelector('#wkLvMain .wk-rest-card'); if (!sc || !card) return;
+    card.classList.remove('wk-rest-compact', 'wk-rest-tight');
+    var over = function () { return card.offsetHeight > sc.clientHeight + 2; };   // compact only when the rest CARD itself can't fit (not because warm-up sits above it)
+    if (over()) card.classList.add('wk-rest-compact');
+    if (over()) card.classList.add('wk-rest-tight');
+    sc.scrollTop = Math.max(0, card.offsetTop - 4);   // bring the rest card to the top so char/ring/next-set read top-down, above the dock
   }
   // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
   var sumM = null;
