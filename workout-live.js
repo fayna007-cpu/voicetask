@@ -15,6 +15,8 @@
   var $ = function (id) { return document.getElementById(id); };
   var h = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var num = function (n) { return '<bdi dir="ltr">' + h(n) + '</bdi>'; };
+  // F7: LTR isolation for PLAIN-TEXT sinks (notification title/body, aria-label, toast, document.title) — Unicode isolates, never markup
+  var numIso = function (n) { return '⁦' + String(n == null ? '' : n) + '⁩'; };
   var setTxt = function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; };          // "28×6", combined "28×6+5"
   var js = function (v) { return h(JSON.stringify(v)); };                // a value inside an onclick="" attribute
 
@@ -612,7 +614,13 @@
   }
   function hidePR() { var e = $('wkPr'); if (e) e.classList.remove('on'); clearTimeout(prTimer); }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
-  function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) { } }
+  // best-effort, never required for meaning: Vibration API where present (Android); on iOS (no vibrate) the hidden
+  // checkbox-"switch" trick, feature-detected and wrapped so it never throws. (iOS behaviour UNVERIFIED on device.)
+  function haptic() {
+    if (!prefs().haptic) return;
+    try { if (navigator.vibrate) { navigator.vibrate(20); return; } } catch (_) { }
+    try { var l = $('wkHapL'); if (l && l.querySelector && l.querySelector('input[switch]')) l.click(); } catch (_) { }
+  }
   // "= כמו הסט הקודם": the previous set of this exercise prefills the active one (a combined set keeps its parts)
   function sameAsLast() {
     var c = cur(), ex = state.exercises[c.ex], p = ex.sets[ex.sets.length - 1]; if (!p) return;
@@ -1393,7 +1401,7 @@
     var isUp = st === 'tomorrow' || st === 'far', cc0 = cat();
     if (isUp) {
       var mus = d && d.exercises[0] ? muscleName(W.muscleKey(d.exercises[0], cc0)) : '';
-      head = st === 'tomorrow' ? h(S.upTomorrow(mus)) : h(S.upInDays(num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))), mus));
+      head = st === 'tomorrow' ? S.upTomorrow(h(mus)) : S.upInDays(num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))), h(mus));   // F7: num() is HTML-safe <bdi>; escape only the muscle, never re-escape the whole
       var ue = d && d.exercises.filter(function (e) { var ll = lastOf(e.label); return ll && ll.sets.length; })[0], ul = ue && lastOf(ue.label);
       if (ul) data = S.upStart(h(ue.label) + ' ' + setTxt(ul.sets[0]));
     }
@@ -1478,7 +1486,7 @@
   // ── B2: the insights screen (entry: the home "שיא" fact card + the workouts menu; nav is NOT restructured) ──
   var insActions = {};
   // B2/A7: escape, then bidi-isolate numeric runs so Latin numerals read correctly inside the RTL Hebrew insight copy
-  function insNum(s) { return h(s).replace(/[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }
+  function insNum(s) { return h(W.plural(String(s))).replace(/[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }   // F1: 1/2 counts -> singular/dual, then bidi-isolate numerals
   function insightsData() { try { return window.WkInsights ? window.WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }) : null; } catch (_) { return null; } }
   function sparkSvg(spark) {
     if (!spark || spark.length < 2) return '';
@@ -1556,25 +1564,29 @@
   function notifVars(b, n, tz) {
     var f = b.facts, t = b.targets || {}, w = b.workout || {}, v = {};
     if (n.muscle) v.muscle = muscleName(n.muscle);
-    if (f.streakWeeks > 0) v.streak = num(f.streakWeeks);
-    if (w.mins) v.mins = num(w.mins);
-    if (w.exercises) v.n = num(w.exercises);
-    if (n.instance) v.time = num(new Date(n.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }));
+    if (f.streakWeeks > 0) v.streak = numIso(f.streakWeeks);
+    if (w.mins) v.mins = numIso(w.mins);
+    if (w.exercises) v.n = numIso(w.exercises);
+    if (n.instance) v.time = numIso(new Date(n.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }));
     if (t.exercise) v.exercise = h(t.exercise);
-    if (t.lastKg != null) v.lastKg = num(t.lastKg);
-    if (t.lastReps != null) v.lastReps = num(t.lastReps);
-    if (t.targetKg != null) v.targetKg = num(t.targetKg);
-    if (f.weekPlanned > 0) { v.done = num(f.weekDone); v.planned = num(f.weekPlanned); }
+    if (t.lastKg != null) v.lastKg = numIso(t.lastKg);
+    if (t.lastReps != null) v.lastReps = numIso(t.lastReps);
+    if (t.targetKg != null) v.targetKg = numIso(t.targetKg);
+    // F2: {last} previous set, {target} today's target, {dur} workout minutes (so the body carries a fact the title does not)
+    if (t.lastKg != null && t.lastReps != null) v.last = numIso(t.lastKg) + '×' + numIso(t.lastReps);
+    if (t.targetKg != null) v.target = numIso(t.targetKg) + ' ' + T.unit.kg;
+    if (w.mins) v.dur = numIso(w.mins);
+    if (f.weekPlanned > 0) { v.done = numIso(f.weekDone); v.planned = numIso(f.weekPlanned); }
     // B3 weekly review: {n} workouts this week, {x} PRs this week, {insight} = the top real insight
     if (n.type === 'weeklyReview') {
       var all2 = sessions(), wr2 = W.weekRange(new Date(Date.now())), prs = 0, wdone = 0;
       all2.forEach(function (s) { if (!s || s.test || s.source === 'test') return; var d = s.dateStr || s.date; if (d >= wr2.start && d <= wr2.end) { wdone++; prs += (W.prsFor(s, all2.filter(function (p) { return p.id !== s.id && (p.dateStr || p.date) <= d; })) || []).length; } });
-      v.n = num(wdone); v.x = num(prs);
+      v.n = numIso(wdone); v.x = numIso(prs);
       try { var ti = window.WkInsights && WkInsights.top(all2, Date.now(), { tz: tz, catalog: cat() }); if (ti && ti.headline) v.insight = h(ti.headline); } catch (_) { }
     }
     // {hint}: a near-PR beats the plain plan line; only when its own placeholders are present
     if (f.nearPR && t.exercise) v.hint = 'שיא אפשרי ב' + h(t.exercise);
-    else if (w.mins && w.exercises) v.hint = W.plural(num(w.mins) + ' דק׳, ' + num(w.exercises) + ' תרגילים');
+    else if (w.mins && w.exercises) v.hint = W.plural(numIso(w.mins) + ' דק׳, ' + numIso(w.exercises) + ' תרגילים');
     return v;
   }
   // a notification tap: open the ready screen preloaded (never auto-start); "warm" focuses the warm-up; "mute" silences today
