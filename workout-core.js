@@ -451,10 +451,22 @@
     return { i: i, text: list[i] };
   }
   // counts read as Hebrew: a lone 1 (plain, <bdi>-wrapped or isolated) before a plural noun -> the singular form ("1 סטים" -> "סט אחד")
-  var ONE_FORMS = { 'סטים': 'סט אחד', 'תרגילים': 'תרגיל אחד', 'חזרות': 'חזרה אחת', 'ימים': 'יום אחד', 'אימונים': 'אימון אחד' };
+  // F1: one shared count helper — Hebrew singular / dual / plural with gender (1 "שיא אחד"/"אימון אחד", 2 "שני שיאים"/"שני אימונים"/"שתי חזרות", 3+ "N שיאים"); 0 = plural.
+  var COUNT = {
+    set: { one: 'סט אחד', two: 'שני סטים', many: 'סטים' },
+    ex: { one: 'תרגיל אחד', two: 'שני תרגילים', many: 'תרגילים' },
+    rep: { one: 'חזרה אחת', two: 'שתי חזרות', many: 'חזרות' },
+    day: { one: 'יום אחד', two: 'יומיים', many: 'ימים' },
+    workout: { one: 'אימון אחד', two: 'שני אימונים', many: 'אימונים' },
+    pr: { one: 'שיא אחד', two: 'שני שיאים', many: 'שיאים' },
+    week: { one: 'שבוע אחד', two: 'שבועיים', many: 'שבועות' }
+  };
+  var NOUN_KEY = { 'סטים': 'set', 'תרגילים': 'ex', 'חזרות': 'rep', 'ימים': 'day', 'אימונים': 'workout', 'שיאים': 'pr', 'שבועות': 'week' };
+  function hcount(n, key) { var f = COUNT[key]; if (!f) return String(n); var v = +String(n).replace(/<[^>]*>/g, '').replace(/[⁦-⁩\s]/g, ''); return v === 1 ? f.one : v === 2 ? f.two : n + ' ' + f.many; }   // keep the caller's (possibly bidi-wrapped) numeral for 0 / 3+
   function isOne(v) { return String(v).replace(/<[^>]*>/g, '').replace(/[⁦-⁩\s]/g, '') === '1'; }
+  // post-process a filled string: any "1 <noun>" / "2 <noun>" becomes the singular / dual form (3+ and 0 stay "N <noun>")
   function plural(text) {
-    return String(text).replace(/(^|[^\d.,:×*+\-\/])((?:<bdi[^>]*>|⁦)?1(?:<\/bdi>|⁩)?) (סטים|תרגילים|חזרות|ימים|אימונים)(?![֐-׿])/g, function (m, pre, n, noun) { return pre + ONE_FORMS[noun]; });
+    return String(text).replace(/(^|[^\d.,:×*+\-\/])((?:<bdi[^>]*>|⁦)?([12])(?:<\/bdi>|⁩)?) (סטים|תרגילים|חזרות|ימים|אימונים|שיאים|שבועות)(?![֐-׿])/g, function (m, pre, whole, digit, noun) { var k = NOUN_KEY[noun]; return pre + (digit === '1' ? COUNT[k].one : COUNT[k].two); });
   }
   function fill(tpl, vars) { return plural(String(tpl).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? vars[k] : ''; })); }
   // The coach line after a workout: ONE line with numbers, from the strongest fact (PR > progress > steady > first).
@@ -637,7 +649,7 @@
       warmOn: 'סטי חימום לפני התרגיל', weightT: 'משקל', warmEditHint: 'לאימון הזה בלבד', warmModes: { auto: 'אוטומטי', on: 'תמיד', off: 'בלי' },
       warmModeHint: { auto: 'לתרגיל הראשון עם משקל בכל קבוצת שרירים', on: 'לפני הסט הראשון (משקל גוף: סט קל בחצי מהחזרות)', off: 'בלי סטי חימום לתרגיל הזה' }, saveEx: 'שמור תרגיל', removeEx: 'הסר תרגיל', delEx: 'להסיר את התרגיל?', needName: 'צריך שם לתרגיל',
       range: function (i) { return 'סט ' + i + ' · טווח חזרות'; }, min: 'מינימום', max: 'מקסימום', presets: 'מוכנים',
-      ready: 'מוכן?', start: 'התחל', next: 'הבא', lockerT: 'תא ציוד', warmPreview: function (n) { return 'חימום · ' + (isOne(n) ? 'סט אחד' : n + ' סטים'); }, noWarmBw: 'אין חימום: משקל גוף',
+      ready: 'מוכן?', start: 'התחל', next: 'הבא', lockerT: 'תא ציוד', warmPreview: function (n) { return 'חימום · ' + hcount(n, 'set'); }, noWarmBw: 'אין חימום: משקל גוף',
       feel: 'איך אתה מרגיש?', sleep: 'שינה', energy: 'אנרגיה', pain: 'כאבים', modeT: 'היום', modes: { full: 'מלא', light: 'קל יותר', short: 'קצר' },
       modeHint: { full: 'כל הסטים, היעדים הרגילים', light: 'היעדים פחות 10%', short: '2 סטים לכל תרגיל' }, suggested: 'הצעה',
       reps: 'חזרות', perHand: 'לכל יד', target: 'יעד', lastTime: 'בפעם שעברה', first: 'פעם ראשונה, מתחילים מהמשקל שהגדרת',
@@ -647,40 +659,51 @@
       pickEx: 'הוסף תרגיל', edit: 'עריכה', keep: 'שמור', warmSkip: 'דלג על החימום', warmDone: 'סט חימום בוצע',
       wake: 'השאר את המסך דולק', memFull: 'הזיכרון מלא. האימון נשמר רק כאן עד שתסיים',
       leave: 'לצאת? האימון נשמר, ותוכל להמשיך מאיפה שעצרת.', noSets: 'עוד לא נרשם אף סט. לסגור בלי לשמור?',
+      less: 'פחות', readySwitch: 'החלף', readyKey: function (t) { return 'היעד הראשון: ' + t; }, exMore: function (n) { return 'ועוד ' + n + ' תרגילים'; }, readyWarm: 'חימום', readyChecks: 'בדיקות', readyEdit: 'ערוך תוכנית',
+      cardOpts: 'אפשרויות', upTomorrow: function (m) { return m ? 'מחר · ' + m : 'מחר'; }, upInDays: function (n, m) { return 'בעוד ' + n + ' ימים' + (m ? ' · ' + m : ''); }, upStart: function (x) { return 'נקודת הפתיחה: ' + x; },
+      sumVolume: 'נפח', sumTime: 'זמן', sumVsWeek: 'מול שבוע שעבר', sumPrHero: function (x) { return 'שיא חדש · ' + x; }, nextTimeT: 'לפעם הבאה', nextTargetL: function (ex, t) { return ex + ': ' + t; }, plannedAt: function (t) { return 'התזכורת הבאה: ' + t; },
+      sumMuscleT: 'נפח לפי שריר השבוע', muscleSets: function (n) { return hcount(n, 'set'); },
+      restEndT: 'המנוחה הסתיימה', restEndBody: function (ex, n, tgt) { return ex + ' · סט ' + n + (tgt ? ': ' + tgt : ''); },
+      noProgT: 'עוד אין תוכנית אימון', noProgSub: 'נבנה אחת ונתחיל', noProgCta: 'צור תוכנית', restDayT: function (m) { return m ? 'יום מנוחה. מחר: ' + m : 'יום מנוחה'; }, restDaySub: function (t) { return 'האימון הבא: ' + t; },
       sumT: 'סיכום', setsW: function (n) { return n === 1 ? 'סט' : 'סטים'; }, duration: 'משך', setsDone: function (n) { return n === 1 ? 'סט אחד' : n + ' סטים'; }, effort: 'כמה קשה היה?',
       backLive: 'חזרה לאימון', saveW: 'שמור אימון', existsQ: 'כבר שמרת היום אימון כזה', replace: 'החלף את הקיים', both: 'שמור את שניהם',
       saveErr: 'לא הצלחתי לשמור, אין מקום בזיכרון. האימון עדיין כאן',
       cmpFirst: 'פעם ראשונה', cmpSame: 'כמו בפעם שעברה',
       cmpWas: function (a, b) { return 'בפעם הקודמת ' + a + ' ← עכשיו ' + b; }, cmpNow: function (b) { return 'עכשיו ' + b; },
       factUp: function (l, d, u) { return l + ': <bdi dir="ltr">+' + d + '</bdi>' + (u ? ' ' + u : '') + ' מהפעם הקודמת'; },
-      factSets: function (n, m) { return (isOne(n) ? 'סט אחד' : n + ' סטים') + ' ב-' + m + ' דק׳'; },
+      factSets: function (n, m) { return hcount(n, 'set') + ' ב-' + m + ' דק׳'; },
 cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       cmpReps: function (d) { return d > 0 ? '+' + (d === 1 ? 'חזרה אחת' : d + ' חזרות') : (d === -1 ? 'חזרה אחת פחות' : -d + ' חזרות פחות'); },
-      prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + (isOne(r) ? 'חזרה אחת' : r + ' חזרות') + (w != null ? ' ב-' + w + ' ' + u : ''); },
+      prE: function (l, v) { return l + ': 1RM משוער ' + v + ' ק״ג'; }, prR: function (l, w, r, u) { return l + ': ' + hcount(r, 'rep') + (w != null ? ' ב-' + w + ' ' + u : ''); },
       prsT: 'שיאים', estimate: 'הערכה לפי נוסחת Epley',
       rx: { exceed: 'מעל היעד', met: 'ביעד', under: 'מתחת ליעד', pr: 'שיא אישי' },   // the row tag = the same judgement as the coach
       doneSetN: function (n) { return 'סיימתי סט ' + n; }, nextExBtn: 'לתרגיל הבא ←', skipRestBtn: 'דלג על המנוחה', options: 'אפשרויות', addNote: 'הוסף הערה',
-      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + (isOne(n) ? 'סט אחד נרשם, והוא יישמר בסיכום.' : n + ' סטים נרשמו, והם יישמרו בסיכום.'); },
+      finishQ: function (n) { return 'לסיים את האימון עכשיו? ' + hcount(n, 'set') + (isOne(n) ? ' נרשם, והוא יישמר בסיכום.' : ' נרשמו, והם יישמרו בסיכום.'); },
       prMomentT: 'שיא חדש', prHint: 'הקש להמשך', prDeltaKg: function (d) { return '+' + d + ' ק״ג מהפעם הקודמת'; }, prDeltaReps: function (d) { return '+' + d + ' חזרות מהפעם הקודמת'; },
       prStreak: function (n) { return n === 2 ? 'שיא שני ברצף' : n === 3 ? 'שיא שלישי ברצף' : n + ' שיאים ברצף'; },
-      finishHere: 'סיים אימון כאן', exDoneOf: function (x, y) { return x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים') + (isOne(x) ? ' בוצע' : ' בוצעו'); }, setsLogged: function (n) { return isOne(n) ? 'סט אחד נרשם' : n + ' סטים נרשמו'; },
-      savePartial: 'סיים ושמור כאימון חלקי', discardW: 'בטל בלי לשמור', partialT: function (x, y) { return 'אימון חלקי · ' + x + ' מתוך ' + y + (isOne(y) ? ' תרגיל' : ' תרגילים'); }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
+      finishHere: 'סיים אימון כאן', exDoneOf: function (x, y) { return x + ' מתוך ' + hcount(y, 'ex') + (isOne(x) ? ' בוצע' : ' בוצעו'); }, setsLogged: function (n) { return hcount(n, 'set') + (isOne(n) ? ' נרשם' : ' נרשמו'); },
+      savePartial: 'סיים ושמור כאימון חלקי', discardW: 'בטל בלי לשמור', partialT: function (x, y) { return 'אימון חלקי · ' + x + ' מתוך ' + hcount(y, 'ex'); }, keepGoing: 'המשך להתאמן', restNext: 'הסט הבא', swapEx: 'החלף תרגיל', addExMenu: 'הוסף תרגיל',
       sameAsLast: '= כמו הסט הקודם', undoToast: function (n) { return 'נרשם סט ' + n; }, undoBtn: '↶ בטל', peekT: 'שלושת האחרונים',
       restDone: function (n) { return 'המנוחה נגמרה · סט ' + n; }, restDoneNotif: function (n) { return 'המנוחה נגמרה · סט ' + n + ' מחכה'; },
       restFinished: function (ex, n) { return ex + ' · סט ' + n + ' הסתיים'; }, restOf: function (t) { return 'מתוך ' + t; }, restMinus: '15 שניות פחות', restPlus: '15 שניות יותר',
-      restLastSet: 'הסט האחרון:', nextSetOf: function (a, b) { return 'הסט הבא · ' + a + ' מתוך ' + b; }, restLastCoach: 'הסט האחרון בתרגיל.', restReady: 'אני מוכן, דלג על המנוחה',
-      openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + (isOne(sets) ? 'סט אחד נרשם' : sets + ' סטים נרשמו') + '. מה לעשות איתו?'; },
+      restLastSet: 'הסט האחרון:', nextSetOf: function (a, b) { return 'הסט הבא · ' + a + ' מתוך ' + b; }, restLastCoach: 'הסט האחרון. תן הכול, זה השיא שלך.', restReady: 'אני מוכן, דלג על המנוחה',
+      openReal: 'יש אימון פתוח', openRealSub: function (n, sets) { return n + ' · ' + hcount(sets, 'set') + (isOne(sets) ? ' נרשם' : ' נרשמו') + '. מה לעשות איתו?'; },
       openResume: 'המשך באימון הפתוח', openFinish: 'סיים אותו', openDelete: 'מחק ללא שמירה', cancelWorkout: 'בטל אימון (ללא שמירה)',
       cancelWorkoutQ: function (n) { return n === 1 ? 'לבטל את האימון? סט אחד שנרשם יימחק ולא יישמר.' : n ? 'לבטל את האימון? ' + n + ' סטים שנרשמו יימחקו ולא יישמרו.' : 'לבטל את האימון? עוד לא נרשם אף סט.'; },
       coachOff: 'כבוי', coachOffHint: 'בלי משפטים. הסימונים נשארים', coachModeT: 'המאמן', soundT: 'צליל', hapticT: 'רטט עדין (אם הטלפון תומך)', menuT: 'הגדרות האימון',
       soundTest: 'בדוק צליל', soundHint: 'לא שמעת? בדוק את מתג השקט בצד הטלפון', soundOk: 'הצליל נבדק',
       hapticTest: 'בדוק רטט', hapticHint: 'לא הרגשת? בדוק שרטט המערכת מופעל בהגדרות הטלפון',
       silentT: 'צליל גם במצב שקט (ניסיוני)', silentHint: 'עלול לעצור מוזיקה שמתנגנת ברקע', mascotT: 'המאמן',
+      addBrief: 'הוסף לתדריך', addedBrief: 'נוסף לתדריך', briefUndo: 'בטל', removeBrief: 'הסר מהתדריך',
+      insTitle: 'סקירת שבוע', insWeek: function (n) { return 'סקירת שבוע ' + n; }, insNeutral: 'סקירת האימונים שלך',
+      insEmpty: function (n) { return 'בונים תמונה: עוד ' + n + (n === 1 ? ' אימון' : ' אימונים'); }, insNoProg: 'עוד אין תוכנית אימון. צור תוכנית ונתחיל למדוד.',
+      insTestNote: 'מצב בדיקה — התובנות מתעלמות מאימוני בדיקה', insTrendT: '1RM משוער', insClose: 'סגור', insOpen: 'התובנות שלי',
+      insLabel: { plateau: 'תקיעות', balance: 'איזון', nearPR: 'קרוב לשיא', fatigue: 'עייפות', trend: 'מגמה' },
       nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + (isOne(y) ? ' סט' : ' סטים'); },
       testBanner: 'מצב בדיקה · לא נשמר', testStart: 'אימון בדיקה', testClose: 'סגור', testMode: 'מצב בדיקת אימון', testModeSub: 'אימון שלם בלי לשמור כלום',
       testKeep: 'לשמור את השינויים בהערות, בקפיצות ובתרגילים שהוספת?', settingsSection: 'אימונים',
       notifSection: 'התראות אימון', notifOnT: 'התראות אימון', notifOnSub: 'תזכורות לפני ובזמן האימון', notifEvening: 'ערב קודם', notifMorning: 'בוקר האימון',
-      notifType: { eveningBefore: 'ערב לפני', morning: 'בוקר האימון', warmup: 'חימום (45 דק׳ לפני)', unlock: 'פתיחת האימון', rescue: 'תזכורת אחרונה', fridayTeaser: 'סיכום שישי' },
+      notifType: { eveningBefore: 'ערב לפני', morning: 'בוקר האימון', warmup: 'חימום (45 דק׳ לפני)', unlock: 'פתיחת האימון', rescue: 'תזכורת אחרונה', fridayTeaser: 'סיכום שישי', weeklyReview: 'סקירת שבוע (שבת)', backup: 'גיבוי שבועי (ראשון)' },
       typeW: 'הקלד משקל', badW: 'משקל לא תקין', stepT: 'קפיצה', addPart: '+ חלק', partN: function (i) { return 'חלק ' + i; }, removePart: 'הסר חלק',
       swap: 'החלף', swapT: function (m) { return 'החלפה · ' + m; }, remember: 'זכור כברירת מחדל', addVariant: 'הוסף', variantName: 'תרגיל אחר מאותה קבוצה',
       swappedFrom: function (l) { return 'במקום ' + l; }, noteT: function (m) { return 'הערה · ' + m; }, noteEdit: 'הערה', noteHint: 'הערה קבועה לקבוצת השריר', noteGroup: 'הערה לקבוצת השריר',
@@ -714,7 +737,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
     lastTimeBefore: lastTimeBefore, lastNBefore: lastNBefore, sortRecent: sortRecent, muscleOf: muscleOf, labelKey: labelKey, resolveDate: resolveDate, ymdIn: ymdIn, addDaysYmd: addDaysYmd, DEFAULT_ALIASES: DEFAULT_ALIASES, TZ: TZ,
     EQUIP: EQUIP, snap: snap, rangeStatus: rangeStatus, restFor: restFor, targetsFor: targetsFor, reduce: reduce, replay: replay, durationSec: durationSec, sessionFromLive: sessionFromLive,
     GOALS: GOALS, RANGE_PRESETS: RANGE_PRESETS, goalScheme: goalScheme, schemeFor: schemeFor, rangeValid: rangeValid, clampRange: clampRange, setSets: setSets,
-    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, coachNum: coachNum, plural: plural, isOne: isOne, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
+    readPrograms: readPrograms, nextDay: nextDay, warmupSets: warmupSets, coachNum: coachNum, plural: plural, isOne: isOne, hcount: hcount, exProgress: exProgress, WARMUP_RAMP: WARMUP_RAMP, warmupMode: warmupMode, warmupIdx: warmupIdx, warmupBw: warmupBw, e1rm: e1rm, prsFor: prsFor, cardState: cardState, daysBetween: daysBetween,
     pick: pick, fill: fill, coachKind: coachKind, TEXT: TEXT,
     setText: setText, firstR: firstR, STEP_CHIPS: STEP_CHIPS, DRAFT_V: DRAFT_V, parseWeight: parseWeight, effStep: effStep, addStep: addStep, volume: volume,
     muscleKey: muscleKey, variantsFor: variantsFor, startBlock: startBlock, notesFor: notesFor, firstOfGroup: firstOfGroup,

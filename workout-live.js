@@ -15,6 +15,8 @@
   var $ = function (id) { return document.getElementById(id); };
   var h = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var num = function (n) { return '<bdi dir="ltr">' + h(n) + '</bdi>'; };
+  // F7: LTR isolation for PLAIN-TEXT sinks (notification title/body, aria-label, toast, document.title) — Unicode isolates, never markup
+  var numIso = function (n) { return '⁦' + String(n == null ? '' : n) + '⁩'; };
   var setTxt = function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; };          // "28×6", combined "28×6+5"
   var js = function (v) { return h(JSON.stringify(v)); };                // a value inside an onclick="" attribute
 
@@ -193,7 +195,7 @@
       if (lock.blocked) { say(lock.line); return; }
       if (lock.inst) o = Object.assign({}, o, lock.inst);
     }
-    ui.ctx = { routineId: o.test || o.routineId == null ? null : String(o.routineId), dateStr: o.test ? null : o.dateStr || null, programId: o.programId || null, test: !!o.test };
+    ui.ctx = { routineId: o.test || o.routineId == null ? null : String(o.routineId), dateStr: o.test ? null : o.dateStr || null, programId: o.programId || null, test: !!o.test, warm: !!o.warm };
     if (!store().programs.length) { ui.after = 'ready'; ui.stack = []; ui.mode = 'programs'; show(); return; }
     openReady();
   }
@@ -212,8 +214,9 @@
     var c = ui.ctx || {}, r = c.routineId ? routineOf(c.routineId) : null;
     var p = programById(c.programId || (r && r.programId) || null); if (!p) { ui.mode = 'programs'; show(); return; }
     var d = W.nextDay(p, sessions()), prev = W.sortRecent(sessions()).filter(function (s) { return s.programId === p.id && s.locker != null; })[0];
-    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: false, feelOpen: false, feel: {}, mode: 'full', modeTouched: false, coachMode: prefs().coachMode };
+    ui.ready = { programId: p.id, dayId: d ? d.id : null, nextId: d ? d.id : null, locker: prev ? prev.locker : null, warmOpen: !!c.warm, feelOpen: false, feel: {}, mode: 'full', modeTouched: false, coachMode: prefs().coachMode };
     ui.stack = []; ui.mode = 'ready'; show();
+    if (c.warm) setTimeout(readyWarm, 0);   // A10: the card's "או התחל בחימום" opens ready focused on the warm-up — the same path as the notification warm action
   }
   function begin() {
     var R = ui.ready, p = programById(R.programId), d = p && p.days.filter(function (x) { return x.id === R.dayId; })[0];
@@ -293,6 +296,24 @@
     if (resting && ui.mRestFor !== r.endsAt) { ui.mRestFor = r.endsAt; ui.mCount = 0; setTimeout(function () { try { if (mascot && state && state.rest && state.rest.endsAt === r.endsAt) mascot.look(0, 1, 2600); } catch (_) { } }, 1300); }
     if (resting && left >= 1 && left <= 3 && ui.mCount !== left) { ui.mCount = left; try { mascot.set('count'); } catch (_) { } }
   }
+  // the REST character: 96 px in its fixed reserved slot (CLS 0); lazy, breathes with the ring; one instance reused
+  var restM = null;
+  function restMount() {
+    var el = $('wkRestChar'); if (!el) { restKill(); return; }
+    if (el.firstChild) { try { if (restM) restM.breathe(true); } catch (_) { } return; }
+    afterPaint(function () { var e = $('wkRestChar'); if (!e || e.firstChild || !window.WkMascot) return; try { restM = window.WkMascot.mount(e, { mode: mascotMode() }); restM.breathe(true); } catch (_) { restM = null; } });
+  }
+  function restKill() { if (restM) { try { restM.destroy(); } catch (_) { } restM = null; } }
+  // F8: the rest card must fit above the dock WITHOUT scroll — shrink the ring (compact), then drop the 96px character slot (tight)
+  function fitRest() {
+    // SYNC (before paint) so resizing the ring never causes a layout shift — CLS stays 0 (A2/motion)
+    var sc = $('wkLvScroll'), card = document.querySelector('#wkLvMain .wk-rest-card'); if (!sc || !card) return;
+    card.classList.remove('wk-rest-compact', 'wk-rest-tight');
+    var over = function () { return card.offsetHeight > sc.clientHeight + 2; };   // compact only when the rest CARD itself can't fit (not because warm-up sits above it)
+    if (over()) card.classList.add('wk-rest-compact');
+    if (over()) card.classList.add('wk-rest-tight');
+    sc.scrollTop = Math.max(0, card.offsetTop - 4);   // bring the rest card to the top so char/ring/next-set read top-down, above the dock
+  }
   // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
   var sumM = null;
   function sumMount() {
@@ -369,7 +390,7 @@
       if (state && state.test) { if (logged && !confirm(S.leave)) return; if (!logged) { drop(KEY_D); draft = null; state = null; testQ = null; } hide(); refreshAll(); return; }
       if (logged) { if (!confirm(S.leave)) return; }
       else { drop(KEY_D); draft = null; state = null; }
-      hide(); refreshAll(); return;
+      restPushCancel(); hide(); refreshAll(); return;   // B6: leaving/discarding the workout cancels the rest-end push
     }
     if (ui.mode === 'programs' && ui.after === 'ready') { ui.after = null; hide(); refreshAll(); return; }
     back();
@@ -459,6 +480,8 @@
     else if (k === 'day') R.dayId = v;
     else if (k === 'warm') R.warmOpen = !R.warmOpen;
     else if (k === 'feelOpen') R.feelOpen = !R.feelOpen;
+    else if (k === 'exOpen') R.exOpen = !R.exOpen;
+    else if (k === 'checksOpen') R.checksOpen = !R.checksOpen;
     else if (k === 'mode') { R.mode = v; R.modeTouched = true; }
     else if (k === 'coach') { R.coachMode = v; setPref('coachMode', v); }
     else if (k === 'sleep' || k === 'energy' || k === 'pain') { R.feel[k] = v; if (!R.modeTouched) R.mode = suggestMode(R.feel); }
@@ -571,6 +594,8 @@
     delete ui.extra[c.ex]; ui.view = state.exIdx; ui.chimed = 0; ui.fired = {}; ui.restTouched = 0;
     sound('tick'); haptic(); render(); reveal(); undoToast(slot + 1);
     if (then === 'finish') { finishOpen(); return; }                       // the final set of the final exercise: straight to the summary
+    if (state.rest && state.rest.endsAt > Date.now()) restPushSchedule();   // B6: schedule the lock-screen rest-end push
+
     // the coach reacts to THIS set: judged against the target it had (done = the total reps of a combined set); no target -> no judgement
     var pr = W.isPR(done, ex, sessions());
     var m = W.coachMoment(state, { set: done, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null, pr: pr, judge: CO && CO.judge, seen: ui.coachSeen });
@@ -599,7 +624,13 @@
   }
   function hidePR() { var e = $('wkPr'); if (e) e.classList.remove('on'); clearTimeout(prTimer); }
   // best effort: a hidden iOS switch toggled by its label gives a light tick on supporting phones; behind a pref, no promise in the UI
-  function haptic() { if (!prefs().haptic) return; try { var l = $('wkHapL'); if (l) l.click(); } catch (_) { } try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) { } }
+  // best-effort, never required for meaning: Vibration API where present (Android); on iOS (no vibrate) the hidden
+  // checkbox-"switch" trick, feature-detected and wrapped so it never throws. (iOS behaviour UNVERIFIED on device.)
+  function haptic() {
+    if (!prefs().haptic) return;
+    try { if (navigator.vibrate) { navigator.vibrate(20); return; } } catch (_) { }
+    try { var l = $('wkHapL'); if (l && l.querySelector && l.querySelector('input[switch]')) l.click(); } catch (_) { }
+  }
   // "= כמו הסט הקודם": the previous set of this exercise prefills the active one (a combined set keeps its parts)
   function sameAsLast() {
     var c = cur(), ex = state.exercises[c.ex], p = ex.sets[ex.sets.length - 1]; if (!p) return;
@@ -689,7 +720,7 @@
   function delSet() { var e = ui.editing; dispatch({ type: 'DELETE_SET', ex: e.ex, i: e.i }); ui.editing = null; ui.pend = {}; render(); }
   function cancelEdit() { ui.editing = null; render(); }
   function restAdj(d) { dispatch({ type: 'REST_ADJUST', delta: d }); renderDock(); tick(); }
-  function restSkip() { dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }
+  function restSkip() { restPushCancel(); dispatch({ type: 'REST_SKIP' }); render(); reveal(); coachArrive(false); }   // B6: skipping rest cancels the scheduled push
   // the warm-up rows of exercise i: [] when it gets none (setting / auto rule), skipped, or no first target; edits apply to this session only
   function warmRows(i) {
     var ex = state.exercises[i], w = ui.warm[i] || {}; if (w.skip || W.warmupIdx(state.exercises, cat()).indexOf(i) < 0) return [];
@@ -719,6 +750,7 @@
   }
   function addEx(i) { var e = ui['_add' + i]; if (!e) return; dispatch({ type: 'ADD_EXERCISE', exercise: copy(e) }); pickClose(); ui.view = state.exIdx; render(); }
   function finishOpen() {
+    restPushCancel();   // B6: ending the workout cancels any pending rest-end push
     var logged = state.exercises.some(function (e) { return e.sets.length; });
     if (!logged) { if (confirm(S.noSets)) { drop(KEY_D); draft = null; state = null; hide(); refreshAll(); } return; }
     ui.locker = state.locker; ui.exists = false; ui.err = ''; go('finish');
@@ -823,8 +855,8 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); }   // the slot is never left empty on a re-render
-    if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); }
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
+    if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); var ex = main.querySelector('.wk-lv-ex'); if (ex) ex.classList.add('wk-sum-in'); }   // A13: the summary builds up once (CSS stagger; reduced-motion = no animation); not re-run on later re-renders
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
   // the summary's numbers count up once, staggered (480 ms each, 80 ms apart; text nodes only; reduced motion = no animation)
@@ -894,24 +926,42 @@
     var wi = -1; d.exercises.some(function (e, i) { if (!isBw(e)) { wi = i; return true; } return false; });
     var wex = wi > -1 ? d.exercises[wi] : null, wl = wex && lastOf(wex.label), wt = wex && W.targetsFor(wex, wl && wl.sets, [], { scale: R.mode === 'light' ? 0.9 : 1 })[0], ws = wt ? W.warmupSets(wt.w, wex.step) : [];
     var feel = function (k) { return line(S[k], '<div class="wk-chips wk-five">' + [1, 2, 3, 4, 5].map(function (n) { return '<button class="wk-chip' + (R.feel[k] === n ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'' + k + '\',' + n + ')">' + n + '</button>'; }).join('') + '</div>'); };
-    return (ui.ctx && ui.ctx.test ? '<div class="wk-test-strip">' + S.testBanner + '</div>' : '') + '<div class="wk-ready-h"><div class="wk-lv-title">' + h(d.name) + '</div><button class="wk-pill" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">' + h(p.name) + ' ▾</button></div>'
+    // the KEY NUMBER (gold): the first weighted exercise's first-set target, or the first exercise's reps
+    var keyT = wt ? (wex ? num(wt.w) + ' ' + unitTxt(wex) + ' × ' + num(wt.aim) : '') : (d.exercises[0] ? num((W.targetsFor(d.exercises[0], lastOf(d.exercises[0].label) && lastOf(d.exercises[0].label).sets, [])[0] || {}).aim || '') + ' ' + S.reps : '');
+    // the exercise list card: 3 rows + "ועוד N תרגילים" expanding in place
+    var exRow = function (e) { var l = lastOf(e.label); return '<div class="wk-ex-row"><span class="wk-ex-name">' + h(e.label) + '</span><span class="wk-ex-last">' + (l && l.sets.length ? setTxt(l.sets[0]) : S.first) + '</span></div>'; };
+    var exShown = R.exOpen ? d.exercises : d.exercises.slice(0, 3), exMore = d.exercises.length - 3;
+    return (ui.ctx && ui.ctx.test ? '<div class="wk-test-strip">' + S.testBanner + '</div>' : '')
+      + '<div class="wk-card-cap wk-ready-cap">' + C.todayCap + '</div>'
+      + '<div class="wk-ready-h"><div class="wk-lv-title wk-ready-name">' + h(d.name) + '</div><button class="wk-pill wk-switch" onclick="WorkoutLive.programPick(\'WorkoutLive.readyProgram\')">⇄ ' + S.readySwitch + '</button></div>'
       + (p.days.length > 1 ? '<div class="wk-chips wk-days">' + p.days.map(function (x) { return '<button class="wk-chip' + (x.id === d.id ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'day\',' + js(x.id) + ')">' + h(x.name) + (x.id === R.nextId ? ' · ' + S.next : '') + '</button>'; }).join('') + '</div>' : '')
-      + '<div class="wk-lv-cap wk-exlist">' + d.exercises.map(function (e) { return h(e.label); }).join(' · ') + '</div>'
-      + (CP && !d.exercises.some(function (e) { return lastOf(e.label); }) ? '<div class="wk-lv-cap wk-cue">' + h(CP.COPY.label.firstSessionHint) + '</div>' : '')
+      // ONE coach card: the 140px stage + a coach line + the key number in gold + the coach-mode chips
+      + '<div class="wk-ready-coach wk-lv-group">'
+        + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
+        + (keyT ? '<div class="wk-ready-key">' + S.readyKey('<b class="wk-gold-n">' + keyT + '</b>') + '</div>' : '')
+        + '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
+        + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div></div>'
+      // the exercise list card
+      + '<div class="wk-ready-ex wk-lv-group">' + exShown.map(exRow).join('')
+        + (exMore > 0 ? '<button class="wk-row wk-ex-more" onclick="WorkoutLive.readySet(\'exOpen\')" aria-expanded="' + !!R.exOpen + '">' + (R.exOpen ? S.less : S.exMore(num(exMore))) + ' ' + (R.exOpen ? '▴' : '▾') + '</button>' : '') + '</div>'
       + W.notesFor(d.exercises, cat()).map(function (n) { return '<div class="wk-note-line wk-note-ro"><span class="wk-note-g">📝 ' + muscleName(n.muscle) + '</span><span>' + h(n.text) + '</span></div>'; }).join('')
       + group(line(S.lockerT, stepper('rlk', R.locker == null ? S.none : R.locker, '', 'wkLk', 1)))
-      // the coach: רגוע / מאמן / אש / כבוי (the owner's choice, remembered) + a sound check
-      + group('<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
-        + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div>'
-        + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
-        + checksHtml())
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
         + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return num(x.w) + ' ' + unitTxt(wex) + ' × ' + num(x.r); }).join(' · ') + '</div>' : '')) : '')
       + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
         + (R.feelOpen ? feel('sleep') + feel('energy') + feel('pain')
           + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, dayModes())
-          + '<div class="wk-lv-cap">' + S.modeHint[R.mode] + (Object.keys(R.feel).length && !R.modeTouched ? ' · ' + S.suggested : '') + '</div>' : ''));
+          + '<div class="wk-lv-cap">' + S.modeHint[R.mode] + (Object.keys(R.feel).length && !R.modeTouched ? ' · ' + S.suggested : '') + '</div>' : ''))
+      // the בדיקות checks, collapsed behind the bottom link
+      + (R.checksOpen ? '<div class="wk-ready-checks">' + checksHtml() + '</div>' : '')
+      // bottom row: חימום · בדיקות · ערוך תוכנית
+      + '<div class="wk-ready-links">'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readyWarm()">' + S.readyWarm + '</button><span class="wk-sep">·</span>'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readySet(\'checksOpen\')">' + S.readyChecks + '</button><span class="wk-sep">·</span>'
+        + '<button class="wk-lv-link" onclick="WorkoutLive.readyEdit()">' + S.readyEdit + '</button></div>';
   }
+  function readyWarm() { var R = ui.ready; if (!R.warmOpen) { R.warmOpen = true; render(); } ui.warmFocus = true; var sc = $('wkLvScroll'), w = document.querySelector('#wkLvMain .wk-warm, #wkLvMain .wk-row'); if (w && sc) sc.scrollTop = w.offsetTop - 60; }
+  function readyEdit() { var R = ui.ready; if (R.programId) editProgram(R.programId); }
   function liveHtml() {
     var i = ui.view, ex = state.exercises[i], l = lastOf(ex.label), t = targets(i), u = unitTxt(ex), bw = isBw(ex);
     var n = Math.max((ex.scheme && ex.scheme.sets) || 3, ex.sets.length), active = !ex.skipped && (ex.sets.length < n || ui.extra[i]);
@@ -932,6 +982,7 @@
       var total = Math.max(1, Math.round((state.rest.total || 0))), isLastNext = nIdx + 1 >= n;
       var tgt = function (o, big) { return '<div class="' + (big ? 'wk-rest-nt' : 'wk-lv-cap') + '">' + (bw ? num(o.aim == null ? o.r : o.aim) + ' ' + S.reps : num(o.w) + ' ' + u + ' × ' + num(o.aim == null ? o.r : o.aim)) + '</div>'; };
       act = '<div class="wk-lv-set active wk-rest-card">'
+        + '<div class="wk-rest-char" id="wkRestChar" aria-hidden="true"></div>'   // the 96px rest character (fixed reserved slot -> CLS 0)
         + '<div class="wk-rest-h">' + S.restFinished(h(ex.label), num(nIdx)) + '</div>'
         + '<div class="wk-rest"><div class="wk-ring wk-ring-xl"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span class="wk-ring-of">' + S.restOf(W.iso(clock(total))) + '</span></div></div></div>'
         + '<div class="wk-rest-adj"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">' + S.restMinus + '</button><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">' + S.restPlus + '</button></div>'
@@ -1012,11 +1063,9 @@
     return { html: S.factSets(cnt(n), num(Math.max(1, Math.round(W.durationSec(state, Date.now()) / 60)))) };
   }
   function cmpLine(ex) {
-    var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0], u = unitTxt(ex), d;
-    if (!b) d = S.cmpFirst;
-    else if (a.w != null && b.w != null && a.w !== b.w) d = '<bdi dir="ltr">' + h(S.cmpKg(W.snap(a.w - b.w, 0), '').trim()) + '</bdi> ' + u;   // "+4.5" isolated
-    else d = a.r === b.r ? S.cmpSame : S.cmpReps(a.r - b.r);
-    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + (b ? S.cmpWas(setTxt(b), setTxt(a)) : S.cmpNow(setTxt(a))) + '</span><span class="wk-lv-cap">' + d + '</span></div>';
+    var l = W.lastTimeBefore(sessions(), ex.label, W.ymdIn(new Date(state.startedAt))), a = ex.sets[0], b = l && l.sets[0];
+    // A6: the "+X ק״ג" delta is NOT duplicated here (it leads in the top coach line); the row just shows then -> now
+    return '<div class="wk-lv-cmp"><span class="wk-lv-cmp-l">' + h(ex.label) + '</span><span>' + (b ? S.cmpWas(setTxt(b), setTxt(a)) : S.cmpNow(setTxt(a))) + '</span></div>';
   }
   // the end of a TEST run: nothing is saved; edits made during it (notes, steps, variants, a remembered swap) only if the owner confirms
   function closeTest() {
@@ -1041,17 +1090,59 @@
     state.exercises.forEach(function (e, i) { var t = targets(i); e.sets.forEach(function (x, k) { var tg = t[k]; pairs.push({ set: x, target: tg && tg.aim != null ? { w: tg.w, r: tg.aim } : null }); }); });
     return CO ? W.tally(pairs, CO.judge) : { ok: 0, of: 0 };
   }
+  // the weekly volume change vs last week (this week incl. the just-finished session); null when there is no prior week
+  function weekPct(s) {
+    var tz = W.TZ, wk = W.weekRange(new Date(state.startedAt), tz), prev = W.weekRange(W.addDaysYmd(wk.start, -7), tz);
+    var vol = function (range) { return (sessions() || []).filter(function (x) { return x && x.source === 'live'; }).reduce(function (a, x) { var ms = new Date(x.dateStr || x.date).getTime(); return ms >= range.startMs && ms < range.endMs ? a + W.volume(x) : a; }, 0); };
+    var thisW = vol(wk) + W.volume(s), lastW = vol(prev);
+    return lastW > 0 ? Math.round((thisW - lastW) / lastW * 100) : null;
+  }
+  // "לפעם הבאה": the next target for the top exercise + the next planned reminder (if a future instance exists)
+  function nextTimeCard(done) {
+    var ex = done.filter(function (e) { return !isBw(e); })[0] || done[0]; if (!ex) return '';
+    var t = W.targetsFor(ex, ex.sets, [])[0], tgt = t ? (isBw(ex) ? num(t.aim) + ' ' + S.reps : num(t.w) + ' ' + unitTxt(ex) + ' × ' + num(t.aim)) : '';
+    var when = '';
+    try { var b = homeBrief(); if (b && b.instance && b.notifications && b.notifications[0]) { var nx = b.notifications.filter(function (nn) { return nn.instance; })[0]; if (nx) when = num(new Date(nx.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ })); } } catch (_) { }
+    // B5: the "לפעם הבאה" story line is driven by a plateau / near-PR insight when one exists
+    var story = '';
+    try { var r = window.WkInsights && WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }); var si = r && r.insights && r.insights.filter(function (i) { return i.type === 'plateau' || i.type === 'nearPR'; })[0]; if (si) story = '<div class="wk-next-story">' + h(si.headline) + ' · ' + h(si.detail) + '</div>'; } catch (_) { }
+    return '<div class="wk-sum-next">' + group('<div class="wk-lv-cap">' + S.nextTimeT + '</div><div class="wk-next-t">' + S.nextTargetL(h(ex.label), tgt) + '</div>' + story + (when ? '<div class="wk-lv-cap">' + S.plannedAt(when) + '</div>' : '')) + '</div>';
+  }
+  // B5: weekly hard sets per muscle vs the 10-20 band, including this just-finished session
+  function muscleBars(cur) {
+    var LO = 10, HI = 20, all = sessions(), wr = W.weekRange(new Date(Date.now())), by = {};
+    var add = function (s) { if (!s || s.test || s.source === 'test') return; var d = s.dateStr || s.date; if (d < wr.start || d > wr.end) return; (s.exercises || []).forEach(function (e) { var m = W.muscleKey(e, cat()); by[m] = (by[m] || 0) + (e.sets ? e.sets.length : 0); }); };
+    all.forEach(add);
+    if (cur && cur.exercises && !cur.test && !(state && state.test)) cur.exercises.forEach(function (e) { var m = W.muscleKey(e, cat()); by[m] = (by[m] || 0) + (e.sets ? e.sets.length : 0); });   // this session isn't saved yet at the summary (a test run never counts)
+    var keys = Object.keys(by).filter(function (m) { return by[m] > 0; }).sort(function (a, b) { return by[b] - by[a]; });
+    if (!keys.length) return '';
+    var bars = keys.map(function (m) {
+      var n = by[m], state = n < LO ? 'under' : n > HI ? 'over' : 'in', pct = Math.min(100, Math.round(n / HI * 100));
+      return '<div class="wk-mb-row"><div class="wk-mb-l">' + h(muscleName(m)) + '</div>'
+        + '<div class="wk-mb-track"><span class="wk-mb-band" aria-hidden="true"></span><span class="wk-mb-fill wk-mb-' + state + '" style="width:' + pct + '%"></span></div>'
+        + '<div class="wk-mb-n"><bdi dir="ltr">' + n + '</bdi></div></div>';
+    }).join('');
+    return '<div class="wk-sum-muscles">' + group('<div class="wk-lv-cap">' + S.sumMuscleT + '</div>' + bars) + '</div>';
+  }
   function finishHtml() {
     var s = preview(), done = state.exercises.filter(function (e) { return e.sets.length; }), n = done.reduce(function (a, e) { return a + e.sets.length; }, 0);
     var prs = W.prsFor(s, sessions()), fin = finishLine(), tl = tallyNow();
     var cnt = function (v) { return '<bdi dir="ltr" data-wk-count="' + v + '">' + v + '</bdi>'; };   // counted up once (staggered)
     var ft = topFact(done, tl, n, cnt);
-    // the summary's ONE hero: sets + time as big numbers (labels small and muted)
-    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '') + '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>'
-      + '<div class="wk-sum-k"><b><bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi></b> ' + S.duration + '</div></div>'
-      + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '') + '</div>'
-      // the TOP line opens with a real number (the biggest weight gain vs last time, else the on-target tally, else sets in minutes) + the coach's line
+    var vol = Math.round(W.volume(s)), pct = weekPct(s), pr0 = prs[0];
+    var prTxt = pr0 ? (pr0.kind === 'e1rm' ? h(pr0.label) + ' ~' + num(pr0.value) + ' ' + T.unit.kg : h(pr0.label) + ' ' + num(pr0.w == null ? pr0.r : pr0.w + '×' + pr0.r)) : '';
+    var tile = function (val, label, gold) { return '<div class="wk-stat' + (gold ? ' wk-stat-gold' : '') + '"><b>' + val + '</b><span>' + label + '</span></div>'; };
+    // A6 hero PR block: the 84px character + (a new record headline if any, else the sets); volume LEADS the 3 stat tiles
+    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '')
+      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr">' + S.sumPrHero('<b class="wk-gold-n">' + prTxt + '</b>') + '</div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
+      + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '')
+      + '<div class="wk-sum-tiles">' + tile('<bdi dir="ltr" data-wk-count="' + vol + '">' + num(vol) + '</bdi>', S.sumVolume, true)
+        + tile('<bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi>', S.sumTime)
+        + tile(pct == null ? '—' : '<bdi dir="ltr">' + (pct >= 0 ? '+' : '') + pct + '%</bdi>', S.sumVsWeek) + '</div></div>'
+      // the coach's line (the +X number lives here, NOT duplicated in the table below)
       + '<div class="wk-coach"><b class="wk-fact">' + ft.html + '</b>' + (fin ? ' ' + h(fin) : '') + '</div>'
+      + nextTimeCard(done)
+      + muscleBars(s)
       + (tl.of && !ft.tally ? '<div class="wk-tally">' + S.tally(cnt(tl.ok), cnt(tl.of)) + '</div>' : '')
       + (prs.length ? group(prs.map(function (p) { return '<div class="wk-lv-cmp"><span class="wk-pr">★</span><span>' + (p.kind === 'e1rm' ? S.prE(h(p.label), num(p.value)) : S.prR(h(p.label), p.w == null ? null : num(p.w), num(p.r), T.unit.kg)) + '</span></div>'; }).join('')
         + (prs.some(function (p) { return p.kind === 'e1rm'; }) ? '<div class="wk-lv-cap">' + S.estimate + '</div>' : ''), S.prsT) : '')
@@ -1104,7 +1195,7 @@
       if (a) {
         W.restAlertSchedule(r.endsAt, now, false).forEach(function (x) { if (x.atMs <= now) ui.fired[x.atMs] = 1; });
         sound('rest'); var first = a.kind === 'end' && ui.chimed !== r.endsAt;
-        if (a.kind === 'end') { acquireWake(); if (first) ui.chimed = r.endsAt; }
+        if (a.kind === 'end') { acquireWake(); if (first) { ui.chimed = r.endsAt; haptic(); restPushCancel(); } }   // A12b: haptic paired to the rest-end; B6: foreground = suppress the push (the in-app alert handled it)
         if (first) render(); else renderDock();                             // the rest card turns back into the set (once)
         if (first) coachArrive(true);
       }
@@ -1137,6 +1228,27 @@
     }, wait);
   }
 
+  // ── B6: a lock-screen push at rest END via the server scheduler (reaches iOS where JS is frozen while locked) ──
+  // The scheduler is injectable (window.__wkRestSched) so it can be mocked in tests. The live /schedule worker is a 1-minute
+  // cron with only a bulk /cleanup (no per-id cancel, no seconds-scale fire) — insufficient for a short rest, so the worker
+  // needs a change (alfred-archive/session3-worker-checklist.md); NOT deployed. The in-app alert stays the guaranteed path.
+  var restSchedDefault = {
+    schedule: function (n) { try { if (!(window.Notification && Notification.permission === 'granted')) return; if (typeof window.wkSchedulePush === 'function') window.wkSchedulePush(n); } catch (_) { } },
+    cancel: function (id) { try { if (typeof window.wkCancelPush === 'function') window.wkCancelPush(id); } catch (_) { } }
+  };
+  function restSched() { return window.__wkRestSched || restSchedDefault; }
+  function restPushId() { var c = ui.ctx || {}; return 'wk_restend_' + (c.routineId || 'free') + '_' + (state ? state.startedAt : 0); }
+  function restPushSchedule() {
+    if (!state || !state.rest || ui.mode !== 'live' || state.test) return;   // never a real push for a test run
+    var ex = state.exercises[ui.view]; if (!ex) return;
+    var ts = targets(ui.view), tg = ts[Math.min(ex.sets.length, ts.length - 1)];
+    var plain = function (s) { return String(s).replace(/<[^>]+>/g, '').replace(/[⁦-⁩]/g, ''); };   // a push body is plain text, not in-app HTML
+    var tgt = tg ? (isBw(ex) ? tg.aim + ' ' + S.reps : tg.w + ' ' + unitTxt(ex) + ' × ' + tg.aim) : '';
+    var c = ui.ctx || {};
+    try { restSched().schedule({ id: restPushId(), fireAt: new Date(state.rest.endsAt).toISOString(), title: S.restEndT, body: plain(S.restEndBody(ex.label, ex.sets.length + 1, tgt)),
+      payload: { type: 'workout', id: (c.routineId || '') + '__' + (c.dateStr || ''), stage: 'restEnd' } }); } catch (_) { }   // B6b: never surfaces an error
+  }
+  function restPushCancel() { try { restSched().cancel(restPushId()); } catch (_) { } }
   // ── wake lock (feature-detected) + one-time hint ──
   function acquireWake() {
     if (navigator.wakeLock && navigator.wakeLock.request) { navigator.wakeLock.request('screen').then(function (l) { wake = l; }).catch(function () { }); return; }
@@ -1191,6 +1303,17 @@
   function saveOld() { var r = readDraft(); if (!r) return; draft = r.d; state = r.s; testQ = state.test ? [] : null; ui.effort = null; ui.locker = state.locker; ui.exists = false; ui.err = ''; hideBanner(); ui.stack = []; ui.mode = 'finish'; show(); }
   function delOld() { if (!confirm(S.delConfirm)) return; drop(KEY_D); hideBanner(); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', banner); else banner();
+  // A5: the mic/coach FAB must never cover card content — it auto-docks (tucks away) while scrolling, returns when idle.
+  // Structural + global: a wk- class on the existing FAB, no card-by-card fix, no restructure. Reduced motion = instant.
+  (function fabTuck() {
+    var t = 0, on = false, el = function () { return document.getElementById('asstFab'); };
+    var move = function () { var f = el(); if (!f) return; if (!on) { on = true; f.classList.add('wk-fab-tuck'); } clearTimeout(t); t = setTimeout(function () { on = false; var g = el(); if (g) g.classList.remove('wk-fab-tuck'); }, 650); };
+    // an always-present bottom gutter in the scroll container (sibling after #list, survives render()) so no card ever
+    // sits in the FAB's rest position — the structural guarantee; the tuck above is only an extra while scrolling
+    var gutter = function () { var app = document.getElementById('app'); if (!app || document.getElementById('wkFabGutter')) return; var g = document.createElement('div'); g.id = 'wkFabGutter'; g.className = 'wk-fab-gutter'; g.setAttribute('aria-hidden', 'true'); app.appendChild(g); };
+    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+  })();
   // the audio context is created (suspended) in idle time, so a tap only resumes it (creating it costs ~50 ms)
   (window.requestIdleCallback || function (f) { return setTimeout(f, 1500); })(function () { if (enabled()) audio(false); });
 
@@ -1209,7 +1332,8 @@
     } catch (_) { }
     var dft = readDraft();
     try {
-      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ }, now) : null;
+      var nc = readNotif();   // A14/B3/B4: the configurable times feed the schedule (not hard-coded in the brief)
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, review: nc.review, backup: nc.backup } }, now) : null;
     } catch (_) { briefCache = null; }
     briefAt = now; return briefCache;
   }
@@ -1224,13 +1348,13 @@
     if (!b || !b.facts) return '';
     var f = b.facts, wk = '';
     if (f.weekPlanned > 0) {
-      var dots = '';
-      for (var i = 0; i < Math.min(7, f.weekPlanned); i++) dots += '<i class="wk-dot' + (i < f.weekDone ? ' on' : '') + '"></i>';
+      var dots = '', tdy = Math.min(f.weekDone, Math.min(7, f.weekPlanned) - 1);   // A10: the first not-yet-done dot is today's session (clamped); marked distinctly
+      for (var i = 0; i < Math.min(7, f.weekPlanned); i++) dots += '<i class="wk-dot' + (i < f.weekDone ? ' on' : '') + (i === tdy && f.weekDone < f.weekPlanned ? ' today' : '') + '"></i>';
       wk = '<div class="wk-sub"><div class="wk-sub-dots">' + dots + '</div><div class="wk-sub-t">' + (f.streakWeeks > 1 ? W.plural(num(f.streakWeeks) + ' שבועות ברצף') : S.weekProg(num(f.weekDone), num(f.weekPlanned))) + '</div></div>';
     }
     var pr = '';
     if (b.targets && b.targets.exercise && (f.prCount || f.nearPR)) {
-      pr = '<div class="wk-sub"><div class="wk-sub-k">' + (f.nearPR ? '◎' : '★') + '</div><div class="wk-sub-t">' + h(f.nearPR ? S.nearPRL(h(b.targets.exercise)) : S.lastPRL) + '</div></div>';
+      pr = '<button class="wk-sub wk-sub-tap" onclick="event.stopPropagation();WorkoutHome.openInsights()" aria-label="' + h(S.insOpen) + '"><div class="wk-sub-k">' + (f.nearPR ? '◎' : '★') + '</div><div class="wk-sub-t">' + h(f.nearPR ? S.nearPRL(h(b.targets.exercise)) : S.lastPRL) + '</div></button>';
     }
     return wk || pr ? '<div class="wk-hero-extra">' + wk + pr + '</div>' : '';
   }
@@ -1265,7 +1389,8 @@
       var cl = copyLine(seed + '|l', st === 'done' && prs.length && K.linePR ? K.linePR : K.line, cv); if (cl) data = cl;
     }
     var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
-    var arg = js({ routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }), go = 'event.stopPropagation();Workout.start(' + arg + ')';
+    var argO = { routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }, arg = js(argO), go = 'event.stopPropagation();Workout.start(' + arg + ')';
+    var goWarm = 'event.stopPropagation();Workout.start(' + js(Object.assign({ warm: true }, argO)) + ')';   // A10: warm-up focus path, identical to the notification warm action
     var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
@@ -1274,22 +1399,33 @@
     // in-progress: the NEXT exercise still to do (from the draft)
     var nextExName = '';
     if (isHero && st === 'progress' && dft) { var xs = dft.s.exercises, from = dft.s.exIdx == null ? 0 : dft.s.exIdx; for (var qi = 1; qi <= xs.length; qi++) { var jj = (from + qi) % xs.length, ee = xs[jj]; if (!ee.skipped && ee.sets.length < ((ee.scheme && ee.scheme.sets) || 3)) { nextExName = ee.label; break; } } }
-    var btn = st === 'tomorrow' ? '<button class="wk-card-btn ghost" onclick="' + go + '">' + cta(C.prepare) + '</button>'
+    var btn = st === 'tomorrow' || st === 'far' ? '<button class="wk-card-btn ghost wk-prep" onclick="' + go + '">' + cta(C.prepare) + '</button>'
       : st === 'open' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.start) + '</button>'
       : st === 'progress' ? '<button class="wk-card-btn primary" onclick="' + go + '">' + cta(C.resume) + '</button>' : '';
-    // the hero open state drops the דחייה/דלג row (it owns the screen); other states keep it
-    var sec = st !== 'done' && st !== 'progress' && !(isHero && st === 'open') ? '<div class="wk-card-sec"><button class="wk-card-link" onclick="event.stopPropagation();openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
-      + '<button class="wk-card-link" onclick="event.stopPropagation();skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div>' : '';
-    var cap = isHero ? '<div class="wk-card-cap">' + (st === 'locked' ? C.unlockCap(num(time)) : h(st === 'done' ? S.sumT : C.todayCap)) + '</div>' : '';
+    // A9: דחייה / דלג are never a loud row — a quiet "⋯" options control in every non-done state holds them
+    var opts = st !== 'done' ? '<details class="wk-card-opts" onclick="event.stopPropagation()"><summary aria-label="' + S.cardOpts + '">⋯</summary>'
+      + '<div class="wk-card-menu"><button class="wk-card-link" onclick="event.stopPropagation();this.closest(\'details\').open=false;openPostpone(\'routine\',' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.postpone + '</button>'
+      + '<button class="wk-card-link" onclick="event.stopPropagation();this.closest(\'details\').open=false;skipRoutineInstance(' + js(String(r.id)) + ',' + js(inst.dateStr) + ')">' + C.skip + '</button></div></details>' : '';
+    var sec = '';
+    // A8: upcoming (tomorrow / far) cards speak the hero language — dark + gold hairline, facts-first title, time once, "הכן אותי" pill
+    var isUp = st === 'tomorrow' || st === 'far', cc0 = cat();
+    if (isUp) {
+      var mus = d && d.exercises[0] ? muscleName(W.muscleKey(d.exercises[0], cc0)) : '';
+      head = st === 'tomorrow' ? S.upTomorrow(h(mus)) : S.upInDays(num(W.daysBetween(W.ymdIn(new Date(now)), W.ymdIn(dt))), h(mus));   // F7: num() is HTML-safe <bdi>; escape only the muscle, never re-escape the whole
+      var ue = d && d.exercises.filter(function (e) { var ll = lastOf(e.label); return ll && ll.sets.length; })[0], ul = ue && lastOf(ue.label);
+      if (ul) data = S.upStart(h(ue.label) + ' ' + setTxt(ul.sets[0]));
+    }
+    // A10: the locked caption is a plain label (no time) — the time/countdown lives once in the headline + the 🔒 row, so no clock time is repeated
+    var cap = isHero ? '<div class="wk-card-cap">' + h(st === 'done' ? S.sumT : C.todayCap) + '</div>' : '';
     var meta = isHero && (st === 'open' || st === 'locked') ? heroMeta(b) : '';
     if (isHero && st === 'progress' && b.workout) { var dn = dft ? dft.s.exercises.reduce(function (a, e) { return a + e.sets.length; }, 0) : 0, tot = Math.max(b.workout.sets, dn); meta = '<div class="wk-prog-row"><div class="wk-ring-badge" style="--f:' + (tot ? (dn / tot).toFixed(3) : 0) + '"><span><bdi dir="ltr">' + dn + '/' + tot + '</bdi></span></div>' + (nextExName ? '<div class="wk-card-next">' + C.nextExLabel(h(nextExName)) + '</div>' : '') + '</div>'; }
     // done: lead with the real volume + "מה הלאה"
     if (isHero && st === 'done' && done) { meta = '<div class="wk-card-vol"><b>' + num(Math.round(W.volume(done))) + '</b> ' + T.unit.kg + ' · ' + C.volumeWord + '</div>' + (d ? '<div class="wk-card-next">' + C.whatsNext(h(d.name)) + '</div>' : ''); }
-    var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + go + '">' + C.warmupLink + '</button>' : '';
+    var warm = isHero && st === 'open' ? '<button class="wk-card-link wk-card-warm" onclick="' + goWarm + '">' + C.warmupLink + '</button>' : '';
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
-    return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-time">' + num(time) + '</span></div>'
+    return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
+      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
@@ -1336,11 +1472,78 @@
   function readNotif() {
     var raw = load(KEY_NOTIF, null), p = raw && typeof raw === 'object' ? raw : {};
     var types = p.types && typeof p.types === 'object' ? p.types : {};
-    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser'], t = {};
+    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
     T6.forEach(function (k) { t[k] = types[k] !== false; });
-    return { on: p.on !== false, evening: /^\d\d:\d\d$/.test(p.evening) ? p.evening : '20:00', morning: /^\d\d:\d\d$/.test(p.morning) ? p.morning : '09:00', types: t, muteDay: p.muteDay || null };
+    var hm = function (s, d) { return /^\d\d:\d\d$/.test(s) ? s : d; };
+    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
   }
   function setNotif(fn) { W.updateJSON(localStorage, KEY_NOTIF, {}, function (p) { p = p && typeof p === 'object' ? p : {}; fn(p); return p; }); }
+  // ── B1b: insight suggestions added to the brief — reversible (undo toast) + removable anytime; NEVER auto-applied to any target ──
+  var KEY_BRIEF = 'vt_wk_brief', lastBriefAdd = null;
+  function briefAdds() { var a = load(KEY_BRIEF, []); return Array.isArray(a) ? a : []; }
+  function briefKey(ac) { return ac.exercise + '|' + (ac.suggest ? (ac.suggest.w == null ? 'bw' : ac.suggest.w) + 'x' + ac.suggest.r : (ac.label || '')); }
+  function inBrief(id) { return briefAdds().some(function (x) { return x.id === id; }); }
+  function addToBrief(ac) {
+    if (!ac || ac.kind !== 'addToBrief' || !ac.exercise) return;
+    var id = briefKey(ac);
+    W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { a = Array.isArray(a) ? a : []; if (!a.some(function (x) { return x.id === id; })) a.push({ id: id, exercise: ac.exercise, suggest: ac.suggest || null, label: ac.label || '', at: Date.now() }); return a; });
+    lastBriefAdd = id;
+    try { if (typeof toast === 'function') toast(h(S.addedBrief) + ' · <button class="wk-toast-undo" onclick="WorkoutHome.briefUndo()">' + h(S.briefUndo) + '</button>', 5000); } catch (_) { }
+    try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { }
+  }
+  function briefUndo() { if (lastBriefAdd) { var id = lastBriefAdd; lastBriefAdd = null; removeFromBrief(id); try { if (typeof closeToast === 'function') closeToast(); } catch (_) { } } }
+  function removeFromBrief(id) { W.updateJSON(localStorage, KEY_BRIEF, [], function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return x.id !== id; }); }); try { if (typeof refreshAll === 'function') refreshAll(); } catch (_) { } }
+  // ── B2: the insights screen (entry: the home "שיא" fact card + the workouts menu; nav is NOT restructured) ──
+  var insActions = {};
+  // B2/A7: escape, then bidi-isolate numeric runs so Latin numerals read correctly inside the RTL Hebrew insight copy
+  function insNum(s) { return h(W.plural(String(s))).replace(/[+\-]?[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }   // F1/F11: 1/2 counts -> singular/dual, then LTR-isolate numeral runs incl. a leading +/- (so "+19%" reads as one unit)
+  function insightsData() { try { return window.WkInsights ? window.WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }) : null; } catch (_) { return null; } }
+  function sparkSvg(spark) {
+    if (!spark || spark.length < 2) return '';
+    var w = 240, hg = 84, pad = 8, min = Math.min.apply(null, spark), max = Math.max.apply(null, spark), rng = max - min || 1;
+    var xs = spark.map(function (v, i) { return pad + i * (w - 2 * pad) / (spark.length - 1); });
+    var ys = spark.map(function (v) { return hg - pad - (v - min) / rng * (hg - 2 * pad); });
+    var line = xs.map(function (x, i) { return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ');
+    var area = 'M' + xs[0].toFixed(1) + ' ' + (hg - pad) + ' ' + xs.map(function (x, i) { return 'L' + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ') + ' L' + xs[xs.length - 1].toFixed(1) + ' ' + (hg - pad) + ' Z';
+    return '<svg class="wk-spark" viewBox="0 0 ' + w + ' ' + hg + '" preserveAspectRatio="none" aria-hidden="true">'
+      + '<path class="wk-spark-fill" d="' + area + '"/><path class="wk-spark-line" d="' + line + '"/>'
+      + '<circle class="wk-spark-dot" cx="' + xs[xs.length - 1].toFixed(1) + '" cy="' + ys[ys.length - 1].toFixed(1) + '" r="4"/></svg>';
+  }
+  function insightCard(ins) {
+    var label = (S.insLabel && S.insLabel[ins.type]) || ins.type, act = '';
+    if (ins.action && ins.action.kind === 'addToBrief') {
+      var id = briefKey(ins.action); insActions[id] = ins.action;
+      act = '<div class="wk-ins-acts">' + (inBrief(id)
+        ? '<button class="wk-ins-btn" onclick="WorkoutHome.removeFromBrief(' + js(id) + ');WorkoutHome.openInsights()">' + h(S.removeBrief) + '</button>'
+        : '<button class="wk-ins-btn primary" onclick="WorkoutHome.addToBriefById(' + js(id) + ')">' + h(S.addBrief) + '</button>') + '</div>';
+    }
+    return '<div class="wk-ins-card wk-ins-' + ins.type + '"><div class="wk-ins-tag">' + h(label) + '</div>'
+      + '<div class="wk-ins-h">' + insNum(ins.headline) + '</div><div class="wk-ins-d">' + insNum(ins.detail) + '</div>' + act + '</div>';
+  }
+  function insightsHtml() {
+    insActions = {};
+    var head = '<div class="wk-ins-top"><button class="wk-ins-x" aria-label="' + h(S.insClose) + '" onclick="WorkoutHome.closeInsights()">✕</button></div>';
+    if (!enabled()) return head;
+    var hasProg = allRoutines().some(function (r) { return r.kind === 'workout' && programById(r.programId); });
+    if (!hasProg) return head + '<div class="wk-ins-cap">' + h(S.insTitle) + '</div><div class="wk-ins-title">' + h(S.insNeutral) + '</div><div class="wk-ins-empty">' + h(S.insNoProg) + '</div>';
+    var r = insightsData(); if (!r || r.error) return head + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>';
+    var test = prefs().testMode ? '<div class="wk-ins-note">' + h(S.insTestNote) + '</div>' : '';
+    var cap = '<div class="wk-ins-cap">' + insNum(S.insWeek(r.week)) + '</div>';
+    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + insNum(S.insEmpty(r.needMore)) + '</div>';
+    var top = r.insights[0], title = top ? top.headline : S.insNeutral;
+    var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
+    var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
+      + '<div class="wk-ins-trend-pct">' + insNum((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
+      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence + ' ' + T.unit.kg) + '">' + insNum(trend.evidence + ' ' + T.unit.kg) + '</div></div>' : '';   // F11: the e1RM range carries its unit
+    var cards = r.insights.filter(function (i) { return i.type !== 'trend'; }).map(insightCard).join('');
+    return head + cap + '<div class="wk-ins-title">' + insNum(title) + '</div>' + test + trendCard + cards;
+  }
+  function openInsights() {
+    var el = $('wkInsights'); if (!el) { el = document.createElement('div'); el.id = 'wkInsights'; el.className = 'wk-ins'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
+    el.innerHTML = insightsHtml(); el.classList.add('on');
+  }
+  function closeInsights() { var el = $('wkInsights'); if (el) el.classList.remove('on'); }
+  function addToBriefById(id) { var a = insActions[id]; if (a) { addToBrief(a); openInsights(); } }
   // one notify string: the first variant whose placeholders the vars fill (the plain fallback always qualifies)
   function fillNotify(type, part, vars, seed) {
     var list = CP && CP.COPY.notify[type] && CP.COPY.notify[type][part]; if (!list) return '';
@@ -1361,26 +1564,39 @@
       var title = fillNotify(n.type, 'title', vars, seed), body = fillNotify(n.type, 'body', vars, seed);
       if (!title && !body) return;
       var rid = n.instance ? n.instance.routineId : '', id = 'wk_' + n.type + '_' + rid + '_' + ds;
+      // deep-link target: an instance -> the ready screen; weeklyReview -> insights; backup -> the export (B3/B4)
+      var pid = n.instance ? rid + '__' + ds : (n.type === 'weeklyReview' ? 'insights' : n.type === 'backup' ? 'backup' : '');
       out.push({ id: id, title: title, body: body, fireAt: new Date(n.fireAt).toISOString(),
-        payload: { type: 'workout', id: rid + (n.instance ? '__' + ds : ''), stage: n.type, warm: n.type === 'warmup' } });
+        payload: { type: 'workout', id: pid, stage: n.type, warm: n.type === 'warmup' } });
     });
     return out;
   }
   function notifVars(b, n, tz) {
     var f = b.facts, t = b.targets || {}, w = b.workout || {}, v = {};
     if (n.muscle) v.muscle = muscleName(n.muscle);
-    if (f.streakWeeks > 0) v.streak = num(f.streakWeeks);
-    if (w.mins) v.mins = num(w.mins);
-    if (w.exercises) v.n = num(w.exercises);
-    if (n.instance) v.time = num(new Date(n.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }));
+    if (f.streakWeeks > 0) v.streak = numIso(f.streakWeeks);
+    if (w.mins) v.mins = numIso(w.mins);
+    if (w.exercises) v.n = numIso(w.exercises);
+    if (n.instance) v.time = numIso(new Date(n.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }));
     if (t.exercise) v.exercise = h(t.exercise);
-    if (t.lastKg != null) v.lastKg = num(t.lastKg);
-    if (t.lastReps != null) v.lastReps = num(t.lastReps);
-    if (t.targetKg != null) v.targetKg = num(t.targetKg);
-    if (f.weekPlanned > 0) { v.done = num(f.weekDone); v.planned = num(f.weekPlanned); }
+    if (t.lastKg != null) v.lastKg = numIso(t.lastKg);
+    if (t.lastReps != null) v.lastReps = numIso(t.lastReps);
+    if (t.targetKg != null) v.targetKg = numIso(t.targetKg);
+    // F2: {last} previous set, {target} today's target, {dur} workout minutes (so the body carries a fact the title does not)
+    if (t.lastKg != null && t.lastReps != null) v.last = numIso(t.lastKg) + '×' + numIso(t.lastReps);
+    if (t.targetKg != null) v.target = numIso(t.targetKg) + ' ' + T.unit.kg;
+    if (w.mins) v.dur = numIso(w.mins);
+    if (f.weekPlanned > 0) { v.done = numIso(f.weekDone); v.planned = numIso(f.weekPlanned); }
+    // B3 weekly review: {n} workouts this week, {x} PRs this week, {insight} = the top real insight
+    if (n.type === 'weeklyReview') {
+      var all2 = sessions(), wr2 = W.weekRange(new Date(Date.now())), prs = 0, wdone = 0;
+      all2.forEach(function (s) { if (!s || s.test || s.source === 'test') return; var d = s.dateStr || s.date; if (d >= wr2.start && d <= wr2.end) { wdone++; prs += (W.prsFor(s, all2.filter(function (p) { return p.id !== s.id && (p.dateStr || p.date) <= d; })) || []).length; } });
+      v.n = numIso(wdone); v.x = numIso(prs);
+      try { var ti = window.WkInsights && WkInsights.top(all2, Date.now(), { tz: tz, catalog: cat() }); if (ti && ti.headline) v.insight = h(ti.headline); } catch (_) { }
+    }
     // {hint}: a near-PR beats the plain plan line; only when its own placeholders are present
     if (f.nearPR && t.exercise) v.hint = 'שיא אפשרי ב' + h(t.exercise);
-    else if (w.mins && w.exercises) v.hint = W.plural(num(w.mins) + ' דק׳, ' + num(w.exercises) + ' תרגילים');
+    else if (w.mins && w.exercises) v.hint = W.plural(numIso(w.mins) + ' דק׳, ' + numIso(w.exercises) + ' תרגילים');
     return v;
   }
   // a notification tap: open the ready screen preloaded (never auto-start); "warm" focuses the warm-up; "mute" silences today
@@ -1390,9 +1606,24 @@
     try { if (window.Workout) window.Workout.start({ routineId: String(routineId), dateStr: dateStr || null, warm: action === 'warm' }); } catch (_) { }
   }
   // one extra line in the greeting area on a workout day
+  // A10b: the "no program" and "rest day" hero states, in the same language. '' when today has a workout (a normal card renders).
+  function heroState() {
+    if (!enabled()) return '';
+    var wr = allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }); if (!wr.length) return '';
+    var hasProg = wr.some(function (r) { return programById(r.programId); });
+    if (!hasProg) return '<div class="wk-card wk-hero wk-state-empty" data-wk-state="noprogram"><div class="wk-card-cap">' + C.todayCap + '</div><div class="wk-card-h">' + S.noProgT + '</div><div class="wk-card-d">' + S.noProgSub + '</div><button class="wk-card-btn ghost wk-prep" onclick="event.stopPropagation();WorkoutLive.openPrograms()">' + S.noProgCta + '</button></div>';
+    var b = homeBrief();
+    if (b && b.phase === 'rest' && b.instance) {
+      var mus = b.workout && b.workout.muscles && b.workout.muscles[0] ? muscleName(b.workout.muscles[0]) : '';
+      var when = num(new Date(b.instance.dt).toLocaleDateString('he-IL', { weekday: 'long', timeZone: W.TZ }).replace(/^יום\s+/, '') + ' ' + new Date(b.instance.dt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }));
+      return '<div class="wk-card wk-hero wk-state-rest" data-wk-state="restday"><div class="wk-card-cap">' + C.todayCap + '</div><div class="wk-card-h">' + h(S.restDayT(mus)) + '</div><div class="wk-card-d">' + S.restDaySub(when) + '</div></div>';
+    }
+    return '';
+  }
   function greeting(subEl) {
-    var old = $('wkGreet'); if (old) old.remove();
+    var old = $('wkGreet'); if (old) old.remove(); var oh = $('wkHeroState'); if (oh) oh.remove();
     if (!enabled() || !subEl) return;
+    var hs = heroState(); if (hs) { var hel = document.createElement('div'); hel.id = 'wkHeroState'; hel.dir = 'rtl'; hel.innerHTML = hs; var list = document.getElementById('list'); if (list) list.parentNode.insertBefore(hel, list); }
     var t = todayWorkoutInstance(); if (!t) return;
     var r = routineOf(t.routineId), st = W.cardState({ now: Date.now(), dt: t.dateStr, unlockMin: r && r.wkUnlockMin });
     var time = new Date(t.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
@@ -1453,7 +1684,7 @@
     noteOpen: noteOpen, noteSave: noteSave, exNote: exNote,
     restAdj: restAdj, restSkip: restSkip, warm: warm, addPick: addPick, addEx: addEx, finishOpen: finishOpen, effort: effort, saveWorkout: saveWorkout, backToLive: backToLive,
     saveOld: saveOld, delOld: delOld, hideBanner: hideBanner, pickClose: pickClose, completeRoutine: completeRoutine, suggestMode: suggestMode,
-    warmEdit: warmEdit, warmSave: warmSave, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
+    warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, openPrograms: openPrograms, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
     showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
@@ -1472,7 +1703,7 @@
     box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(nsec, nbox);
     renderNotifBox();
   }
-  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser'];
+  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'];
   function renderNotifBox() {
     var nbox = $('wkNotifBox'); if (!nbox) return; var c = readNotif();
     var row = function (title, sub, ctrl) { return '<div class="settings-row"><div class="settings-row-body"><div class="settings-row-title">' + title + '</div>' + (sub ? '<div class="settings-row-sub">' + sub + '</div>' : '') + '</div>' + ctrl + '</div>'; };
@@ -1480,7 +1711,8 @@
     var html = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🔔</div><div class="settings-row-body"><div class="settings-row-title">' + S.notifOnT + '</div><div class="settings-row-sub">' + S.notifOnSub + '</div></div>' + toggle(c.on, 'WorkoutLive.notifSet(\'on\',this.checked)') + '</div>';
     if (c.on) {
       // the evening / morning time chip lives INSIDE its own toggle row (no duplicated rows)
-      var timeFor = function (k) { return k === 'eveningBefore' ? '<input type="time" class="wk-time" value="' + c.evening + '" onchange="WorkoutLive.notifSet(\'evening\',this.value)" onclick="event.stopPropagation()">' : k === 'morning' ? '<input type="time" class="wk-time" value="' + c.morning + '" onchange="WorkoutLive.notifSet(\'morning\',this.value)" onclick="event.stopPropagation()">' : ''; };
+      var tinp = function (key, val) { return '<input type="time" class="wk-time" value="' + val + '" onchange="WorkoutLive.notifSet(\'' + key + '\',this.value)" onclick="event.stopPropagation()">'; };
+      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
       html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', timeFor(k) + toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
     }
     nbox.innerHTML = html;
@@ -1488,12 +1720,14 @@
   function notifSet(key, val) {
     setNotif(function (p) {
       if (key === 'on') p.on = !!val;
-      else if (key === 'evening' || key === 'morning') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
+      else if (key === 'evening' || key === 'morning' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
       else if (key.slice(0, 2) === 't:') { p.types = p.types || {}; p.types[key.slice(2)] = !!val; }
     });
     renderNotifBox();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
-  window.WorkoutHome = { card: card, greeting: greeting, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif };
+  window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
+    addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

@@ -29,7 +29,7 @@
     var hasDraft = function (x) { return o.draft && !o.draft.test && String(o.draft.routineId) === String(x.r.id) && o.draft.dateStr === x.i.dt && !isDone(x); };
     var todayInst = todays.filter(hasDraft)[0] || todays.filter(function (x) { return !isDone(x); })[0] || todays[0];
     var pick = todayInst || insts.filter(function (x) { return x.ymd >= today; })[0] || null;
-    if (!pick) return brief;
+    if (!pick) { brief.notifications = notifications(o, insts, now, tz); return brief; }   // the weekly summaries (friday/weekly review) fire from history even with no upcoming instance
     brief.instance = { routineId: String(pick.r.id), dt: pick.i.dt }; brief.isToday = pick === todayInst;
 
     var saved = (o.sessions || []).some(function (s) { return s && s.source === 'live' && String(s.routineId) === String(pick.r.id) && s.dateStr === pick.i.dt; });
@@ -132,24 +132,32 @@
     var WIN = now + 2 * DAY, out = [];
     var localH = function (ms) { return +new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date(ms)).slice(0, 2); };
     var at = function (ymd, h, m) { var d = new Date(ymd + 'T00:00:00'); return dateMs(ymd) + (h * 60 + (m || 0)) * 60000 - tzOffset(ymd, tz); };
+    var hm = function (s, dh, dm) { var m = /^(\d\d):(\d\d)$/.exec(String(s || '')); return m ? { h: +m[1], m: +m[2] } : { h: dh, m: dm }; };   // A14: configurable times
+    var ev = hm(o.notif && o.notif.evening, 20, 0), mo = hm(o.notif && o.notif.morning, 9, 0);
     insts.forEach(function (x) {
       if (x.ms < now || x.ms > WIN || x.i.completed) return;
       var muscle = brMuscle(o, x.r, now);
       var add = function (type, ms) { if (ms > now && ms <= WIN) out.push({ type: type, fireAt: ms, instance: { routineId: String(x.r.id), dt: x.i.dt }, muscle: muscle }); };
-      add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), 20, 0));
-      add('morning', at(x.ymd, 9, 0));
+      add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), ev.h, ev.m));
+      add('morning', at(x.ymd, mo.h, mo.m));
       add('warmup', x.ms - 45 * 60000);
       add('unlock', x.ms);
       add('rescue', x.ms + 60 * 60000);
     });
     // Friday teaser (summary) at 18:00, once in the window
     var fri = nextFriday(now, tz); if (fri > now && fri <= WIN) out.push({ type: 'fridayTeaser', fireAt: fri, instance: null, muscle: null });
+    // B3 weekly review at Saturday 20:00 (configurable), once in the window -> deep-links to the insights screen
+    var rev = hm(o.notif && o.notif.review, 20, 0), tday = W.ymdIn(new Date(now), tz);
+    for (var kk = 0; kk < 3; kk++) { var yy = W.addDaysYmd(tday, kk); if (new Date(yy + 'T12:00:00').getDay() === 6) { var rms = at(yy, rev.h, rev.m); if (rms > now && rms <= WIN) out.push({ type: 'weeklyReview', fireAt: rms, instance: null, muscle: null }); break; } }
+    // B4 backup reminder at Sunday 10:00 (configurable), only when >=1 real (non-test) session exists; deep-links to the export
+    var bk = hm(o.notif && o.notif.backup, 10, 0), hasReal = (o.sessions || []).some(function (s) { return s && !s.test && s.source !== 'test'; });
+    if (hasReal) for (var kb = 0; kb < 3; kb++) { var yb = W.addDaysYmd(tday, kb); if (new Date(yb + 'T12:00:00').getDay() === 0) { var bms = at(yb, bk.h, bk.m); if (bms > now && bms <= WIN) out.push({ type: 'backup', fireAt: bms, instance: null, muscle: null }); break; } }
     out = out.filter(function (n) { var h = localH(n.fireAt); return !(h >= 22 || h < 7); });   // quiet hours: drop
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);
   }
   // when a day has more than 3, keep the ones nearest to acting; warm-up is the cuttable one (the cut list)
-  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5 };
+  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6, backup: 7 };
   function capPerDay(list, tz) {
     var byDay = {};
     list.forEach(function (n) { var k = W.ymdIn(new Date(n.fireAt), tz); (byDay[k] = byDay[k] || []).push(n); });
