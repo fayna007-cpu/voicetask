@@ -2061,7 +2061,7 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-rest-card{align-items:center;text-align:center;gap:var(--wk-s3)}
 .wk-rest-card .wk-lv-n{font-size:var(--wk-fs-body);font-weight:800;color:var(--accent)}
 .wk-rest-card .wk-rest{justify-content:center}
-.wk-rest-card .wk-ring{width:132px;height:132px}
+/* F8: the rest ring is the 272px wk-ring-xl so the 76px digits sit comfortably inside it (was a 132px override that the digits overflowed) */
 .wk-rest-over .wk-lv-n{color:var(--accent);font-weight:800;font-size:var(--wk-fs-body)}
 /* the empty group note -> one quiet line */
 .wk-note-add{display:block;width:100%;min-height:48px;margin:0 0 var(--wk-s3);padding:var(--wk-s2) 0;border:none;background:none;color:var(--accent);font-family:inherit;font-size:var(--wk-fs-body);font-weight:700;text-align:start;cursor:pointer;touch-action:manipulation}
@@ -2283,6 +2283,19 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{box-shadow:0 0 26px rgba(227,197,138,.5);opacity:.3;animation:wk-hero-glow 3.2s ease-in-out infinite}
 /* A13: this gold override out-specifies the wk-breathe reduced-motion rule above — restore the fallback at equal specificity */
 @media (prefers-reduced-motion:reduce){.wk-live[data-mode=ready] .wk-lv-dock .wk-big:not(:disabled)::after{animation:none}}
+/* F9: ONE gold CTA language across the workout flow — gold gradient token + ink #1A1405. Live "סיימתי סט"/"לתרגיל הבא",
+   Summary "שמור", the open-workout "המשך" banner, the "התחל אימון" card CTA. Secondary stays neutral; purple is non-workout only. */
+.wk-card-btn.primary,
+.wk-lv-dock .wk-primary,
+.wk-live[data-mode=finish] .wk-lv-dock .wk-big,
+.wk-resume-in .wk-chip.on,
+#wkStartBox .wk-resume-in .wk-chip.on {
+  background-color:#C9A45C; background-image:linear-gradient(135deg,#E3C58A,#C9A45C); color:#1A1405; border:none;
+}
+.wk-card-btn.primary{box-shadow:0 6px 22px rgba(201,164,92,.35);animation:wk-hero-glow 3.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.wk-card-btn.primary{animation:none}}
+/* F10: balance hero / card titles so a short word (e.g. "דק׳") never orphans on its own line */
+.wk-card-h,.wk-ins-title,.wk-state-empty .wk-card-h,.wk-state-rest .wk-card-h{text-wrap:balance}
 .wk-live[data-mode=ready] .wk-ready-h .wk-pill{border-color:var(--wk-line);color:var(--wk-gold)}
 /* Session 3 · A1 the READY rework: caption, switcher chip, ONE coach card, exercise-list card, bottom links */
 .wk-ready-cap{margin:0 0 var(--wk-s1)}
@@ -2304,6 +2317,16 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-ready-checks{margin:var(--wk-s2) 0}
 /* Session 3 · A2 the REST character: 96px in a fixed reserved slot (CLS 0); the top coach-slot mascot hides during rest */
 .wk-rest-char{width:96px;height:96px;flex:0 0 96px;margin:0 auto var(--wk-s1)}
+/* F8: compact tiers (applied by fitRest when the rest card would overflow the dock) — shrink the ring, then drop the 96px slot */
+.wk-rest-compact{gap:var(--wk-s2)}
+.wk-rest-compact .wk-ring-xl{width:208px;height:208px}
+.wk-rest-compact .wk-ring-xl .wk-ring-t>bdi{font-size:60px}
+.wk-rest-tight{gap:var(--wk-s1)}
+.wk-rest-tight .wk-rest-char{display:none}
+.wk-rest-tight .wk-rest-h{display:none}
+.wk-rest-tight .wk-ring-xl{width:150px;height:150px}
+.wk-rest-tight .wk-ring-xl .wk-ring-t>bdi{font-size:44px}
+.wk-rest-tight .wk-rest-last{display:none}   /* the ±15 buttons stay >=48px (A7); gain the space from the last-set recap instead */
 .wk-rest-char .wkm-bubble{display:none}
 .wk-lv-scroll:has(.wk-rest-char) .wk-coach-slot .wk-mascot{visibility:hidden}
 /* Session 3 · A9 the quiet "⋯" options control (holds דחייה / דלג in every card state) */

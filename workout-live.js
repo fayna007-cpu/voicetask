@@ -304,6 +304,17 @@
     afterPaint(function () { var e = $('wkRestChar'); if (!e || e.firstChild || !window.WkMascot) return; try { restM = window.WkMascot.mount(e, { mode: mascotMode() }); restM.breathe(true); } catch (_) { restM = null; } });
   }
   function restKill() { if (restM) { try { restM.destroy(); } catch (_) { } restM = null; } }
+  // F8: the rest card must fit above the dock WITHOUT scroll — shrink the ring (compact), then drop the 96px character slot (tight)
+  function fitRest() {
+    afterPaint(function () {
+      var sc = $('wkLvScroll'), card = document.querySelector('#wkLvMain .wk-rest-card'); if (!sc || !card) return;
+      card.classList.remove('wk-rest-compact', 'wk-rest-tight');
+      var over = function () { return card.offsetHeight > sc.clientHeight + 2; };   // compact only when the rest CARD itself can't fit (not because warm-up sits above it)
+      if (over()) card.classList.add('wk-rest-compact');
+      if (over()) card.classList.add('wk-rest-tight');
+      sc.scrollTop = Math.max(0, card.offsetTop - 4);   // bring the rest card to the top so char/ring/next-set read top-down, above the dock
+    });
+  }
   // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
   var sumM = null;
   function sumMount() {
@@ -845,7 +856,7 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) restMount(); else restKill(); }   // the slot is never left empty on a re-render
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); var ex = main.querySelector('.wk-lv-ex'); if (ex) ex.classList.add('wk-sum-in'); }   // A13: the summary builds up once (CSS stagger; reduced-motion = no animation); not re-run on later re-renders
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
@@ -1486,7 +1497,7 @@
   // ── B2: the insights screen (entry: the home "שיא" fact card + the workouts menu; nav is NOT restructured) ──
   var insActions = {};
   // B2/A7: escape, then bidi-isolate numeric runs so Latin numerals read correctly inside the RTL Hebrew insight copy
-  function insNum(s) { return h(W.plural(String(s))).replace(/[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }   // F1: 1/2 counts -> singular/dual, then bidi-isolate numerals
+  function insNum(s) { return h(W.plural(String(s))).replace(/[+\-]?[0-9][0-9.,:×+%→\s-]*[0-9%]|[0-9]/g, function (m) { return '<bdi dir="ltr">' + m + '</bdi>'; }); }   // F1/F11: 1/2 counts -> singular/dual, then LTR-isolate numeral runs incl. a leading +/- (so "+19%" reads as one unit)
   function insightsData() { try { return window.WkInsights ? window.WkInsights.compute(sessions(), Date.now(), { tz: W.TZ, catalog: cat() }) : null; } catch (_) { return null; } }
   function sparkSvg(spark) {
     if (!spark || spark.length < 2) return '';
@@ -1524,7 +1535,7 @@
     var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
     var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
       + '<div class="wk-ins-trend-pct">' + insNum((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
-      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence) + '">' + insNum(trend.evidence) + '</div></div>' : '';
+      + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence + ' ' + T.unit.kg) + '">' + insNum(trend.evidence + ' ' + T.unit.kg) + '</div></div>' : '';   // F11: the e1RM range carries its unit
     var cards = r.insights.filter(function (i) { return i.type !== 'trend'; }).map(insightCard).join('');
     return head + cap + '<div class="wk-ins-title">' + insNum(title) + '</div>' + test + trendCard + cards;
   }
