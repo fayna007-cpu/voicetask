@@ -2413,3 +2413,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-state-empty .wk-card-h,.wk-state-rest .wk-card-h{font-size:24px;font-weight:800;color:#F3EEE3}
 .wk-state-empty .wk-card-d,.wk-state-rest .wk-card-d{color:#9A968C;margin-top:6px}
 .wk-state-empty .wk-prep{min-height:48px;margin-top:14px;width:auto;padding:0 22px;border:1px solid var(--wk-line);background:none;color:var(--wk-gold);font-weight:700}
+/* N2: 'מצב התראות' notification-status rows + N3 test-push result */
+.wk-st-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wk-st-val{font-size:13px;font-weight:700}
+.wk-st-val.ok{color:#8FD1A8}.wk-st-val.warn{color:#E58A6B}
+.wk-st-step{font-size:12px;color:#E58A6B;padding:6px 14px;line-height:1.4}
+.wk-st-note{font-size:12px;color:#9A968C;padding:4px 14px;line-height:1.4}
+.wk-st-sched-h{font-size:12px;font-weight:700;color:#D4B06A;padding:8px 14px 2px;letter-spacing:.5px}
+.wk-st-item{display:flex;gap:10px;padding:4px 14px;font-size:13px;color:#F4F0E8;align-items:baseline}
+.wk-st-item-t{flex:0 0 auto;color:#9A968C;font-variant-numeric:tabular-nums}
+.wk-st-item-ti{flex:1 1 auto;min-width:0}
+.wk-st-test{margin:10px 14px 4px;min-height:44px;background:#1F1F23;border:1px solid rgba(212,176,106,.4);color:#D4B06A;border-radius:22px;padding:0 18px;font-weight:800;font-family:inherit;cursor:pointer}
+.wk-st-result{font-size:13px;font-weight:700;color:#8FD1A8;padding:4px 14px 8px;min-height:18px}

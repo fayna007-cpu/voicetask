@@ -1699,9 +1699,10 @@
     cards.parentNode.insertBefore(box, cards.nextSibling); cards.parentNode.insertBefore(sec, box);
     // "התראות אימון": a master toggle, the two main times, per-type toggles
     var nsec = document.createElement('div'); nsec.className = 'settings-section'; nsec.textContent = S.notifSection;
+    var stbox = document.createElement('div'); stbox.className = 'settings-cards'; stbox.id = 'wkNotifStatus';
     var nbox = document.createElement('div'); nbox.className = 'settings-cards'; nbox.id = 'wkNotifBox';
-    box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(nsec, nbox);
-    renderNotifBox();
+    box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(stbox, box.nextSibling); box.parentNode.insertBefore(nsec, stbox);
+    renderNotifStatus(); renderNotifBox();
   }
   var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'];
   function renderNotifBox() {
@@ -1723,11 +1724,52 @@
       else if (key === 'evening' || key === 'morning' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
       else if (key.slice(0, 2) === 't:') { p.types = p.types || {}; p.types[key.slice(2)] = !!val; }
     });
-    renderNotifBox();
+    renderNotifBox(); renderNotifStatus();
+  }
+  // N2: 'מצב התראות' — permission, push subscription, the next-48h schedule, and a plain-language next step per failure
+  function renderNotifStatus() {
+    var el = $('wkNotifStatus'); if (!el) return;
+    var c = readNotif(), perm = (window.Notification && Notification.permission) || 'default', now = Date.now();
+    var sched = []; try { sched = notifs(now, 48 * 3600000) || []; } catch (_) { }
+    var statusRow = function (label, val, ok, id) { return '<div class="settings-row wk-st-row"><div class="settings-row-body"><div class="settings-row-title">' + h(label) + '</div></div><div class="wk-st-val ' + (ok ? 'ok' : 'warn') + '"' + (id ? ' id="' + id + '"' : '') + '>' + h(val) + '</div></div>'; };
+    var step = function (txt) { return '<div class="wk-st-step">' + h(txt) + '</div>'; };
+    var html = statusRow(S.permT, perm === 'granted' ? S.permOk : perm === 'denied' ? S.permNo : S.permAsk, perm === 'granted');
+    if (perm === 'denied') html += step(S.permStepNo); else if (perm !== 'granted') html += step(S.permStepAsk);
+    if (!enabled()) html += step(S.killStep);
+    if (!c.on) html += step(S.offStep);
+    if (c.muteDay && c.muteDay === W.ymdIn(new Date())) html += step(S.mutedStep(c.muteDay));
+    html += '<div class="wk-st-note">' + h(S.quietNote) + '</div>';
+    html += statusRow(S.subT, '…', false, 'wkSubState');
+    html += '<div class="wk-st-sched-h">' + h(S.next48T) + '</div>';
+    if (!sched.length) html += '<div class="wk-st-note">' + h(S.next48None) + '</div>';
+    else html += sched.slice(0, 8).map(function (n) { var t = new Date(n.fireAt).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); return '<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>'; }).join('');
+    html += '<button class="wk-chip wk-st-test" onclick="WorkoutHome.sendTestPush()">' + h(S.testPushBtn) + '</button><div class="wk-st-result" id="wkTestResult" aria-live="polite"></div>';
+    el.innerHTML = html;
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready
+        .then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; })
+        .then(function (sub) { var s = $('wkSubState'); if (!s) return; s.textContent = sub ? S.subOk : S.subNo; s.className = 'wk-st-val ' + (sub ? 'ok' : 'warn'); if (!sub) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.subStepNo; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); } })
+        .catch(function () { });
+    } catch (_) { }
+  }
+  // N3: send a real test push through the existing pipeline (subscribe -> /send-now), body 'בדיקה מאלפרד', with a visible result
+  function sendTestPush() {
+    var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
+    var send = function () {
+      var userId = (window.gAuth && gAuth.email) || 'anon';
+      return fetch((window.PUSH_SERVER || '') + '/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
+        .then(function (r) { return r.json().catch(function () { return { status: r.status, ok: r.ok }; }); })
+        .then(function (d) { if (res) res.textContent = (d && (d.ok || d.status === 200 || d.status === 201)) ? S.testPushOk : S.testPushFail((d && (d.error || d.status)) || 'שגיאה'); })
+        .catch(function (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'רשת'); });
+    };
+    try {
+      if (window.subscribeToPush) return Promise.resolve(window.subscribeToPush()).then(function (ok) { if (!ok) { if (res) res.textContent = S.testPushFail(S.subStepNo); return; } return send(); });
+      return send();
+    } catch (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'שגיאה'); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
     addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
-    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById };
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();
