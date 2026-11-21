@@ -2437,3 +2437,10 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .lux .bnav-fab{width:56px;height:56px;background-color:var(--lux-grad-b);background-image:linear-gradient(135deg,var(--lux-grad-a),var(--lux-grad-b));box-shadow:0 8px 24px rgba(201,164,92,.5),0 0 0 4px rgba(201,164,92,.14);margin-top:-14px}
 .lux .bnav-fab svg{stroke:#1A1405 !important;filter:none}
 @media (prefers-reduced-motion:reduce){.lux .bnav-fab{transition:none}}
+/* S2 — header: the 'N פעילויות' pill = surface2 + gold count; menu button on surface2 */
+.lux .badge{background:var(--lux-s2);border:1px solid var(--lux-line);color:var(--lux-gold)}
+.lux .menu-btn{background:var(--lux-s2);border:1px solid var(--lux-line);color:var(--lux-mut)}
+/* S3 — filter chips: no emoji chrome; inactive surface2, active gold text + gold outline (not a filled purple) */
+.lux .f-ico{display:none}
+.lux .f-btn{background:var(--lux-s2);border:1px solid var(--lux-line);color:var(--lux-mut)}
+.lux .f-btn.on{background:transparent;border-color:var(--lux-gold);color:var(--lux-gold);font-weight:700}
