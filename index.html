@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<script>/* PART S: the ONE-Alfred luxury shell is scoped under html.lux; vt_ui_lux='0' reverts to the previous look instantly. */try{if(localStorage.getItem('vt_ui_lux')!=='0')document.documentElement.classList.add('lux');}catch(e){document.documentElement.classList.add('lux');}</script>
 
 <!-- Login -->
 <div id="loginScreen">
@@ -215,10 +216,12 @@
 <div class="bottom-nav">
   <button class="bnav-item" onclick="openNotifManager()">
     <span class="bnav-icon">🔔</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>התראות</span>
   </button>
   <button class="bnav-item" onclick="openRoutineSheet()">
     <span class="bnav-icon">🔄</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
     <span>שגרות</span>
   </button>
   <div class="bnav-fab-wrap">
@@ -232,10 +235,12 @@
   </div>
   <button class="bnav-item active" id="bnavTasks">
     <span class="bnav-icon">📋</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     <span>משימות</span>
   </button>
   <button class="bnav-item" onclick="openSideMenu()">
     <span class="bnav-icon">☰</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     <span>תפריט</span>
   </button>
 </div>

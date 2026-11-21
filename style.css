@@ -2425,3 +2425,15 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-st-item-ti{flex:1 1 auto;min-width:0}
 .wk-st-test{margin:10px 14px 4px;min-height:44px;background:#1F1F23;border:1px solid rgba(212,176,106,.4);color:#D4B06A;border-radius:22px;padding:0 18px;font-weight:800;font-family:inherit;cursor:pointer}
 .wk-st-result{font-size:13px;font-weight:700;color:#8FD1A8;padding:4px 14px 8px;min-height:18px}
+/* ═══════════════ PART S — ONE Alfred luxury shell (scoped under html.lux; vt_ui_lux='0' reverts instantly). Appended only; existing rules untouched. ═══════════════ */
+.lux{--lux-bg:#0B0B0D;--lux-card:#141417;--lux-s2:#1F1F23;--lux-gold:#D4B06A;--lux-grad-a:#E3C58A;--lux-grad-b:#C9A45C;--lux-ink:#1A1405;--lux-text:#F4F0E8;--lux-mut:#9A968C;--lux-green:#8FD1A8;--lux-warn:#E58A6B;--lux-line:rgba(255,255,255,.07)}
+/* S1 — floating bottom-nav pill + inline SVG line icons + gold mic (emoji kept in DOM for the non-lux revert) */
+.bnav-svg{display:none}
+.lux .bnav-icon{display:none}
+.lux .bnav-svg{display:block;width:22px;height:22px}
+.lux .bottom-nav{left:16px;right:16px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:448px;height:64px;padding:0 6px;background:rgba(30,30,34,.88);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.08);border-radius:32px;box-shadow:0 10px 32px rgba(0,0,0,.45)}
+.lux .bnav-item{color:var(--lux-mut);gap:4px;font-size:11px;font-weight:600}
+.lux .bnav-item.active{color:var(--lux-gold);font-size:12px;font-weight:700}
+.lux .bnav-fab{width:56px;height:56px;background-color:var(--lux-grad-b);background-image:linear-gradient(135deg,var(--lux-grad-a),var(--lux-grad-b));box-shadow:0 8px 24px rgba(201,164,92,.5),0 0 0 4px rgba(201,164,92,.14);margin-top:-14px}
+.lux .bnav-fab svg{stroke:#1A1405 !important;filter:none}
+@media (prefers-reduced-motion:reduce){.lux .bnav-fab{transition:none}}
