@@ -2422,8 +2422,9 @@ function buildSmartPushBatch(windowMs){
       queue('overdue_'+t.id,'⚠️ לא הושלמה: '+t.text,'הייתה מתוכננת ל-'+fmt(new Date(t.datetime)),new Date(now+60000));
     });
   }
-  // Routine slot reminders
-  routines.filter(r=>r.enabled).forEach(r=>{
+  // Routine slot reminders — N0: workout routines (kind:'workout') are owned ENTIRELY by the WkBrief journey below;
+  // the legacy generic reminders (rmorning_/rslot_/fup_r_) are suppressed for them so no duplicate/generic push remains.
+  routines.filter(r=>r.enabled && r.kind!=='workout').forEach(r=>{
     const name=r.name||r.text||'שגרה';
     [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
       const slot=new Date(iso);const ds=ymd(slot);const slotFmt=fmt(slot);
