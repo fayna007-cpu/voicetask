@@ -2444,3 +2444,17 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .lux .f-ico{display:none}
 .lux .f-btn{background:var(--lux-s2);border:1px solid var(--lux-line);color:var(--lux-mut)}
 .lux .f-btn.on{background:transparent;border-color:var(--lux-gold);color:var(--lux-gold);font-weight:700}
+/* S4 / R1 — home cards: #141417 bg, 1px line border, radius 22, separated; SEMANTIC left bars only (done green, overdue warn); no purple tint/glow. wk- hero cards untouched. */
+.lux .section-cards .card{background:#141417;border:1px solid var(--lux-line);border-radius:22px;margin:0 0 8px;border-bottom:1px solid var(--lux-line);overflow:hidden}
+.lux .section-cards .card:last-child{margin-bottom:0}
+.lux .card.overdue{background:#141417}
+.lux .card.important{background:#141417;box-shadow:none}
+.lux .card::before{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:transparent;border-radius:3px}
+.lux .card.done::before{background:var(--lux-green)}
+.lux .card.overdue::before{background:var(--lux-warn)}
+.lux .card-cat-dot{background:var(--lux-mut)}
+.lux .bill-card{background:#141417;border:1px solid var(--lux-line);position:relative;overflow:hidden}
+.lux .bill-card.overdue{background:#141417}
+.lux .bill-card.paid{background:#141417}
+.lux .bill-card.overdue::before{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:var(--lux-warn);border-radius:3px}
+.lux .bill-card.paid::before{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:var(--lux-green);border-radius:3px}
