@@ -155,6 +155,10 @@
     // B4 backup reminder at Sunday 10:00 (configurable), only when >=1 real (non-test) session exists; deep-links to the export
     var bk = hm(o.notif && o.notif.backup, 10, 0), hasReal = (o.sessions || []).some(function (s) { return s && !s.test && s.source !== 'test'; });
     if (hasReal) for (var kb = 0; kb < 3; kb++) { var yb = W.addDaysYmd(tday, kb); if (new Date(yb + 'T12:00:00').getDay() === 0) { var bms = at(yb, bk.h, bk.m); if (bms > now && bms <= WIN) out.push({ type: 'backup', fireAt: bms, instance: null, muscle: null }); break; } }
+    // J4 post-workout: end-of-day (21:00, configurable) ONLY if a workout was COMPLETED today (a live session today)
+    var pw = hm(o.notif && o.notif.post, 21, 0);
+    var todaySess = (o.sessions || []).filter(function (s) { return s && !s.test && s.source === 'live' && String(s.dateStr || s.date || '').slice(0, 10) === tday; });
+    if (todaySess.length) { var pms = at(tday, pw.h, pw.m); if (pms > now && pms <= WIN) { var ls = todaySess[todaySess.length - 1]; out.push({ type: 'postWorkout', fireAt: pms, instance: ls.routineId != null ? { routineId: String(ls.routineId), dt: ls.dateStr || ls.date } : null, muscle: (ls.exercises && ls.exercises[0]) ? W.muscleKey(ls.exercises[0], o.catalog) : null, session: ls }); } }
     out = out.filter(function (n) { var h = localH(n.fireAt); return !(h >= 22 || h < 7); });   // quiet hours: drop
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);

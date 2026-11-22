@@ -1333,7 +1333,7 @@
     var dft = readDraft();
     try {
       var nc = readNotif();   // A14/B3/B4: the configurable times feed the schedule (not hard-coded in the brief)
-      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, review: nc.review, backup: nc.backup } }, now) : null;
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, post: nc.post, review: nc.review, backup: nc.backup } }, now) : null;
     } catch (_) { briefCache = null; }
     briefAt = now; return briefCache;
   }
@@ -1472,10 +1472,10 @@
   function readNotif() {
     var raw = load(KEY_NOTIF, null), p = raw && typeof raw === 'object' ? raw : {};
     var types = p.types && typeof p.types === 'object' ? p.types : {};
-    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
+    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'postWorkout', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
     T6.forEach(function (k) { t[k] = types[k] !== false; });
     var hm = function (s, d) { return /^\d\d:\d\d$/.test(s) ? s : d; };
-    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
+    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), post: hm(p.post, '21:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
   }
   function setNotif(fn) { W.updateJSON(localStorage, KEY_NOTIF, {}, function (p) { p = p && typeof p === 'object' ? p : {}; fn(p); return p; }); }
   // ── B1b: insight suggestions added to the brief — reversible (undo toast) + removable anytime; NEVER auto-applied to any target ──
@@ -1601,6 +1601,7 @@
     if (t.targetKg != null) v.target = numIso(t.targetKg) + ' ' + T.unit.kg;
     if (w.mins) v.dur = numIso(w.mins);
     if (f.weekPlanned > 0) { v.done = numIso(f.weekDone); v.planned = numIso(f.weekPlanned); }
+    if (n.type === 'postWorkout' && n.session) { try { v.volume = numIso(Math.round(W.volume(n.session))) + ' ' + T.unit.kg; } catch (_) { } }   // J4 post-workout volume
     // B3 weekly review: {n} workouts this week, {x} PRs this week, {insight} = the top real insight
     if (n.type === 'weeklyReview') {
       var all2 = sessions(), wr2 = W.weekRange(new Date(Date.now())), prs = 0, wdone = 0;
@@ -1718,7 +1719,7 @@
     box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(stbox, box.nextSibling); box.parentNode.insertBefore(nsec, stbox);
     renderNotifStatus(); renderNotifBox();
   }
-  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'];
+  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'postWorkout', 'fridayTeaser', 'weeklyReview', 'backup'];
   function renderNotifBox() {
     var nbox = $('wkNotifBox'); if (!nbox) return; var c = readNotif();
     var row = function (title, sub, ctrl) { return '<div class="settings-row"><div class="settings-row-body"><div class="settings-row-title">' + title + '</div>' + (sub ? '<div class="settings-row-sub">' + sub + '</div>' : '') + '</div>' + ctrl + '</div>'; };
@@ -1727,7 +1728,7 @@
     if (c.on) {
       // the evening / morning time chip lives INSIDE its own toggle row (no duplicated rows)
       var tinp = function (key, val) { return '<input type="time" class="wk-time" value="' + val + '" onchange="WorkoutLive.notifSet(\'' + key + '\',this.value)" onclick="event.stopPropagation()">'; };
-      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
+      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'postWorkout' ? tinp('post', c.post) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
       html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', timeFor(k) + toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
     }
     nbox.innerHTML = html;
@@ -1735,7 +1736,7 @@
   function notifSet(key, val) {
     setNotif(function (p) {
       if (key === 'on') p.on = !!val;
-      else if (key === 'evening' || key === 'morning' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
+      else if (key === 'evening' || key === 'morning' || key === 'post' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
       else if (key.slice(0, 2) === 't:') { p.types = p.types || {}; p.types[key.slice(2)] = !!val; }
     });
     renderNotifBox(); renderNotifStatus();
