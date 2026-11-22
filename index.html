@@ -147,7 +147,7 @@ try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,2
 <div id="app" style="display:none">
 
 <div class="header">
-  <div class="logo-wrap">
+  <div class="logo-wrap" id="logoChat" role="button" tabindex="0" onclick="openAssistantChat()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAssistantChat()}" aria-label="פתח שיחה עם אלפרד" style="cursor:pointer">
     <div class="logo-orb">
       <div class="logo-orb-eyes">
         <span class="logo-orb-eye"></span>

@@ -1290,7 +1290,7 @@
   // ── resume banner (app open) and the sheet line ──
   function resumeLine(where) {
     var r = enabled() && readDraft(); if (!r || r.s.test) return '';          // a TEST draft never shows as a real workout
-    return '<div class="wk-resume-in"><span>🏋️ ' + S.open + '</span><span class="wk-chips">'
+    return '<div class="wk-resume-in"><span><span data-lux-ico="dumbbell">🏋️</span> ' + S.open + '</span><span class="wk-chips">'
       + (isStale(r) ? '<button class="wk-chip on" onclick="WorkoutLive.saveOld()">' + S.saveOld + '</button><button class="wk-chip" onclick="WorkoutLive.delOld()">' + S.delOld + '</button>'
         : '<button class="wk-chip on" onclick="Workout.start()">' + S.resume + '</button>' + (where === 'banner' ? '<button class="wk-chip" onclick="WorkoutLive.hideBanner()" aria-label="' + S.close + '">✕</button>' : '')) + '</span></div>';
   }
@@ -1391,7 +1391,7 @@
     var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
     var argO = { routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }, arg = js(argO), go = 'event.stopPropagation();Workout.start(' + arg + ')';
     var goWarm = 'event.stopPropagation();Workout.start(' + js(Object.assign({ warm: true }, argO)) + ')';   // A10: warm-up focus path, identical to the notification warm action
-    var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
+    var cd = st === 'locked' ? '<div class="wk-card-cd"><span data-lux-ico="lock">🔒</span> ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
     // the hero (computed early so the states below can use it): the brief's today/next instance in a focus state
@@ -1425,7 +1425,7 @@
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
     return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
+      + '<div class="wk-card-top"><span class="wk-card-tag"><span data-lux-ico="dumbbell">🏋️</span> ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
