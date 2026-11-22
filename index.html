@@ -29,6 +29,24 @@
 </head>
 <body>
 <script>/* PART S: the ONE-Alfred luxury shell is scoped under html.lux; vt_ui_lux='0' reverts to the previous look instantly. */try{if(localStorage.getItem('vt_ui_lux')!=='0')document.documentElement.classList.add('lux');}catch(e){document.documentElement.classList.add('lux');}</script>
+<script>/* S7: map icon-chip emoji (side menu + settings rows) to line SVG under .lux, generically (covers current + future
+   rows). Wraps the glyph in a data-lux-ico span; CSS hides the emoji (font-size:0) and paints the SVG via mask. */
+(function(){
+  if(!document.documentElement.classList.contains('lux'))return;
+  var MAP={'📥':'import','🚀':'rocket','🤖':'ai','💳':'card','📋':'clipboard','🔄':'repeat','🏋️':'dumbbell','🏋':'dumbbell','🔔':'bell','⚙️':'gear','⚙':'gear','🚪':'logout','⏰':'clock','▶️':'play','▶':'play','🧪':'flask','🌓':'theme','🌙':'theme','📅':'cal','☁️':'cloud','☁':'cloud','📤':'export','📧':'mail','🐛':'bug','🛡️':'shield','🛡':'shield','🎯':'target','☀️':'sun','📌':'pin','💡':'flask','📈':'rocket','📊':'clipboard'};
+  function wrap(el){
+    if(el.querySelector&&el.querySelector('[data-lux-ico]'))return;
+    var t=(el.textContent||'').trim(); if(!t)return;
+    var ch=Array.from(t)[0]; var key=MAP[ch]||MAP[t.slice(0,2)];
+    if(!key)return;
+    el.innerHTML='<span data-lux-ico="'+key+'">'+ch+'</span>';
+  }
+  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico').forEach(wrap);}
+  conv();
+  var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},120);});
+  try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
 <script>/* F1.4/R6: under .lux the floating mascot must never sit over card text. It dims while scrolling, and at rest it dims
    ONLY when it geometrically overlaps content (full opacity over empty space). Hit-tested with elementsFromPoint. */
 (function(){var t,fab;
@@ -324,7 +342,7 @@ try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,2
   <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
   <div class="rsheet-head">
     <button class="rsheet-close-btn" onclick="closeSettings()">✕</button>
-    <h3>⚙️ הגדרות</h3>
+    <h3><span data-lux-ico="gear">⚙️</span> הגדרות</h3>
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
