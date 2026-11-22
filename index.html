@@ -2673,8 +2673,8 @@ async function fetchCalendarNotifs(){
 async function cleanupPushServer(validIds){
   if(PUSH_SERVER.includes('REPLACE'))return;
   const userId=gAuth?.email||'anon';
-  try{await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});}
-  catch(e){console.warn('cleanupPushServer:',e);}
+  try{const r=await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});window.__wkCleanupFailed=!r.ok;}
+  catch(e){console.warn('cleanupPushServer:',e);window.__wkCleanupFailed=true;}// N4: record failure so 'מצב התראות' can surface it (not silent)
 }
 async function scheduleSmartPushNotifs(){
   if(!('Notification'in window)||Notification.permission!=='granted')return;

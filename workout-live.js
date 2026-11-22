@@ -1740,6 +1740,8 @@
     if (c.muteDay && c.muteDay === W.ymdIn(new Date())) html += step(S.mutedStep(c.muteDay));
     html += '<div class="wk-st-note">' + h(S.quietNote) + '</div>';
     html += statusRow(S.subT, '…', false, 'wkSubState');
+    html += statusRow(S.serverVerT, '…', false, 'wkServerVer');                                  // N4: push-server capability
+    if (window.__wkCleanupFailed) html += '<div class="wk-st-step">' + h(S.cleanupFailNote) + '</div>';
     html += '<div class="wk-st-sched-h">' + h(S.next48T) + '</div>';
     if (!sched.length) html += '<div class="wk-st-note">' + h(S.next48None) + '</div>';
     else html += sched.slice(0, 8).map(function (n) { var t = new Date(n.fireAt).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); return '<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>'; }).join('');
@@ -1750,6 +1752,16 @@
         .then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; })
         .then(function (sub) { var s = $('wkSubState'); if (!s) return; s.textContent = sub ? S.subOk : S.subNo; s.className = 'wk-st-val ' + (sub ? 'ok' : 'warn'); if (!sub) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.subStepNo; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); } })
         .catch(function () { });
+    } catch (_) { }
+    // N4: probe GET /health. Old deployment has no /health (returns the plain fallback string, not JSON) -> 'old'.
+    try {
+      fetch((window.PUSH_SERVER || '') + '/health').then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {
+        var s = $('wkServerVer'); if (!s) return;
+        var need = ['schedule', 'cleanup', 'send-now'];
+        var ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
+        s.textContent = ok ? S.serverOk : S.serverOld; s.className = 'wk-st-val ' + (ok ? 'ok' : 'warn');
+        if (!ok) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.serverStep; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); }
+      }).catch(function () { var s = $('wkServerVer'); if (s) { s.textContent = S.serverOld; s.className = 'wk-st-val warn'; } });
     } catch (_) { }
   }
   // N3: send a real test push through the existing pipeline (subscribe -> /send-now), body 'בדיקה מאלפרד', with a visible result
