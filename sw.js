@@ -1,5 +1,6 @@
-const V = 'alfred-v44';
-const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './wk-insights.js', './workout-live.js'];
+const V = 'alfred-v45';
+const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './wk-insights.js', './wk-inbox.js', './workout-live.js'];
+try { importScripts('./wk-inbox.js'); } catch (e) { }   // J9: the inbox store (WkInbox) is available in the SW too
 
 // ═══════════════════════════════════════════════════════════════════
 // Notif v2 — IDB shadow store access (mirrors index.html Stage 1 module)
@@ -218,6 +219,14 @@ self.addEventListener('push', e => {
         return;
       }
     }catch(_){/* fail-open below */}
+    // J9: record the DELIVERED notification to the inbox (dedupe by id) BEFORE showing it, so nothing is lost
+    try{
+      if(self.WkInbox&&self.WkInbox.add){
+        const cat=(payload&&payload.type==='workout')?'אימון':(payload&&payload.type==='task')?'משימה':(payload&&payload.type)||'אחר';
+        const id=(payload&&payload.type&&payload.id!=null)?(payload.type+'_'+payload.id+'_'+(payload.stage||'')):((data.tag||'push')+'_'+Date.now());
+        await self.WkInbox.add({id:id,ts:Date.now(),category:cat,title:data.title||'',body:data.body||'',deepLink:(payload&&payload.type==='workout')?'workout':null,test:/בדיקה/.test(data.body||'')});
+      }
+    }catch(_){}
     return self.registration.showNotification(data.title,opts);
   })());
 });
@@ -232,6 +241,8 @@ self.addEventListener('notificationclick', e => {
     // notificationclick did NOT fire on the OS — iOS PWA quirk where
     // body-taps sometimes just launch the app and skip the SW event.
     await _swLogPersist('log','[sw:v2] notificationclick action='+(action||'(body)')+' payload='+JSON.stringify(payload||{}));
+    // J9: mark the inbox item read when its notification is tapped
+    try{ if(self.WkInbox&&payload&&payload.type&&payload.id!=null){ await self.WkInbox.markRead(payload.type+'_'+payload.id+'_'+(payload.stage||'')); } }catch(_){}
     const v2=await _swV2Enabled().catch(()=>false);
 
     // v2 "בוצע": write completion to IDB and STOP. No client open.

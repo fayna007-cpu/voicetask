@@ -21,6 +21,7 @@
 <script src="wk-mascot.js"></script>
 <script src="wk-brief.js"></script>
 <script src="wk-insights.js"></script>
+<script src="wk-inbox.js"></script>
 <script src="workout-live.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -251,7 +252,7 @@ try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,2
 </div>
 </div><!-- /#app -->
 <div class="bottom-nav">
-  <button class="bnav-item" onclick="openNotifManager()">
+  <button class="bnav-item" onclick="(window.WkInbox&&WkInbox.open)?WkInbox.open():openNotifManager()">
     <span class="bnav-icon">🔔</span>
     <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>התראות</span>

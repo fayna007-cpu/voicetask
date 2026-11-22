@@ -619,6 +619,7 @@
     var sub = $('wkPrSub'); sub.textContent = info.streak >= 2 ? S.prStreak(info.streak) : '';   // only when the streak is real
     sub.hidden = !sub.textContent;
     e.classList.add('on'); haptic();
+    try { inboxPR(label, (info.set || '').replace(/[⁦-⁩]/g, '')); } catch (_) { }   // J9c: record the PR to the inbox
     try { if (!prM && window.WkMascot) prM = window.WkMascot.mount($('wkPrM'), { mode: 'fire' }); if (prM) prM.set('pr'); } catch (_) { }
     clearTimeout(prTimer); prTimer = setTimeout(hidePR, 3000);            // closes on tap OR after 3 s (both themes)
   }
@@ -753,6 +754,7 @@
     restPushCancel();   // B6: ending the workout cancels any pending rest-end push
     var logged = state.exercises.some(function (e) { return e.sets.length; });
     if (!logged) { if (confirm(S.noSets)) { drop(KEY_D); draft = null; state = null; hide(); refreshAll(); } return; }
+    try { if (!state.test) inboxDone({ id: 'd' + state.startedAt, dateStr: W.ymdIn(new Date()), exercises: state.exercises }); } catch (_) { }   // J9c: workout completed -> inbox
     ui.locker = state.locker; ui.exists = false; ui.err = ''; go('finish');
   }
   function effort(n) { ui.effort = n; render(); }
@@ -1832,7 +1834,11 @@
   }
   function dayPlanMins(day0) { try { var secs = day0.exercises.reduce(function (a, e) { return a + ((e.scheme && e.scheme.sets || 3) * ((e.restSec || 75) + 40)); }, 0); return Math.max(1, Math.round(secs / 60)); } catch (_) { return 45; } }
   function dismissConfirm() { var el = document.getElementById('wkConfirm'); if (el) { el.classList.remove('on'); setTimeout(function () { try { el.remove(); } catch (_) { } }, 240); } }
-  try { window.addEventListener('vt-routine-saved', function (ev) { var d = ev && ev.detail; if (d && d.id != null) setTimeout(function () { confirmCard(d.id, !!d.isNew); }, 120); }); } catch (_) { }
+  try { window.addEventListener('vt-routine-saved', function (ev) { var d = ev && ev.detail; if (d && d.id != null) setTimeout(function () { confirmCard(d.id, !!d.isNew); inboxLog(d.id, !!d.isNew); }, 120); }); } catch (_) { }
+  // J9c: record in-app journey events to the inbox (workout completed, new PR, routine created, weekly review)
+  function inboxLog(routineId, isNew) { try { if (!window.WkInbox) return; var r = routineOf(routineId); if (!r || r.kind !== 'workout') return; var p = programFor(r), d0 = p && p.days && p.days[0]; var m = d0 && d0.exercises && d0.exercises[0] ? muscleName(W.muscleKey(d0.exercises[0], cat())) : (r.name || 'אימון'); WkInbox.add({ id: 'inapp_rt_' + routineId + '_' + (r.updatedAt || Date.now()), category: 'אימון', title: isNew ? S.confNewT : S.confChangedT, body: m + (r.specificTime ? ' · ' + r.specificTime : '') }); } catch (_) { } }
+  function inboxDone(sess) { try { if (!window.WkInbox || !sess) return; var vol = Math.round(W.volume(sess)); var m = sess.exercises && sess.exercises[0] ? muscleName(W.muscleKey(sess.exercises[0], cat())) : 'אימון'; WkInbox.add({ id: 'inapp_done_' + (sess.id || sess.dateStr || Date.now()), category: 'אימון', title: m + ' הושלם', body: vol + ' ' + T.unit.kg + ' נפח. כל הכבוד.', deepLink: 'workout' }); } catch (_) { } }
+  function inboxPR(label, value) { try { if (!window.WkInbox) return; WkInbox.add({ id: 'inapp_pr_' + label + '_' + Date.now(), category: 'אימון', title: 'שיא חדש', body: h(label) + ': ' + value, deepLink: 'workout' }); } catch (_) { } }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
