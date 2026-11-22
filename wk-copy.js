@@ -55,7 +55,7 @@
     //    Facts first, no guilt, no emoji. 2 rich variants + ONE plain fallback (always fillable) per list. ──
     notify: {
       eveningBefore: {
-        title: ['מחר: {muscle}', 'אימון מחר · {time}', 'מחר מתאמנים'],
+        title: ['מחר: {muscle}', 'אימון מחר · {time}', 'מחר אימון'],
         body: ['{streak} שבועות ברצף. {hint}. הכול מוכן.', 'מחר {muscle}. {hint}', 'הכול מוכן למחר.']
       },
       morning: {
@@ -64,7 +64,7 @@
       },
       // F2: body adds a fact the title does not carry; no fallback repeats its title
       warmup: {
-        title: ['{muscle} בעוד 45 דק׳', '{muscle} עוד מעט', 'מתחילים בעוד 45 דק׳'],
+        title: ['{muscle} בעוד 45 דק׳', '{muscle} עוד מעט', 'אימון בעוד 45 דק׳'],
         body: ['פעם קודמת סיימת {last}. אפשר להתחיל בחימום עכשיו.', 'אפשר להתחיל בחימום עכשיו. {dur} דק׳ לאימון.', 'אפשר להתחיל בחימום עכשיו.']
       },
       unlock: {
@@ -72,7 +72,7 @@
         body: ['היעד היום {target}. {dur} דק׳, הכול מוכן.', '{dur} דק׳, הכול מוכן.', 'הכול מוכן. אפשר להתחיל.']
       },
       rescue: {
-        title: ['{muscle} עדיין פתוח', '{dur} דק׳ ואתה בפנים', 'עוד אפשר להספיק'],
+        title: ['{muscle} עדיין פתוח', 'אימון · {dur} דק׳ ואתה בפנים', 'עוד אפשר להספיק אימון'],
         body: ['{dur} דק׳, או רק חימום של 5. מה שנוח לך.', 'עוד אפשר, או רק חימום של 5.', 'עוד אפשר להתחיל, או רק חימום.']
       },
       fridayTeaser: {
