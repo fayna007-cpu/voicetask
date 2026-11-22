@@ -137,12 +137,15 @@
     insts.forEach(function (x) {
       if (x.ms < now || x.ms > WIN || x.i.completed) return;
       var muscle = brMuscle(o, x.r, now);
+      // once the workout is STARTED (an open draft for this instance), the unlock + rescue pushes are cancelled:
+      // unlock is moot and rescue ('you did not start') is false. The client rebuilds the batch on start, so these
+      // ids drop out of validIds and cleanupPushServer removes them server-side (per-id cancel via /cleanup).
+      var started = !!(o.draft && !o.draft.test && String(o.draft.routineId) === String(x.r.id) && o.draft.dateStr === x.i.dt);
       var add = function (type, ms) { if (ms > now && ms <= WIN) out.push({ type: type, fireAt: ms, instance: { routineId: String(x.r.id), dt: x.i.dt }, muscle: muscle }); };
       add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), ev.h, ev.m));
       add('morning', at(x.ymd, mo.h, mo.m));
       add('warmup', x.ms - 45 * 60000);
-      add('unlock', x.ms);
-      add('rescue', x.ms + 60 * 60000);
+      if (!started) { add('unlock', x.ms); add('rescue', x.ms + 60 * 60000); }
     });
     // Friday teaser (summary) at 18:00, once in the window
     var fri = nextFriday(now, tz); if (fri > now && fri <= WIN) out.push({ type: 'fridayTeaser', fireAt: fri, instance: null, muscle: null });
@@ -156,8 +159,10 @@
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);
   }
-  // when a day has more than 3, keep the ones nearest to acting; warm-up is the cuttable one (the cut list)
-  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6, backup: 7 };
+  // Cap 3/day priority (lower = kept). rescue ranks BELOW unlock, post-workout and morning (it only exists if NOT started,
+  // and must never crowd out the act-now or the end-of-day summary). warm-up and next-day eveningBefore are the cut list.
+  // postWorkout (J4, 21:00) is mutually exclusive with rescue in practice (done XOR not-started) but ranked here for back-to-back days.
+  var PRI = { unlock: 0, postWorkout: 1, morning: 2, rescue: 3, eveningBefore: 4, warmup: 5, fridayTeaser: 6, weeklyReview: 7, backup: 8 };
   function capPerDay(list, tz) {
     var byDay = {};
     list.forEach(function (n) { var k = W.ymdIn(new Date(n.fireAt), tz); (byDay[k] = byDay[k] || []).push(n); });
@@ -180,7 +185,8 @@
     return (parseInt(m[1], 10) * 60 + (m[1][0] === '-' ? -1 : 1) * (m[2] ? +m[2] : 0)) * 60000;
   }
 
-  var api = { compute: compute };
+  // test-only surface for the 3/day cap priority (postWorkout is J4-future, so it can't come from the real pipeline yet)
+  var api = { compute: compute, _pri: PRI, _capDay: function (list, tz) { return capPerDay(list, tz || 'Asia/Jerusalem'); } };
   root.WkBrief = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
