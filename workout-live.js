@@ -1799,9 +1799,44 @@
       return send();
     } catch (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'שגיאה'); }
   }
+  // J2/SM5: client-side 'אימון חדש נקבע' confirmation card, rendered from the saved routine (no AI-worker change).
+  function confirmCard(routineId, isNew) {
+    try {
+      if (!enabled()) return;
+      var r = routineOf(routineId); if (!r || r.kind !== 'workout') return;
+      var p = programFor(r); var day0 = p && p.days && p.days[0];
+      var muscle = day0 && day0.exercises && day0.exercises[0] ? muscleName(W.muscleKey(day0.exercises[0], cat())) : (day0 && day0.name) || (r.name || 'אימון');
+      var dayName = (r.preferredDays && r.preferredDays.length) ? W.DAY_NAMES_FULL ? null : null : null;
+      var time = r.specificTime || '';
+      var dayTxt = '';
+      try { if (r.preferredDays && r.preferredDays.length) { var dn = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת']; dayTxt = 'יום ' + dn[r.preferredDays[0]]; } } catch (_) { }
+      var mins = p && day0 ? dayPlanMins(day0) : (r.duration || 45);
+      var nEx = day0 && day0.exercises ? day0.exercises.length : 0;
+      var cfg = readNotif(); var perm = (window.Notification && Notification.permission) || 'default';
+      var notifOn = cfg.on && perm === 'granted';
+      var sub = [h(muscle), h(dayTxt), time ? num(time) : ''].filter(Boolean).join(' · ');   // escape text parts; num() is trusted RTL markup
+      var prepTime = cfg.evening || '20:00';
+      var nudge = (!cfg.on || perm !== 'granted') ? '<div class="wk-conf-nudge"><div class="wk-conf-nudge-b"><div class="wk-conf-nudge-t">' + h(S.confNudgeT) + '</div><div class="wk-conf-nudge-s">' + h(S.confNudge) + '</div></div><button class="wk-conf-nudge-btn" onclick="(function(){try{WorkoutLive&&0;}catch(e){}openSettings&&openSettings();WorkoutHome.dismissConfirm&&WorkoutHome.dismissConfirm();})()">' + h(S.confNudgeBtn) + '</button></div>' : '';
+      var el = document.getElementById('wkConfirm'); if (!el) { el = document.createElement('div'); el.id = 'wkConfirm'; el.className = 'wk-conf-wrap'; el.setAttribute('dir', 'rtl'); document.body.appendChild(el); }
+      el.innerHTML = '<div class="wk-conf-ov" onclick="WorkoutHome.dismissConfirm()"></div><div class="wk-conf-card" role="dialog" aria-modal="true">'
+        + '<div class="wk-conf-top"><span class="wk-conf-check" aria-hidden="true"></span><span class="wk-conf-eyebrow">' + h(isNew ? S.confNewT : S.confChangedT) + '</span></div>'
+        + '<div class="wk-conf-h">' + sub + '</div>'
+        + '<div class="wk-conf-d">' + insNum(S.confDetails(mins, nEx)) + '</div>'
+        + '<div class="wk-conf-prep">' + h(S.confPrep(notifOn ? num(prepTime) : '')) + '</div>'
+        + nudge
+        + '<div class="wk-conf-acts"><button class="wk-conf-ok" onclick="WorkoutHome.dismissConfirm()">' + h(S.confOk) + '</button></div>'
+        + '</div>';
+      requestAnimationFrame(function () { el.classList.add('on'); });
+    } catch (e) { }
+  }
+  function dayPlanMins(day0) { try { var secs = day0.exercises.reduce(function (a, e) { return a + ((e.scheme && e.scheme.sets || 3) * ((e.restSec || 75) + 40)); }, 0); return Math.max(1, Math.round(secs / 60)); } catch (_) { return 45; } }
+  function dismissConfirm() { var el = document.getElementById('wkConfirm'); if (el) { el.classList.remove('on'); setTimeout(function () { try { el.remove(); } catch (_) { } }, 240); } }
+  try { window.addEventListener('vt-routine-saved', function (ev) { var d = ev && ev.detail; if (d && d.id != null) setTimeout(function () { confirmCard(d.id, !!d.isNew); }, 120); }); } catch (_) { }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
     addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
-    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus };
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus,
+    confirmCard: confirmCard, dismissConfirm: dismissConfirm };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

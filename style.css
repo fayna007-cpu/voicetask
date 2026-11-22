@@ -2385,6 +2385,27 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .wk-spark{width:100%;height:84px;display:block}
 .wk-spark-line{fill:none;stroke:#D4B06A;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .wk-spark-fill{fill:url(#wkSparkGrad);stroke:none}
+/* J2/SM5: routine-created confirmation card (ref 03) */
+.wk-conf-wrap{position:fixed;inset:0;z-index:600;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s}
+.wk-conf-wrap.on{opacity:1;pointer-events:auto}
+.wk-conf-ov{position:absolute;inset:0;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.wk-conf-card{position:relative;width:calc(100% - 24px);max-width:440px;margin:0 12px calc(12px + var(--sab,0px));background:linear-gradient(160deg,rgba(212,176,106,.10),var(--card,#141417) 60%);border:1px solid rgba(212,176,106,.32);border-radius:22px;padding:20px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.6);transform:translateY(16px);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.wk-conf-wrap.on .wk-conf-card{transform:translateY(0)}
+.wk-conf-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.wk-conf-check{width:26px;height:26px;border-radius:50%;background:#8FD1A8;flex-shrink:0;position:relative}
+.wk-conf-check::after{content:'';position:absolute;left:8px;top:6px;width:6px;height:11px;border:solid #0B0B0D;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.wk-conf-eyebrow{font-size:12px;font-weight:800;letter-spacing:.06em;color:#D4B06A;margin-inline-start:auto;text-align:start;flex:1}
+.wk-conf-h{font-family:var(--font-display,serif);font-size:26px;font-weight:700;color:var(--text,#F4F0E8);line-height:1.15;text-align:start}
+.wk-conf-d{font-size:14px;color:var(--muted,#9A968C);margin-top:4px;text-align:start}
+.wk-conf-prep{font-size:14px;color:var(--text,#F4F0E8);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:11px 13px;margin-top:14px;line-height:1.5;text-align:start}
+.wk-conf-nudge{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 13px;border:1px solid rgba(229,138,107,.4);border-radius:14px;background:rgba(229,138,107,.06)}
+.wk-conf-nudge-b{flex:1;text-align:start}
+.wk-conf-nudge-t{font-size:13px;font-weight:700;color:#E58A6B}
+.wk-conf-nudge-s{font-size:12px;color:var(--muted,#9A968C);margin-top:2px}
+.wk-conf-nudge-btn{flex-shrink:0;padding:8px 16px;border-radius:50px;border:1px solid #D4B06A;background:transparent;color:#D4B06A;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+.wk-conf-acts{display:flex;margin-top:16px}
+.wk-conf-ok{flex:1;padding:14px;border:none;border-radius:16px;background:linear-gradient(135deg,#E3C58A,#C9A45C);color:#1A1405;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.wk-conf-wrap,.wk-conf-card{transition:none}}
 /* R2: designed insights empty state */
 .wk-ins-empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 20px 28px;gap:10px}
 .wk-ins-empty-m{width:96px;height:96px;margin:4px auto 2px}
