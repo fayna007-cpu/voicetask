@@ -37,10 +37,13 @@ function overlapsContent(){var f=getFab();if(!f)return false;var r=f.getBounding
   var pts=[[r.left+r.width/2,r.top+r.height/2],[r.left+5,r.top+5],[r.right-5,r.top+5],[r.left+5,r.bottom-5],[r.right-5,r.bottom-5]];
   for(var i=0;i<pts.length;i++){var stack=document.elementsFromPoint(pts[i][0],pts[i][1]);
     for(var j=0;j<stack.length;j++){var el=stack[j];if(f.contains(el)||(el.closest&&el.closest('.asst-fab')))continue;
-      if(el.closest&&el.closest('.bill-mini-card,.bill-card,.section-cards .card,.tp-wrap,.ge-card,.card,.ot-empty,.ot-active'))return true;break;}}
+      // generic: the first element under the FAB that is NOT page background (body/html/#app/the nav+scrim) = content.
+      var tag=el.tagName,id=el.id||'';
+      if(tag==='BODY'||tag==='HTML'||id==='app'||(el.closest&&el.closest('.bottom-nav')))break;
+      return true;}}
   return false;}
 function update(){if(!document.documentElement.classList.contains('lux'))return;var f=getFab();if(!f||f.classList.contains('dragging'))return;f.classList.toggle('fab-over-content',overlapsContent());}
-function onScroll(){if(!document.documentElement.classList.contains('lux'))return;var f=getFab();if(!f||f.classList.contains('dragging'))return;f.classList.add('fab-scroll');clearTimeout(t);t=setTimeout(function(){f.classList.remove('fab-scroll');update();},500);}
+var raf=0;function onScroll(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;update();});}
 document.addEventListener('scroll',onScroll,true);
 window.addEventListener('load',function(){setTimeout(update,300);});
 try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,200);});mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
@@ -3790,7 +3793,7 @@ function renderTaskCard(task){
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')"><span data-lux-ico="bell">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
     <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
@@ -3838,14 +3841,14 @@ function renderRoutineInstance(inst){
   const isImportant=routineRef?.important;
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}${isImportant?' important':''}" style="--cc:${cat.c}">
   ${isImportant?`<button class="important-marker on" onclick="toggleRoutineImportant('${inst.routineId}')" title="הסר סימון חשוב">!</button>`:`<button class="important-marker" onclick="toggleRoutineImportant('${inst.routineId}')" title="סמן כחשוב">!</button>`}
-  <div class="routine-badge">🔄 שגרה</div>
+  <div class="routine-badge"><span data-lux-ico="repeat">🔄</span> שגרה</div>
   <div class="card-row">
     <div class="card-main">
       <div class="task-txt">${esc(inst.text)}</div>
       <div class="card-meta-row">
         <span class="card-date">${dateStr}</span>
         <span class="dur-tag">${durTxt}</span>
-        ${inst.notes?`<span class="card-date">📝 ${esc(inst.notes)}<\/span>`:''}
+        ${inst.notes?`<span class="card-date"><span data-lux-ico="note">📝</span> ${esc(inst.notes)}<\/span>`:''}
         ${!inst.completed?`<button class="defer-chip" onclick="openPostpone('routine','${inst.routineId}','${inst.dateStr}')">דחייה</button>`:''}
       </div>
     </div>
@@ -3858,7 +3861,7 @@ function renderRoutineInstance(inst){
     <button class="act add-inst-btn" onclick="quickAddInstance('${inst.routineId}')" title="הוסף מופע נוסף">＋</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')"><span data-lux-ico="bell">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
   <div class="card-edit" id="redit-${safeId}">
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;direction:rtl">שינוי מועד לאירוע זה בלבד</div>
     <input class="edit-dt" id="redt-${safeId}" type="datetime-local" value="${dtLocal}">
@@ -11159,11 +11162,11 @@ function renderUrgentBillsBanner(){
     const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
     return dl<today;
   }).length;
-  const title=overdue?`🚨 ${overdue} חשבונות באיחור!`:`🔔 חשבונות לתשלום היום`;
+  const title=overdue?`${overdue} חשבונות באיחור!`:`חשבונות לתשלום היום`;
   const detailParts=[`${todayBills.length} חשבונות`];
   if(totalAmount)detailParts.push(`₪${Math.round(totalAmount).toLocaleString('he-IL')}`);
   return `<div class="urgent-bills-banner${overdue?' overdue':''}" onclick="openBillsSheet()">
-    <div class="ubb-icon">${overdue?'🚨':'💳'}</div>
+    <div class="ubb-icon" data-lux-ico="${overdue?'alert':'card'}">${overdue?'🚨':'💳'}</div>
     <div class="ubb-body">
       <div class="ubb-title">${title}</div>
       <div class="ubb-detail">${detailParts.join(' · ')} — לחץ לטיפול</div>

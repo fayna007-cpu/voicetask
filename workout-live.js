@@ -1628,7 +1628,7 @@
     var r = routineOf(t.routineId), st = W.cardState({ now: Date.now(), dt: t.dateStr, unlockMin: r && r.wkUnlockMin });
     var time = new Date(t.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
     var el = document.createElement('div'); el.id = 'wkGreet'; el.className = 'greeting-sub wk-greet';
-    el.innerHTML = '🏋️ ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
+    el.innerHTML = '<span class="wk-greet-ico" data-lux-ico="dumbbell">🏋️</span> ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
     subEl.parentNode.insertBefore(el, subEl.nextSibling);
   }
   // the assistant: "התחל אימון" / "מה האימון הבא" (code-first; nothing goes to the model)
