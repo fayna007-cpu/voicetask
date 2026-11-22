@@ -29,6 +29,22 @@
 </head>
 <body>
 <script>/* PART S: the ONE-Alfred luxury shell is scoped under html.lux; vt_ui_lux='0' reverts to the previous look instantly. */try{if(localStorage.getItem('vt_ui_lux')!=='0')document.documentElement.classList.add('lux');}catch(e){document.documentElement.classList.add('lux');}</script>
+<script>/* F1.4/R6: under .lux the floating mascot must never sit over card text. It dims while scrolling, and at rest it dims
+   ONLY when it geometrically overlaps content (full opacity over empty space). Hit-tested with elementsFromPoint. */
+(function(){var t,fab;
+function getFab(){return fab||(fab=document.querySelector('.asst-fab'));}
+function overlapsContent(){var f=getFab();if(!f)return false;var r=f.getBoundingClientRect();if(!r.width)return false;
+  var pts=[[r.left+r.width/2,r.top+r.height/2],[r.left+5,r.top+5],[r.right-5,r.top+5],[r.left+5,r.bottom-5],[r.right-5,r.bottom-5]];
+  for(var i=0;i<pts.length;i++){var stack=document.elementsFromPoint(pts[i][0],pts[i][1]);
+    for(var j=0;j<stack.length;j++){var el=stack[j];if(f.contains(el)||(el.closest&&el.closest('.asst-fab')))continue;
+      if(el.closest&&el.closest('.bill-mini-card,.bill-card,.section-cards .card,.tp-wrap,.ge-card,.card,.ot-empty,.ot-active'))return true;break;}}
+  return false;}
+function update(){if(!document.documentElement.classList.contains('lux'))return;var f=getFab();if(!f||f.classList.contains('dragging'))return;f.classList.toggle('fab-over-content',overlapsContent());}
+function onScroll(){if(!document.documentElement.classList.contains('lux'))return;var f=getFab();if(!f||f.classList.contains('dragging'))return;f.classList.add('fab-scroll');clearTimeout(t);t=setTimeout(function(){f.classList.remove('fab-scroll');update();},500);}
+document.addEventListener('scroll',onScroll,true);
+window.addEventListener('load',function(){setTimeout(update,300);});
+try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,200);});mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();</script>
 
 <!-- Login -->
 <div id="loginScreen">
@@ -3890,7 +3906,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">📋</span>
+    <span class="section-hdr-icon" data-lux-ico="clipboard">📋</span>
     <span class="section-hdr-title">משימות שוטפות</span>
     ${countBadge}
   </div>
@@ -3908,7 +3924,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">🔄</span>
+    <span class="section-hdr-icon" data-lux-ico="repeat">🔄</span>
     <span class="section-hdr-title">שגרות</span>
     <span class="section-count green">${routineList.length}</span>
   </div>
@@ -7219,7 +7235,7 @@ function todayItemRow(item,isRoutine){
   const dt=new Date(item.datetime);
   const time=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
   return`<div class="tp-row">`
-    +`<span class="tp-dot">${isRoutine?'🔄':'📌'}</span>`
+    +`<span class="tp-dot" data-lux-ico="${isRoutine?'repeat':'pin'}">${isRoutine?'🔄':'📌'}</span>`
     +`<span class="tp-text">${esc(item.text)}</span>`
     +`<span class="tp-time">${time}</span>`
     +`</div>`;
@@ -7249,7 +7265,7 @@ function renderOneThing(){
   const d=getOneThingList();
   if(!d||!d.items||!d.items.length){
     el.innerHTML=`<div class="ot-empty" onclick="openOtSheet()">
-      <span class="ot-empty-icon">🎯</span>
+      <span class="ot-empty-icon" data-lux-ico="target">🎯</span>
       <span class="ot-empty-text">מה המשימה האחת שלך היום?</span>
       <span class="ot-empty-arrow">←</span>
     </div>`;
@@ -7470,7 +7486,7 @@ function renderTodayPlan(){
     ?[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('')
     :`<div class="tp-row tp-empty"><span class="tp-text" style="color:var(--muted)">לא זוהו משימות להיום</span></div>`;
   el.innerHTML=`<div class="tp-wrap">
-<div class="tp-hdr"><span class="tp-hdr-icon">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
+<div class="tp-hdr"><span class="tp-hdr-icon" data-lux-ico="sun">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
 <div class="tp-list">${rows}</div></div>`;
 }
 
@@ -11195,7 +11211,7 @@ function renderBillCard(bill){
 
   return `<div class="bill-card${isPaid?' paid':''}${isOverdue?' overdue':''}" onclick="openBillForm(${bill.id})">
   <div class="bill-card-top">
-    <span class="bill-cat-icon">${cat}</span>
+    <span class="bill-cat-icon" data-lux-ico="bolt">${cat}</span>
     <div class="bill-card-info">
       <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}${bill.autoDebit?'<span class="bill-autodebit-tag">💳 אוטומטי</span>':''}</div>
       <div class="bill-card-meta">${bill.category}${payDateStr?' · שלי: '+payDateStr:''}${deadlineStr?' · חברה: '+deadlineStr:''}</div>
@@ -11862,7 +11878,7 @@ function renderBillsSection(){
   let html=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">💳</span>
+    <span class="section-hdr-icon" data-lux-ico="card">💳</span>
     <span class="section-hdr-title">חשבונות פתוחים</span>
     <span class="section-count" style="background:oklch(0.65 0.2 25 / 0.2);color:oklch(0.75 0.2 25)">${pending.length}</span>
   </div>
@@ -11881,7 +11897,7 @@ function renderBillsSection(){
     const payDL=payD2?Math.ceil((payD2-now)/(86400000)):null;
     const effective=(payDL!==null&&daysLeft!==null)?Math.min(payDL,daysLeft):(payDL!==null?payDL:daysLeft);
     const isPayDate=payDL!==null&&(daysLeft===null||payDL<=daysLeft);
-    const prefix=isPayDate?'📅':'⏰';
+    const prefix=`<span class="bdp" data-lux-ico="${isPayDate?'cal':'clock'}">${isPayDate?'📅':'⏰'}</span>`;
     if(effective===null)badge='';
     else if(effective<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(effective)} ימים</span>`;
     else if(effective===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
@@ -11889,7 +11905,7 @@ function renderBillsSection(){
     else if(effective<=3)badge=`<span class="bill-days-badge big urgent pulse">${prefix} ${effective} ימים</span>`;
     else badge=`<span class="bill-days-badge big">${prefix} ${effective} ימים</span>`;
     html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
-      <span class="bill-cat-icon">${cat}</span>
+      <span class="bill-cat-icon" data-lux-ico="bolt">${cat}</span>
       <span class="bill-mini-name">${esc(b.name)}</span>
       ${b.amount?`<span class="bill-mini-amount">₪${Number(b.amount).toLocaleString('he-IL')}</span>`:''}
       ${badge}

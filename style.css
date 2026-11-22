@@ -2458,3 +2458,48 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .lux .bill-card.paid{background:#141417}
 .lux .bill-card.overdue::before{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:var(--lux-warn);border-radius:3px}
 .lux .bill-card.paid::before{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:var(--lux-green);border-radius:3px}
+
+/* ═══ S3b FEEDBACK F1 (evidence: fb-audit.js computed-style + hue scan; new sheets in tocheck) ═══ */
+/* F1.1 + F1.2 — remap the purple (hue 285) palette tokens to the neutral/gold lux palette.
+   One change neutralizes the violet-tinted bg AND every var(--accent) purple element at once
+   (today circle, tp-count, gcal dot, chevrons…). The mascot uses hardcoded oklch(…285) literals,
+   NOT var(--accent), so it stays purple — the only purple allowed. vt_ui_lux='0' restores :root. */
+.lux{
+  --bg:#0B0B0D;--surface:#141417;--surface2:#1F1F23;--surface3:#26262B;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --text:#F4F0E8;--muted:#9A968C;--muted2:#8A867C;
+  --accent:#D4B06A;--accent-deep:#C9A45C;--accent-glow:#E3C58A;
+  --gold:#D4B06A;--gold-deep:#C9A45C;--accent2:#D4B06A;
+  --success:#8FD1A8;--warn:#E58A6B
+}
+/* F1.1 — count badges: gold on surface2 (bills badge carries an inline red style → needs !important) */
+.lux .section-count{background:var(--lux-s2) !important;color:var(--lux-gold) !important}
+.lux .section-count.green{color:var(--lux-green) !important}
+.lux .tp-count{background:var(--lux-gold);color:var(--lux-ink)}
+/* F1.1 — week-strip dots carry inline category colors (some purple/blue) → force gold, no purple */
+.lux .cal-dot{background:var(--lux-gold) !important}
+/* F1.3 — chrome emoji → line SVG via currentColor mask (emoji kept in DOM, hidden with font-size:0; reverts with .lux) */
+.lux [data-lux-ico]{display:inline-block;width:18px;height:18px;font-size:0;flex-shrink:0;background-color:currentColor;-webkit-mask:var(--li) center/contain no-repeat;mask:var(--li) center/contain no-repeat;vertical-align:-4px}
+.lux .section-hdr-icon[data-lux-ico],.lux .tp-hdr-icon[data-lux-ico],.lux .bill-cat-icon[data-lux-ico],.lux .ot-empty-icon[data-lux-ico]{color:var(--lux-gold)}
+.lux [data-lux-ico="target"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.5'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="sun"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="pin"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="repeat"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='17 1 21 5 17 9'/%3E%3Cpath d='M3 11V9a4 4 0 0 1 4-4h14'/%3E%3Cpolyline points='7 23 3 19 7 15'/%3E%3Cpath d='M21 13v2a4 4 0 0 1-4 4H3'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="clipboard"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='2' width='8' height='4' rx='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="card"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='5' width='20' height='14' rx='2'/%3E%3Cline x1='2' y1='10' x2='22' y2='10'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="bolt"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="cal"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")}
+.lux [data-lux-ico="clock"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpolyline points='12 7 12 12 16 14'/%3E%3C/svg%3E")}
+/* inline-in-badge prefix icon: smaller, inherits the badge's text color */
+.lux .bdp[data-lux-ico]{width:13px;height:13px;vertical-align:-2px;color:inherit}
+/* F1.5 — nav pill nearly opaque + a bottom scrim so nothing reads behind it */
+.lux .bottom-nav{background:rgba(30,30,34,.96)}
+.lux .bottom-nav::after{content:'';position:fixed;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to top,var(--lux-bg) 32%,rgba(11,11,13,.7) 64%,transparent);z-index:-1;pointer-events:none}
+/* F1.6 — 'הצג הכל' / sec-btn: warn tone, not plain red */
+.lux .sec-btn{color:var(--lux-warn)}
+/* F1.4 / R6 — mascot must not sit over card text. Raise it above the bills row, and dim while scrolling so
+   content reads through (JS adds .fab-scroll on scroll, clears 600ms after it stops). */
+.lux .asst-fab{transition:opacity .22s ease,transform .22s ease}
+.lux .asst-fab.fab-scroll,.lux .asst-fab.fab-over-content{opacity:.18;transform:scale(.86)}
+.lux .asst-fab.fab-over-content:hover,.lux .asst-fab.fab-over-content:active{opacity:1;transform:scale(1)}
+@media (prefers-reduced-motion:reduce){.lux .asst-fab{animation:none;transition:opacity .22s ease}.lux .asst-fab.fab-scroll,.lux .asst-fab.fab-over-content{transform:none}}
