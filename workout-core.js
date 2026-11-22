@@ -705,6 +705,8 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       confNewT: 'אימון חדש נקבע', confChangedT: 'האימון עודכן', confPrep: function (t) { return 'אכין אותך ערב לפני' + (t ? ' ב-' + t : '') + ', ואזכיר שוב בבוקר.'; },
       confDetails: function (mins, n) { return mins + ' דק׳ · ' + n + (n === 1 ? ' תרגיל' : ' תרגילים'); }, confOk: 'מצוין', confChange: 'שנה',
       confNudgeT: 'ההתראות כבויות', confNudge: 'בלעדיהן לא אוכל להזכיר לך לפני האימון.', confNudgeBtn: 'הפעל',
+      // V1: preview
+      previewT: 'תצוגה מקדימה', previewSub: 'איך נראות ההתראות והכרטיסים — דוגמה בלבד', previewNote: 'הכול דוגמה — לא נשמר כלום ולא משפיע על התובנות.', previewPushT: 'התראות המסע', previewHeroT: 'כרטיס האימון בבית', previewOff: 'האימון מושבת כרגע — הפעל אותו כדי לראות תצוגה מקדימה.',
       insTestNote: 'מצב בדיקה — התובנות מתעלמות מאימוני בדיקה', insTrendT: '1RM משוער', insClose: 'סגור', insOpen: 'התובנות שלי',
       insLabel: { plateau: 'תקיעות', balance: 'איזון', nearPR: 'קרוב לשיא', fatigue: 'עייפות', trend: 'מגמה' },
       nextSet: function (t) { return 'הסט הבא: ' + t; }, nextSetBtn: 'סט הבא', tally: function (x, y) { return 'ביעד: ' + x + ' מתוך ' + y + (isOne(y) ? ' סט' : ' סטים'); },

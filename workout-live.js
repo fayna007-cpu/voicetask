@@ -1712,7 +1712,8 @@
     var sec = document.createElement('div'); sec.className = 'settings-section'; sec.textContent = S.settingsSection;
     var box = document.createElement('div'); box.className = 'settings-cards'; box.id = 'wkTestRow';
     box.innerHTML = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🧪</div><div class="settings-row-body"><div class="settings-row-title">' + S.testMode + '</div><div class="settings-row-sub">' + S.testModeSub + '</div></div>'
-      + '<label class="rtoggle"><input type="checkbox" id="wkTestToggle"' + (prefs().testMode ? ' checked' : '') + ' onchange="WorkoutLive.setTestMode(this.checked)"><span class="rtoggle-sl"></span></label></div>';
+      + '<label class="rtoggle"><input type="checkbox" id="wkTestToggle"' + (prefs().testMode ? ' checked' : '') + ' onchange="WorkoutLive.setTestMode(this.checked)"><span class="rtoggle-sl"></span></label></div>'
+      + '<div class="settings-row wk-preview-row" role="button" tabindex="0" onclick="WorkoutHome.openPreview()"><div class="settings-row-ico">👁️</div><div class="settings-row-body"><div class="settings-row-title">' + S.previewT + '</div><div class="settings-row-sub">' + S.previewSub + '</div></div><span class="wk-preview-arrow">‹</span></div>';
     cards.parentNode.insertBefore(box, cards.nextSibling); cards.parentNode.insertBefore(sec, box);
     // "התראות אימון": a master toggle, the two main times, per-type toggles
     var nsec = document.createElement('div'); nsec.className = 'settings-section'; nsec.textContent = S.notifSection;
@@ -1834,6 +1835,22 @@
   }
   function dayPlanMins(day0) { try { var secs = day0.exercises.reduce(function (a, e) { return a + ((e.scheme && e.scheme.sets || 3) * ((e.restSec || 75) + 40)); }, 0); return Math.max(1, Math.round(secs / 60)); } catch (_) { return 45; } }
   function dismissConfirm() { var el = document.getElementById('wkConfirm'); if (el) { el.classList.remove('on'); setTimeout(function () { try { el.remove(); } catch (_) { } }, 240); } }
+  // V1: 'תצוגה מקדימה' — example renderings of every push + hero state, INVENTED data labeled 'דוגמה'. Saves nothing, never feeds insights.
+  function openPreview() {
+    var el = document.getElementById('wkPreview'); if (!el) { el = document.createElement('div'); el.id = 'wkPreview'; el.className = 'wk-pv-panel'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
+    var head = '<div class="wk-pv-top"><button class="wk-pv-x" aria-label="סגור" onclick="WorkoutHome.closePreview()"></button><h2 class="wk-pv-h">' + h(S.previewT) + '</h2><div class="wk-pv-note">' + h(S.previewNote) + '</div></div><div class="wk-pv-scroll">';
+    if (!enabled()) { el.innerHTML = head + '<div class="wk-pv-off">' + h(S.previewOff) + '</div></div>'; el.classList.add('on'); return; }
+    var ex = { muscle: 'גב וכתפיים', streak: numIso(3), hint: 'מנוחה טובה', mins: numIso(52), dur: numIso(52), exercise: h('משיכה בכבל'), lastKg: numIso(60), lastReps: numIso(8), targetKg: numIso(62.5), last: numIso(60) + '×' + numIso(8), target: numIso(62.5) + ' ' + T.unit.kg, volume: numIso(472) + ' ' + T.unit.kg, done: numIso(2), planned: numIso(3), n: numIso(3), x: numIso(2), time: numIso('18:00') };
+    var pushCard = function (type) { var t = fillNotify(type, 'title', ex, type), b = fillNotify(type, 'body', ex, type); if (!t && !b) return ''; return '<div class="wk-pv-push"><div class="wk-pv-push-h"><span class="wk-pv-sender">אלפרד</span><span class="wk-pv-badge">דוגמה</span></div><div class="wk-pv-push-t">' + t + '</div><div class="wk-pv-push-b">' + b + '</div></div>'; };
+    var pushes = ['eveningBefore', 'morning', 'unlock', 'postWorkout', 'weeklyReview'].map(pushCard).join('');
+    var states = [['locked', 'נעול'], ['open', 'פתוח · מוכן'], ['progress', 'בתהליך'], ['done', 'בוצע']].map(function (s) { return '<div class="wk-pv-state wk-pv-' + s[0] + '"><span class="wk-pv-state-l">' + h(s[1]) + '</span><span class="wk-pv-badge">דוגמה</span></div>'; }).join('');
+    el.innerHTML = head
+      + '<div class="wk-pv-sec">' + h(S.previewPushT) + '</div>' + pushes
+      + '<div class="wk-pv-sec">' + h(S.previewHeroT) + '</div><div class="wk-pv-states">' + states + '</div>'
+      + '</div>';
+    el.classList.add('on');
+  }
+  function closePreview() { var el = document.getElementById('wkPreview'); if (el) el.classList.remove('on'); }
   try { window.addEventListener('vt-routine-saved', function (ev) { var d = ev && ev.detail; if (d && d.id != null) setTimeout(function () { confirmCard(d.id, !!d.isNew); inboxLog(d.id, !!d.isNew); }, 120); }); } catch (_) { }
   // J9c: record in-app journey events to the inbox (workout completed, new PR, routine created, weekly review)
   function inboxLog(routineId, isNew) { try { if (!window.WkInbox) return; var r = routineOf(routineId); if (!r || r.kind !== 'workout') return; var p = programFor(r), d0 = p && p.days && p.days[0]; var m = d0 && d0.exercises && d0.exercises[0] ? muscleName(W.muscleKey(d0.exercises[0], cat())) : (r.name || 'אימון'); WkInbox.add({ id: 'inapp_rt_' + routineId + '_' + (r.updatedAt || Date.now()), category: 'אימון', title: isNew ? S.confNewT : S.confChangedT, body: m + (r.specificTime ? ' · ' + r.specificTime : '') }); } catch (_) { } }
@@ -1844,6 +1861,6 @@
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
     addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
     openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus,
-    confirmCard: confirmCard, dismissConfirm: dismissConfirm };
+    confirmCard: confirmCard, dismissConfirm: dismissConfirm, openPreview: openPreview, closePreview: closePreview };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

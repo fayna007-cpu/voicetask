@@ -34,7 +34,7 @@
    rows). Wraps the glyph in a data-lux-ico span; CSS hides the emoji (font-size:0) and paints the SVG via mask. */
 (function(){
   if(!document.documentElement.classList.contains('lux'))return;
-  var MAP={'📥':'import','🚀':'rocket','🤖':'ai','💳':'card','📋':'clipboard','🔄':'repeat','🏋️':'dumbbell','🏋':'dumbbell','🔔':'bell','⚙️':'gear','⚙':'gear','🚪':'logout','⏰':'clock','▶️':'play','▶':'play','🧪':'flask','🌓':'theme','🌙':'theme','📅':'cal','☁️':'cloud','☁':'cloud','📤':'export','📧':'mail','🐛':'bug','🛡️':'shield','🛡':'shield','🎯':'target','☀️':'sun','📌':'pin','💡':'flask','📈':'rocket','📊':'clipboard'};
+  var MAP={'📥':'import','🚀':'rocket','🤖':'ai','💳':'card','📋':'clipboard','🔄':'repeat','🏋️':'dumbbell','🏋':'dumbbell','🔔':'bell','⚙️':'gear','⚙':'gear','🚪':'logout','⏰':'clock','▶️':'play','▶':'play','🧪':'flask','🌓':'theme','🌙':'theme','📅':'cal','☁️':'cloud','☁':'cloud','📤':'export','📧':'mail','🐛':'bug','🛡️':'shield','🛡':'shield','🎯':'target','☀️':'sun','📌':'pin','💡':'flask','📈':'rocket','📊':'clipboard','👁️':'eye','👁':'eye'};
   function wrap(el){
     if(el.querySelector&&el.querySelector('[data-lux-ico]'))return;
     var t=(el.textContent||'').trim(); if(!t)return;
