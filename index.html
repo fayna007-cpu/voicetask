@@ -41,7 +41,7 @@
     if(!key)return;
     el.innerHTML='<span data-lux-ico="'+key+'">'+ch+'</span>';
   }
-  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico').forEach(wrap);}
+  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico,.alfred-top-ico,.ubb-icon:not([data-lux-ico])').forEach(wrap);}
   conv();
   var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},120);});
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}

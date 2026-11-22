@@ -1027,7 +1027,7 @@
         : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
       // the group note, or ONE quiet line to add it (an empty card would only take space)
       + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
-        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()">📝 ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
+        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
