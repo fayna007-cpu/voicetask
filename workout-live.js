@@ -1506,6 +1506,7 @@
     var line = xs.map(function (x, i) { return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ');
     var area = 'M' + xs[0].toFixed(1) + ' ' + (hg - pad) + ' ' + xs.map(function (x, i) { return 'L' + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ') + ' L' + xs[xs.length - 1].toFixed(1) + ' ' + (hg - pad) + ' Z';
     return '<svg class="wk-spark" viewBox="0 0 ' + w + ' ' + hg + '" preserveAspectRatio="none" aria-hidden="true">'
+      + '<defs><linearGradient id="wkSparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4B06A" stop-opacity="0.38"/><stop offset="0.6" stop-color="#D4B06A" stop-opacity="0.10"/><stop offset="1" stop-color="#D4B06A" stop-opacity="0"/></linearGradient></defs>'   // R7: fading gradient fill, not a flat block
       + '<path class="wk-spark-fill" d="' + area + '"/><path class="wk-spark-line" d="' + line + '"/>'
       + '<circle class="wk-spark-dot" cx="' + xs[xs.length - 1].toFixed(1) + '" cy="' + ys[ys.length - 1].toFixed(1) + '" r="4"/></svg>';
   }
@@ -1529,7 +1530,19 @@
     var r = insightsData(); if (!r || r.error) return head + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>';
     var test = prefs().testMode ? '<div class="wk-ins-note">' + h(S.insTestNote) + '</div>' : '';
     var cap = '<div class="wk-ins-cap">' + insNum(S.insWeek(r.week)) + '</div>';
-    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + insNum(S.insEmpty(r.needMore)) + '</div>';
+    if (r.empty) {
+      var done = sessions().filter(function (s) { return s && !s.test && s.source !== 'test'; }).length, total = done + (r.needMore || 0), pct = total ? Math.round(done / total * 100) : 0;
+      return head + cap
+        + '<div class="wk-ins-empty-state">'
+        + (window.WkMascot ? '<div class="wk-ins-empty-m" id="wkInsMascot" aria-hidden="true"></div>' : '')
+        + '<div class="wk-ins-empty-title">' + h(S.insNeutral) + '</div>'
+        + '<div class="wk-ins-empty-lead">' + insNum(S.insEmptyLead(r.needMore)) + '</div>'
+        + '<div class="wk-ins-empty-prog"><div class="wk-ins-empty-bar" style="--p:' + pct + '%"></div><div class="wk-ins-empty-prog-t">' + insNum(S.insEmptyProg(done, total)) + '</div></div>'
+        + '<div class="wk-ins-empty-pvt">' + h(S.insEmptyPvT) + '</div>'
+        + '<div class="wk-ins-empty-pv">' + S.insPreview.map(function (p) { return '<div class="wk-ins-pv-row"><span class="wk-ins-pv-n">' + h(p.n) + '</span><span class="wk-ins-pv-m">' + h(p.m) + '</span></div>'; }).join('') + '</div>'
+        + '<button class="wk-ins-start" onclick="WorkoutHome.closeInsights();Workout.start&&Workout.start({})">' + h(S.insStartCTA) + '</button>'
+        + test + '</div>';
+    }
     var top = r.insights[0], title = top ? top.headline : S.insNeutral;
     var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
     var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
@@ -1541,6 +1554,7 @@
   function openInsights() {
     var el = $('wkInsights'); if (!el) { el = document.createElement('div'); el.id = 'wkInsights'; el.className = 'wk-ins'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
     el.innerHTML = insightsHtml(); el.classList.add('on');
+    var mel = $('wkInsMascot'); if (mel && !mel.firstChild && window.WkMascot) { try { window.WkMascot.mount(mel, { mode: 'coach' }); } catch (_) { } }   // R2: 96px mascot in the empty state
   }
   function closeInsights() { var el = $('wkInsights'); if (el) el.classList.remove('on'); }
   function addToBriefById(id) { var a = insActions[id]; if (a) { addToBrief(a); openInsights(); } }
