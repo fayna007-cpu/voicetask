@@ -247,6 +247,25 @@
   }
   function coachHide() { ui.coachLine = null; coachFallback(); }          // tap = dismiss -> the next-target line
   function coachSlot() { if (ui.coachLine) coachShow(ui.coachLine.text, ui.coachLine.kind); else coachFallback(); }
+  // E3/E4: in-workout INFO-PROVIDER registry. provider = { id, priority, condition(ctx)->bool, render(ctx)->htmlString }.
+  // Additive only — it feeds the reserved #wkLvInfo slot (CLS 0) and never touches the coach line/behavior (parity).
+  var infoProviders = [];
+  function registerInfo(p) { if (p && p.id && typeof p.render === 'function' && !infoProviders.some(function (x) { return x.id === p.id; })) infoProviders.push(p); }
+  function renderInfo() {
+    var slot = $('wkLvInfo'); if (!slot) return;
+    var ex = state && state.exercises[ui.view]; if (!ex) { slot.innerHTML = ''; return; }
+    var ctx = { exercise: ex, state: state, sessions: sessions(), view: ui.view, cat: cat() };
+    var MAX_PER_SET = 1;   // at most one info line per set, so the slot never grows unbounded
+    var cands = infoProviders.filter(function (p) { try { return !p.condition || p.condition(ctx); } catch (_) { return false; } })
+      .sort(function (a, b) { return (b.priority || 0) - (a.priority || 0); });
+    var html = '', shown = 0;
+    for (var i = 0; i < cands.length && shown < MAX_PER_SET; i++) {   // a throwing provider is SKIPPED and we fall through to the next, so it never silences the slot
+      try { var r = cands[i].render(ctx); if (r) { html += '<div class="wk-lv-info-item">' + r + '</div>'; shown++; } } catch (_) { }
+    }
+    slot.innerHTML = html;
+  }
+  // No default provider: the "בפעם שעברה" peek already shows last-time, so the slot is a PURE extension point —
+  // reserved (CLS 0), empty until a plugin registers (e.g. e1RM hint, weekly volume). See EXTENDING.md / e2-plugins.js.
   function coachSay(m) {
     if (!m || curMode() === 'off' || !CO) { coachSlot(); return; }
     var now = performance.now();
@@ -619,6 +638,7 @@
     var sub = $('wkPrSub'); sub.textContent = info.streak >= 2 ? S.prStreak(info.streak) : '';   // only when the streak is real
     sub.hidden = !sub.textContent;
     e.classList.add('on'); haptic();
+    try { inboxPR(label, (info.set || '').replace(/[⁦-⁩]/g, '')); } catch (_) { }   // J9c: record the PR to the inbox
     try { if (!prM && window.WkMascot) prM = window.WkMascot.mount($('wkPrM'), { mode: 'fire' }); if (prM) prM.set('pr'); } catch (_) { }
     clearTimeout(prTimer); prTimer = setTimeout(hidePR, 3000);            // closes on tap OR after 3 s (both themes)
   }
@@ -753,6 +773,7 @@
     restPushCancel();   // B6: ending the workout cancels any pending rest-end push
     var logged = state.exercises.some(function (e) { return e.sets.length; });
     if (!logged) { if (confirm(S.noSets)) { drop(KEY_D); draft = null; state = null; hide(); refreshAll(); } return; }
+    try { if (!state.test) inboxDone({ id: 'd' + state.startedAt, dateStr: W.ymdIn(new Date()), exercises: state.exercises }); } catch (_) { }   // J9c: workout completed -> inbox
     ui.locker = state.locker; ui.exists = false; ui.err = ''; go('finish');
   }
   function effort(n) { ui.effort = n; render(); }
@@ -855,7 +876,7 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); renderInfo(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); var ex = main.querySelector('.wk-lv-ex'); if (ex) ex.classList.add('wk-sum-in'); }   // A13: the summary builds up once (CSS stagger; reduced-motion = no animation); not re-run on later re-renders
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
@@ -1026,13 +1047,15 @@
         + (ui.peek[i] ? '<div class="wk-peek">' + W.lastNBefore(sessions(), ex.label, tomorrow(), 3).map(function (p) { var d = p.date.split('-'); return '<div class="wk-peek-r"><span class="wk-lv-n">' + num(+d[2] + '.' + +d[1]) + '</span><span class="wk-lv-v">' + p.sets.map(setTxt).join(' · ') + '</span></div>'; }).join('') + '</div>' : '')
         : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
       // the group note, or ONE quiet line to add it (an empty card would only take space)
-      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
-        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()">📝 ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
+      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g"><span data-lux-ico="note" aria-hidden="true">📝</span> ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
+        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note" aria-hidden="true">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
       + (!active && !ex.skipped || draft.actions.length > 1 ? '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
-        + (draft.actions.length > 1 ? '<button class="wk-chip wk-undo-c" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '');
+        + (draft.actions.length > 1 ? '<button class="wk-chip wk-undo-c" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '')
+      // E4: reserved mid-workout info slot at the END of the view — collapsing/expanding it moves nothing above it (CLS 0)
+      + '<div class="wk-lv-info" id="wkLvInfo" aria-live="polite"></div>';
   }
   // the primary bar's ONE action for the current position (the label says exactly what happens)
   function primaryAction() {
@@ -1290,7 +1313,7 @@
   // ── resume banner (app open) and the sheet line ──
   function resumeLine(where) {
     var r = enabled() && readDraft(); if (!r || r.s.test) return '';          // a TEST draft never shows as a real workout
-    return '<div class="wk-resume-in"><span>🏋️ ' + S.open + '</span><span class="wk-chips">'
+    return '<div class="wk-resume-in"><span><span data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + S.open + '</span><span class="wk-chips">'
       + (isStale(r) ? '<button class="wk-chip on" onclick="WorkoutLive.saveOld()">' + S.saveOld + '</button><button class="wk-chip" onclick="WorkoutLive.delOld()">' + S.delOld + '</button>'
         : '<button class="wk-chip on" onclick="Workout.start()">' + S.resume + '</button>' + (where === 'banner' ? '<button class="wk-chip" onclick="WorkoutLive.hideBanner()" aria-label="' + S.close + '">✕</button>' : '')) + '</span></div>';
   }
@@ -1333,7 +1356,7 @@
     var dft = readDraft();
     try {
       var nc = readNotif();   // A14/B3/B4: the configurable times feed the schedule (not hard-coded in the brief)
-      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, review: nc.review, backup: nc.backup } }, now) : null;
+      briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, post: nc.post, review: nc.review, backup: nc.backup } }, now) : null;
     } catch (_) { briefCache = null; }
     briefAt = now; return briefCache;
   }
@@ -1391,7 +1414,7 @@
     var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
     var argO = { routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }, arg = js(argO), go = 'event.stopPropagation();Workout.start(' + arg + ')';
     var goWarm = 'event.stopPropagation();Workout.start(' + js(Object.assign({ warm: true }, argO)) + ')';   // A10: warm-up focus path, identical to the notification warm action
-    var cd = st === 'locked' ? '<div class="wk-card-cd">🔒 ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
+    var cd = st === 'locked' ? '<div class="wk-card-cd"><span data-lux-ico="lock" aria-hidden="true">🔒</span> ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
     // the hero (computed early so the states below can use it): the brief's today/next instance in a focus state
@@ -1425,7 +1448,7 @@
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
     return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag">🏋️ ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
+      + '<div class="wk-card-top"><span class="wk-card-tag"><span data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
@@ -1472,10 +1495,10 @@
   function readNotif() {
     var raw = load(KEY_NOTIF, null), p = raw && typeof raw === 'object' ? raw : {};
     var types = p.types && typeof p.types === 'object' ? p.types : {};
-    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
+    var T6 = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'postWorkout', 'fridayTeaser', 'weeklyReview', 'backup'], t = {};
     T6.forEach(function (k) { t[k] = types[k] !== false; });
     var hm = function (s, d) { return /^\d\d:\d\d$/.test(s) ? s : d; };
-    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
+    return { on: p.on !== false, evening: hm(p.evening, '20:00'), morning: hm(p.morning, '09:00'), post: hm(p.post, '21:00'), review: hm(p.review, '20:00'), backup: hm(p.backup, '10:00'), types: t, muteDay: p.muteDay || null };
   }
   function setNotif(fn) { W.updateJSON(localStorage, KEY_NOTIF, {}, function (p) { p = p && typeof p === 'object' ? p : {}; fn(p); return p; }); }
   // ── B1b: insight suggestions added to the brief — reversible (undo toast) + removable anytime; NEVER auto-applied to any target ──
@@ -1506,6 +1529,7 @@
     var line = xs.map(function (x, i) { return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ');
     var area = 'M' + xs[0].toFixed(1) + ' ' + (hg - pad) + ' ' + xs.map(function (x, i) { return 'L' + x.toFixed(1) + ' ' + ys[i].toFixed(1); }).join(' ') + ' L' + xs[xs.length - 1].toFixed(1) + ' ' + (hg - pad) + ' Z';
     return '<svg class="wk-spark" viewBox="0 0 ' + w + ' ' + hg + '" preserveAspectRatio="none" aria-hidden="true">'
+      + '<defs><linearGradient id="wkSparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4B06A" stop-opacity="0.38"/><stop offset="0.6" stop-color="#D4B06A" stop-opacity="0.10"/><stop offset="1" stop-color="#D4B06A" stop-opacity="0"/></linearGradient></defs>'   // R7: fading gradient fill, not a flat block
       + '<path class="wk-spark-fill" d="' + area + '"/><path class="wk-spark-line" d="' + line + '"/>'
       + '<circle class="wk-spark-dot" cx="' + xs[xs.length - 1].toFixed(1) + '" cy="' + ys[ys.length - 1].toFixed(1) + '" r="4"/></svg>';
   }
@@ -1529,7 +1553,19 @@
     var r = insightsData(); if (!r || r.error) return head + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>';
     var test = prefs().testMode ? '<div class="wk-ins-note">' + h(S.insTestNote) + '</div>' : '';
     var cap = '<div class="wk-ins-cap">' + insNum(S.insWeek(r.week)) + '</div>';
-    if (r.empty) return head + cap + '<div class="wk-ins-title">' + h(S.insNeutral) + '</div>' + test + '<div class="wk-ins-empty">' + insNum(S.insEmpty(r.needMore)) + '</div>';
+    if (r.empty) {
+      var done = sessions().filter(function (s) { return s && !s.test && s.source !== 'test'; }).length, total = done + (r.needMore || 0), pct = total ? Math.round(done / total * 100) : 0;
+      return head + cap
+        + '<div class="wk-ins-empty-state">'
+        + (window.WkMascot ? '<div class="wk-ins-empty-m" id="wkInsMascot" aria-hidden="true"></div>' : '')
+        + '<div class="wk-ins-empty-title">' + h(S.insNeutral) + '</div>'
+        + '<div class="wk-ins-empty-lead">' + insNum(S.insEmptyLead(r.needMore)) + '</div>'
+        + '<div class="wk-ins-empty-prog"><div class="wk-ins-empty-bar" style="--p:' + pct + '%"></div><div class="wk-ins-empty-prog-t">' + insNum(S.insEmptyProg(done, total)) + '</div></div>'
+        + '<div class="wk-ins-empty-pvt">' + h(S.insEmptyPvT) + '</div>'
+        + '<div class="wk-ins-empty-pv">' + S.insPreview.map(function (p) { return '<div class="wk-ins-pv-row"><span class="wk-ins-pv-n">' + h(p.n) + '</span><span class="wk-ins-pv-m">' + h(p.m) + '</span></div>'; }).join('') + '</div>'
+        + '<button class="wk-ins-start" onclick="WorkoutHome.closeInsights();Workout.start&&Workout.start({})">' + h(S.insStartCTA) + '</button>'
+        + test + '</div>';
+    }
     var top = r.insights[0], title = top ? top.headline : S.insNeutral;
     var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
     var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
@@ -1541,6 +1577,7 @@
   function openInsights() {
     var el = $('wkInsights'); if (!el) { el = document.createElement('div'); el.id = 'wkInsights'; el.className = 'wk-ins'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
     el.innerHTML = insightsHtml(); el.classList.add('on');
+    var mel = $('wkInsMascot'); if (mel && !mel.firstChild && window.WkMascot) { try { window.WkMascot.mount(mel, { mode: 'coach' }); } catch (_) { } }   // R2: 96px mascot in the empty state
   }
   function closeInsights() { var el = $('wkInsights'); if (el) el.classList.remove('on'); }
   function addToBriefById(id) { var a = insActions[id]; if (a) { addToBrief(a); openInsights(); } }
@@ -1587,6 +1624,7 @@
     if (t.targetKg != null) v.target = numIso(t.targetKg) + ' ' + T.unit.kg;
     if (w.mins) v.dur = numIso(w.mins);
     if (f.weekPlanned > 0) { v.done = numIso(f.weekDone); v.planned = numIso(f.weekPlanned); }
+    if (n.type === 'postWorkout' && n.session) { try { v.volume = numIso(Math.round(W.volume(n.session))) + ' ' + T.unit.kg; } catch (_) { } }   // J4 post-workout volume
     // B3 weekly review: {n} workouts this week, {x} PRs this week, {insight} = the top real insight
     if (n.type === 'weeklyReview') {
       var all2 = sessions(), wr2 = W.weekRange(new Date(Date.now())), prs = 0, wdone = 0;
@@ -1628,7 +1666,7 @@
     var r = routineOf(t.routineId), st = W.cardState({ now: Date.now(), dt: t.dateStr, unlockMin: r && r.wkUnlockMin });
     var time = new Date(t.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
     var el = document.createElement('div'); el.id = 'wkGreet'; el.className = 'greeting-sub wk-greet';
-    el.innerHTML = '🏋️ ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
+    el.innerHTML = '<span class="wk-greet-ico" data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
     subEl.parentNode.insertBefore(el, subEl.nextSibling);
   }
   // the assistant: "התחל אימון" / "מה האימון הבא" (code-first; nothing goes to the model)
@@ -1687,7 +1725,7 @@
     warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, openPrograms: openPrograms, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
-    showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
+    showPR: showPR, hidePR: hidePR, registerInfo: registerInfo, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
   function injectSettings() {
     if ($('wkTestRow') || !enabled()) return;
@@ -1695,15 +1733,17 @@
     var sec = document.createElement('div'); sec.className = 'settings-section'; sec.textContent = S.settingsSection;
     var box = document.createElement('div'); box.className = 'settings-cards'; box.id = 'wkTestRow';
     box.innerHTML = '<div class="settings-row"><div class="settings-row-ico wk-set-ico">🧪</div><div class="settings-row-body"><div class="settings-row-title">' + S.testMode + '</div><div class="settings-row-sub">' + S.testModeSub + '</div></div>'
-      + '<label class="rtoggle"><input type="checkbox" id="wkTestToggle"' + (prefs().testMode ? ' checked' : '') + ' onchange="WorkoutLive.setTestMode(this.checked)"><span class="rtoggle-sl"></span></label></div>';
+      + '<label class="rtoggle"><input type="checkbox" id="wkTestToggle"' + (prefs().testMode ? ' checked' : '') + ' onchange="WorkoutLive.setTestMode(this.checked)"><span class="rtoggle-sl"></span></label></div>'
+      + '<div class="settings-row wk-preview-row" role="button" tabindex="0" onclick="WorkoutHome.openPreview()"><div class="settings-row-ico">👁️</div><div class="settings-row-body"><div class="settings-row-title">' + S.previewT + '</div><div class="settings-row-sub">' + S.previewSub + '</div></div><span class="wk-preview-arrow">‹</span></div>';
     cards.parentNode.insertBefore(box, cards.nextSibling); cards.parentNode.insertBefore(sec, box);
     // "התראות אימון": a master toggle, the two main times, per-type toggles
     var nsec = document.createElement('div'); nsec.className = 'settings-section'; nsec.textContent = S.notifSection;
+    var stbox = document.createElement('div'); stbox.className = 'settings-cards'; stbox.id = 'wkNotifStatus';
     var nbox = document.createElement('div'); nbox.className = 'settings-cards'; nbox.id = 'wkNotifBox';
-    box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(nsec, nbox);
-    renderNotifBox();
+    box.parentNode.insertBefore(nbox, box.nextSibling); box.parentNode.insertBefore(stbox, box.nextSibling); box.parentNode.insertBefore(nsec, stbox);
+    renderNotifStatus(); renderNotifBox();
   }
-  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'fridayTeaser', 'weeklyReview', 'backup'];
+  var NOTIF_TYPES = ['eveningBefore', 'morning', 'warmup', 'unlock', 'rescue', 'postWorkout', 'fridayTeaser', 'weeklyReview', 'backup'];
   function renderNotifBox() {
     var nbox = $('wkNotifBox'); if (!nbox) return; var c = readNotif();
     var row = function (title, sub, ctrl) { return '<div class="settings-row"><div class="settings-row-body"><div class="settings-row-title">' + title + '</div>' + (sub ? '<div class="settings-row-sub">' + sub + '</div>' : '') + '</div>' + ctrl + '</div>'; };
@@ -1712,7 +1752,7 @@
     if (c.on) {
       // the evening / morning time chip lives INSIDE its own toggle row (no duplicated rows)
       var tinp = function (key, val) { return '<input type="time" class="wk-time" value="' + val + '" onchange="WorkoutLive.notifSet(\'' + key + '\',this.value)" onclick="event.stopPropagation()">'; };
-      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
+      var timeFor = function (k) { return k === 'eveningBefore' ? tinp('evening', c.evening) : k === 'morning' ? tinp('morning', c.morning) : k === 'postWorkout' ? tinp('post', c.post) : k === 'weeklyReview' ? tinp('review', c.review) : k === 'backup' ? tinp('backup', c.backup) : ''; };
       html += NOTIF_TYPES.map(function (k) { return row(S.notifType[k], '', timeFor(k) + toggle(c.types[k] !== false, 'WorkoutLive.notifSet(\'t:' + k + '\',this.checked)')); }).join('');
     }
     nbox.innerHTML = html;
@@ -1720,14 +1760,130 @@
   function notifSet(key, val) {
     setNotif(function (p) {
       if (key === 'on') p.on = !!val;
-      else if (key === 'evening' || key === 'morning' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
+      else if (key === 'evening' || key === 'morning' || key === 'post' || key === 'review' || key === 'backup') { if (/^\d\d:\d\d$/.test(val)) p[key] = val; }
       else if (key.slice(0, 2) === 't:') { p.types = p.types || {}; p.types[key.slice(2)] = !!val; }
     });
-    renderNotifBox();
+    renderNotifBox(); renderNotifStatus();
   }
+  // N2: 'מצב התראות' — permission, push subscription, the next-48h schedule, and a plain-language next step per failure
+  function renderNotifStatus() {
+    var el = $('wkNotifStatus'); if (!el) return;
+    var c = readNotif(), perm = (window.Notification && Notification.permission) || 'default', now = Date.now();
+    var sched = []; try { sched = notifs(now, 48 * 3600000) || []; } catch (_) { }
+    var statusRow = function (label, val, ok, id) { return '<div class="settings-row wk-st-row"><div class="settings-row-body"><div class="settings-row-title">' + h(label) + '</div></div><div class="wk-st-val ' + (ok ? 'ok' : 'warn') + '"' + (id ? ' id="' + id + '"' : '') + '>' + h(val) + '</div></div>'; };
+    var step = function (txt) { return '<div class="wk-st-step">' + h(txt) + '</div>'; };
+    var html = statusRow(S.permT, perm === 'granted' ? S.permOk : perm === 'denied' ? S.permNo : S.permAsk, perm === 'granted');
+    // installed PWA (standalone) -> point to iOS Settings, not the browser's site settings (item 8a)
+    var standalone = (window.navigator && window.navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (perm === 'denied') html += step(standalone ? S.permStepNoApp : S.permStepNo); else if (perm !== 'granted') html += step(S.permStepAsk);
+    if (!enabled()) html += step(S.killStep);
+    if (!c.on) html += step(S.offStep);
+    if (c.muteDay && c.muteDay === W.ymdIn(new Date())) html += step(S.mutedStep(c.muteDay));
+    html += '<div class="wk-st-note">' + h(S.quietNote) + '</div>';
+    html += statusRow(S.subT, '…', false, 'wkSubState');
+    html += statusRow(S.serverVerT, '…', false, 'wkServerVer');                                  // N4: push-server capability
+    if (window.__wkCleanupFailed) html += '<div class="wk-st-step">' + h(S.cleanupFailNote) + '</div>';
+    html += '<div class="wk-st-sched-h">' + h(S.next48T) + '</div>';
+    if (!sched.length) html += '<div class="wk-st-note">' + h(S.next48None) + '</div>';
+    else html += sched.slice(0, 8).map(function (n) { var t = new Date(n.fireAt).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); return '<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>'; }).join('');
+    html += '<button class="wk-chip wk-st-test" onclick="WorkoutHome.sendTestPush()">' + h(S.testPushBtn) + '</button><div class="wk-st-result" id="wkTestResult" aria-live="polite"></div>';
+    el.innerHTML = html;
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready
+        .then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; })
+        .then(function (sub) { var s = $('wkSubState'); if (!s) return; s.textContent = sub ? S.subOk : S.subNo; s.className = 'wk-st-val ' + (sub ? 'ok' : 'warn'); if (!sub) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.subStepNo; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); } })
+        .catch(function () { });
+    } catch (_) { }
+    // N4: probe GET /health. Old deployment has no /health (returns the plain fallback string, not JSON) -> 'old'.
+    try {
+      fetch((window.PUSH_SERVER || '') + '/health').then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {
+        var s = $('wkServerVer'); if (!s) return;
+        var need = ['schedule', 'cleanup', 'send-now'];
+        var ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
+        s.textContent = ok ? S.serverOk : S.serverOld; s.className = 'wk-st-val ' + (ok ? 'ok' : 'warn');
+        if (!ok) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.serverStep; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); }
+      }).catch(function () { var s = $('wkServerVer'); if (s) { s.textContent = S.serverOld; s.className = 'wk-st-val warn'; } });
+    } catch (_) { }
+  }
+  // N3: send a real test push through the existing pipeline (subscribe -> /send-now), body 'בדיקה מאלפרד', with a visible result
+  function sendTestPush() {
+    var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
+    var send = function () {
+      var userId = (window.gAuth && gAuth.email) || 'anon';
+      return fetch((window.PUSH_SERVER || '') + '/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
+        .then(function (r) { var status = r.status, ok = r.ok; return r.json().catch(function () { return {}; }).then(function (body) { return { status: status, ok: ok, body: body || {} }; }); })
+        .then(function (d) {
+          if (!res) return;
+          if (d.ok || d.status === 200 || d.status === 201) res.textContent = S.testPushOk;                                   // delivered
+          else if (d.status === 404 || /subscription/i.test(d.body.error || '')) res.textContent = S.testPushNoSub;           // no push subscription for this user
+          else if (d.status === 405 || d.status === 501 || d.status >= 500) res.textContent = S.testPushNeedsDeploy(d.status);// route missing on the LIVE worker -> needs a worker deploy
+          else res.textContent = S.testPushFail(d.body.error || d.status || 'שגיאה');
+        })
+        .catch(function (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'רשת'); });
+    };
+    try {
+      if (window.subscribeToPush) return Promise.resolve(window.subscribeToPush()).then(function (ok) { if (!ok) { if (res) res.textContent = S.testPushFail(S.subStepNo); return; } return send(); });
+      return send();
+    } catch (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'שגיאה'); }
+  }
+  // J2/SM5: client-side 'אימון חדש נקבע' confirmation card, rendered from the saved routine (no AI-worker change).
+  function confirmCard(routineId, isNew) {
+    try {
+      if (!enabled()) return;
+      var r = routineOf(routineId); if (!r || r.kind !== 'workout') return;
+      var p = programFor(r); var day0 = p && p.days && p.days[0];
+      var muscle = day0 && day0.exercises && day0.exercises[0] ? muscleName(W.muscleKey(day0.exercises[0], cat())) : (day0 && day0.name) || (r.name || 'אימון');
+      var dayName = (r.preferredDays && r.preferredDays.length) ? W.DAY_NAMES_FULL ? null : null : null;
+      var time = r.specificTime || '';
+      var dayTxt = '';
+      try { if (r.preferredDays && r.preferredDays.length) { var dn = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת']; dayTxt = 'יום ' + dn[r.preferredDays[0]]; } } catch (_) { }
+      var mins = p && day0 ? dayPlanMins(day0) : (r.duration || 45);
+      var nEx = day0 && day0.exercises ? day0.exercises.length : 0;
+      var cfg = readNotif(); var perm = (window.Notification && Notification.permission) || 'default';
+      var notifOn = cfg.on && perm === 'granted';
+      var sub = [h(muscle), h(dayTxt), time ? num(time) : ''].filter(Boolean).join(' · ');   // escape text parts; num() is trusted RTL markup
+      var prepTime = cfg.evening || '20:00';
+      var nudge = (!cfg.on || perm !== 'granted') ? '<div class="wk-conf-nudge"><div class="wk-conf-nudge-b"><div class="wk-conf-nudge-t">' + h(S.confNudgeT) + '</div><div class="wk-conf-nudge-s">' + h(S.confNudge) + '</div></div><button class="wk-conf-nudge-btn" onclick="(function(){try{WorkoutLive&&0;}catch(e){}openSettings&&openSettings();WorkoutHome.dismissConfirm&&WorkoutHome.dismissConfirm();})()">' + h(S.confNudgeBtn) + '</button></div>' : '';
+      var el = document.getElementById('wkConfirm'); if (!el) { el = document.createElement('div'); el.id = 'wkConfirm'; el.className = 'wk-conf-wrap'; el.setAttribute('dir', 'rtl'); document.body.appendChild(el); }
+      el.innerHTML = '<div class="wk-conf-ov" onclick="WorkoutHome.dismissConfirm()"></div><div class="wk-conf-card" role="dialog" aria-modal="true">'
+        + '<div class="wk-conf-top"><span class="wk-conf-check" aria-hidden="true"></span><span class="wk-conf-eyebrow">' + h(isNew ? S.confNewT : S.confChangedT) + '</span></div>'
+        + '<div class="wk-conf-h">' + sub + '</div>'
+        + '<div class="wk-conf-d">' + insNum(S.confDetails(mins, nEx)) + '</div>'
+        + '<div class="wk-conf-prep">' + h(S.confPrep(notifOn ? num(prepTime) : '')) + '</div>'
+        + nudge
+        + '<div class="wk-conf-acts"><button class="wk-conf-ok" onclick="WorkoutHome.dismissConfirm()">' + h(S.confOk) + '</button></div>'
+        + '</div>';
+      requestAnimationFrame(function () { el.classList.add('on'); });
+    } catch (e) { }
+  }
+  function dayPlanMins(day0) { try { var secs = day0.exercises.reduce(function (a, e) { return a + ((e.scheme && e.scheme.sets || 3) * ((e.restSec || 75) + 40)); }, 0); return Math.max(1, Math.round(secs / 60)); } catch (_) { return 45; } }
+  function dismissConfirm() { var el = document.getElementById('wkConfirm'); if (el) { el.classList.remove('on'); setTimeout(function () { try { el.remove(); } catch (_) { } }, 240); } }
+  // V1: 'תצוגה מקדימה' — example renderings of every push + hero state, INVENTED data labeled 'דוגמה'. Saves nothing, never feeds insights.
+  function openPreview() {
+    var el = document.getElementById('wkPreview'); if (!el) { el = document.createElement('div'); el.id = 'wkPreview'; el.className = 'wk-pv-panel'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
+    var head = '<div class="wk-pv-top"><button class="wk-pv-x" aria-label="סגור" onclick="WorkoutHome.closePreview()"></button><h2 class="wk-pv-h">' + h(S.previewT) + '</h2><div class="wk-pv-note">' + h(S.previewNote) + '</div></div><div class="wk-pv-scroll">';
+    if (!enabled()) { el.innerHTML = head + '<div class="wk-pv-off">' + h(S.previewOff) + '</div></div>'; el.classList.add('on'); return; }
+    var ex = { muscle: 'גב וכתפיים', streak: numIso(3), hint: 'מנוחה טובה', mins: numIso(52), dur: numIso(52), exercise: h('משיכה בכבל'), lastKg: 60, lastReps: 8, targetKg: 62.5, last: numIso('60×8'), target: numIso(62.5) + ' ' + T.unit.kg, volume: numIso(472) + ' ' + T.unit.kg, done: numIso(2), planned: numIso(3), n: numIso(3), x: numIso(2), time: numIso('18:00') };
+    var pushCard = function (type) { var t = fillNotify(type, 'title', ex, type), b = fillNotify(type, 'body', ex, type); if (!t && !b) return ''; return '<div class="wk-pv-push"><div class="wk-pv-push-h"><span class="wk-pv-sender">אלפרד</span><span class="wk-pv-badge">דוגמה</span></div><div class="wk-pv-push-t">' + t + '</div><div class="wk-pv-push-b">' + b + '</div></div>'; };
+    var pushes = ['eveningBefore', 'morning', 'unlock', 'postWorkout', 'weeklyReview'].map(pushCard).join('');
+    var states = [['locked', 'נעול'], ['open', 'פתוח · מוכן'], ['progress', 'בתהליך'], ['done', 'בוצע']].map(function (s) { return '<div class="wk-pv-state wk-pv-' + s[0] + '"><span class="wk-pv-state-l">' + h(s[1]) + '</span><span class="wk-pv-badge">דוגמה</span></div>'; }).join('');
+    el.innerHTML = head
+      + '<div class="wk-pv-sec">' + h(S.previewPushT) + '</div>' + pushes
+      + '<div class="wk-pv-sec">' + h(S.previewHeroT) + '</div><div class="wk-pv-states">' + states + '</div>'
+      + '</div>';
+    el.classList.add('on');
+  }
+  function closePreview() { var el = document.getElementById('wkPreview'); if (el) el.classList.remove('on'); }
+  try { window.addEventListener('vt-routine-saved', function (ev) { var d = ev && ev.detail; if (d && d.id != null) setTimeout(function () { confirmCard(d.id, !!d.isNew); inboxLog(d.id, !!d.isNew); }, 120); }); } catch (_) { }
+  // J9c: record in-app journey events to the inbox (workout completed, new PR, routine created, weekly review)
+  function inboxLog(routineId, isNew) { try { if (!window.WkInbox) return; var r = routineOf(routineId); if (!r || r.kind !== 'workout') return; var p = programFor(r), d0 = p && p.days && p.days[0]; var m = d0 && d0.exercises && d0.exercises[0] ? muscleName(W.muscleKey(d0.exercises[0], cat())) : (r.name || 'אימון'); WkInbox.add({ id: 'inapp_rt_' + routineId + '_' + (r.updatedAt || Date.now()), category: 'אימון', title: isNew ? S.confNewT : S.confChangedT, body: m + (r.specificTime ? ' · ' + r.specificTime : '') }); } catch (_) { } }
+  function inboxDone(sess) { try { if (!window.WkInbox || !sess) return; var vol = Math.round(W.volume(sess)); var m = sess.exercises && sess.exercises[0] ? muscleName(W.muscleKey(sess.exercises[0], cat())) : 'אימון'; WkInbox.add({ id: 'inapp_done_' + (sess.id || sess.dateStr || Date.now()), category: 'אימון', title: m + ' הושלם', body: vol + ' ' + T.unit.kg + ' נפח. כל הכבוד.', deepLink: 'workout' }); } catch (_) { } }
+  function inboxPR(label, value) { try { if (!window.WkInbox) return; WkInbox.add({ id: 'inapp_pr_' + label + '_' + Date.now(), category: 'אימון', title: 'שיא חדש', body: h(label) + ': ' + value, deepLink: 'workout' }); } catch (_) { } }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
     addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
-    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById };
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus,
+    confirmCard: confirmCard, dismissConfirm: dismissConfirm, openPreview: openPreview, closePreview: closePreview };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

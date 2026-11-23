@@ -69,6 +69,12 @@ export default {
       return new Response('OK',{headers:CORS});
     }
 
+    // GET /health — N4: capability probe so the client can show 'גרסת שרת הפוש'. No secrets.
+    // An OLD deployment lacks this route and returns the plain fallback string -> the client reads 'old'.
+    if(url.pathname==='/health'){
+      return new Response(JSON.stringify({version:'2026-11-22',routes:['schedule','cleanup','send-now']}),{headers:{...CORS,'Content-Type':'application/json'}});
+    }
+
     // POST /schedule — store scheduled notifications (now also persists
     // actions/payload/requireInteraction/tag for Stage 2+ SW-side filtering)
     if(url.pathname==='/schedule'&&req.method==='POST'){

@@ -137,12 +137,15 @@
     insts.forEach(function (x) {
       if (x.ms < now || x.ms > WIN || x.i.completed) return;
       var muscle = brMuscle(o, x.r, now);
+      // once the workout is STARTED (an open draft for this instance), the unlock + rescue pushes are cancelled:
+      // unlock is moot and rescue ('you did not start') is false. The client rebuilds the batch on start, so these
+      // ids drop out of validIds and cleanupPushServer removes them server-side (per-id cancel via /cleanup).
+      var started = !!(o.draft && !o.draft.test && String(o.draft.routineId) === String(x.r.id) && o.draft.dateStr === x.i.dt);
       var add = function (type, ms) { if (ms > now && ms <= WIN) out.push({ type: type, fireAt: ms, instance: { routineId: String(x.r.id), dt: x.i.dt }, muscle: muscle }); };
       add('eveningBefore', at(W.addDaysYmd(x.ymd, -1), ev.h, ev.m));
       add('morning', at(x.ymd, mo.h, mo.m));
       add('warmup', x.ms - 45 * 60000);
-      add('unlock', x.ms);
-      add('rescue', x.ms + 60 * 60000);
+      if (!started) { add('unlock', x.ms); add('rescue', x.ms + 60 * 60000); }
     });
     // Friday teaser (summary) at 18:00, once in the window
     var fri = nextFriday(now, tz); if (fri > now && fri <= WIN) out.push({ type: 'fridayTeaser', fireAt: fri, instance: null, muscle: null });
@@ -152,12 +155,18 @@
     // B4 backup reminder at Sunday 10:00 (configurable), only when >=1 real (non-test) session exists; deep-links to the export
     var bk = hm(o.notif && o.notif.backup, 10, 0), hasReal = (o.sessions || []).some(function (s) { return s && !s.test && s.source !== 'test'; });
     if (hasReal) for (var kb = 0; kb < 3; kb++) { var yb = W.addDaysYmd(tday, kb); if (new Date(yb + 'T12:00:00').getDay() === 0) { var bms = at(yb, bk.h, bk.m); if (bms > now && bms <= WIN) out.push({ type: 'backup', fireAt: bms, instance: null, muscle: null }); break; } }
+    // J4 post-workout: end-of-day (21:00, configurable) ONLY if a workout was COMPLETED today (a live session today)
+    var pw = hm(o.notif && o.notif.post, 21, 0);
+    var todaySess = (o.sessions || []).filter(function (s) { return s && !s.test && s.source === 'live' && String(s.dateStr || s.date || '').slice(0, 10) === tday; });
+    if (todaySess.length) { var pms = at(tday, pw.h, pw.m); if (pms > now && pms <= WIN) { var ls = todaySess[todaySess.length - 1]; out.push({ type: 'postWorkout', fireAt: pms, instance: ls.routineId != null ? { routineId: String(ls.routineId), dt: ls.dateStr || ls.date } : null, muscle: (ls.exercises && ls.exercises[0]) ? W.muscleKey(ls.exercises[0], o.catalog) : null, session: ls }); } }
     out = out.filter(function (n) { var h = localH(n.fireAt); return !(h >= 22 || h < 7); });   // quiet hours: drop
     out.sort(function (a, b) { return a.fireAt - b.fireAt; });
     return capPerDay(out, tz);
   }
-  // when a day has more than 3, keep the ones nearest to acting; warm-up is the cuttable one (the cut list)
-  var PRI = { unlock: 0, rescue: 1, morning: 2, warmup: 3, eveningBefore: 4, fridayTeaser: 5, weeklyReview: 6, backup: 7 };
+  // Cap 3/day priority (lower = kept). rescue ranks BELOW unlock, post-workout and morning (it only exists if NOT started,
+  // and must never crowd out the act-now or the end-of-day summary). warm-up and next-day eveningBefore are the cut list.
+  // postWorkout (J4, 21:00) is mutually exclusive with rescue in practice (done XOR not-started) but ranked here for back-to-back days.
+  var PRI = { unlock: 0, postWorkout: 1, morning: 2, rescue: 3, eveningBefore: 4, warmup: 5, fridayTeaser: 6, weeklyReview: 7, backup: 8 };
   function capPerDay(list, tz) {
     var byDay = {};
     list.forEach(function (n) { var k = W.ymdIn(new Date(n.fireAt), tz); (byDay[k] = byDay[k] || []).push(n); });
@@ -180,7 +189,8 @@
     return (parseInt(m[1], 10) * 60 + (m[1][0] === '-' ? -1 : 1) * (m[2] ? +m[2] : 0)) * 60000;
   }
 
-  var api = { compute: compute };
+  // test-only surface for the 3/day cap priority (postWorkout is J4-future, so it can't come from the real pipeline yet)
+  var api = { compute: compute, _pri: PRI, _capDay: function (list, tz) { return capPerDay(list, tz || 'Asia/Jerusalem'); } };
   root.WkBrief = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

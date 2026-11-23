@@ -162,7 +162,10 @@
     fatigueHead: 'אולי כדאי שבוע הקלה', fatigueDetail: 'ירידה של {pct}% בנפח השבועי. שקול דילוד'
   };
 
-  var api = { compute: compute, top: top, TYPES: TYPES, CONST: CONST, CITATIONS: CITATIONS, COPY: T };
+  // E2: extension point — register a new insight type. provider = { id, compute(ctx) -> [{type,severity,headline,detail,...}] }.
+  // compute() is already wrapped in try/catch at call time, so a throwing provider never breaks the others.
+  function register(provider) { if (provider && typeof provider.compute === 'function' && !TYPES.some(function (t) { return t.id === provider.id; })) TYPES.push(provider); }
+  var api = { compute: compute, top: top, TYPES: TYPES, register: register, CONST: CONST, CITATIONS: CITATIONS, COPY: T };
   root.WkInsights = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

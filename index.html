@@ -21,6 +21,7 @@
 <script src="wk-mascot.js"></script>
 <script src="wk-brief.js"></script>
 <script src="wk-insights.js"></script>
+<script src="wk-inbox.js"></script>
 <script src="workout-live.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,6 +29,46 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<script>/* PART S: the ONE-Alfred luxury shell is scoped under html.lux; vt_ui_lux='0' reverts to the previous look instantly. */try{if(localStorage.getItem('vt_ui_lux')!=='0')document.documentElement.classList.add('lux');}catch(e){document.documentElement.classList.add('lux');}</script>
+<script>/* S7: map icon-chip emoji (side menu + settings rows) to line SVG under .lux, generically (covers current + future
+   rows). Wraps the glyph in a data-lux-ico span; CSS hides the emoji (font-size:0) and paints the SVG via mask. */
+(function(){
+  if(!document.documentElement.classList.contains('lux'))return;
+  var MAP={'📥':'import','🚀':'rocket','🤖':'ai','💳':'card','📋':'clipboard','🔄':'repeat','🏋️':'dumbbell','🏋':'dumbbell','🔔':'bell','⚙️':'gear','⚙':'gear','🚪':'logout','⏰':'clock','▶️':'play','▶':'play','🧪':'flask','🌓':'theme','🌙':'theme','📅':'cal','☁️':'cloud','☁':'cloud','📤':'export','📧':'mail','🐛':'bug','🛡️':'shield','🛡':'shield','🎯':'target','☀️':'sun','📌':'pin','💡':'flask','📈':'rocket','📊':'clipboard','👁️':'eye','👁':'eye'};
+  function wrap(el){
+    if(el.querySelector&&el.querySelector('[data-lux-ico]'))return;
+    var t=(el.textContent||'').trim(); if(!t)return;
+    var ch=Array.from(t)[0]; var key=MAP[ch]||MAP[t.slice(0,2)];
+    if(!key)return;
+    el.innerHTML='<span data-lux-ico="'+key+'" aria-hidden="true">'+ch+'</span>';
+  }
+  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico,.alfred-top-ico,.ubb-icon:not([data-lux-ico])').forEach(wrap);
+    // every emoji->SVG icon span is DECORATIVE: hide it from the a11y tree so axe doesn't flag the (invisible) emoji glyph's contrast
+    document.querySelectorAll('[data-lux-ico]:not([aria-hidden])').forEach(function(e){e.setAttribute('aria-hidden','true');});}
+  conv();
+  var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},40);});
+  try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
+<script>/* F1.4/R6: under .lux the floating mascot must never sit over card text. It dims while scrolling, and at rest it dims
+   ONLY when it geometrically overlaps content (full opacity over empty space). Hit-tested with elementsFromPoint. */
+(function(){var t,fab;
+function getFab(){return fab||(fab=document.querySelector('.asst-fab'));}
+function overlapsContent(){var f=getFab();if(!f)return false;var r=f.getBoundingClientRect();if(!r.width)return false;
+  var pts=[[r.left+r.width/2,r.top+r.height/2],[r.left+5,r.top+5],[r.right-5,r.top+5],[r.left+5,r.bottom-5],[r.right-5,r.bottom-5]];
+  for(var i=0;i<pts.length;i++){var stack=document.elementsFromPoint(pts[i][0],pts[i][1]);
+    for(var j=0;j<stack.length;j++){var el=stack[j];if(f.contains(el)||(el.closest&&el.closest('.asst-fab')))continue;
+      // generic: the first element under the FAB that is NOT page background (body/html/#app/the nav+scrim) = content.
+      var tag=el.tagName,id=el.id||'';
+      if(tag==='BODY'||tag==='HTML'||id==='app'||(el.closest&&el.closest('.bottom-nav')))break;
+      return true;}}
+  return false;}
+function update(){if(!document.documentElement.classList.contains('lux'))return;var f=getFab();if(!f||f.classList.contains('dragging'))return;f.classList.toggle('fab-over-content',overlapsContent());}
+var raf=0;function onScroll(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;update();});}
+document.addEventListener('scroll',onScroll,true);
+window.addEventListener('load',function(){setTimeout(update,300);});
+try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,200);});mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
+})();</script>
 
 <!-- Login -->
 <div id="loginScreen">
@@ -127,7 +168,7 @@
 <div id="app" style="display:none">
 
 <div class="header">
-  <div class="logo-wrap">
+  <div class="logo-wrap" id="logoChat" role="button" tabindex="0" onclick="openAssistantChat()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAssistantChat()}" aria-label="פתח שיחה עם אלפרד" style="cursor:pointer">
     <div class="logo-orb">
       <div class="logo-orb-eyes">
         <span class="logo-orb-eye"></span>
@@ -200,10 +241,10 @@
 <div id="todayPlan"></div>
 <div class="filters">
   <button class="f-btn on" onclick="setFilter('all',this)">הכל</button>
-  <button class="f-btn" onclick="setFilter('אישי',this)">👤 אישי</button>
-  <button class="f-btn" onclick="setFilter('מקצועי',this)">💼 מקצועי</button>
-  <button class="f-btn" onclick="setFilter('כללי',this)">📌 כללי</button>
-  <button class="f-btn" onclick="setFilter('done',this)">✓ הושלמו</button>
+  <button class="f-btn" onclick="setFilter('אישי',this)"><span class="f-ico" aria-hidden="true">👤</span> אישי</button>
+  <button class="f-btn" onclick="setFilter('מקצועי',this)"><span class="f-ico" aria-hidden="true">💼</span> מקצועי</button>
+  <button class="f-btn" onclick="setFilter('כללי',this)"><span class="f-ico" aria-hidden="true">📌</span> כללי</button>
+  <button class="f-btn" onclick="setFilter('done',this)"><span class="f-ico" aria-hidden="true">✓</span> הושלמו</button>
 </div>
 <div class="list" id="list"></div>
 <div class="install-bar" id="installBar">
@@ -213,12 +254,14 @@
 </div>
 </div><!-- /#app -->
 <div class="bottom-nav">
-  <button class="bnav-item" onclick="openNotifManager()">
+  <button class="bnav-item" onclick="(window.WkInbox&&WkInbox.open)?WkInbox.open():openNotifManager()">
     <span class="bnav-icon">🔔</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>התראות</span>
   </button>
   <button class="bnav-item" onclick="openRoutineSheet()">
     <span class="bnav-icon">🔄</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
     <span>שגרות</span>
   </button>
   <div class="bnav-fab-wrap">
@@ -232,10 +275,12 @@
   </div>
   <button class="bnav-item active" id="bnavTasks">
     <span class="bnav-icon">📋</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     <span>משימות</span>
   </button>
   <button class="bnav-item" onclick="openSideMenu()">
     <span class="bnav-icon">☰</span>
+    <svg class="bnav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     <span>תפריט</span>
   </button>
 </div>
@@ -300,7 +345,7 @@
   <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
   <div class="rsheet-head">
     <button class="rsheet-close-btn" onclick="closeSettings()">✕</button>
-    <h3>⚙️ הגדרות</h3>
+    <h3><span data-lux-ico="gear" aria-hidden="true">⚙️</span> הגדרות</h3>
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
@@ -2422,8 +2467,9 @@ function buildSmartPushBatch(windowMs){
       queue('overdue_'+t.id,'⚠️ לא הושלמה: '+t.text,'הייתה מתוכננת ל-'+fmt(new Date(t.datetime)),new Date(now+60000));
     });
   }
-  // Routine slot reminders
-  routines.filter(r=>r.enabled).forEach(r=>{
+  // Routine slot reminders — N0: workout routines (kind:'workout') are owned ENTIRELY by the WkBrief journey below;
+  // the legacy generic reminders (rmorning_/rslot_/fup_r_) are suppressed for them so no duplicate/generic push remains.
+  routines.filter(r=>r.enabled && r.kind!=='workout').forEach(r=>{
     const name=r.name||r.text||'שגרה';
     [0,1].forEach(wo=>{(generateWeekSlots(r,wo)||[]).forEach(iso=>{
       const slot=new Date(iso);const ds=ymd(slot);const slotFmt=fmt(slot);
@@ -2630,8 +2676,8 @@ async function fetchCalendarNotifs(){
 async function cleanupPushServer(validIds){
   if(PUSH_SERVER.includes('REPLACE'))return;
   const userId=gAuth?.email||'anon';
-  try{await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});}
-  catch(e){console.warn('cleanupPushServer:',e);}
+  try{const r=await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});window.__wkCleanupFailed=!r.ok;}
+  catch(e){console.warn('cleanupPushServer:',e);window.__wkCleanupFailed=true;}// N4: record failure so 'מצב התראות' can surface it (not silent)
 }
 async function scheduleSmartPushNotifs(){
   if(!('Notification'in window)||Notification.permission!=='granted')return;
@@ -3768,7 +3814,7 @@ function renderTaskCard(task){
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')"><span data-lux-ico="bell" aria-hidden="true">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
     <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
@@ -3816,14 +3862,14 @@ function renderRoutineInstance(inst){
   const isImportant=routineRef?.important;
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}${isImportant?' important':''}" style="--cc:${cat.c}">
   ${isImportant?`<button class="important-marker on" onclick="toggleRoutineImportant('${inst.routineId}')" title="הסר סימון חשוב">!</button>`:`<button class="important-marker" onclick="toggleRoutineImportant('${inst.routineId}')" title="סמן כחשוב">!</button>`}
-  <div class="routine-badge">🔄 שגרה</div>
+  <div class="routine-badge"><span data-lux-ico="repeat" aria-hidden="true">🔄</span> שגרה</div>
   <div class="card-row">
     <div class="card-main">
       <div class="task-txt">${esc(inst.text)}</div>
       <div class="card-meta-row">
         <span class="card-date">${dateStr}</span>
         <span class="dur-tag">${durTxt}</span>
-        ${inst.notes?`<span class="card-date">📝 ${esc(inst.notes)}<\/span>`:''}
+        ${inst.notes?`<span class="card-date"><span data-lux-ico="note" aria-hidden="true">📝</span> ${esc(inst.notes)}<\/span>`:''}
         ${!inst.completed?`<button class="defer-chip" onclick="openPostpone('routine','${inst.routineId}','${inst.dateStr}')">דחייה</button>`:''}
       </div>
     </div>
@@ -3836,7 +3882,7 @@ function renderRoutineInstance(inst){
     <button class="act add-inst-btn" onclick="quickAddInstance('${inst.routineId}')" title="הוסף מופע נוסף">＋</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')">🔔 מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')"><span data-lux-ico="bell" aria-hidden="true">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
   <div class="card-edit" id="redit-${safeId}">
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;direction:rtl">שינוי מועד לאירוע זה בלבד</div>
     <input class="edit-dt" id="redt-${safeId}" type="datetime-local" value="${dtLocal}">
@@ -3884,7 +3930,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">📋</span>
+    <span class="section-hdr-icon" data-lux-ico="clipboard" aria-hidden="true">📋</span>
     <span class="section-hdr-title">משימות שוטפות</span>
     ${countBadge}
   </div>
@@ -3902,7 +3948,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">🔄</span>
+    <span class="section-hdr-icon" data-lux-ico="repeat" aria-hidden="true">🔄</span>
     <span class="section-hdr-title">שגרות</span>
     <span class="section-count green">${routineList.length}</span>
   </div>
@@ -7213,7 +7259,7 @@ function todayItemRow(item,isRoutine){
   const dt=new Date(item.datetime);
   const time=dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');
   return`<div class="tp-row">`
-    +`<span class="tp-dot">${isRoutine?'🔄':'📌'}</span>`
+    +`<span class="tp-dot" data-lux-ico="${isRoutine?'repeat':'pin'}">${isRoutine?'🔄':'📌'}</span>`
     +`<span class="tp-text">${esc(item.text)}</span>`
     +`<span class="tp-time">${time}</span>`
     +`</div>`;
@@ -7243,7 +7289,7 @@ function renderOneThing(){
   const d=getOneThingList();
   if(!d||!d.items||!d.items.length){
     el.innerHTML=`<div class="ot-empty" onclick="openOtSheet()">
-      <span class="ot-empty-icon">🎯</span>
+      <span class="ot-empty-icon" data-lux-ico="target" aria-hidden="true">🎯</span>
       <span class="ot-empty-text">מה המשימה האחת שלך היום?</span>
       <span class="ot-empty-arrow">←</span>
     </div>`;
@@ -7464,7 +7510,7 @@ function renderTodayPlan(){
     ?[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('')
     :`<div class="tp-row tp-empty"><span class="tp-text" style="color:var(--muted)">לא זוהו משימות להיום</span></div>`;
   el.innerHTML=`<div class="tp-wrap">
-<div class="tp-hdr"><span class="tp-hdr-icon">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
+<div class="tp-hdr"><span class="tp-hdr-icon" data-lux-ico="sun" aria-hidden="true">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
 <div class="tp-list">${rows}</div></div>`;
 }
 
@@ -11137,11 +11183,11 @@ function renderUrgentBillsBanner(){
     const dl=new Date(b.deadline);dl.setHours(0,0,0,0);
     return dl<today;
   }).length;
-  const title=overdue?`🚨 ${overdue} חשבונות באיחור!`:`🔔 חשבונות לתשלום היום`;
+  const title=overdue?`${overdue} חשבונות באיחור!`:`חשבונות לתשלום היום`;
   const detailParts=[`${todayBills.length} חשבונות`];
   if(totalAmount)detailParts.push(`₪${Math.round(totalAmount).toLocaleString('he-IL')}`);
   return `<div class="urgent-bills-banner${overdue?' overdue':''}" onclick="openBillsSheet()">
-    <div class="ubb-icon">${overdue?'🚨':'💳'}</div>
+    <div class="ubb-icon" data-lux-ico="${overdue?'alert':'card'}">${overdue?'🚨':'💳'}</div>
     <div class="ubb-body">
       <div class="ubb-title">${title}</div>
       <div class="ubb-detail">${detailParts.join(' · ')} — לחץ לטיפול</div>
@@ -11189,7 +11235,7 @@ function renderBillCard(bill){
 
   return `<div class="bill-card${isPaid?' paid':''}${isOverdue?' overdue':''}" onclick="openBillForm(${bill.id})">
   <div class="bill-card-top">
-    <span class="bill-cat-icon">${cat}</span>
+    <span class="bill-cat-icon" data-lux-ico="bolt" aria-hidden="true">${cat}</span>
     <div class="bill-card-info">
       <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}${bill.autoDebit?'<span class="bill-autodebit-tag">💳 אוטומטי</span>':''}</div>
       <div class="bill-card-meta">${bill.category}${payDateStr?' · שלי: '+payDateStr:''}${deadlineStr?' · חברה: '+deadlineStr:''}</div>
@@ -11856,7 +11902,7 @@ function renderBillsSection(){
   let html=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon">💳</span>
+    <span class="section-hdr-icon" data-lux-ico="card" aria-hidden="true">💳</span>
     <span class="section-hdr-title">חשבונות פתוחים</span>
     <span class="section-count" style="background:oklch(0.65 0.2 25 / 0.2);color:oklch(0.75 0.2 25)">${pending.length}</span>
   </div>
@@ -11875,7 +11921,7 @@ function renderBillsSection(){
     const payDL=payD2?Math.ceil((payD2-now)/(86400000)):null;
     const effective=(payDL!==null&&daysLeft!==null)?Math.min(payDL,daysLeft):(payDL!==null?payDL:daysLeft);
     const isPayDate=payDL!==null&&(daysLeft===null||payDL<=daysLeft);
-    const prefix=isPayDate?'📅':'⏰';
+    const prefix=`<span class="bdp" data-lux-ico="${isPayDate?'cal':'clock'}" aria-hidden="true">${isPayDate?'📅':'⏰'}</span>`;
     if(effective===null)badge='';
     else if(effective<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(effective)} ימים</span>`;
     else if(effective===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
@@ -11883,7 +11929,7 @@ function renderBillsSection(){
     else if(effective<=3)badge=`<span class="bill-days-badge big urgent pulse">${prefix} ${effective} ימים</span>`;
     else badge=`<span class="bill-days-badge big">${prefix} ${effective} ימים</span>`;
     html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
-      <span class="bill-cat-icon">${cat}</span>
+      <span class="bill-cat-icon" data-lux-ico="bolt" aria-hidden="true">${cat}</span>
       <span class="bill-mini-name">${esc(b.name)}</span>
       ${b.amount?`<span class="bill-mini-amount">₪${Number(b.amount).toLocaleString('he-IL')}</span>`:''}
       ${badge}
