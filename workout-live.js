@@ -247,6 +247,27 @@
   }
   function coachHide() { ui.coachLine = null; coachFallback(); }          // tap = dismiss -> the next-target line
   function coachSlot() { if (ui.coachLine) coachShow(ui.coachLine.text, ui.coachLine.kind); else coachFallback(); }
+  // E3/E4: in-workout INFO-PROVIDER registry. provider = { id, priority, condition(ctx)->bool, render(ctx)->htmlString }.
+  // Additive only — it feeds the reserved #wkLvInfo slot (CLS 0) and never touches the coach line/behavior (parity).
+  var infoProviders = [];
+  function registerInfo(p) { if (p && p.id && typeof p.render === 'function' && !infoProviders.some(function (x) { return x.id === p.id; })) infoProviders.push(p); }
+  function renderInfo() {
+    var slot = $('wkLvInfo'); if (!slot) return;
+    var ex = state && state.exercises[ui.view]; if (!ex) { slot.innerHTML = ''; return; }
+    var ctx = { exercise: ex, state: state, sessions: sessions(), view: ui.view, cat: cat() };
+    var MAX_PER_SET = 1;   // at most one info line per set, so the slot never grows unbounded
+    var cands = infoProviders.filter(function (p) { try { return !p.condition || p.condition(ctx); } catch (_) { return false; } })
+      .sort(function (a, b) { return (b.priority || 0) - (a.priority || 0); });
+    var html = '', shown = 0;
+    for (var i = 0; i < cands.length && shown < MAX_PER_SET; i++) {   // a throwing provider is SKIPPED and we fall through to the next, so it never silences the slot
+      try { var r = cands[i].render(ctx); if (r) { html += '<div class="wk-lv-info-item">' + r + '</div>'; shown++; } } catch (_) { }
+    }
+    slot.innerHTML = html;
+  }
+  // default provider: last-time top set for this exercise (the reserved slot stays a fixed height when absent -> CLS 0)
+  registerInfo({ id: 'lastTime', priority: 10, condition: function (c) { return !!(c.exercise && c.exercise.label); }, render: function (c) {
+    try { var last = W.lastNBefore(c.sessions, c.exercise.label, tomorrow(), 1)[0]; if (!last || !last.sets || !last.sets.length) return ''; var top = last.sets[0]; return '<span class="wk-lv-info-k">' + h(S.lastTimeShort || 'פעם קודמת') + '</span> <bdi dir="ltr">' + h(W.setText ? W.setText(top) : (top.w + '×' + top.r)) + '</bdi>'; } catch (_) { return ''; }
+  } });
   function coachSay(m) {
     if (!m || curMode() === 'off' || !CO) { coachSlot(); return; }
     var now = performance.now();
@@ -857,7 +878,7 @@
       return '<button class="wk-seg wk-seg-' + g.m + (g.idx.indexOf(ui.view) > -1 ? ' on' : '') + '" onclick="WorkoutLive.view(' + jump + ')" aria-label="' + muscleName(g.m) + '"><span class="wk-seg-l">' + MUSCLE_ICON[g.m] + ' ' + muscleName(g.m) + '</span><i style="--f:' + (planned ? Math.min(1, done / planned) : 0).toFixed(3) + '"></i></button>';
     }).join('');
     main.innerHTML = ui.mode === 'finish' ? finishHtml() : liveHtml();
-    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
+    pvKill(); renderDock(); tick(); if (ui.mode === 'live') { coachSlot(); renderInfo(); mascotSync(); if ($('wkRestChar')) { restMount(); fitRest(); } else restKill(); }   // the slot is never left empty on a re-render
     if (ui.mode === 'finish' && ui.counted !== state.startedAt) { ui.counted = state.startedAt; countUp(); var ex = main.querySelector('.wk-lv-ex'); if (ex) ex.classList.add('wk-sum-in'); }   // A13: the summary builds up once (CSS stagger; reduced-motion = no animation); not re-run on later re-renders
     if (ui.mode === 'finish') sumMount(); else sumKill();
   }
@@ -1028,8 +1049,9 @@
         + (ui.peek[i] ? '<div class="wk-peek">' + W.lastNBefore(sessions(), ex.label, tomorrow(), 3).map(function (p) { var d = p.date.split('-'); return '<div class="wk-peek-r"><span class="wk-lv-n">' + num(+d[2] + '.' + +d[1]) + '</span><span class="wk-lv-v">' + p.sets.map(setTxt).join(' · ') + '</span></div>'; }).join('') + '</div>' : '')
         : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
       // the group note, or ONE quiet line to add it (an empty card would only take space)
-      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g">📝 ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
+      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g"><span data-lux-ico="note">📝</span> ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
         : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
+      + '<div class="wk-lv-info" id="wkLvInfo" aria-live="polite"></div>'   // E4: reserved mid-workout info slot (CLS 0) — filled by the info-provider registry
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
@@ -1704,7 +1726,7 @@
     warmEdit: warmEdit, warmSave: warmSave, readyWarm: readyWarm, readyEdit: readyEdit, openPrograms: openPrograms, notifSet: notifSet, coachHide: coachHide, menuOpen: menuOpen, setMode: setMode, togglePref: togglePref, soundTest: soundTest, hapticTest: hapticTest, hasTestDraft: hasTestDraft,
     conflict: conflict, cancelWorkout: cancelWorkout, sameAsLast: sameAsLast, peek: peek, undoSet: undoSet, finishAsk: finishAsk, nextEx: nextEx,
     testOn: function () { return enabled() && prefs().testMode; }, setTestMode: function (v) { setPref('testMode', !!v); var s = $('wkSheet'); if (s && s.classList.contains('on') && window.Workout) window.Workout.open(); },
-    showPR: showPR, hidePR: hidePR, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
+    showPR: showPR, hidePR: hidePR, registerInfo: registerInfo, state: function () { return state ? copy(state) : null; }, mode: function () { return isOpen() ? ui.mode : null; } };
   // Settings: ONE row "מצב בדיקת אימון" in the existing settings sheet (existing settings-row + rtoggle components)
   function injectSettings() {
     if ($('wkTestRow') || !enabled()) return;
