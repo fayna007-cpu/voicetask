@@ -1837,7 +1837,7 @@
     } catch (_) { }
     // N4: probe GET /health. Old deployment has no /health (returns the plain fallback string, not JSON) -> 'old'.
     try {
-      fetch((window.PUSH_SERVER || '') + '/health').then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {
+      fetch((window.PUSH_SERVER || '') + '/health', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {   // no-store: iOS was serving a heuristically-cached pre-deploy /health -> 'old'
         var s = $('wkServerVer'); if (!s) return;
         var need = ['schedule', 'cleanup', 'send-now'];
         var ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
@@ -1855,12 +1855,14 @@
         .then(function (r) { var status = r.status, ok = r.ok; return r.json().catch(function () { return {}; }).then(function (body) { return { status: status, ok: ok, body: body || {} }; }); })
         .then(function (d) {
           if (!res) return;
-          if (d.ok || d.status === 200 || d.status === 201) res.textContent = S.testPushOk;                                   // delivered
+          var good = d.ok || d.status === 200 || d.status === 201;
+          if (good) res.textContent = S.testPushOk;                                                                          // delivered
           else if (d.status === 404 || /subscription/i.test(d.body.error || '')) res.textContent = S.testPushNoSub;           // no push subscription for this user
           else if (d.status === 405 || d.status === 501 || d.status >= 500) res.textContent = S.testPushNeedsDeploy(d.status);// route missing on the LIVE worker -> needs a worker deploy
           else res.textContent = S.testPushFail(d.body.error || d.status || 'שגיאה');
+          res.className = 'wk-st-result ' + (good ? 'ok' : 'warn');                                                           // a failure (incl. 405) reads amber, not green
         })
-        .catch(function (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'רשת'); });
+        .catch(function (e) { if (res) { res.textContent = S.testPushFail((e && e.message) || 'רשת'); res.className = 'wk-st-result warn'; } });
     };
     try {
       if (window.subscribeToPush) return Promise.resolve(window.subscribeToPush()).then(function (ok) { if (!ok) { if (res) res.textContent = S.testPushFail(S.subStepNo); return; } return send(); });
