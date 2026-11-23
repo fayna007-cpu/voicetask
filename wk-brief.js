@@ -151,7 +151,14 @@
     var fri = nextFriday(now, tz); if (fri > now && fri <= WIN) out.push({ type: 'fridayTeaser', fireAt: fri, instance: null, muscle: null });
     // B3 weekly review at Saturday 20:00 (configurable), once in the window -> deep-links to the insights screen
     var rev = hm(o.notif && o.notif.review, 20, 0), tday = W.ymdIn(new Date(now), tz);
-    for (var kk = 0; kk < 3; kk++) { var yy = W.addDaysYmd(tday, kk); if (new Date(yy + 'T12:00:00').getDay() === 6) { var rms = at(yy, rev.h, rev.m); if (rms > now && rms <= WIN) out.push({ type: 'weeklyReview', fireAt: rms, instance: null, muscle: null }); break; } }
+    for (var kk = 0; kk < 3; kk++) { var yy = W.addDaysYmd(tday, kk); if (new Date(yy + 'T12:00:00').getDay() === 6) {
+      var rms = at(yy, rev.h, rev.m);
+      // J6: never a weekly review with 0 workouts — count non-test sessions in the [Sun..Sat] week ending this review Saturday
+      var wkStart = W.addDaysYmd(yy, -6);
+      var wkN = (o.sessions || []).filter(function (s) { if (!s || s.test || s.source === 'test') return false; var d = String(s.dateStr || s.date || '').slice(0, 10); return d >= wkStart && d <= yy; }).length;
+      if (wkN > 0 && rms > now && rms <= WIN) out.push({ type: 'weeklyReview', fireAt: rms, instance: null, muscle: null, n: wkN });
+      break;
+    } }
     // B4 backup reminder at Sunday 10:00 (configurable), only when >=1 real (non-test) session exists; deep-links to the export
     var bk = hm(o.notif && o.notif.backup, 10, 0), hasReal = (o.sessions || []).some(function (s) { return s && !s.test && s.source !== 'test'; });
     if (hasReal) for (var kb = 0; kb < 3; kb++) { var yb = W.addDaysYmd(tday, kb); if (new Date(yb + 'T12:00:00').getDay() === 0) { var bms = at(yb, bk.h, bk.m); if (bms > now && bms <= WIN) out.push({ type: 'backup', fireAt: bms, instance: null, muscle: null }); break; } }

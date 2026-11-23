@@ -2668,3 +2668,61 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 .lux .asst-fab{display:none !important}
 .lux #app{padding-bottom:calc(var(--nav-h, 70px) + 16px)}
 @media (prefers-reduced-motion:reduce){.lux .asst-fab{animation:none}}
+/* PERF (S3b motion A/B): while the full-screen workout owns the screen (body.wk-lock), the home/assistant decorative
+   loops run invisibly behind it and still paint/composite every frame — the Siri orb (orb+aura+rings+eyes), the header
+   logo blink, the important-marker pulse and the box-shadow bills-CTA pulse. Under CPU load they starve the rest-ring +
+   mascot. Pausing them costs nothing visible (they're occluded) and frees the throttled CPU for the signature moment.
+   Scoped to body.wk-lock so it never touches the live view's own mascot/ring animations (those live inside #wkLive). */
+body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.wk-lock .logo-orb, body.wk-lock .logo-orb *, body.wk-lock .important-marker, body.wk-lock .bills-add-cta{animation-play-state:paused !important}
+
+/* ============================================================================
+   FINAL PRE-DEPLOY FIX BATCH — append-only overrides (compare.js stays +N/-0).
+   Each block is one owner-review item built against the reference images.
+   ============================================================================ */
+/* item 4 — the close X is centered in its circle (the lux ::before SVG mask was top-left without flex) */
+.wk-lv-x{display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0}
+.lux .rsheet-close-btn,.lux .mpp-close,.lux .wpc-close,.lux .wk-lv-x,.lux .wk-ins-x{display:inline-flex;align-items:center;justify-content:center}
+
+/* item 2a — READY header shows "N דק׳ · M תרגילים" (ref 04); hide the empty elapsed pill */
+.wk-live[data-mode=ready] .wk-lv-hr{display:none}
+
+/* item 7a — the greeting dumbbell is inline, before the text (it was dropping to its own line) */
+.lux .wk-greet{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.lux .wk-greet-ico[data-lux-ico]{flex:0 0 auto}
+
+/* item 7b — the bottom scrim must not cover the overdue-card header: cap it at ~96px */
+.lux .bottom-nav::after{height:96px}
+
+/* item 7d — the toast sits ABOVE the floating nav pill and never over the center mic */
+.lux .toast{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+
+/* item 1c — the rest ring renders >=200px visible at 390x844 (gold circle ~0.92 of the container) */
+.wk-rest-compact .wk-ring-xl{width:244px;height:244px}
+.wk-rest-compact .wk-ring-xl .wk-ring-t>bdi{font-size:64px}
+
+/* item 1d — next-set card per ref 05: a 48px gold mascot ball beside the 24px/800 target (W×R stays LtR-isolated) */
+.wk-rest-next-row{display:flex;align-items:center;justify-content:center;gap:var(--wk-s3)}
+.wk-rest-next-ball{flex:0 0 auto;width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#F3E0AE,#D4B06A 58%,#C9A45C);box-shadow:0 2px 12px rgba(201,164,92,.42)}
+.wk-rest-next .wk-rest-nt{font-size:24px;font-weight:800;margin:0}
+
+/* item 1b — during rest the large character is NOT clipped by the sticky coach slot: collapse the (empty) slot */
+.wk-lv-scroll:has(.wk-rest-char) .wk-coach-slot{display:none}
+.wk-rest-char{min-height:96px}
+
+/* item 3 — PR summary: cap + name + an 84px figure (ref 06/08), big numbers with smaller units */
+.wk-sum-hero-pr{flex-direction:column;align-items:center;text-align:center;gap:var(--wk-s2)}
+.wk-sum-prcap{font-size:13px;font-weight:700;letter-spacing:.1em;color:var(--lux-gold,#D4B06A)}
+.wk-sum-prname{font-size:30px;font-weight:800;line-height:1.1;color:var(--wk-text,#F4F0E8)}
+.wk-sum-prfig{line-height:1;color:var(--wk-text,#F4F0E8);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wk-sum-prfig .wk-pf-n{font-size:84px;font-weight:300}
+.wk-sum-prfig .wk-pf-u{font-size:34px;font-weight:400;color:var(--wk-mut,#9A968C)}
+/* PR moment overlay figure to match ref 06 (was 64px) */
+.wk-prm-n{font-size:84px}
+
+/* item 8b — a negative insights trend is warn, never green */
+.wk-ins-trend-pct.wk-neg{color:var(--lux-warn,#E58A6B)}
+
+/* item 5 — the general Settings sheet adopts lux tokens (gold toggles, dark card), scoped so nothing else shifts and
+   s9-revert (lux off) is untouched. SVG icons come from the existing emoji->mask mapper + .settings-row-ico lux rule. */
+.lux #settingsSheet{--accent:var(--lux-gold);--surface:var(--lux-card);--surface2:var(--lux-s2);--surface3:var(--lux-s2);--bg:var(--lux-bg);--border:var(--lux-line);--border2:var(--lux-line);--text:var(--lux-text);--muted:var(--lux-mut)}
+.lux #settingsSheet .settings-section{color:var(--lux-gold)}

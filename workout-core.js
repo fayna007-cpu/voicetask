@@ -660,6 +660,12 @@
       wake: 'השאר את המסך דולק', memFull: 'הזיכרון מלא. האימון נשמר רק כאן עד שתסיים',
       leave: 'לצאת? האימון נשמר, ותוכל להמשיך מאיפה שעצרת.', noSets: 'עוד לא נרשם אף סט. לסגור בלי לשמור?',
       less: 'פחות', readySwitch: 'החלף', readyKey: function (t) { return 'היעד הראשון: ' + t; }, exMore: function (n) { return 'ועוד ' + n + ' תרגילים'; }, readyWarm: 'חימום', readyChecks: 'בדיקות', readyEdit: 'ערוך תוכנית',
+      // R4: the gold coach sentence. With previous data: "פעם קודמת … היום היעד …"; fact fallback keeps a real number.
+      // Numbers are LtR-isolated (U+2066..U+2069). goldT is the pre-wrapped gold target span.
+      readyKeyPrev: function (ex, lw, lr, goldT) { return 'פעם קודמת סיימת ' + ex + ' ב-⁦' + lw + '⁩ ל-⁦' + lr + '⁩. ' + goldT + ', ואפשר שיא.'; },
+      readyKeyFact: function (ex, goldT) { return goldT + ' ב' + ex + '. אפשר שיא.'; },
+      readyMeta: function (mins, exN) { return '⁦' + mins + '⁩ דק׳ · ' + exN + ' תרגילים'; },
+      readyGold: function (t) { return 'היום היעד ' + t; },
       cardOpts: 'אפשרויות', upTomorrow: function (m) { return m ? 'מחר · ' + m : 'מחר'; }, upInDays: function (n, m) { return 'בעוד ' + n + ' ימים' + (m ? ' · ' + m : ''); }, upStart: function (x) { return 'נקודת הפתיחה: ' + x; },
       sumVolume: 'נפח', sumTime: 'זמן', sumVsWeek: 'מול שבוע שעבר', sumPrHero: function (x) { return 'שיא חדש · ' + x; }, nextTimeT: 'לפעם הבאה', nextTargetL: function (ex, t) { return ex + ': ' + t; }, plannedAt: function (t) { return 'התזכורת הבאה: ' + t; },
       sumMuscleT: 'נפח לפי שריר השבוע', muscleSets: function (n) { return hcount(n, 'set'); },

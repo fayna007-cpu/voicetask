@@ -327,11 +327,26 @@
   function fitRest() {
     // SYNC (before paint) so resizing the ring never causes a layout shift — CLS stays 0 (A2/motion)
     var sc = $('wkLvScroll'), card = document.querySelector('#wkLvMain .wk-rest-card'); if (!sc || !card) return;
+    var dock = $('wkLvDock');
     card.classList.remove('wk-rest-compact', 'wk-rest-tight');
-    var over = function () { return card.offsetHeight > sc.clientHeight + 2; };   // compact only when the rest CARD itself can't fit (not because warm-up sits above it)
+    // the scroll container extends BEHIND the fixed dock, so sc.clientHeight over-reports the usable height by the
+    // dock's height (~81px at 390x844) — a card could "fit" clientHeight yet still sit behind the dock. Measure the
+    // real space ABOVE the dock top instead (minus the 4px top gap fitRest leaves), so the next-set card always clears.
+    var avail = function () { if (!dock) return sc.clientHeight; var d = dock.getBoundingClientRect().top, t = sc.getBoundingClientRect().top; return Math.max(0, d - t - 4); };
+    var over = function () { return card.offsetHeight > avail(); };   // compact only when the rest CARD itself can't fit above the dock (not because warm-up sits above it)
     if (over()) card.classList.add('wk-rest-compact');
     if (over()) card.classList.add('wk-rest-tight');
-    sc.scrollTop = Math.max(0, card.offsetTop - 4);   // bring the rest card to the top so char/ring/next-set read top-down, above the dock
+    // Bring the rest card to the top so char/ring/next-set read top-down, above the dock. Two fixes vs the old
+    // `scrollTop = card.offsetTop - 4`: (1) the card is nested in the sets group, so offsetTop was relative to that
+    // group, not the scroll container; (2) the positioning must run AFTER paint — at sync fitRest time the sticky
+    // coach-slot/warm-up above the card aren't in their final place, so the mid-render delta was ~0 and the card was
+    // left 107px low, clipping the next-set card 56px behind the dock. Deferring + a bottom-clearance guard fixes both.
+    afterPaint(function () {
+      var s = $('wkLvScroll'), c = document.querySelector('#wkLvMain .wk-rest-card'), k = $('wkLvDock'); if (!s || !c) return;
+      s.scrollTop = Math.max(0, s.scrollTop + (c.getBoundingClientRect().top - s.getBoundingClientRect().top) - 4);
+      var ov = c.getBoundingClientRect().bottom - (k ? k.getBoundingClientRect().top : s.getBoundingClientRect().bottom);
+      if (ov > 0) s.scrollTop += ov + 4;   // guarantee the next-set card clears the dock even if the top couldn't reach
+    });
   }
   // the summary stage: 120 px beside the hero; ONE gesture per workout (a record -> pr, else finish), lazy (after the paint)
   var sumM = null;
@@ -860,7 +875,11 @@
     $('wkLive').setAttribute('data-mode', ui.mode);
     $('wkLvX').textContent = ui.stack.length ? '›' : '✕'; $('wkLvX').setAttribute('aria-label', ui.stack.length ? S.back : S.close);
     if (TITLES[ui.mode]) {
-      name.textContent = TITLES[ui.mode](); el.textContent = ''; prog.innerHTML = '';
+      if (ui.mode === 'ready') {   // R4: header = "N דק׳ · M תרגילים" metadata (ref 04), not an empty elapsed pill (which is hidden in ready via CSS)
+        var _rp = programById(ui.ready.programId), _rd = _rp && (_rp.days.filter(function (x) { return x.id === ui.ready.dayId; })[0] || _rp.days[0]);
+        name.textContent = _rd ? S.readyMeta(num(dayPlanMins(_rd)), num(_rd.exercises.length)) : TITLES.ready();
+      } else name.textContent = TITLES[ui.mode]();
+      el.textContent = ''; prog.innerHTML = '';
       main.innerHTML = ui.mode === 'programs' ? programsHtml() : ui.mode === 'program' ? programHtml() : ui.mode === 'exercise' ? exerciseHtml() : readyHtml();
       renderDock(); if (ui.mode === 'ready') pvMount(); else pvKill(); return;
     }
@@ -959,7 +978,15 @@
       // ONE coach card: the 140px stage + a coach line + the key number in gold + the coach-mode chips
       + '<div class="wk-ready-coach wk-lv-group">'
         + (R.coachMode !== 'off' && window.WkMascot ? '<div class="wk-m-pv"><div class="wk-m-pv-c" id="wkMascotPv"></div><div class="wk-m-pv-t">' + h(modeSample(R.coachMode)) + '</div></div>' : '')
-        + (keyT ? '<div class="wk-ready-key">' + S.readyKey('<b class="wk-gold-n">' + keyT + '</b>') + '</div>' : '')
+        + (function () {   // R4: gold coach sentence — "פעם קודמת … היום היעד …" when previous data exists, else a fact
+            var keyHtml = '';
+            if (wex && !isBw(wex) && wt) {
+              var goldW = '<b class="wk-gold-n">' + S.readyGold('⁦' + num(wt.w) + '⁩') + '</b>';
+              if (wl && wl.sets && wl.sets.length) { var ls = wl.sets[0]; keyHtml = S.readyKeyPrev(h(wex.label), num(ls.w), num(ls.r), goldW); }
+              else keyHtml = S.readyKeyFact(h(wex.label), goldW);
+            } else if (keyT) { keyHtml = S.readyKey('<b class="wk-gold-n">' + keyT + '</b>'); }
+            return keyHtml ? '<div class="wk-ready-key">' + keyHtml + '</div>' : '';
+          })()
         + '<div class="wk-lv-cap">' + S.coachModeT + '</div>' + chips(W.COACH_MODES, R.coachMode, function (k) { return 'WorkoutLive.readySet(\'coach\',\'' + k + '\')'; }, modeLabels())
         + '<div class="wk-lv-cap">' + h(modeHint(R.coachMode)) + '</div></div>'
       // the exercise list card
@@ -1001,14 +1028,17 @@
       // a next-set card (the upcoming target + a last-set coach line). The dock holds "אני מוכן, דלג על המנוחה".
       var nIdx = ex.sets.length, nt = t[Math.min(nIdx, t.length - 1)], last = ex.sets[nIdx - 1];
       var total = Math.max(1, Math.round((state.rest.total || 0))), isLastNext = nIdx + 1 >= n;
-      var tgt = function (o, big) { return '<div class="' + (big ? 'wk-rest-nt' : 'wk-lv-cap') + '">' + (bw ? num(o.aim == null ? o.r : o.aim) + ' ' + S.reps : num(o.w) + ' ' + u + ' × ' + num(o.aim == null ? o.r : o.aim)) + '</div>'; };
+      // the W×R target as ONE LtR-isolated unit (U+2066 FSI .. U+2069 PDI) so "62.5 kg × 9" never renders as "9 × 62.5" in RTL
+      var tgt = function (o, big) { var s = bw ? num(o.aim == null ? o.r : o.aim) + ' ' + S.reps : '⁦' + num(o.w) + ' ' + u + ' × ' + num(o.aim == null ? o.r : o.aim) + '⁩'; return '<div class="' + (big ? 'wk-rest-nt' : 'wk-lv-cap') + '">' + s + '</div>'; };
       act = '<div class="wk-lv-set active wk-rest-card">'
         + '<div class="wk-rest-char" id="wkRestChar" aria-hidden="true"></div>'   // the 96px rest character (fixed reserved slot -> CLS 0)
         + '<div class="wk-rest-h">' + S.restFinished(h(ex.label), num(nIdx)) + '</div>'
         + '<div class="wk-rest"><div class="wk-ring wk-ring-xl"><svg class="focus-ring-svg" viewBox="0 0 200 200"><circle class="focus-ring-bg" cx="100" cy="100" r="88"/><circle class="focus-ring-progress" id="wkRing" cx="100" cy="100" r="88"/></svg><div class="wk-ring-t"><bdi dir="ltr" id="wkRestT"></bdi><span class="wk-ring-of">' + S.restOf(W.iso(clock(total))) + '</span></div></div></div>'
         + '<div class="wk-rest-adj"><button class="wk-rest-b" onclick="WorkoutLive.restAdj(-15)">' + S.restMinus + '</button><button class="wk-rest-b" onclick="WorkoutLive.restAdj(15)">' + S.restPlus + '</button></div>'
-        + (last ? '<div class="wk-rest-last"><span class="wk-lv-cap">' + S.restLastSet + ' ' + setTxt(last) + '</span><button class="wk-chip wk-rest-undo" onclick="WorkoutLive.undoSet()">' + S.undo + '</button></div>' : '')
-        + '<div class="wk-rest-next"><div class="wk-rest-next-h">' + S.nextSetOf(num(nIdx + 1), num(n)) + '</div>' + tgt(nt, true)
+        + (last ? '<div class="wk-rest-last"><span class="wk-lv-cap">' + S.restLastSet + ' ' + setTxt(last) + '</span></div>' : '')   // R3-fix: the undo lives ONLY in the dock snackbar now (exactly one undo on the rest screen)
+        // next-set card per ref 05: 48px gold mascot ball + the LtR-isolated target (24px/800), under the "הסט הבא · N מתוך M" header, with the coach line
+        + '<div class="wk-rest-next"><div class="wk-rest-next-h">' + S.nextSetOf(num(nIdx + 1), num(n)) + '</div>'
+        + '<div class="wk-rest-next-row"><div class="wk-rest-next-ball" aria-hidden="true"></div>' + tgt(nt, true) + '</div>'
         + (isLastNext ? '<div class="wk-lv-cap wk-rest-coach">' + S.restLastCoach + '</div>' : '') + '</div></div>';
     } else if (active && !ui.editing) {
       var c = cur(), tg = t[Math.min(ex.sets.length, t.length - 1)];
@@ -1156,8 +1186,13 @@
     var prTxt = pr0 ? (pr0.kind === 'e1rm' ? h(pr0.label) + ' ~' + num(pr0.value) + ' ' + T.unit.kg : h(pr0.label) + ' ' + num(pr0.w == null ? pr0.r : pr0.w + '×' + pr0.r)) : '';
     var tile = function (val, label, gold) { return '<div class="wk-stat' + (gold ? ' wk-stat-gold' : '') + '"><b>' + val + '</b><span>' + label + '</span></div>'; };
     // A6 hero PR block: the 84px character + (a new record headline if any, else the sets); volume LEADS the 3 stat tiles
-    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '')
-      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr">' + S.sumPrHero('<b class="wk-gold-n">' + prTxt + '</b>') + '</div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
+    // R5/SM3: a PR summary stacks cap + name + a prominent 84px figure (ref 06/08). Big numbers (.wk-pf-n = 84px),
+    // small units, and the W×R pair LtR-isolated (U+2066..U+2069) so it never flips to "9 × 62.5" in RTL.
+    var pfN = function (x) { return '<span class="wk-pf-n">' + x + '</span>'; }, pfU = function (x) { return '<span class="wk-pf-u">' + x + '</span>'; };
+    var prFig = pr0 ? (pr0.kind === 'e1rm' ? pfU('~') + pfN(num(pr0.value)) + pfU(' ' + T.unit.kg)
+      : (pr0.w == null ? pfN(num(pr0.r)) + pfU(' ' + S.reps) : '⁦' + pfN(num(pr0.w)) + pfU(' ' + T.unit.kg + ' × ') + pfN(num(pr0.r)) + '⁩')) : '';
+    return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero' + (pr0 ? ' wk-sum-hero-pr' : '') + '">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '')
+      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr"><div class="wk-sum-prcap">' + h(S.prMomentT) + '</div><div class="wk-sum-prname">' + h(pr0.label) + '</div><div class="wk-sum-prfig"><bdi dir="ltr">' + prFig + '</bdi></div></div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
       + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '')
       + '<div class="wk-sum-tiles">' + tile('<bdi dir="ltr" data-wk-count="' + vol + '">' + num(vol) + '</bdi>', S.sumVolume, true)
         + tile('<bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi>', S.sumTime)
@@ -1344,9 +1379,13 @@
   var C = T.card;
   function programFor(r) { return programById(r && r.programId || null); }
   // ONE brief per render (cached ~1.5 s): the home hero + the notification journey read the same numbers
-  var briefCache = null, briefAt = 0;
+  var briefCache = null, briefAt = 0, briefSig = null;
   function homeBrief() {
-    var now = Date.now(); if (briefCache && now - briefAt < 1500) return briefCache;
+    var now = Date.now();
+    // SM2 fix: build the instance set first, then key the cache on it (not time alone). A routine instance can
+    // appear/complete/skip inside the 1500ms window; a purely time-based cache returned a stale brief with
+    // instance=null, so the home never applied the .wk-hero big-treatment even when b.instance.dt matched. The
+    // signature below (instances + draft) invalidates the cache the moment the set changes.
     var insts = [];
     try {
       allRoutines().filter(function (r) { return r.enabled !== false && r.kind === 'workout'; }).forEach(function (r) {
@@ -1354,11 +1393,13 @@
       });
     } catch (_) { }
     var dft = readDraft();
+    var sig = insts.map(function (i) { return i.routineId + '@' + i.dt + (i.completed ? 'c' : '') + (i.skipped ? 's' : ''); }).join(',') + '|' + (dft ? (String(dft.s && dft.s.routineId) + '@' + (dft.s && dft.s.dateStr) + (dft.s && dft.s.test ? 't' : '')) : '-');
+    if (briefCache && briefSig === sig && now - briefAt < 1500) return briefCache;
     try {
       var nc = readNotif();   // A14/B3/B4: the configurable times feed the schedule (not hard-coded in the brief)
       briefCache = window.WkBrief ? window.WkBrief.compute({ enabled: enabled(), routines: allRoutines(), programs: load(KEY_P, null), sessions: sessions(), catalog: cat(), draft: dft ? Object.assign({}, dft.s, { test: dft.s.test }) : null, prefs: prefs(), instances: insts, tz: W.TZ, notif: { evening: nc.evening, morning: nc.morning, post: nc.post, review: nc.review, backup: nc.backup } }, now) : null;
     } catch (_) { briefCache = null; }
-    briefAt = now; return briefCache;
+    briefSig = sig; briefAt = now; return briefCache;
   }
   // the hero's muted meta line "52 דק׳ · 6 תרגילים · 18 סטים" (from the plan; each part only if known)
   function heroMeta(b) {
@@ -1569,7 +1610,7 @@
     var top = r.insights[0], title = top ? top.headline : S.insNeutral;
     var trend = r.insights.filter(function (i) { return i.type === 'trend'; })[0];
     var trendCard = trend ? '<div class="wk-ins-trend"><div class="wk-ins-trend-h">' + h(S.insTrendT) + ' · ' + h(trend.exercise) + '</div>'
-      + '<div class="wk-ins-trend-pct">' + insNum((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
+      + '<div class="wk-ins-trend-pct' + (trend.pct < 0 ? ' wk-neg' : '') + '">' + insNum((trend.pct >= 0 ? '+' : '') + trend.pct + '%') + '</div>'
       + sparkSvg(trend.spark) + '<div class="wk-ins-trend-ev" aria-label="' + h(trend.evidence + ' ' + T.unit.kg) + '">' + insNum(trend.evidence + ' ' + T.unit.kg) + '</div></div>' : '';   // F11: the e1RM range carries its unit
     var cards = r.insights.filter(function (i) { return i.type !== 'trend'; }).map(insightCard).join('');
     return head + cap + '<div class="wk-ins-title">' + insNum(title) + '</div>' + test + trendCard + cards;
