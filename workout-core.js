@@ -716,7 +716,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       notifType: { eveningBefore: 'ערב לפני', morning: 'בוקר האימון', warmup: 'חימום (45 דק׳ לפני)', unlock: 'פתיחת האימון', rescue: 'תזכורת אחרונה', postWorkout: 'סיכום אחרי האימון (ערב)', fridayTeaser: 'סיכום שישי', weeklyReview: 'סקירת שבוע (שבת)', backup: 'גיבוי שבועי (ראשון)' },
       // N2/N3: notifications status ('מצב התראות') + test push
       notifStatusT: 'מצב התראות', permT: 'הרשאת התראות', permOk: 'מאושרת', permNo: 'חסומה', permAsk: 'לא אושרה עדיין',
-      permStepNo: 'ההרשאה חסומה — פתח את הגדרות האתר בדפדפן ואפשר התראות', permStepAsk: 'אשר התראות כדי לקבל אותן על מסך הנעילה',
+      permStepNo: 'ההרשאה חסומה — פתח את הגדרות האתר בדפדפן ואפשר התראות', permStepNoApp: 'ההרשאה חסומה — הגדרות האייפון › התראות › Alfred, ואפשר התראות', permStepAsk: 'אשר התראות כדי לקבל אותן על מסך הנעילה',
       subT: 'מנוי פוש', subOk: 'פעיל', subNo: 'לא פעיל', subStepNo: 'פתח את האפליקציה מהאייקון במסך הבית כדי להפעיל פוש',
       offStep: 'ההתראות כבויות (מתג ראשי) — הפעל את "התראות אימון"', mutedStep: function (d) { return 'מושתק להיום (' + d + ') — יחזור מחר'; },
       quietNote: 'בשעות השקט 22:00–07:00 לא נשלחות התראות', killStep: 'מודול האימון כבוי',

@@ -1773,7 +1773,9 @@
     var statusRow = function (label, val, ok, id) { return '<div class="settings-row wk-st-row"><div class="settings-row-body"><div class="settings-row-title">' + h(label) + '</div></div><div class="wk-st-val ' + (ok ? 'ok' : 'warn') + '"' + (id ? ' id="' + id + '"' : '') + '>' + h(val) + '</div></div>'; };
     var step = function (txt) { return '<div class="wk-st-step">' + h(txt) + '</div>'; };
     var html = statusRow(S.permT, perm === 'granted' ? S.permOk : perm === 'denied' ? S.permNo : S.permAsk, perm === 'granted');
-    if (perm === 'denied') html += step(S.permStepNo); else if (perm !== 'granted') html += step(S.permStepAsk);
+    // installed PWA (standalone) -> point to iOS Settings, not the browser's site settings (item 8a)
+    var standalone = (window.navigator && window.navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (perm === 'denied') html += step(standalone ? S.permStepNoApp : S.permStepNo); else if (perm !== 'granted') html += step(S.permStepAsk);
     if (!enabled()) html += step(S.killStep);
     if (!c.on) html += step(S.offStep);
     if (c.muteDay && c.muteDay === W.ymdIn(new Date())) html += step(S.mutedStep(c.muteDay));
@@ -1861,7 +1863,7 @@
     var el = document.getElementById('wkPreview'); if (!el) { el = document.createElement('div'); el.id = 'wkPreview'; el.className = 'wk-pv-panel'; el.setAttribute('dir', 'rtl'); el.setAttribute('role', 'dialog'); document.body.appendChild(el); }
     var head = '<div class="wk-pv-top"><button class="wk-pv-x" aria-label="סגור" onclick="WorkoutHome.closePreview()"></button><h2 class="wk-pv-h">' + h(S.previewT) + '</h2><div class="wk-pv-note">' + h(S.previewNote) + '</div></div><div class="wk-pv-scroll">';
     if (!enabled()) { el.innerHTML = head + '<div class="wk-pv-off">' + h(S.previewOff) + '</div></div>'; el.classList.add('on'); return; }
-    var ex = { muscle: 'גב וכתפיים', streak: numIso(3), hint: 'מנוחה טובה', mins: numIso(52), dur: numIso(52), exercise: h('משיכה בכבל'), lastKg: numIso(60), lastReps: numIso(8), targetKg: numIso(62.5), last: numIso(60) + '×' + numIso(8), target: numIso(62.5) + ' ' + T.unit.kg, volume: numIso(472) + ' ' + T.unit.kg, done: numIso(2), planned: numIso(3), n: numIso(3), x: numIso(2), time: numIso('18:00') };
+    var ex = { muscle: 'גב וכתפיים', streak: numIso(3), hint: 'מנוחה טובה', mins: numIso(52), dur: numIso(52), exercise: h('משיכה בכבל'), lastKg: 60, lastReps: 8, targetKg: 62.5, last: numIso('60×8'), target: numIso(62.5) + ' ' + T.unit.kg, volume: numIso(472) + ' ' + T.unit.kg, done: numIso(2), planned: numIso(3), n: numIso(3), x: numIso(2), time: numIso('18:00') };
     var pushCard = function (type) { var t = fillNotify(type, 'title', ex, type), b = fillNotify(type, 'body', ex, type); if (!t && !b) return ''; return '<div class="wk-pv-push"><div class="wk-pv-push-h"><span class="wk-pv-sender">אלפרד</span><span class="wk-pv-badge">דוגמה</span></div><div class="wk-pv-push-t">' + t + '</div><div class="wk-pv-push-b">' + b + '</div></div>'; };
     var pushes = ['eveningBefore', 'morning', 'unlock', 'postWorkout', 'weeklyReview'].map(pushCard).join('');
     var states = [['locked', 'נעול'], ['open', 'פתוח · מוכן'], ['progress', 'בתהליך'], ['done', 'בוצע']].map(function (s) { return '<div class="wk-pv-state wk-pv-' + s[0] + '"><span class="wk-pv-state-l">' + h(s[1]) + '</span><span class="wk-pv-badge">דוגמה</span></div>'; }).join('');
