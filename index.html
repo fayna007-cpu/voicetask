@@ -345,7 +345,7 @@ try{var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(update,2
   <div class="rsheet-handle-area"><div class="rsheet-handle"></div></div>
   <div class="rsheet-head">
     <button class="rsheet-close-btn" onclick="closeSettings()">✕</button>
-    <h3><span data-lux-ico="gear">⚙️</span> הגדרות</h3>
+    <h3><span data-lux-ico="gear" aria-hidden="true">⚙️</span> הגדרות</h3>
     <div style="width:32px"></div>
   </div>
   <div class="rsheet-scroll">
@@ -3814,7 +3814,7 @@ function renderTaskCard(task){
     <button class="act wa-btn" onclick="wa(${task.id})">${ICO.msg}</button>
     <button class="act del-btn" onclick="del(${task.id})">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')"><span data-lux-ico="bell">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('t${task.id}')"><span data-lux-ico="bell" aria-hidden="true">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-t${task.id}"></div></div>
   <div class="card-edit" id="edit-${task.id}">
     <textarea class="edit-txt" id="etxt-${task.id}" rows="2">${esc(task.text)}</textarea>
     <input class="edit-dt" id="edt-${task.id}" type="datetime-local" value="${dtLocal}">
@@ -3862,14 +3862,14 @@ function renderRoutineInstance(inst){
   const isImportant=routineRef?.important;
   return `<div class="card routine-card${inst.completed?' done':isOverdue?' overdue':''}${isImportant?' important':''}" style="--cc:${cat.c}">
   ${isImportant?`<button class="important-marker on" onclick="toggleRoutineImportant('${inst.routineId}')" title="הסר סימון חשוב">!</button>`:`<button class="important-marker" onclick="toggleRoutineImportant('${inst.routineId}')" title="סמן כחשוב">!</button>`}
-  <div class="routine-badge"><span data-lux-ico="repeat">🔄</span> שגרה</div>
+  <div class="routine-badge"><span data-lux-ico="repeat" aria-hidden="true">🔄</span> שגרה</div>
   <div class="card-row">
     <div class="card-main">
       <div class="task-txt">${esc(inst.text)}</div>
       <div class="card-meta-row">
         <span class="card-date">${dateStr}</span>
         <span class="dur-tag">${durTxt}</span>
-        ${inst.notes?`<span class="card-date"><span data-lux-ico="note">📝</span> ${esc(inst.notes)}<\/span>`:''}
+        ${inst.notes?`<span class="card-date"><span data-lux-ico="note" aria-hidden="true">📝</span> ${esc(inst.notes)}<\/span>`:''}
         ${!inst.completed?`<button class="defer-chip" onclick="openPostpone('routine','${inst.routineId}','${inst.dateStr}')">דחייה</button>`:''}
       </div>
     </div>
@@ -3882,7 +3882,7 @@ function renderRoutineInstance(inst){
     <button class="act add-inst-btn" onclick="quickAddInstance('${inst.routineId}')" title="הוסף מופע נוסף">＋</button>
     <button class="act del-btn" onclick="skipRoutineInstance('${inst.routineId}','${inst.dateStr}')" title="דלג">${ICO.trash}</button>
   </div>
-  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')"><span data-lux-ico="bell">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
+  <div class="notif-chip-row"><button class="notif-chip" onclick="toggleNotifJourney('r${inst.routineId}_${inst.dateStr}')"><span data-lux-ico="bell" aria-hidden="true">🔔</span> מסע התראות ▾</button><div class="notif-journey-panel" id="nj-r${inst.routineId}_${inst.dateStr}"></div></div>
   <div class="card-edit" id="redit-${safeId}">
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;direction:rtl">שינוי מועד לאירוע זה בלבד</div>
     <input class="edit-dt" id="redt-${safeId}" type="datetime-local" value="${dtLocal}">
@@ -3930,7 +3930,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon" data-lux-ico="clipboard">📋</span>
+    <span class="section-hdr-icon" data-lux-ico="clipboard" aria-hidden="true">📋</span>
     <span class="section-hdr-title">משימות שוטפות</span>
     ${countBadge}
   </div>
@@ -3948,7 +3948,7 @@ function render(){
     html+=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon" data-lux-ico="repeat">🔄</span>
+    <span class="section-hdr-icon" data-lux-ico="repeat" aria-hidden="true">🔄</span>
     <span class="section-hdr-title">שגרות</span>
     <span class="section-count green">${routineList.length}</span>
   </div>
@@ -7289,7 +7289,7 @@ function renderOneThing(){
   const d=getOneThingList();
   if(!d||!d.items||!d.items.length){
     el.innerHTML=`<div class="ot-empty" onclick="openOtSheet()">
-      <span class="ot-empty-icon" data-lux-ico="target">🎯</span>
+      <span class="ot-empty-icon" data-lux-ico="target" aria-hidden="true">🎯</span>
       <span class="ot-empty-text">מה המשימה האחת שלך היום?</span>
       <span class="ot-empty-arrow">←</span>
     </div>`;
@@ -7510,7 +7510,7 @@ function renderTodayPlan(){
     ?[...tt.map(t=>todayItemRow(t,false)),...rr.map(r=>todayItemRow(r,true))].join('')
     :`<div class="tp-row tp-empty"><span class="tp-text" style="color:var(--muted)">לא זוהו משימות להיום</span></div>`;
   el.innerHTML=`<div class="tp-wrap">
-<div class="tp-hdr"><span class="tp-hdr-icon" data-lux-ico="sun">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
+<div class="tp-hdr"><span class="tp-hdr-icon" data-lux-ico="sun" aria-hidden="true">☀️</span><span class="tp-hdr-title">היום שלי</span>${countBadge}</div>
 <div class="tp-list">${rows}</div></div>`;
 }
 
@@ -11235,7 +11235,7 @@ function renderBillCard(bill){
 
   return `<div class="bill-card${isPaid?' paid':''}${isOverdue?' overdue':''}" onclick="openBillForm(${bill.id})">
   <div class="bill-card-top">
-    <span class="bill-cat-icon" data-lux-ico="bolt">${cat}</span>
+    <span class="bill-cat-icon" data-lux-ico="bolt" aria-hidden="true">${cat}</span>
     <div class="bill-card-info">
       <div class="bill-card-name">${esc(bill.name)}${bill.recurring&&bill.recurring!=='none'?`<span class="bill-recurring-tag">🔄 ${bill.recurring==='bimonthly'?'דו-חודשי':'חודשי'}</span>`:''}${bill.amountType==='variable'?'<span class="bill-variable-tag">📊 משתנה</span>':''}${bill.autoDebit?'<span class="bill-autodebit-tag">💳 אוטומטי</span>':''}</div>
       <div class="bill-card-meta">${bill.category}${payDateStr?' · שלי: '+payDateStr:''}${deadlineStr?' · חברה: '+deadlineStr:''}</div>
@@ -11902,7 +11902,7 @@ function renderBillsSection(){
   let html=`<div class="task-section">
 <div class="section-hdr">
   <div class="section-hdr-left">
-    <span class="section-hdr-icon" data-lux-ico="card">💳</span>
+    <span class="section-hdr-icon" data-lux-ico="card" aria-hidden="true">💳</span>
     <span class="section-hdr-title">חשבונות פתוחים</span>
     <span class="section-count" style="background:oklch(0.65 0.2 25 / 0.2);color:oklch(0.75 0.2 25)">${pending.length}</span>
   </div>
@@ -11921,7 +11921,7 @@ function renderBillsSection(){
     const payDL=payD2?Math.ceil((payD2-now)/(86400000)):null;
     const effective=(payDL!==null&&daysLeft!==null)?Math.min(payDL,daysLeft):(payDL!==null?payDL:daysLeft);
     const isPayDate=payDL!==null&&(daysLeft===null||payDL<=daysLeft);
-    const prefix=`<span class="bdp" data-lux-ico="${isPayDate?'cal':'clock'}">${isPayDate?'📅':'⏰'}</span>`;
+    const prefix=`<span class="bdp" data-lux-ico="${isPayDate?'cal':'clock'}" aria-hidden="true">${isPayDate?'📅':'⏰'}</span>`;
     if(effective===null)badge='';
     else if(effective<0)badge=`<span class="bill-days-badge big overdue pulse">איחור ${Math.abs(effective)} ימים</span>`;
     else if(effective===0)badge='<span class="bill-days-badge big today pulse">היום!</span>';
@@ -11929,7 +11929,7 @@ function renderBillsSection(){
     else if(effective<=3)badge=`<span class="bill-days-badge big urgent pulse">${prefix} ${effective} ימים</span>`;
     else badge=`<span class="bill-days-badge big">${prefix} ${effective} ימים</span>`;
     html+=`<div class="bill-mini-card${isOverdue?' overdue':''}" onclick="openBillsSheet()">
-      <span class="bill-cat-icon" data-lux-ico="bolt">${cat}</span>
+      <span class="bill-cat-icon" data-lux-ico="bolt" aria-hidden="true">${cat}</span>
       <span class="bill-mini-name">${esc(b.name)}</span>
       ${b.amount?`<span class="bill-mini-amount">₪${Number(b.amount).toLocaleString('he-IL')}</span>`:''}
       ${badge}

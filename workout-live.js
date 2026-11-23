@@ -1047,8 +1047,8 @@
         + (ui.peek[i] ? '<div class="wk-peek">' + W.lastNBefore(sessions(), ex.label, tomorrow(), 3).map(function (p) { var d = p.date.split('-'); return '<div class="wk-peek-r"><span class="wk-lv-n">' + num(+d[2] + '.' + +d[1]) + '</span><span class="wk-lv-v">' + p.sets.map(setTxt).join(' · ') + '</span></div>'; }).join('') + '</div>' : '')
         : '<div class="wk-lv-cap">' + S.first + '</div>') + '</div>'
       // the group note, or ONE quiet line to add it (an empty card would only take space)
-      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g"><span data-lux-ico="note">📝</span> ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
-        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
+      + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g"><span data-lux-ico="note" aria-hidden="true">📝</span> ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
+        : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note" aria-hidden="true">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
@@ -1313,7 +1313,7 @@
   // ── resume banner (app open) and the sheet line ──
   function resumeLine(where) {
     var r = enabled() && readDraft(); if (!r || r.s.test) return '';          // a TEST draft never shows as a real workout
-    return '<div class="wk-resume-in"><span><span data-lux-ico="dumbbell">🏋️</span> ' + S.open + '</span><span class="wk-chips">'
+    return '<div class="wk-resume-in"><span><span data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + S.open + '</span><span class="wk-chips">'
       + (isStale(r) ? '<button class="wk-chip on" onclick="WorkoutLive.saveOld()">' + S.saveOld + '</button><button class="wk-chip" onclick="WorkoutLive.delOld()">' + S.delOld + '</button>'
         : '<button class="wk-chip on" onclick="Workout.start()">' + S.resume + '</button>' + (where === 'banner' ? '<button class="wk-chip" onclick="WorkoutLive.hideBanner()" aria-label="' + S.close + '">✕</button>' : '')) + '</span></div>';
   }
@@ -1414,7 +1414,7 @@
     var cta = function (fb) { return K && K.cta ? h(K.cta) : fb; }, cdInHead = head.indexOf('data-wk-cd') > -1;
     var argO = { routineId: String(r.id), dateStr: inst.dateStr, programId: p ? p.id : null }, arg = js(argO), go = 'event.stopPropagation();Workout.start(' + arg + ')';
     var goWarm = 'event.stopPropagation();Workout.start(' + js(Object.assign({ warm: true }, argO)) + ')';   // A10: warm-up focus path, identical to the notification warm action
-    var cd = st === 'locked' ? '<div class="wk-card-cd"><span data-lux-ico="lock">🔒</span> ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
+    var cd = st === 'locked' ? '<div class="wk-card-cd"><span data-lux-ico="lock" aria-hidden="true">🔒</span> ' + (cdInHead ? '' : C.unlocks + ' ' + cdSpan)
       + '<button class="wk-card-link" onclick="' + go + '">' + cta(C.openNow) + '</button></div>' : '';
     setTimeout(ensureTicker, 0);
     // the hero (computed early so the states below can use it): the brief's today/next instance in a focus state
@@ -1448,7 +1448,7 @@
     var sub = isHero ? heroSub(b) + '<div class="wk-hero-pad" aria-hidden="true"></div>' : '';
     // DONE = locked: no start action on the card (Workout.start refuses it too)
     return '<div class="wk-card wk-st-' + st + (isHero ? ' wk-hero' : '') + (isUp ? ' wk-up' : '') + '" data-wk-state="' + st + '"' + (st === 'done' ? '' : ' onclick="Workout.start(' + arg + ')"') + '>'
-      + '<div class="wk-card-top"><span class="wk-card-tag"><span data-lux-ico="dumbbell">🏋️</span> ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
+      + '<div class="wk-card-top"><span class="wk-card-tag"><span data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + h(r.name || '') + '</span><span class="wk-card-top-r">' + (isHero && st === 'locked' ? '' : '<span class="wk-card-time">' + num(time) + '</span>') + opts + '</span></div>'
       + cap + '<div class="wk-card-h">' + head + '</div>' + (data ? '<div class="wk-card-d">' + data + '</div>' : '') + meta + cd + btn + warm + sec + '</div>' + sub;
   }
   // the card's copy variables: HTML-safe, numerals in <bdi dir=ltr>; only what the owner's own data has (missing = left out)
@@ -1666,7 +1666,7 @@
     var r = routineOf(t.routineId), st = W.cardState({ now: Date.now(), dt: t.dateStr, unlockMin: r && r.wkUnlockMin });
     var time = new Date(t.dateStr).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ });
     var el = document.createElement('div'); el.id = 'wkGreet'; el.className = 'greeting-sub wk-greet';
-    el.innerHTML = '<span class="wk-greet-ico" data-lux-ico="dumbbell">🏋️</span> ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
+    el.innerHTML = '<span class="wk-greet-ico" data-lux-ico="dumbbell" aria-hidden="true">🏋️</span> ' + (st === 'open' ? C.greetOpen : C.greetToday(num(time)));
     subEl.parentNode.insertBefore(el, subEl.nextSibling);
   }
   // the assistant: "התחל אימון" / "מה האימון הבא" (code-first; nothing goes to the model)
