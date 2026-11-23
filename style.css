@@ -2561,7 +2561,10 @@ body.wk-lock{overflow:hidden;overscroll-behavior:none}
 /* F1.1 — week-strip dots carry inline category colors (some purple/blue) → force gold, no purple */
 .lux .cal-dot{background:var(--lux-gold) !important}
 /* F1.3 — chrome emoji → line SVG via currentColor mask (emoji kept in DOM, hidden with font-size:0; reverts with .lux) */
-.lux [data-lux-ico]{display:inline-block;width:18px;height:18px;font-size:0;flex-shrink:0;background-color:currentColor;-webkit-mask:var(--li) center/contain no-repeat;mask:var(--li) center/contain no-repeat;vertical-align:-4px}
+/* the SVG mask lives on ::before (not the span's own background) so the font-size:0 emoji text isn't "gold-on-gold"
+   for axe — the span background stays transparent, so the hidden glyph reads against the real surface (good contrast) */
+.lux [data-lux-ico]{display:inline-block;width:18px;height:18px;font-size:0;flex-shrink:0;position:relative;vertical-align:-4px}
+.lux [data-lux-ico]::before{content:'';position:absolute;inset:0;background-color:currentColor;-webkit-mask:var(--li) center/contain no-repeat;mask:var(--li) center/contain no-repeat}
 .lux .section-hdr-icon[data-lux-ico],.lux .tp-hdr-icon[data-lux-ico],.lux .bill-cat-icon[data-lux-ico],.lux .ot-empty-icon[data-lux-ico]{color:var(--lux-gold)}
 .lux [data-lux-ico="target"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.5'/%3E%3C/svg%3E")}
 .lux [data-lux-ico="sun"]{--li:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E")}
