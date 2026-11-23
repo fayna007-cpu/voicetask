@@ -264,10 +264,8 @@
     }
     slot.innerHTML = html;
   }
-  // default provider: last-time top set for this exercise (the reserved slot stays a fixed height when absent -> CLS 0)
-  registerInfo({ id: 'lastTime', priority: 10, condition: function (c) { return !!(c.exercise && c.exercise.label); }, render: function (c) {
-    try { var last = W.lastNBefore(c.sessions, c.exercise.label, tomorrow(), 1)[0]; if (!last || !last.sets || !last.sets.length) return ''; var top = last.sets[0]; return '<span class="wk-lv-info-k">' + h(S.lastTimeShort || 'פעם קודמת') + '</span> <bdi dir="ltr">' + h(W.setText ? W.setText(top) : (top.w + '×' + top.r)) + '</bdi>'; } catch (_) { return ''; }
-  } });
+  // No default provider: the "בפעם שעברה" peek already shows last-time, so the slot is a PURE extension point —
+  // reserved (CLS 0), empty until a plugin registers (e.g. e1RM hint, weekly volume). See EXTENDING.md / e2-plugins.js.
   function coachSay(m) {
     if (!m || curMode() === 'off' || !CO) { coachSlot(); return; }
     var now = performance.now();
@@ -1051,12 +1049,13 @@
       // the group note, or ONE quiet line to add it (an empty card would only take space)
       + (note ? '<button class="wk-note-line" onclick="WorkoutLive.noteOpen(\'' + m + '\')"><span class="wk-note-g"><span data-lux-ico="note">📝</span> ' + muscleName(m) + '</span><span>' + h(note) + '</span></button>'
         : W.firstOfGroup(state.exercises, i, cc) ? '<button class="wk-note-add" onclick="WorkoutLive.noteOpen()"><span data-lux-ico="note">📝</span> ' + S.addNote + ' · ' + muscleName(m) + '</button>' : '')
-      + '<div class="wk-lv-info" id="wkLvInfo" aria-live="polite"></div>'   // E4: reserved mid-workout info slot (CLS 0) — filled by the info-provider registry
       + wu + '<div class="wk-lv-group wk-lv-sets">' + rows + act + next + '</div>'
       + (allDone ? '<div class="wk-lv-cap wk-lv-center">' + S.allDone + '</div>' : '')
       // quick, mid-set only: + סט (the exercise is complete) / undo; swap, note, skip, add, finish, cancel live in "⋯ אפשרויות"
       + (!active && !ex.skipped || draft.actions.length > 1 ? '<div class="wk-chips wk-lv-more">' + (!active && !ex.skipped ? '<button class="wk-chip" onclick="WorkoutLive.addSet()">' + S.addSet + '</button>' : '')
-        + (draft.actions.length > 1 ? '<button class="wk-chip wk-undo-c" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '');
+        + (draft.actions.length > 1 ? '<button class="wk-chip wk-undo-c" onclick="WorkoutLive.undo()">' + S.undo + '</button>' : '') + '</div>' : '')
+      // E4: reserved mid-workout info slot at the END of the view — collapsing/expanding it moves nothing above it (CLS 0)
+      + '<div class="wk-lv-info" id="wkLvInfo" aria-live="polite"></div>';
   }
   // the primary bar's ONE action for the current position (the label says exactly what happens)
   function primaryAction() {

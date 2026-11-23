@@ -40,11 +40,13 @@
     var t=(el.textContent||'').trim(); if(!t)return;
     var ch=Array.from(t)[0]; var key=MAP[ch]||MAP[t.slice(0,2)];
     if(!key)return;
-    el.innerHTML='<span data-lux-ico="'+key+'">'+ch+'</span>';
+    el.innerHTML='<span data-lux-ico="'+key+'" aria-hidden="true">'+ch+'</span>';
   }
-  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico,.alfred-top-ico,.ubb-icon:not([data-lux-ico])').forEach(wrap);}
+  function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico,.alfred-top-ico,.ubb-icon:not([data-lux-ico])').forEach(wrap);
+    // every emoji->SVG icon span is DECORATIVE: hide it from the a11y tree so axe doesn't flag the (invisible) emoji glyph's contrast
+    document.querySelectorAll('[data-lux-ico]:not([aria-hidden])').forEach(function(e){e.setAttribute('aria-hidden','true');});}
   conv();
-  var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},120);});
+  var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},40);});
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
 })();
 </script>
