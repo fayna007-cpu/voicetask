@@ -1375,11 +1375,12 @@
     var occluded = function (f) {
       var m = f.getBoundingClientRect(); if (!m.width) return false;
       var pts = [[m.left + m.width / 2, m.top + m.height / 2], [m.left + 5, m.top + 5], [m.right - 5, m.top + 5], [m.left + 5, m.bottom - 5], [m.right - 5, m.bottom - 5]];
+      var CONTENT = '.card,.bill-mini-card,.bill-card,.tp-wrap,.ot-empty,.ot-active,.routine-card,.task-card,.section-cards,.wk-card,.greeting-sub,button,a,input,select,textarea,label,[onclick],[role="button"]';
       for (var i = 0; i < pts.length; i++) {
         var stack = document.elementsFromPoint(pts[i][0], pts[i][1]) || [];
         for (var j = 0; j < stack.length; j++) {
           var e = stack[j]; if (f === e || f.contains(e)) continue;
-          if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA|LABEL)$/.test(e.tagName) || e.getAttribute('onclick') || e.getAttribute('role') === 'button') return true;
+          if (e.closest && e.closest(CONTENT)) return true;                               // any content card/control behind it
           var txt = false; for (var k = 0; k < e.childNodes.length; k++) { var n = e.childNodes[k]; if (n.nodeType === 3 && n.textContent.trim()) { txt = true; break; } }
           if (txt) return true;
           break;   // only the topmost non-mascot element at each sample point matters
