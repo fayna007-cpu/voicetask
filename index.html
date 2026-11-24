@@ -23,9 +23,7 @@
 <script src="wk-insights.js"></script>
 <script src="wk-inbox.js"></script>
 <script src="workout-live.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="preload" href="heebo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -3792,7 +3790,7 @@ function renderTaskCard(task){
   const extraBtn=detectIntent(task.text)==='call'?`<button class="act call-btn" onclick="phoneAction(${task.id})">${ICO.phone}<\/button>`:'';
   return `<div class="card${task.completed?' done':isOverdue?' overdue':''}${task.important?' important':''}" style="--cc:${cat.c}">
   ${task.important?'<button class="important-marker on" onclick="toggleTaskImportant('+task.id+')" title="הסר סימון חשוב">!</button>':'<button class="important-marker" onclick="toggleTaskImportant('+task.id+')" title="סמן כחשוב">!</button>'}
-  ${isOverdue?'<div class="overdue-label">⏰ עבר הזמן<\/div>':''}
+  ${isOverdue?'<div class="overdue-label"><span data-lux-ico="clock" aria-hidden="true">⏰<\/span> עבר הזמן<\/div>':''}
   <div class="card-row">
     <div class="card-main">
       <div class="task-txt">${esc(task.text)}</div>
@@ -3855,7 +3853,7 @@ function renderRoutineInstance(inst){
   const avgE=getRoutineEnergyAvg(inst.routineId);
   const energyIco={high:'⚡',mid:'😐',low:'😴'};
   const consBar=cons?`<div class="routine-cons-wrap">
-    <div class="routine-cons-track"><div class="routine-cons-fill" style="width:${cons.pct}%;background:${cons.pct>=80?'oklch(0.72 0.18 145)':cons.pct>=50?'var(--accent)':'oklch(0.65 0.22 25)'}"></div></div>
+    <div class="routine-cons-track"><div class="routine-cons-fill ${cons.pct>=80?'cons-good':cons.pct>=50?'cons-mid':'cons-low'}" style="width:${cons.pct}%"></div></div>
     <span class="routine-cons-label">${cons.pct}% עקביות${avgE?` · ${energyIco[avgE]}`:''}</span>
   </div>`:'';
   const routineRef=routines.find(rr=>rr.id===inst.routineId);
