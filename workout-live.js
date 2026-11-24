@@ -1393,7 +1393,7 @@
     // an always-present bottom gutter in the scroll container (sibling after #list, survives render()) so no card ever
     // sits in the FAB's rest position — the structural guarantee; the tuck above is only an extra while scrolling
     var gutter = function () { var app = document.getElementById('app'); if (!app || document.getElementById('wkFabGutter')) return; var g = document.createElement('div'); g.id = 'wkFabGutter'; g.className = 'wk-fab-gutter'; g.setAttribute('aria-hidden', 'true'); app.appendChild(g); };
-    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); setTimeout(settle, 400); setInterval(settle, 2000); };
+    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); [400, 1500, 3500].forEach(function (ms) { setTimeout(settle, ms); }); };   // settle on load + after async content, not a perpetual interval (keeps the main thread free for taps)
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
   })();
   // V46: the floating mascot fades while the keyboard is open (an input/textarea is focused) so it never sits on the field
