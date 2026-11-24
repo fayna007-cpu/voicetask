@@ -54,87 +54,106 @@ async function sendPush(sub,notif,env){
   return fetch(sub.endpoint,{method:'POST',headers:{Authorization:auth,'Content-Type':'application/octet-stream','Content-Encoding':'aes128gcm',TTL:'86400'},body:enc});
 }
 
-const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,OPTIONS'};
+// Cache-Control:no-store on EVERY response (incl. OPTIONS, /health, errors) so no client ever caches a stale version.
+const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store'};
+const JH={...CORS,'Content-Type':'application/json'};
+const json=(obj,status)=>new Response(JSON.stringify(obj),{status:status||200,headers:JH});
+// parse the body, returning {ok:false} on malformed JSON (-> 400, never a 500 for bad client input)
+async function readJson(req){try{return {ok:true,data:await req.json()};}catch(_){return {ok:false};}}
 
 // ── Worker ─────────────────────────────────────────────────────────────────────
 export default {
   async fetch(req,env){
+   try{
     if(req.method==='OPTIONS')return new Response(null,{headers:CORS});
     const url=new URL(req.url);
+    const path=url.pathname;
 
-    // POST /subscribe — store push subscription
-    if(url.pathname==='/subscribe'&&req.method==='POST'){
-      const{subscription,userId}=await req.json();
-      await env.KV.put(`sub:${userId}`,JSON.stringify(subscription),{expirationTtl:86400*365});
-      return new Response('OK',{headers:CORS});
+    // GET /health — capability probe (no secrets); always fresh (no-store via CORS).
+    if(path==='/health'){
+      if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'method not allowed'},405);
+      return json({version:'2026-11-23',routes:['schedule','cleanup','send-now']});
     }
 
-    // GET /health — N4: capability probe so the client can show 'גרסת שרת הפוש'. No secrets.
-    // An OLD deployment lacks this route and returns the plain fallback string -> the client reads 'old'.
-    if(url.pathname==='/health'){
-      return new Response(JSON.stringify({version:'2026-11-22',routes:['schedule','cleanup','send-now']}),{headers:{...CORS,'Content-Type':'application/json'}});
-    }
+    // the POST endpoints: parse the body ONCE here -> malformed JSON is a 400, never a 500 (W3)
+    const POST_ROUTES={'/subscribe':1,'/schedule':1,'/cleanup':1,'/send-now':1};
+    if(POST_ROUTES[path]){
+      if(req.method!=='POST')return json({error:'method not allowed, use POST'},405);
+      const parsed=await readJson(req);
+      if(!parsed.ok)return json({error:'invalid JSON body'},400);
+      const body=parsed.data||{};
 
-    // POST /schedule — store scheduled notifications (now also persists
-    // actions/payload/requireInteraction/tag for Stage 2+ SW-side filtering)
-    if(url.pathname==='/schedule'&&req.method==='POST'){
-      const{userId,notifications}=await req.json();
-      for(const n of notifications){
-        const ttl=Math.max(60,Math.ceil((new Date(n.fireAt)-Date.now())/1000)+3600);
-        const stored={userId,title:n.title,body:n.body,fireAt:n.fireAt};
-        if(n.actions)stored.actions=n.actions;
-        if(n.payload)stored.payload=n.payload;
-        if(n.requireInteraction)stored.requireInteraction=true;
-        if(n.tag)stored.tag=n.tag;
-        await env.KV.put(`notif:${n.id}`,JSON.stringify(stored),{expirationTtl:ttl});
+      // POST /subscribe — store push subscription
+      if(path==='/subscribe'){
+        if(!body.userId||!body.subscription)return json({error:'userId and subscription required'},400);
+        await env.KV.put(`sub:${body.userId}`,JSON.stringify(body.subscription),{expirationTtl:86400*365});
+        return json({ok:true});
       }
-      return new Response('OK',{headers:CORS});
+
+      // POST /schedule — store scheduled notifications (also persists actions/payload/requireInteraction/tag)
+      if(path==='/schedule'){
+        const {userId,notifications}=body;
+        if(!userId||!Array.isArray(notifications))return json({error:'userId and notifications[] required'},400);
+        let stored=0;
+        for(const n of notifications){
+          if(!n||!n.id||!n.fireAt)continue;                    // skip a malformed entry rather than throw
+          const ttl=Math.max(60,Math.ceil((new Date(n.fireAt)-Date.now())/1000)+3600);
+          const rec={userId,title:n.title,body:n.body,fireAt:n.fireAt};
+          if(n.actions)rec.actions=n.actions;
+          if(n.payload)rec.payload=n.payload;
+          if(n.requireInteraction)rec.requireInteraction=true;
+          if(n.tag)rec.tag=n.tag;
+          await env.KV.put(`notif:${n.id}`,JSON.stringify(rec),{expirationTtl:ttl});
+          stored++;
+        }
+        return json({ok:true,stored});
+      }
+
+      // POST /cleanup — delete this user's stored notifs NOT in validIds (cancels the pending unlock+rescue on start)
+      if(path==='/cleanup'){
+        const {userId,validIds=[]}=body;
+        if(!userId)return json({error:'userId required'},400);
+        const valid=new Set(Array.isArray(validIds)?validIds:[]);
+        const list=await env.KV.list({prefix:'notif:'});
+        let deleted=0;
+        // W1 FIX: sequential + per-entry try/catch. A single non-JSON legacy value used to throw here with no
+        // catch -> the bare 500 "error code 1101" + no CORS. Now one bad key is skipped, never aborting the request.
+        for(const {name} of list.keys){
+          try{
+            const raw=await env.KV.get(name);if(!raw)continue;
+            let n;try{n=JSON.parse(raw);}catch(_){continue;}
+            if(n&&n.userId===userId&&!valid.has(name.slice(6))){await env.KV.delete(name);deleted++;}
+          }catch(_){/* one key failing never fails the whole cleanup */}
+        }
+        return json({ok:true,deleted});
+      }
+
+      // POST /send-now — immediately send a push (test); accepts the optional v2 shape
+      if(path==='/send-now'){
+        const {userId}=body;
+        if(!userId)return json({error:'userId required'},400);
+        const sub=JSON.parse(await env.KV.get(`sub:${userId}`)||'null');
+        if(!sub)return json({error:'no subscription for '+userId},404);
+        const r=await sendPush(sub,{title:body.title||'🧪 Test',body:body.body||'immediate test',actions:body.actions,payload:body.payload,requireInteraction:body.requireInteraction,tag:body.tag},env);
+        return json({status:r.status,ok:r.ok});
+      }
     }
 
-    // POST /cleanup — delete any stored notifs for userId NOT in validIds
-    if(url.pathname==='/cleanup'&&req.method==='POST'){
-      const{userId,validIds=[]}=await req.json();
-      const list=await env.KV.list({prefix:'notif:'});
-      await Promise.all(list.keys.map(async({name})=>{
-        const raw=await env.KV.get(name);if(!raw)return;
-        const n=JSON.parse(raw);
-        if(n.userId===userId&&!validIds.includes(name.slice(6)))await env.KV.delete(name);
-      }));
-      return new Response('OK',{headers:CORS});
-    }
-
-    // GET /debug?userId=... — check what's stored for this user
-    if(url.pathname==='/debug'&&req.method==='GET'){
+    // GET /debug?userId=... — invented data only; no raw endpoint echoed back
+    if(path==='/debug'&&req.method==='GET'){
       const userId=url.searchParams.get('userId')||'anon';
       const sub=await env.KV.get(`sub:${userId}`);
       const notifList=await env.KV.list({prefix:'notif:'});
       const notifs=[];
-      for(const{name}of notifList.keys){
-        const v=await env.KV.get(name);
-        if(v){const p=JSON.parse(v);if(p.userId===userId)notifs.push({key:name,...p});}
-      }
-      return new Response(JSON.stringify({
-        hasSubscription:!!sub,
-        subscriptionEndpoint:sub?JSON.parse(sub).endpoint?.slice(0,60)+'...':null,
-        pendingNotifs:notifs
-      },{},2),{headers:{...CORS,'Content-Type':'application/json'}});
+      for(const{name}of notifList.keys){try{const v=await env.KV.get(name);if(v){const p=JSON.parse(v);if(p.userId===userId)notifs.push({key:name,...p});}}catch(_){}}
+      return json({hasSubscription:!!sub,pendingNotifs:notifs});
     }
 
-    // POST /send-now — immediately send a push (test). Accepts optional
-    // actions/payload/requireInteraction/tag for testing the v2 shape.
-    if(url.pathname==='/send-now'&&req.method==='POST'){
-      const body=await req.json();
-      const{userId}=body;
-      const sub=JSON.parse(await env.KV.get(`sub:${userId}`)||'null');
-      if(!sub)return new Response(JSON.stringify({error:'no subscription for '+userId}),{status:404,headers:{...CORS,'Content-Type':'application/json'}});
-      const r=await sendPush(sub,{
-        title:body.title||'🧪 Test',body:body.body||'immediate test',
-        actions:body.actions,payload:body.payload,requireInteraction:body.requireInteraction,tag:body.tag
-      },env);
-      return new Response(JSON.stringify({status:r.status,ok:r.ok}),{headers:{...CORS,'Content-Type':'application/json'}});
-    }
-
-    return new Response('VoiceTask Push Server',{headers:CORS});
+    return json({error:'not found',path},404);
+   }catch(e){
+    // W2: ANY unexpected failure returns JSON {error} + CORS + no-store — never a bare 1101 without CORS
+    return json({error:'server error',detail:String((e&&e.message)||e)},500);
+   }
   },
 
   // Runs every minute — sends due notifications

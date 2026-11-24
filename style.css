@@ -2728,3 +2728,7 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 .lux #settingsSheet .settings-section{color:var(--lux-gold)}
 /* diagnosis fix — the push test-result line reads amber on a failure (405/5xx/error), not the default green */
 .wk-st-result.warn{color:#E58A6B}
+/* V46 item 2 — the floating nav is anchored with ONE consistent offset: safe-area-inset-bottom + 8px (identical on
+   every screen + installed PWA). The 96px scrim (above) fills everything below/behind it so no content shows through.
+   At 390x844 with a 34px safe area the computed offset is 34 + 8 = 42px; with no safe area it is 8px. */
+.lux .bottom-nav{bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)}
