@@ -732,6 +732,7 @@ cmpKg: function (d, u) { return (d > 0 ? '+' : '') + d + ' ' + u; },
       serverVerT: 'גרסת שרת הפוש', serverOk: 'תקין', serverOld: 'ישן — דרוש עדכון', serverStep: 'צריך לעדכן (לפרוס) את שרת הפוש כדי שההתראות יעבדו', cleanupFailNote: 'סנכרון עם השרת נכשל — ייתכן שהתראה ישנה עדיין מתוזמנת עד שהשרת יעודכן',
       // N5 — the notification-journey test
       njBtn: 'בדיקת מסע התראות', njRun: 'בודק…', njWait: 'ממתין…',
+      diagT: 'פרטים טכניים', diagEmpty: 'ריק', diagProbing: 'בודק…',
       njStep: { perm: 'הרשאה', sub: 'מנוי פוש', health: 'שרת הפוש', cleanup: 'ביטול התראות ישנות', real: 'פוש אמיתי עכשיו', inbox: 'רישום במרכז ההתראות', sched: 'פוש מתוזמן (+2 דק׳)' },
       njPermOk: 'אושרה', njPermNo: 'חסומה — אפשר במכשיר', njSubOk: 'פעיל', njSubNo: 'אין מנוי — אפשר התראות ונסה שוב',
       njHealthOk: function (v) { return 'תקין · גרסה ' + v; }, njHealthBad: function (v, e) { return 'לא תקין (' + (v || e) + ') — צריך לפרוס שרת'; },

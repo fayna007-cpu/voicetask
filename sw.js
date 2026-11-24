@@ -185,11 +185,14 @@ self.addEventListener('push', e => {
   let data={title:'Alfred 🔔',body:''};
   try{data={...data,...e.data.json()};}catch(_){}
   const payload=data.payload||data.data||null;
+  // HOTFIX pop: a UNIQUE tag per notification (never the shared 'vt-push', which made iOS silently replace/coalesce
+  // one notification over another with no re-alert) + renotify so even a same-tag update actually pops again.
+  const _tag=data.tag||((payload&&payload.type&&payload.id!=null)?('vt_'+payload.type+'_'+payload.id+'_'+(payload.stage||'')):('vt_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
   const opts={
     body:data.body||'',
     icon:'./icon.svg',badge:'./icon.svg',
     dir:'rtl',vibrate:[200,100,200],
-    tag:data.tag||'vt-push',
+    tag:_tag,renotify:true,
     data:payload
   };
   if(data.actions&&Array.isArray(data.actions))opts.actions=data.actions;
@@ -199,40 +202,21 @@ self.addEventListener('push', e => {
   // v2: read live status from IDB and swallow if resolved.
   // If IDB read or flag lookup throws → fail-open (show the notification).
   e.waitUntil((async()=>{
-    // Log FIRST inside waitUntil so the IDB write is guaranteed to commit
-    // before the SW is terminated. Awaited on purpose.
-    await _swLogPersist('log','[sw:v2] push arrived, title='+data.title+' payload='+JSON.stringify(payload||{})+' hasActions='+!!(data.actions&&data.actions.length));
-    // Also stash the last push arrival timestamp+payload so if
-    // notificationclick fails to fire (iOS quirk), the client can still
-    // spot "the most recent notification" on cold boot.
-    if(payload&&payload.type&&payload.id!=null){
-      try{await _swIdbPut({key:'meta:lastPushArrival',payload,at:Date.now()});}catch(_){}
-    }
-    // N5: a test push (payload.test) reports its arrival back to the page so the notification-journey test can
-    // confirm a REAL round-trip ('התקבלה ✓'). It still shows a notification so the owner sees it on the device.
-    if(payload&&payload.test){
-      try{const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});cs.forEach(c=>{try{c.postMessage({type:'VT_TEST_PUSH',at:Date.now()});}catch(_){}});}catch(_){}
-    }
-    try{
-      const v2=await _swV2Enabled();
-      if(v2&&payload&&await _swShouldSwallow(payload)){
-        // Silent swallow — no showNotification. Firefox requires *some*
-        // notification to satisfy the "user visible" contract, but Chrome
-        // and iOS Safari tolerate the missing call after a short grace.
-        // Accept the trade-off: better to skip a stale reminder than to
-        // spam. If a browser warns, the flag can be flipped off.
-        return;
-      }
-    }catch(_){/* fail-open below */}
-    // J9: record the DELIVERED notification to the inbox (dedupe by id) BEFORE showing it, so nothing is lost
-    try{
-      if(self.WkInbox&&self.WkInbox.add){
-        const cat=(payload&&payload.type==='workout')?'אימון':(payload&&payload.type==='task')?'משימה':(payload&&payload.type)||'אחר';
-        const id=(payload&&payload.type&&payload.id!=null)?(payload.type+'_'+payload.id+'_'+(payload.stage||'')):((data.tag||'push')+'_'+Date.now());
-        await self.WkInbox.add({id:id,ts:Date.now(),category:cat,title:data.title||'',body:data.body||'',deepLink:(payload&&payload.type==='workout')?'workout':null,test:/בדיקה/.test(data.body||'')});
-      }
-    }catch(_){}
-    return self.registration.showNotification(data.title,opts);
+    // REGRESSION FIX (ADDITION 4): showNotification MUST always run. The J9 inbox write used to sit BEFORE it and
+    // could hang/throw in the SW, silently killing the pop. Now the pop is GUARANTEED; logging + inbox + meta are
+    // best-effort in the background and can never block or prevent it. The 'swallow' is ADVISORY only (don't re-pop a
+    // genuinely-resolved task/routine) and fails OPEN (any error -> we still show).
+    let swallow=false;
+    try{ const v2=await _swV2Enabled(); if(v2&&payload&&await _swShouldSwallow(payload)) swallow=true; }catch(_){/* fail-open: show */}
+    // best-effort writes — fire in parallel, NEVER awaited before the notification
+    const bg=(async()=>{
+      try{await _swLogPersist('log','[sw] push title='+data.title+' type='+((payload&&payload.type)||'-')+' swallow='+swallow);}catch(_){}
+      try{if(payload&&payload.type&&payload.id!=null)await _swIdbPut({key:'meta:lastPushArrival',payload,at:Date.now()});}catch(_){}
+      try{if(payload&&payload.test){const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});cs.forEach(c=>{try{c.postMessage({type:'VT_TEST_PUSH',at:Date.now()});}catch(_){}});}}catch(_){}
+      try{if(!swallow&&self.WkInbox&&self.WkInbox.add){const cat=(payload&&payload.type==='workout')?'אימון':(payload&&payload.type==='task')?'משימה':((payload&&payload.type)||'אחר');const id=(payload&&payload.type&&payload.id!=null)?(payload.type+'_'+payload.id+'_'+(payload.stage||'')):((data.tag||'push')+'_'+Date.now());await self.WkInbox.add({id:id,ts:Date.now(),category:cat,title:data.title||'',body:data.body||'',deepLink:(payload&&payload.type==='workout')?'workout':null,test:/בדיקה/.test(data.body||'')});}}catch(_){}
+    })();
+    if(!swallow){ try{await self.registration.showNotification(data.title,opts);}catch(_){} }   // the guaranteed pop
+    try{await bg;}catch(_){}
   })());
 });
 

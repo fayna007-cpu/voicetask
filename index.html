@@ -2392,7 +2392,7 @@ function buildSmartPushBatch(windowMs){
   const _v2Enabled=(typeof notifV2Enabled==='function'&&notifV2Enabled());
   function queue(id,title,body,fireAt,extras){
     if(seen.has(id))return;const delay=fireAt-now;
-    if(delay<=0||delay>WIN)return;seen.add(id);
+    if(delay<=0||delay>WIN||isNaN(delay))return;seen.add(id);   // guard: an invalid fireAt (NaN delay) must skip this one entry, never throw and abort the whole push batch
     // Cap title to 80 chars, body to 140 chars (mobile-friendly)
     const t=String(title||'').slice(0,80);
     const b=String(body||'').slice(0,140);
