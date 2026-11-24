@@ -1596,6 +1596,9 @@ const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.google
 const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
 const PUSH_SERVER='https://voicetask-push.fayna007.workers.dev';
+// HOTFIX: the ONLY way to reach the push worker. Every call is cache:'no-store' + a unique cache-buster so iOS never
+// reuses a stale response OR a stale CORS preflight (the phone's 'ישן'/'405' cause). Single source, no override.
+window.pushFetch=function(pathWithOpts,opts){var path=pathWithOpts,o=opts||{};var sep=path.indexOf('?')>=0?'&':'?';var cb='cb='+Date.now().toString(36)+Math.random().toString(36).slice(2);var init=Object.assign({cache:'no-store'},o);return fetch(PUSH_SERVER+path+sep+cb,init);};
 const VAPID_PUBLIC_KEY='BCkBcRLfmYljHezmWoubFdRMxuL1ExrkzilYUAaz47dR390m1PR_LvXwMDdZDAHQpCNU58V8mvoJ-BD2jrxvgIM';
 
 const CATS={
@@ -2674,7 +2677,7 @@ async function fetchCalendarNotifs(){
 async function cleanupPushServer(validIds){
   if(PUSH_SERVER.includes('REPLACE'))return;
   const userId=gAuth?.email||'anon';
-  try{const r=await fetch(PUSH_SERVER+'/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});window.__wkCleanupFailed=!r.ok;}
+  try{const r=await pushFetch('/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,validIds})});window.__wkCleanupFailed=!r.ok;}
   catch(e){console.warn('cleanupPushServer:',e);window.__wkCleanupFailed=true;}// N4: record failure so 'מצב התראות' can surface it (not silent)
 }
 async function scheduleSmartPushNotifs(){
@@ -2759,7 +2762,7 @@ async function sendPushJourneyItem(id,title,body){
   const subOk=await subscribeToPush();
   if(!subOk){toast('❌ לא רשום — פתח מהאייקון');return;}
   try{
-    const r=await fetch(PUSH_SERVER+'/send-now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,title,body})});
+    const r=await pushFetch('/send-now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,title,body})});
     const d=await r.json();
     if(d.ok)toast('✅ נשלח! סגור את האפליקציה');
     else toast('❌ שגיאה: '+d.status);
@@ -2833,7 +2836,7 @@ async function testV2PushNow(){
   const body=openTask?'לחץ בוצע / דחה על ההתראה כדי לבחון':'משימה מדומה — בדיקת שלד v2';
   const userId=gAuth?.email||'anon';
   try{
-    const r=await fetch(PUSH_SERVER+'/send-now',{
+    const r=await pushFetch('/send-now',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         userId,title,body,
@@ -2856,7 +2859,7 @@ async function testPushFromSettings(){
   // Immediately send a test push (no delay) via /send-now
   const userId=gAuth?.email||'anon';
   try{
-    const r=await fetch(PUSH_SERVER+'/send-now',{
+    const r=await pushFetch('/send-now',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({userId,title:'🔔 Alfred — בדיקה מיידית',body:'אם אתה רואה את זה האפליקציה סגורה — פוש עובד! ✅'})
     });
@@ -5079,14 +5082,14 @@ async function subscribeToPush(){
       sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
     }
     const userId=gAuth?.email||'anon';
-    const r=await fetch(PUSH_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),userId})});
+    const r=await pushFetch('/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON(),userId})});
     return r.ok;
   }catch(e){console.warn('Push subscribe error:',e.name,e.message);return false;}
 }
 async function scheduleToPushServer(notifications){
   if(PUSH_SERVER.includes('REPLACE'))return;
   const userId=gAuth?.email||'anon';
-  try{await fetch(PUSH_SERVER+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,notifications})});}
+  try{await pushFetch('/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,notifications})});}
   catch(e){console.warn('scheduleToPushServer:',e);}
 }
 function scheduleNotifications(){

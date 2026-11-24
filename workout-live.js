@@ -17,6 +17,8 @@
   var num = function (n) { return '<bdi dir="ltr">' + h(n) + '</bdi>'; };
   // F7: LTR isolation for PLAIN-TEXT sinks (notification title/body, aria-label, toast, document.title) — Unicode isolates, never markup
   var numIso = function (n) { return '⁦' + String(n == null ? '' : n) + '⁩'; };
+  // HOTFIX: single push-worker fetch path — no-store + a unique cache-buster, via the global pushFetch (fallback inline).
+  var pf = function (path, opts) { if (window.pushFetch) return window.pushFetch(path, opts); var sep = path.indexOf('?') >= 0 ? '&' : '?'; return fetch((window.PUSH_SERVER || '') + path + sep + 'cb=' + Date.now().toString(36) + Math.random().toString(36).slice(2), Object.assign({ cache: 'no-store' }, opts || {})); };
   var setTxt = function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; };          // "28×6", combined "28×6+5"
   var js = function (v) { return h(JSON.stringify(v)); };                // a value inside an onclick="" attribute
 
@@ -1882,7 +1884,7 @@
     var now = Date.now();
     if (!fresh && _healthP && now - _healthAt < 5000) return _healthP;
     _healthAt = now;
-    _healthP = fetch((window.PUSH_SERVER || '') + '/health?t=' + now, { cache: 'no-store' })
+    _healthP = pf('/health?t=' + now, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
       .then(function (j) { var need = ['schedule', 'cleanup', 'send-now']; return { ok: !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; })), version: j && j.version }; })
       .catch(function () { return { ok: false, version: null }; });
@@ -1893,7 +1895,7 @@
     var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
     var send = function () {
       var userId = (window.gAuth && gAuth.email) || 'anon';
-      return fetch((window.PUSH_SERVER || '') + '/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
+      return pf('/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
         .then(function (r) { var status = r.status, ok = r.ok; return r.json().catch(function () { return {}; }).then(function (body) { return { status: status, ok: ok, body: body || {} }; }); })
         .then(function (d) {
           if (!res) return;
@@ -1938,12 +1940,12 @@
     // 3 server health — no-store + cache-buster, live version vs expected
     serverHealth().then(function (d) { njSet('health', d.ok ? S.njHealthOk(d.version) : S.njHealthBad(d.version), d.ok); });   // F6: same shared probe/result as the top row
     // 4 /cleanup with an invented endpoint — must not be 500
-    fetch(PS + '/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
+    pf('/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
       .then(function (r) { njSet('cleanup', r.status < 500 ? S.njCleanupOk : S.njCleanupBad(r.status), r.status < 500); })
       .catch(function () { njSet('cleanup', S.njCleanupBad('רשת'), false); });
     // 5 a REAL push now — the SW posts VT_TEST_PUSH back; 15s timeout -> 'לא התקבלה'
     njReal.start = Date.now();
-    fetch(PS + '/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
+    pf('/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
       .then(function (r) { if (!njReal.done) njSet('real', r.ok ? S.njRealSent : S.njRealNo, r.ok); }).catch(function () { njSet('real', S.njRealNo, false); });
     setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 15000);
     // 6 inbox write — labelled 'בדיקה', never counted as journey/insights, auto-removed after 24h
@@ -1951,7 +1953,7 @@
     catch (_) { njSet('inbox', S.njInboxNo, false); }
     // 7 a REAL scheduled push for +2 min through production /schedule, with a countdown
     var when = Date.now() + 120000; njSched.start = Date.now();
-    fetch(PS + '/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
+    pf('/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
       .then(function (r) { if (!r.ok) { njSet('sched', S.njSchedNo, false); return; }
         var tick = setInterval(function () { if (njSched.done) { clearInterval(tick); return; } var left = Math.round((when - Date.now()) / 1000); if (left > 0) njSet('sched', S.njSchedWait(left), true); else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); } }, 1000);
       }).catch(function () { njSet('sched', S.njSchedNo, false); });
