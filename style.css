@@ -2732,3 +2732,23 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
    every screen + installed PWA). The 96px scrim (above) fills everything below/behind it so no content shows through.
    At 390x844 with a 34px safe area the computed offset is 34 + 8 = 42px; with no safe area it is 8px. */
 .lux .bottom-nav{bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)}
+/* V46 item 3 — self-hosted Heebo (UI) + Frank Ruhl Libre (the serif 'Alfred' wordmark), subset to Hebrew+Latin+digits,
+   variable weight 100-900, font-display:swap, tabular digits kept (digit advance = 1151 units, verified equal). No
+   Google Fonts request: the <link> was removed from index.html; these woff2 ship with the site and are SW-precached. */
+@font-face{font-family:'Heebo';font-style:normal;font-weight:100 900;font-display:swap;src:url('heebo.woff2') format('woff2')}
+@font-face{font-family:'Frank Ruhl Libre';font-style:normal;font-weight:100 900;font-display:swap;src:url('frank-ruhl.woff2') format('woff2')}
+/* V46 item 4 (N5) — the notification-journey test: one row per step, value amber on failure / green on pass */
+.wk-nj{margin:4px 14px 8px;display:flex;flex-direction:column;gap:6px}
+.wk-nj-step{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.wk-nj-step .wk-nj-l{color:var(--lux-mut,#9A968C);font-weight:600}
+.wk-nj-step .wk-nj-v{font-weight:700;font-variant-numeric:tabular-nums;text-align:end}
+.wk-nj-step .wk-nj-v.ok{color:var(--lux-green,#8FD1A8)}
+.wk-nj-step .wk-nj-v.warn{color:var(--lux-warn,#E58A6B)}
+.wk-nj-btn{margin-top:6px}
+/* V46 item 1 (polish) — saturated green/blue on routine cards mapped to lux tokens; the blue URL chip -> gold */
+.lux .routine-badge{background:rgba(212,176,106,.12);color:var(--lux-gold)}
+.lux .section-count.green{background:rgba(143,209,168,.14);color:var(--lux-green)}
+.lux .card-link-chip{background:var(--lux-s2);color:var(--lux-gold)}
+.lux .card-link-chip:active{background:var(--lux-s2)}
+.lux .cal-badge.synced{background:rgba(143,209,168,.14);color:var(--lux-green)}
+.lux .routine-badge .streak-flame,.lux .r-consistency,.lux .routine-consistency{color:var(--lux-gold)}

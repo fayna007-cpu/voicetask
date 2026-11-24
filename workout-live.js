@@ -877,7 +877,7 @@
     if (TITLES[ui.mode]) {
       if (ui.mode === 'ready') {   // R4: header = "N דק׳ · M תרגילים" metadata (ref 04), not an empty elapsed pill (which is hidden in ready via CSS)
         var _rp = programById(ui.ready.programId), _rd = _rp && (_rp.days.filter(function (x) { return x.id === ui.ready.dayId; })[0] || _rp.days[0]);
-        name.textContent = _rd ? S.readyMeta(num(dayPlanMins(_rd)), num(_rd.exercises.length)) : TITLES.ready();
+        name.textContent = _rd ? S.readyMeta(dayPlanMins(_rd), _rd.exercises.length) : TITLES.ready();   // raw numbers: readyMeta isolates with U+2066/U+2069 as plain text (set via textContent, no HTML)
       } else name.textContent = TITLES[ui.mode]();
       el.textContent = ''; prog.innerHTML = '';
       main.innerHTML = ui.mode === 'programs' ? programsHtml() : ui.mode === 'program' ? programHtml() : ui.mode === 'exercise' ? exerciseHtml() : readyHtml();
@@ -1828,6 +1828,7 @@
     if (!sched.length) html += '<div class="wk-st-note">' + h(S.next48None) + '</div>';
     else html += sched.slice(0, 8).map(function (n) { var t = new Date(n.fireAt).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); return '<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>'; }).join('');
     html += '<button class="wk-chip wk-st-test" onclick="WorkoutHome.sendTestPush()">' + h(S.testPushBtn) + '</button><div class="wk-st-result" id="wkTestResult" aria-live="polite"></div>';
+    html += '<button class="wk-chip wk-st-test wk-nj-btn" onclick="WorkoutHome.runNotifJourney()">' + h(S.njBtn) + '</button><div class="wk-nj" id="wkNotifJourney" aria-live="polite"></div>';   // N5
     el.innerHTML = html;
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready
@@ -1868,6 +1869,54 @@
       if (window.subscribeToPush) return Promise.resolve(window.subscribeToPush()).then(function (ok) { if (!ok) { if (res) res.textContent = S.testPushFail(S.subStepNo); return; } return send(); });
       return send();
     } catch (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'שגיאה'); }
+  }
+  // N5: the notification-journey test — 7 steps, each with a live status line (amber on failure, never green).
+  // Steps 1-4,6 verify locally; 5,7 need a REAL push and are confirmed by the service worker posting VT_TEST_PUSH back.
+  var njMsgBound = false, njReal = { start: 0, done: false }, njSched = { start: 0, done: false };
+  function njHandleMsg(ev) {
+    if (!ev || !ev.data || ev.data.type !== 'VT_TEST_PUSH') return;
+    if (!njReal.done && njReal.start) { njReal.done = true; njSet('real', S.njRealOk(Math.round((Date.now() - njReal.start) / 1000)), true); }
+    else if (!njSched.done && njSched.start && Date.now() - njSched.start > 5000) { njSched.done = true; njSet('sched', S.njSchedOk, true); }
+  }
+  function njSet(key, text, ok) { var d = $('wkNj_' + key); if (!d) return; var v = d.querySelector('.wk-nj-v'); if (v) { v.textContent = text; v.className = 'wk-nj-v ' + (ok ? 'ok' : 'warn'); } }
+  function runNotifJourney() {
+    var box = $('wkNotifJourney'); if (!box) return;
+    box.innerHTML = ''; njReal = { start: 0, done: false }; njSched = { start: 0, done: false };   // clear the previous run
+    ['perm', 'sub', 'health', 'cleanup', 'real', 'inbox', 'sched'].forEach(function (key) {
+      var d = document.createElement('div'); d.className = 'wk-nj-step'; d.id = 'wkNj_' + key;
+      d.innerHTML = '<span class="wk-nj-l">' + h(S.njStep[key]) + '</span><span class="wk-nj-v">' + h(S.njWait) + '</span>'; box.appendChild(d);
+    });
+    var PS = window.PUSH_SERVER || '', userId = (window.gAuth && gAuth.email) || 'anon';
+    if (!njMsgBound) { try { navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', njHandleMsg); njMsgBound = true; } catch (_) { } }
+    // 1 permission
+    var perm = (window.Notification && Notification.permission) || 'default';
+    njSet('perm', perm === 'granted' ? S.njPermOk : S.njPermNo, perm === 'granted');
+    // 2 subscription
+    ((navigator.serviceWorker && navigator.serviceWorker.ready) ? navigator.serviceWorker.ready.then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; }).catch(function () { return null; }) : Promise.resolve(null))
+      .then(function (sub) { njSet('sub', sub ? S.njSubOk : S.njSubNo, !!sub); });
+    // 3 server health — no-store + cache-buster, live version vs expected
+    fetch(PS + '/health?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {
+      var need = ['schedule', 'cleanup', 'send-now'], ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
+      njSet('health', ok ? S.njHealthOk(j.version) : S.njHealthBad(j && j.version), ok);
+    }).catch(function () { njSet('health', S.njHealthBad(null, 'רשת'), false); });
+    // 4 /cleanup with an invented endpoint — must not be 500
+    fetch(PS + '/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
+      .then(function (r) { njSet('cleanup', r.status < 500 ? S.njCleanupOk : S.njCleanupBad(r.status), r.status < 500); })
+      .catch(function () { njSet('cleanup', S.njCleanupBad('רשת'), false); });
+    // 5 a REAL push now — the SW posts VT_TEST_PUSH back; 15s timeout -> 'לא התקבלה'
+    njReal.start = Date.now();
+    fetch(PS + '/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
+      .then(function (r) { if (!njReal.done) njSet('real', r.ok ? S.njRealSent : S.njRealNo, r.ok); }).catch(function () { njSet('real', S.njRealNo, false); });
+    setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 15000);
+    // 6 inbox write — labelled 'בדיקה', never counted as journey/insights, auto-removed after 24h
+    try { if (window.WkInbox) { WkInbox.add({ id: 'nj_test_' + Date.now(), category: S.njTestLabel, title: S.njTestLabel, body: S.testPushBody, expireAt: Date.now() + 24 * 3600000 }).then(function (ok) { njSet('inbox', ok ? S.njInboxOk : S.njInboxNo, !!ok); }); } else njSet('inbox', S.njInboxNo, false); }
+    catch (_) { njSet('inbox', S.njInboxNo, false); }
+    // 7 a REAL scheduled push for +2 min through production /schedule, with a countdown
+    var when = Date.now() + 120000; njSched.start = Date.now();
+    fetch(PS + '/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
+      .then(function (r) { if (!r.ok) { njSet('sched', S.njSchedNo, false); return; }
+        var tick = setInterval(function () { if (njSched.done) { clearInterval(tick); return; } var left = Math.round((when - Date.now()) / 1000); if (left > 0) njSet('sched', S.njSchedWait(left), true); else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); } }, 1000);
+      }).catch(function () { njSet('sched', S.njSchedNo, false); });
   }
   // J2/SM5: client-side 'אימון חדש נקבע' confirmation card, rendered from the saved routine (no AI-worker change).
   function confirmCard(routineId, isNew) {
@@ -1926,7 +1975,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings); else injectSettings();
   window.WorkoutHome = { card: card, greeting: greeting, heroState: heroState, assistant: assistant, tick: homeTick, notifs: notifs, openFromNotif: openFromNotif, readNotif: readNotif, setNotif: setNotif,
     addToBrief: addToBrief, briefUndo: briefUndo, removeFromBrief: removeFromBrief, briefAdds: briefAdds, inBrief: inBrief, briefKey: briefKey,
-    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, renderNotifStatus: renderNotifStatus,
+    openInsights: openInsights, closeInsights: closeInsights, addToBriefById: addToBriefById, sendTestPush: sendTestPush, runNotifJourney: runNotifJourney, renderNotifStatus: renderNotifStatus,
     confirmCard: confirmCard, dismissConfirm: dismissConfirm, openPreview: openPreview, closePreview: closePreview };
   window.WorkoutForm = { fill: formFill, apply: formApply, kind: formKind, pick: formPick, choose: formChoose };
 })();

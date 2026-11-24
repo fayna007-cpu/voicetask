@@ -1,5 +1,5 @@
-const V = 'alfred-v45';
-const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './wk-insights.js', './wk-inbox.js', './workout-live.js'];
+const V = 'alfred-v46';
+const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './wk-insights.js', './wk-inbox.js', './workout-live.js', './heebo.woff2', './frank-ruhl.woff2'];
 try { importScripts('./wk-inbox.js'); } catch (e) { }   // J9: the inbox store (WkInbox) is available in the SW too
 
 // ═══════════════════════════════════════════════════════════════════
@@ -207,6 +207,11 @@ self.addEventListener('push', e => {
     // spot "the most recent notification" on cold boot.
     if(payload&&payload.type&&payload.id!=null){
       try{await _swIdbPut({key:'meta:lastPushArrival',payload,at:Date.now()});}catch(_){}
+    }
+    // N5: a test push (payload.test) reports its arrival back to the page so the notification-journey test can
+    // confirm a REAL round-trip ('התקבלה ✓'). It still shows a notification so the owner sees it on the device.
+    if(payload&&payload.test){
+      try{const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});cs.forEach(c=>{try{c.postMessage({type:'VT_TEST_PUSH',at:Date.now()});}catch(_){}});}catch(_){}
     }
     try{
       const v2=await _swV2Enabled();

@@ -18,8 +18,8 @@
   // add an item (dedupe by id). Prunes to CAP newest + drops items older than KEEP_MS.
   function add(item) {
     if (!item || !item.id) return Promise.resolve(false);
-    var it = { id: String(item.id), ts: item.ts || Date.now(), category: item.category || 'אחר', title: String(item.title || ''), body: String(item.body || ''), read: !!item.read, deepLink: item.deepLink || null };
-    if (item.test || /^(test|wk_test)/.test(it.id)) return Promise.resolve(false);   // never record test pushes as journey items
+    var it = { id: String(item.id), ts: item.ts || Date.now(), category: item.category || 'אחר', title: String(item.title || ''), body: String(item.body || ''), read: !!item.read, deepLink: item.deepLink || null, expireAt: item.expireAt || null };
+    if (item.test || /^(test|wk_test)/.test(it.id)) return Promise.resolve(false);   // never record a test PUSH as a journey item (N5's own 'בדיקה' item uses expireAt, not test)
     return open().then(function (db) {
       return new Promise(function (res, rej) {
         var t = db.transaction(STORE, 'readwrite'), os = t.objectStore(STORE);
@@ -32,8 +32,10 @@
   }
   function prune() {
     return all().then(function (list) {
-      var now = Date.now(), dead = list.filter(function (x) { return now - x.ts > KEEP_MS; });
-      var live = list.filter(function (x) { return now - x.ts <= KEEP_MS; }).sort(function (a, b) { return b.ts - a.ts; });
+      var now = Date.now();
+      var expired = function (x) { return (x.expireAt && now > x.expireAt) || (now - x.ts > KEEP_MS); };   // N5 'בדיקה' item auto-removes at expireAt (24h)
+      var dead = list.filter(expired);
+      var live = list.filter(function (x) { return !expired(x); }).sort(function (a, b) { return b.ts - a.ts; });
       var over = live.slice(CAP);                                 // beyond the newest CAP
       var drop = dead.concat(over).map(function (x) { return x.id; });
       if (!drop.length) return;
