@@ -885,7 +885,7 @@
     }
     // the header names WHERE you are: the exercise (live) / the program (summary); never truncated. The program + locker live in the ⋯ sheet
     var hx = ui.mode === 'live' && state.exercises[ui.view];
-    name.innerHTML = '<span class="wk-lv-nm">' + h(hx ? hx.label : state.program.name) + '</span>' + (state.test ? '<span class="wk-lv-lk wk-test-ban">' + S.testBanner + '</span>' : '');
+    name.innerHTML = '<span class="wk-lv-nm">' + h(hx ? hx.label : (state.dayName || state.program.name)) + '</span>' + (state.test ? '<span class="wk-lv-lk wk-test-ban">' + S.testBanner + '</span>' : '');   // F7: the workout (day) name, not the program name
     // progress, grouped by muscle group: icon + label + a restrained bar; a tap jumps to the group's next unfinished exercise
     var cc0 = cat(), groups = [];
     state.exercises.forEach(function (e, i) { var m = W.muscleKey(e, cc0), g = groups.filter(function (x) { return x.m === m; })[0]; if (!g) groups.push(g = { m: m, idx: [] }); g.idx.push(i); });
@@ -1062,7 +1062,7 @@
       // Tapping the header expands the rows. w.open is the existing toggle state (default falsy = collapsed).
       var wdone = ws.filter(function (x, j) { return w.done[j]; }).length;
       wu = '<div class="wk-lv-group wk-warm' + (w.open ? ' on' : ' wk-warm-collapsed') + '">'
-        + '<div class="wk-warm-h"><button class="wk-row wk-warm-toggle" onclick="WorkoutLive.warm(' + i + ',\'toggle\')" aria-expanded="' + !!w.open + '"><span class="wk-row-l">' + S.warmT + ' · ' + num(wdone) + '/' + num(ws.length) + '</span><span class="wk-row-s">' + (w.open ? '▴' : '▾') + '</span></button>'
+        + '<div class="wk-warm-h"><button class="wk-row wk-warm-toggle" onclick="WorkoutLive.warm(' + i + ',\'toggle\')" aria-expanded="' + !!w.open + '"><span class="wk-row-l">' + S.warmT + ' · <bdi dir="ltr">' + h(wdone) + '/' + h(ws.length) + '</bdi></span><span class="wk-row-s">' + (w.open ? '▴' : '▾') + '</span></button>'
         + '<button class="wk-lv-link wk-warm-skip" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button></div>'
         + (w.open ? ws.map(function (x, j) {
           var v = x.w == null ? num(x.r) + ' ' + S.reps : '⁦' + num(x.w) + ' ' + u + ' × ' + num(x.r) + '⁩';   // LtR-isolated pair -> weight-first (60×8)
@@ -1197,7 +1197,7 @@
     var prFig = pr0 ? (pr0.kind === 'e1rm' ? pfU('~') + pfN(num(pr0.value)) + pfU(' ' + T.unit.kg)
       : (pr0.w == null ? pfN(num(pr0.r)) + pfU(' ' + S.reps) : '⁦' + pfN(num(pr0.w)) + pfU(' ' + T.unit.kg + ' × ') + pfN(num(pr0.r)) + '⁩')) : '';
     return '<div class="wk-lv-ex"><div class="wk-lv-cap">' + S.sumT + '</div><div class="wk-sum-hero' + (pr0 ? ' wk-sum-hero-pr' : '') + '">' + (window.WkMascot && curMode() !== 'off' ? '<div class="wk-sum-m" id="wkMascotSum" aria-hidden="true"></div>' : '')
-      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr"><div class="wk-sum-prcap">' + h(S.prMomentT) + '</div><div class="wk-sum-prname">' + h(pr0.label) + '</div><div class="wk-sum-prfig"><bdi dir="ltr">' + prFig + '</bdi></div></div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
+      + '<div class="wk-sum-lead">' + (pr0 ? '<div class="wk-sum-pr"><div class="wk-sum-prcap">' + h(pr0.kind === 'e1rm' ? S.prEstCap : S.prMomentT) + '</div><div class="wk-sum-prname">' + h(pr0.label) + '</div><div class="wk-sum-prfig"><bdi dir="ltr">' + prFig + '</bdi></div></div>' : '<div class="wk-sum-k"><b>' + cnt(n) + '</b> ' + S.setsW(n) + '</div>') + '</div></div>'
       + (W.exProgress(state).partial ? '<div class="wk-lv-cap wk-partial">' + S.partialT(num(W.exProgress(state).done), num(W.exProgress(state).total)) + '</div>' : '')
       + '<div class="wk-sum-tiles">' + tile('<bdi dir="ltr" data-wk-count="' + vol + '">' + num(vol) + '</bdi>', S.sumVolume, true)
         + tile('<bdi dir="ltr">' + num(clock(W.durationSec(state, Date.now()))) + '</bdi>', S.sumTime)
@@ -1866,16 +1866,27 @@
         .then(function (sub) { var s = $('wkSubState'); if (!s) return; s.textContent = sub ? S.subOk : S.subNo; s.className = 'wk-st-val ' + (sub ? 'ok' : 'warn'); if (!sub) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.subStepNo; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); } })
         .catch(function () { });
     } catch (_) { }
-    // N4: probe GET /health. Old deployment has no /health (returns the plain fallback string, not JSON) -> 'old'.
+    // F6: the top row AND the N5 server step share ONE memoized no-store probe (serverHealth) -> they can never
+    // disagree (no 'old' + 'ok' together on the same screen).
     try {
-      fetch((window.PUSH_SERVER || '') + '/health', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {   // no-store: iOS was serving a heuristically-cached pre-deploy /health -> 'old'
+      serverHealth().then(function (d) {
         var s = $('wkServerVer'); if (!s) return;
-        var need = ['schedule', 'cleanup', 'send-now'];
-        var ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
-        s.textContent = ok ? S.serverOk : S.serverOld; s.className = 'wk-st-val ' + (ok ? 'ok' : 'warn');
-        if (!ok) { var row = s.closest('.settings-row'), d = document.createElement('div'); d.className = 'wk-st-step'; d.textContent = S.serverStep; if (row && row.parentNode) row.parentNode.insertBefore(d, row.nextSibling); }
-      }).catch(function () { var s = $('wkServerVer'); if (s) { s.textContent = S.serverOld; s.className = 'wk-st-val warn'; } });
+        s.textContent = d.ok ? S.serverOk : S.serverOld; s.className = 'wk-st-val ' + (d.ok ? 'ok' : 'warn');
+        if (!d.ok) { var row = s.closest('.settings-row'), e = document.createElement('div'); e.className = 'wk-st-step'; e.textContent = S.serverStep; if (row && row.parentNode) row.parentNode.insertBefore(e, row.nextSibling); }
+      });
     } catch (_) { }
+  }
+  // F6/N4: single no-store /health probe, memoized ~5s, used by BOTH the status row and the N5 journey test.
+  var _healthP = null, _healthAt = 0;
+  function serverHealth(fresh) {
+    var now = Date.now();
+    if (!fresh && _healthP && now - _healthAt < 5000) return _healthP;
+    _healthAt = now;
+    _healthP = fetch((window.PUSH_SERVER || '') + '/health?t=' + now, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
+      .then(function (j) { var need = ['schedule', 'cleanup', 'send-now']; return { ok: !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; })), version: j && j.version }; })
+      .catch(function () { return { ok: false, version: null }; });
+    return _healthP;
   }
   // N3: send a real test push through the existing pipeline (subscribe -> /send-now), body 'בדיקה מאלפרד', with a visible result
   function sendTestPush() {
@@ -1925,10 +1936,7 @@
     ((navigator.serviceWorker && navigator.serviceWorker.ready) ? navigator.serviceWorker.ready.then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; }).catch(function () { return null; }) : Promise.resolve(null))
       .then(function (sub) { njSet('sub', sub ? S.njSubOk : S.njSubNo, !!sub); });
     // 3 server health — no-store + cache-buster, live version vs expected
-    fetch(PS + '/health?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (j) {
-      var need = ['schedule', 'cleanup', 'send-now'], ok = !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; }));
-      njSet('health', ok ? S.njHealthOk(j.version) : S.njHealthBad(j && j.version), ok);
-    }).catch(function () { njSet('health', S.njHealthBad(null, 'רשת'), false); });
+    serverHealth().then(function (d) { njSet('health', d.ok ? S.njHealthOk(d.version) : S.njHealthBad(d.version), d.ok); });   // F6: same shared probe/result as the top row
     // 4 /cleanup with an invented endpoint — must not be 500
     fetch(PS + '/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
       .then(function (r) { njSet('cleanup', r.status < 500 ? S.njCleanupOk : S.njCleanupBad(r.status), r.status < 500); })
