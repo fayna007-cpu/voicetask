@@ -967,7 +967,7 @@
     var wex = wi > -1 ? d.exercises[wi] : null, wl = wex && lastOf(wex.label), wt = wex && W.targetsFor(wex, wl && wl.sets, [], { scale: R.mode === 'light' ? 0.9 : 1 })[0], ws = wt ? W.warmupSets(wt.w, wex.step) : [];
     var feel = function (k) { return line(S[k], '<div class="wk-chips wk-five">' + [1, 2, 3, 4, 5].map(function (n) { return '<button class="wk-chip' + (R.feel[k] === n ? ' on' : '') + '" onclick="WorkoutLive.readySet(\'' + k + '\',' + n + ')">' + n + '</button>'; }).join('') + '</div>'); };
     // the KEY NUMBER (gold): the first weighted exercise's first-set target, or the first exercise's reps
-    var keyT = wt ? (wex ? num(wt.w) + ' ' + unitTxt(wex) + ' × ' + num(wt.aim) : '') : (d.exercises[0] ? num((W.targetsFor(d.exercises[0], lastOf(d.exercises[0].label) && lastOf(d.exercises[0].label).sets, [])[0] || {}).aim || '') + ' ' + S.reps : '');
+    var keyT = wt ? (wex ? '⁦' + num(wt.w) + ' ' + unitTxt(wex) + ' × ' + num(wt.aim) + '⁩' : '') : (d.exercises[0] ? num((W.targetsFor(d.exercises[0], lastOf(d.exercises[0].label) && lastOf(d.exercises[0].label).sets, [])[0] || {}).aim || '') + ' ' + S.reps : '');
     // the exercise list card: 3 rows + "ועוד N תרגילים" expanding in place
     var exRow = function (e) { var l = lastOf(e.label); return '<div class="wk-ex-row"><span class="wk-ex-name">' + h(e.label) + '</span><span class="wk-ex-last">' + (l && l.sets.length ? setTxt(l.sets[0]) : S.first) + '</span></div>'; };
     var exShown = R.exOpen ? d.exercises : d.exercises.slice(0, 3), exMore = d.exercises.length - 3;
@@ -995,7 +995,7 @@
       + W.notesFor(d.exercises, cat()).map(function (n) { return '<div class="wk-note-line wk-note-ro"><span class="wk-note-g">📝 ' + muscleName(n.muscle) + '</span><span>' + h(n.text) + '</span></div>'; }).join('')
       + group(line(S.lockerT, stepper('rlk', R.locker == null ? S.none : R.locker, '', 'wkLk', 1)))
       + (ws.length ? group('<button class="wk-row" onclick="WorkoutLive.readySet(\'warm\')" aria-expanded="' + R.warmOpen + '"><span class="wk-row-l">' + S.warmPreview(ws.length) + '</span><span class="wk-row-s">' + h(wex.label) + ' ' + (R.warmOpen ? '▴' : '▾') + '</span></button>'
-        + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return num(x.w) + ' ' + unitTxt(wex) + ' × ' + num(x.r); }).join(' · ') + '</div>' : '')) : '')
+        + (R.warmOpen ? '<div class="wk-lv-cap">' + ws.map(function (x) { return '⁦' + num(x.w) + ' ' + unitTxt(wex) + ' × ' + num(x.r) + '⁩'; }).join(' · ') + '</div>' : '')) : '')
       + group('<button class="wk-row" onclick="WorkoutLive.readySet(\'feelOpen\')" aria-expanded="' + R.feelOpen + '"><span class="wk-row-l">' + S.feel + '</span><span class="wk-row-s">' + dayModes()[R.mode] + ' ' + (R.feelOpen ? '▴' : '▾') + '</span></button>'
         + (R.feelOpen ? feel('sleep') + feel('energy') + feel('pain')
           + '<div class="wk-lv-cap">' + S.modeT + '</div>' + chips(['full', 'light', 'short'], R.mode, function (k) { return 'WorkoutLive.readySet(\'mode\',\'' + k + '\')'; }, dayModes())
@@ -1045,26 +1045,31 @@
       // the HERO is the set you are about to log (weight × reps, live with the steppers); the target is one muted line
       act = '<div class="wk-lv-set active' + (ended ? ' wk-rest-over' : '') + '"><div class="wk-lv-n">' + (ended ? S.restDone(num(ex.sets.length + 1)) : S.setN(ex.sets.length + 1)) + '</div>'
         + '<div class="wk-lv-target wk-hero">' + (bw ? '' : '<bdi dir="ltr" id="wkHeroW">' + h(c.w == null ? '–' : c.w) + '</bdi><span class="wk-lv-u">' + u + '</span><span class="wk-lv-x2">×</span>') + '<bdi dir="ltr" id="wkHeroR">' + h(c.r == null ? '–' : c.r) + '</bdi>' + (bw ? '<span class="wk-lv-u">' + S.reps + '</span>' : '') + '</div>'
-        + '<div class="wk-lv-cap wk-hero-t">' + S.target + ': ' + (bw ? '' : num(tg.w) + ' ' + u + ' × ') + num(tg.range[0] + '-' + tg.range[1]) + (bw ? ' ' + S.reps : '') + '</div>'
+        + '<div class="wk-lv-cap wk-hero-t">' + S.target + ': ' + (bw ? num(tg.range[0] + '-' + tg.range[1]) + ' ' + S.reps : '⁦' + num(tg.w) + ' ' + u + ' × ' + num(tg.range[0] + '-' + tg.range[1]) + '⁩') + '</div>'
         + (c.parts && c.parts.length ? '<div class="wk-parts"><span class="wk-lv-cap">' + S.partN(c.parts.length + 1) + '</span><bdi dir="ltr" id="wkParts" class="wk-parts-v">' + h(partsTxt(c)) + '</bdi></div>' : '')
         + '<div class="wk-lv-steps">' + (bw ? '' : stepper('w', c.w, wUnit(ex), 'wkLvW', 0, 'WorkoutLive.typeW()')) + stepper('r', c.r, S.reps, 'wkLvR') + '</div>'
         + '<div class="wk-chips wk-center">' + (ex.sets.length ? '<button class="wk-chip" onclick="WorkoutLive.sameAsLast()">' + S.sameAsLast + '</button>' : '')
         + '<button class="wk-chip" onclick="WorkoutLive.addPart()">' + S.addPart + '</button>' + (c.parts && c.parts.length ? '<button class="wk-chip" onclick="WorkoutLive.removePart()">' + S.removePart + '</button>' : '') + '</div></div>';
     }
     var next = '';
-    for (var k = ex.sets.length + (active ? 1 : 0); k < n && !ex.skipped; k++) next += '<div class="wk-lv-set next"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + (bw ? '' : num(t[k].w) + ' ' + u + ' × ') + num(t[k].range[0] + '-' + t[k].range[1]) + '</span></div>';
+    for (var k = ex.sets.length + (active ? 1 : 0); k < n && !ex.skipped; k++) next += '<div class="wk-lv-set next"><span class="wk-lv-n">' + S.setN(k + 1) + '</span><span class="wk-lv-v">' + (bw ? num(t[k].range[0] + '-' + t[k].range[1]) : '⁦' + num(t[k].w) + ' ' + u + ' × ' + num(t[k].range[0] + '-' + t[k].range[1]) + '⁩') + '</span></div>';
     // warm-up (WCore.warmupIdx: auto = the first weighted exercise of each muscle group; on / off per exercise): shown ONCE,
     // before the first set, never during rest; every step tickable + editable for this session; skip-all in one tap; never counted
     var wu = '', ws = !ex.sets.length && !resting ? warmRows(i) : [];
     if (ws.length) {
       var w = ui.warm[i] || { done: {} };
-      wu = '<div class="wk-lv-group wk-warm"><div class="wk-warm-h"><span class="wk-row-l">' + S.warmT + '</span><button class="wk-lv-link wk-warm-skip" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button></div>'
-        + ws.map(function (x, j) {
-          var v = x.w == null ? num(x.r) + ' ' + S.reps : num(x.w) + ' ' + u + ' × ' + num(x.r);
+      // V46: the warm-up is COLLAPSED by default (a compact header), so it never pushes the working set below the fold.
+      // Tapping the header expands the rows. w.open is the existing toggle state (default falsy = collapsed).
+      var wdone = ws.filter(function (x, j) { return w.done[j]; }).length;
+      wu = '<div class="wk-lv-group wk-warm' + (w.open ? ' on' : ' wk-warm-collapsed') + '">'
+        + '<div class="wk-warm-h"><button class="wk-row wk-warm-toggle" onclick="WorkoutLive.warm(' + i + ',\'toggle\')" aria-expanded="' + !!w.open + '"><span class="wk-row-l">' + S.warmT + ' · ' + num(wdone) + '/' + num(ws.length) + '</span><span class="wk-row-s">' + (w.open ? '▴' : '▾') + '</span></button>'
+        + '<button class="wk-lv-link wk-warm-skip" onclick="WorkoutLive.warm(' + i + ',\'skip\')">' + S.warmSkip + '</button></div>'
+        + (w.open ? ws.map(function (x, j) {
+          var v = x.w == null ? num(x.r) + ' ' + S.reps : '⁦' + num(x.w) + ' ' + u + ' × ' + num(x.r) + '⁩';   // LtR-isolated pair -> weight-first (60×8)
           return '<div class="wk-wrow' + (w.done[j] ? ' ok' : '') + '"><button class="wk-lv-set wk-wset" onclick="WorkoutLive.warm(' + i + ',' + j + ')" aria-pressed="' + !!w.done[j] + '"><span class="wk-wtick" aria-hidden="true">' + (w.done[j] ? '✓' : '') + '</span>'
             + '<span class="wk-lv-n">' + S.warmT + ' ' + (j + 1) + '</span><span class="wk-lv-v">' + v + '</span></button>'
             + '<button class="wk-wedit" onclick="WorkoutLive.warmEdit(' + i + ',' + j + ')" aria-label="' + S.edit + ' · ' + S.warmT + ' ' + (j + 1) + '">✎</button></div>';
-        }).join('') + '</div>';
+        }).join('') : '') + '</div>';
     }
     // bodyweight on 'auto': no ramp, said in one muted line where the warm-up would be (first of its muscle group, before the first set)
     if (!wu && bw && !ex.sets.length && !resting && !ex.skipped && W.warmupMode(ex) === 'auto' && W.firstOfGroup(state.exercises, i, cat())) wu = '<div class="wk-lv-cap wk-warm-none">' + S.noWarmBw + '</div>';
