@@ -2779,3 +2779,6 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 .lux .routine-cons-fill.cons-good{background:var(--lux-green)}
 .lux .routine-cons-fill.cons-mid{background:var(--lux-gold)}
 .lux .routine-cons-fill.cons-low{background:var(--lux-warn)}
+
+/* V46 optional — hide the elapsed 0:00 chip in the summary (the real duration is in the זמן stat tile) */
+.wk-live[data-mode=finish] .wk-lv-hr{display:none}
