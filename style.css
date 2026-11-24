@@ -2755,3 +2755,14 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 /* V46 item 1 — the settings title's gear sits INLINE before the text, not dropped to its own line below */
 .lux #settingsSheet .rsheet-head h3{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-wrap:nowrap}
 .lux #settingsSheet .rsheet-head h3 [data-lux-ico]{flex:0 0 auto}
+/* V46 — the floating assistant mascot RETURNS on Home (lux). 56px visual (>=48px tap), inline-end, 12px above the nav,
+   purple ONLY inside the orb. z above content, below sheets/toast. Fades out when a sheet/live view is open, during a
+   workout (body.wk-lock), while a toast shows, or on fast scroll-down (.wk-fab-hide). html.lux='0' reverts to baseline. */
+.lux .asst-fab{display:flex !important;left:auto;right:auto;inset-inline-end:12px;bottom:calc(var(--nav-h) + 12px);width:56px;height:56px;min-width:48px;min-height:48px;z-index:55;box-shadow:0 6px 18px oklch(0.55 0.16 285 / .4);animation:fabFloat 3.4s ease-in-out infinite;transition:opacity .25s ease,transform .25s ease}
+.lux .asst-fab-orb{width:38px;height:38px}
+.lux:has(.rsheet.on) .asst-fab,.lux:has(.wk-live.on) .asst-fab,.lux:has(.toast.on) .asst-fab,.lux body.wk-lock .asst-fab,.lux .asst-fab.wk-fab-hide,.lux .asst-fab.wk-fab-occ{opacity:0 !important;pointer-events:none;transform:translateY(10px)}
+@media (prefers-reduced-motion:reduce){.lux .asst-fab{animation:none}}
+/* reserved space: the last Home item never hides behind the mascot (nav + mascot 56 + 24). The #app padding IS the
+   reservation under lux, so the legacy fab gutter collapses to avoid a double gap. */
+.lux #app{padding-bottom:calc(var(--nav-h) + 56px + 24px)}
+.lux .wk-fab-gutter{height:0}

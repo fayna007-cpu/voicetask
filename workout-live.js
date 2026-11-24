@@ -1370,12 +1370,36 @@
   // Structural + global: a wk- class on the existing FAB, no card-by-card fix, no restructure. Reduced motion = instant.
   (function fabTuck() {
     var t = 0, on = false, el = function () { return document.getElementById('asstFab'); };
-    var move = function () { var f = el(); if (!f) return; if (!on) { on = true; f.classList.add('wk-fab-tuck'); } clearTimeout(t); t = setTimeout(function () { on = false; var g = el(); if (g) g.classList.remove('wk-fab-tuck'); }, 650); };
+    // V46: the mascot NEVER covers content — it shows only when its footprint is over empty space. occluded() samples
+    // the mascot's center+corners; if a tappable element or a text node sits under it, it stays hidden (.wk-fab-occ).
+    var occluded = function (f) {
+      var m = f.getBoundingClientRect(); if (!m.width) return false;
+      var pts = [[m.left + m.width / 2, m.top + m.height / 2], [m.left + 5, m.top + 5], [m.right - 5, m.top + 5], [m.left + 5, m.bottom - 5], [m.right - 5, m.bottom - 5]];
+      for (var i = 0; i < pts.length; i++) {
+        var stack = document.elementsFromPoint(pts[i][0], pts[i][1]) || [];
+        for (var j = 0; j < stack.length; j++) {
+          var e = stack[j]; if (f === e || f.contains(e)) continue;
+          if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA|LABEL)$/.test(e.tagName) || e.getAttribute('onclick') || e.getAttribute('role') === 'button') return true;
+          var txt = false; for (var k = 0; k < e.childNodes.length; k++) { var n = e.childNodes[k]; if (n.nodeType === 3 && n.textContent.trim()) { txt = true; break; } }
+          if (txt) return true;
+          break;   // only the topmost non-mascot element at each sample point matters
+        }
+      }
+      return false;
+    };
+    var settle = function () { var f = el(); if (!f) return; if (occluded(f)) f.classList.add('wk-fab-occ'); else f.classList.remove('wk-fab-occ'); };
+    var move = function () { var f = el(); if (!f) return; if (!on) { on = true; f.classList.add('wk-fab-tuck'); } clearTimeout(t); t = setTimeout(function () { on = false; var g = el(); if (g) g.classList.remove('wk-fab-tuck'); settle(); }, 650); };
     // an always-present bottom gutter in the scroll container (sibling after #list, survives render()) so no card ever
     // sits in the FAB's rest position — the structural guarantee; the tuck above is only an extra while scrolling
     var gutter = function () { var app = document.getElementById('app'); if (!app || document.getElementById('wkFabGutter')) return; var g = document.createElement('div'); g.id = 'wkFabGutter'; g.className = 'wk-fab-gutter'; g.setAttribute('aria-hidden', 'true'); app.appendChild(g); };
-    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); };
+    var attach = function () { gutter(); window.addEventListener('scroll', move, { passive: true }); var app = document.getElementById('app'); if (app) app.addEventListener('scroll', move, { passive: true }); setTimeout(settle, 400); setInterval(settle, 2000); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+  })();
+  // V46: the floating mascot fades while the keyboard is open (an input/textarea is focused) so it never sits on the field
+  (function fabKbd() {
+    var f = function () { return document.getElementById('asstFab'); };
+    document.addEventListener('focusin', function (e) { var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) { var el = f(); if (el) el.classList.add('wk-fab-hide'); } }, true);
+    document.addEventListener('focusout', function () { setTimeout(function () { var a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return; var el = f(); if (el) el.classList.remove('wk-fab-hide'); }, 50); }, true);
   })();
   // the audio context is created (suspended) in idle time, so a tap only resumes it (creating it costs ~50 ms)
   (window.requestIdleCallback || function (f) { return setTimeout(f, 1500); })(function () { if (enabled()) audio(false); });
