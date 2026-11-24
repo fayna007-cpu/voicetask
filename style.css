@@ -2752,3 +2752,6 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 .lux .card-link-chip:active{background:var(--lux-s2)}
 .lux .cal-badge.synced{background:rgba(143,209,168,.14);color:var(--lux-green)}
 .lux .routine-badge .streak-flame,.lux .r-consistency,.lux .routine-consistency{color:var(--lux-gold)}
+/* V46 item 1 — the settings title's gear sits INLINE before the text, not dropped to its own line below */
+.lux #settingsSheet .rsheet-head h3{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-wrap:nowrap}
+.lux #settingsSheet .rsheet-head h3 [data-lux-ico]{flex:0 0 auto}
