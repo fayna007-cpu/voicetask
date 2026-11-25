@@ -1927,7 +1927,9 @@
     var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
     var send = function () {
       var userId = (window.gAuth && gAuth.email) || 'anon';
-      return pf('/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
+      var body = { userId: userId, title: 'אלפרד', body: S.testPushBody };   // SUBSCRIPTION: identical path to the ordinary one — register this device first, retry once on no-subscription (404)
+      var req = window.pushPostRetry ? window.pushPostRetry('/send-now', body) : pf('/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return req
         .then(function (r) { var status = r.status, ok = r.ok; return r.json().catch(function () { return {}; }).then(function (body) { return { status: status, ok: ok, body: body || {} }; }); })
         .then(function (d) {
           if (!res) return;
@@ -1941,8 +1943,7 @@
         .catch(function (e) { if (res) { res.textContent = S.testPushFail((e && e.message) || 'רשת'); res.className = 'wk-st-result warn'; } });
     };
     try {
-      if (window.subscribeToPush) return Promise.resolve(window.subscribeToPush()).then(function (ok) { if (!ok) { if (res) res.textContent = S.testPushFail(S.subStepNo); return; } return send(); });
-      return send();
+      return send();   // SUBSCRIPTION: send() uses pushPostRetry = ensureSubscribed + retry-once-on-404. No pre-bail on a failed subscribe: the worker may already hold a valid subscription, and a real 404 re-registers then retries, finally reporting the server's true answer.
     } catch (e) { if (res) res.textContent = S.testPushFail((e && e.message) || 'שגיאה'); }
   }
   // N5: the notification-journey test — 7 steps, each with a live status line (amber on failure, never green).
@@ -1977,7 +1978,8 @@
       .catch(function () { njSet('cleanup', S.njCleanupBad('רשת'), false); });
     // 5 a REAL push now — the SW posts VT_TEST_PUSH back; 15s timeout -> 'לא התקבלה'
     njReal.start = Date.now();
-    pf('/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
+    var _realBody = { userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } };   // SUBSCRIPTION: same register-then-retry path as the ordinary send
+    (window.pushPostRetry ? window.pushPostRetry('/send-now', _realBody) : pf('/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_realBody) }))
       .then(function (r) { if (!njReal.done) njSet('real', r.ok ? S.njRealSent : S.njRealNo, r.ok); }).catch(function () { njSet('real', S.njRealNo, false); });
     setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 15000);
     // 6 inbox write — labelled 'בדיקה', never counted as journey/insights, auto-removed after 24h
@@ -1985,7 +1987,8 @@
     catch (_) { njSet('inbox', S.njInboxNo, false); }
     // 7 a REAL scheduled push for +2 min through production /schedule, with a countdown
     var when = Date.now() + 120000; njSched.start = Date.now();
-    pf('/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
+    var _schedBody = { userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] };   // SUBSCRIPTION: register before scheduling so the cron has a target at fire time
+    (window.pushPostRetry ? window.pushPostRetry('/schedule', _schedBody) : pf('/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_schedBody) }))
       .then(function (r) { if (!r.ok) { njSet('sched', S.njSchedNo, false); return; }
         var tick = setInterval(function () { if (njSched.done) { clearInterval(tick); return; } var left = Math.round((when - Date.now()) / 1000); if (left > 0) njSet('sched', S.njSchedWait(left), true); else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); } }, 1000);
       }).catch(function () { njSet('sched', S.njSchedNo, false); });
