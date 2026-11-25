@@ -2094,6 +2094,10 @@ let _calNowTimer=null,_editingGcalEventId=null;
 const CAL_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const CAL_DAYS=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','שב׳'];
 let gAuth=null,tokenClient=null;
+// SUBSCRIPTION: gAuth is a top-level `let`, so it is NOT on window. workout-live.js read window.gAuth
+// (undefined) -> userId fell back to 'anon', while the working push paths use the in-scope gAuth.email.
+// This one source gives every script the SAME userId the device subscribed under.
+window.getPushUserId=function(){return (gAuth&&gAuth.email)||'anon';};
 let rec=null,siriLive=false;
 let animId=null;
 

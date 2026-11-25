@@ -1926,7 +1926,7 @@
   function sendTestPush() {
     var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
     var send = function () {
-      var userId = (window.gAuth && gAuth.email) || 'anon';
+      var userId = window.getPushUserId ? window.getPushUserId() : 'anon';   // SUBSCRIPTION: same userId the device subscribed under (was window.gAuth=undefined -> 'anon')
       var body = { userId: userId, title: 'אלפרד', body: S.testPushBody };   // SUBSCRIPTION: identical path to the ordinary one — register this device first, retry once on no-subscription (404)
       var req = window.pushPostRetry ? window.pushPostRetry('/send-now', body) : pf('/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       return req
@@ -1962,7 +1962,7 @@
       var d = document.createElement('div'); d.className = 'wk-nj-step'; d.id = 'wkNj_' + key;
       d.innerHTML = '<span class="wk-nj-l">' + h(S.njStep[key]) + '</span><span class="wk-nj-v">' + h(S.njWait) + '</span>'; box.appendChild(d);
     });
-    var PS = window.PUSH_SERVER || '', userId = (window.gAuth && gAuth.email) || 'anon';
+    var PS = window.PUSH_SERVER || '', userId = window.getPushUserId ? window.getPushUserId() : 'anon';
     if (!njMsgBound) { try { navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', njHandleMsg); njMsgBound = true; } catch (_) { } }
     // 1 permission
     var perm = (window.Notification && Notification.permission) || 'default';
