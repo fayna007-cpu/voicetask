@@ -2782,3 +2782,11 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 
 /* V46 optional — hide the elapsed 0:00 chip in the summary (the real duration is in the זמן stat tile) */
 .wk-live[data-mode=finish] .wk-lv-hr{display:none}
+
+/* ADDITION 3 — the technical-details line in מצב התראות */
+.wk-st-diag{margin:6px 14px 10px;font-size:12px}
+.wk-st-diag summary{color:var(--lux-mut,#9A968C);cursor:pointer;padding:6px 0;font-weight:700}
+.wk-st-diag-body{display:flex;flex-direction:column;gap:4px;padding:4px 0}
+.wk-st-diag-row{display:flex;justify-content:space-between;gap:10px}
+.wk-st-diag-k{color:var(--lux-mut,#9A968C);flex:0 0 auto}
+.wk-st-diag-v{color:var(--lux-text,#F4F0E8);text-align:end;word-break:break-all;font-variant-numeric:tabular-nums}

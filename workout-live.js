@@ -17,6 +17,8 @@
   var num = function (n) { return '<bdi dir="ltr">' + h(n) + '</bdi>'; };
   // F7: LTR isolation for PLAIN-TEXT sinks (notification title/body, aria-label, toast, document.title) — Unicode isolates, never markup
   var numIso = function (n) { return '⁦' + String(n == null ? '' : n) + '⁩'; };
+  // HOTFIX: single push-worker fetch path — no-store + a unique cache-buster, via the global pushFetch (fallback inline).
+  var pf = function (path, opts) { if (window.pushFetch) return window.pushFetch(path, opts); var sep = path.indexOf('?') >= 0 ? '&' : '?'; return fetch((window.PUSH_SERVER || '') + path + sep + 'cb=' + Date.now().toString(36) + Math.random().toString(36).slice(2), Object.assign({ cache: 'no-store' }, opts || {})); };
   var setTxt = function (x) { return '<bdi dir="ltr">' + h(W.setText(x)) + '</bdi>'; };          // "28×6", combined "28×6+5"
   var js = function (v) { return h(JSON.stringify(v)); };                // a value inside an onclick="" attribute
 
@@ -1856,10 +1858,13 @@
     if (window.__wkCleanupFailed) html += '<div class="wk-st-step">' + h(S.cleanupFailNote) + '</div>';
     html += '<div class="wk-st-sched-h">' + h(S.next48T) + '</div>';
     if (!sched.length) html += '<div class="wk-st-note">' + h(S.next48None) + '</div>';
-    else html += sched.slice(0, 8).map(function (n) { var t = new Date(n.fireAt).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); return '<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>'; }).join('');
+    else html += sched.slice(0, 8).map(function (n) { var d = new Date(n.fireAt), t = ''; try { if (!isNaN(d.getTime())) t = d.toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: W.TZ }); } catch (_) { t = ''; } return t ? ('<div class="wk-st-item"><span class="wk-st-item-t">' + num(t) + '</span><span class="wk-st-item-ti">' + h(n.title) + '</span></div>') : ''; }).join('');   // guard: an invalid fireAt must never throw and break the whole status screen
     html += '<button class="wk-chip wk-st-test" onclick="WorkoutHome.sendTestPush()">' + h(S.testPushBtn) + '</button><div class="wk-st-result" id="wkTestResult" aria-live="polite"></div>';
     html += '<button class="wk-chip wk-st-test wk-nj-btn" onclick="WorkoutHome.runNotifJourney()">' + h(S.njBtn) + '</button><div class="wk-nj" id="wkNotifJourney" aria-live="polite"></div>';   // N5
+    // ADDITION 3: a collapsed 'פרטים טכניים' line printing EXACTLY what THIS device sees on the health + send-now probes
+    html += '<details class="wk-st-diag"><summary>' + h(S.diagT) + '</summary><div class="wk-st-diag-body" id="wkPushDiag">' + h(S.diagProbing) + '</div></details>';
     el.innerHTML = html;
+    try { runPushDiag(); } catch (_) { }
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready
         .then(function (reg) { return reg && reg.pushManager ? reg.pushManager.getSubscription() : null; })
@@ -1882,18 +1887,46 @@
     var now = Date.now();
     if (!fresh && _healthP && now - _healthAt < 5000) return _healthP;
     _healthAt = now;
-    _healthP = fetch((window.PUSH_SERVER || '') + '/health?t=' + now, { cache: 'no-store' })
+    _healthP = pf('/health?t=' + now, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
       .then(function (j) { var need = ['schedule', 'cleanup', 'send-now']; return { ok: !!(j && Array.isArray(j.routes) && need.every(function (x) { return j.routes.indexOf(x) >= 0; })), version: j && j.version }; })
       .catch(function () { return { ok: false, version: null }; });
     return _healthP;
+  }
+  // ADDITION 3: print EXACTLY what THIS device sees — URL + source, health (status/version/routes), SW-vs-network,
+  // and /send-now (status + first 80 chars of body, 'ריק' if empty). Always probes the DEFAULT worker URL with
+  // no-store + a unique query; any stored override is removed first. Invented userId so no real push is sent.
+  function runPushDiag() {
+    var box = $('wkPushDiag'); if (!box) return;
+    var base = (window.PUSH_SERVER || '');
+    var removed = []; try { ['vt_push_server', 'pushServer', 'PUSH_SERVER', 'vt_worker', 'pushUrl'].forEach(function (k) { if (localStorage.getItem(k) != null) { removed.push(k); localStorage.removeItem(k); } }); } catch (_) { }
+    var ctrl = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+    var esc = function (s) { return h(String(s == null ? '' : s)); };
+    var row = function (l, v) { return '<div class="wk-st-diag-row"><span class="wk-st-diag-k">' + esc(l) + '</span><span class="wk-st-diag-v" dir="ltr">' + esc(v) + '</span></div>'; };
+    var cb = function () { return 'cb=' + Date.now().toString(36) + Math.random().toString(36).slice(2); };
+    box.innerHTML = row('URL', base + '/health')
+      + row('מקור', removed.length ? ('override הוסר: ' + removed.join(',')) : 'ברירת מחדל (const)')
+      + row('SW שולט בדף', ctrl ? 'כן' : 'לא')
+      + '<div id="wkDiagH">' + h(S.diagProbing) + '</div><div id="wkDiagS">' + h(S.diagProbing) + '</div>';
+    var t0 = Date.now();
+    fetch(base + '/health?' + cb(), { cache: 'no-store' }).then(function (r) {
+      return r.text().then(function (b) {
+        var ms = Date.now() - t0, j = null; try { j = JSON.parse(b); } catch (_) { }
+        var via = 'רשת (cross-origin — ה-SW עוקף, לא מהמטמון)';
+        var d = $('wkDiagH'); if (d) d.innerHTML = row('health', 'HTTP ' + r.status + ' · ' + ms + 'ms · ' + via)
+          + row('גרסה', j ? j.version : '—') + row('routes', j && j.routes ? j.routes.join(',') : (b ? b.slice(0, 80) : S.diagEmpty));
+      });
+    }).catch(function (e) { var d = $('wkDiagH'); if (d) d.innerHTML = row('health', 'שגיאה: ' + (e && e.message || 'רשת')); });
+    fetch(base + '/send-now?' + cb(), { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__diag_probe__', title: 'בדיקה', body: 'diag' }) }).then(function (r) {
+      return r.text().then(function (b) { var d = $('wkDiagS'); if (d) d.innerHTML = row('send-now', 'HTTP ' + r.status) + row('גוף', (b && b.trim()) ? b.slice(0, 80) : S.diagEmpty); });
+    }).catch(function (e) { var d = $('wkDiagS'); if (d) d.innerHTML = row('send-now', 'שגיאה: ' + (e && e.message || 'רשת')); });
   }
   // N3: send a real test push through the existing pipeline (subscribe -> /send-now), body 'בדיקה מאלפרד', with a visible result
   function sendTestPush() {
     var res = $('wkTestResult'); if (res) res.textContent = S.testSending;
     var send = function () {
       var userId = (window.gAuth && gAuth.email) || 'anon';
-      return fetch((window.PUSH_SERVER || '') + '/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
+      return pf('/send-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: 'אלפרד', body: S.testPushBody }) })
         .then(function (r) { var status = r.status, ok = r.ok; return r.json().catch(function () { return {}; }).then(function (body) { return { status: status, ok: ok, body: body || {} }; }); })
         .then(function (d) {
           if (!res) return;
@@ -1938,12 +1971,12 @@
     // 3 server health — no-store + cache-buster, live version vs expected
     serverHealth().then(function (d) { njSet('health', d.ok ? S.njHealthOk(d.version) : S.njHealthBad(d.version), d.ok); });   // F6: same shared probe/result as the top row
     // 4 /cleanup with an invented endpoint — must not be 500
-    fetch(PS + '/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
+    pf('/cleanup', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__nj_invented__', validIds: [] }) })
       .then(function (r) { njSet('cleanup', r.status < 500 ? S.njCleanupOk : S.njCleanupBad(r.status), r.status < 500); })
       .catch(function () { njSet('cleanup', S.njCleanupBad('רשת'), false); });
     // 5 a REAL push now — the SW posts VT_TEST_PUSH back; 15s timeout -> 'לא התקבלה'
     njReal.start = Date.now();
-    fetch(PS + '/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
+    pf('/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } }) })
       .then(function (r) { if (!njReal.done) njSet('real', r.ok ? S.njRealSent : S.njRealNo, r.ok); }).catch(function () { njSet('real', S.njRealNo, false); });
     setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 15000);
     // 6 inbox write — labelled 'בדיקה', never counted as journey/insights, auto-removed after 24h
@@ -1951,7 +1984,7 @@
     catch (_) { njSet('inbox', S.njInboxNo, false); }
     // 7 a REAL scheduled push for +2 min through production /schedule, with a countdown
     var when = Date.now() + 120000; njSched.start = Date.now();
-    fetch(PS + '/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
+    pf('/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] }) })
       .then(function (r) { if (!r.ok) { njSet('sched', S.njSchedNo, false); return; }
         var tick = setInterval(function () { if (njSched.done) { clearInterval(tick); return; } var left = Math.round((when - Date.now()) / 1000); if (left > 0) njSet('sched', S.njSchedWait(left), true); else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); } }, 1000);
       }).catch(function () { njSet('sched', S.njSchedNo, false); });
