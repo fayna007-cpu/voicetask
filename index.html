@@ -1596,6 +1596,7 @@ const GOOGLE_CLIENT_ID='98540256249-t70ecj5dilh8qh1gdl9lcnrk4a6cliuf.apps.google
 const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 const N8N_WEBHOOK='https://guyfs.app.n8n.cloud/webhook/voicetask';
 const PUSH_SERVER='https://voicetask-push.fayna007.workers.dev';
+window.PUSH_SERVER=PUSH_SERVER;   // SUBSCRIPTION fix: a top-level const is NOT on window; the diag probe read window.PUSH_SERVER and got '' -> '/health' resolved relative to the SITE, not the worker. Expose it so the diag (and pf's fallback) hit the worker and show the full URL.
 // HOTFIX: the ONLY way to reach the push worker. Every call is cache:'no-store' + a unique cache-buster so iOS never
 // reuses a stale response OR a stale CORS preflight (the phone's 'ישן'/'405' cause). Single source, no override.
 window.pushFetch=function(pathWithOpts,opts){var path=pathWithOpts,o=opts||{};var sep=path.indexOf('?')>=0?'&':'?';var cb='cb='+Date.now().toString(36)+Math.random().toString(36).slice(2);var init=Object.assign({cache:'no-store'},o);return fetch(PUSH_SERVER+path+sep+cb,init);};
@@ -2138,7 +2139,7 @@ function registerWithEmail(){
   gAuth={email,name,picture:''};
   localStorage.setItem('vt_auth',JSON.stringify(gAuth));showApp();
 }
-function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();subscribeToPush();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();setTimeout(()=>{try{startMissedScanLoop();}catch(_){}},6000);setTimeout(()=>{try{notifV2BootSync();}catch(_){}},100);setTimeout(()=>{try{notifV2HandleUrlAction();}catch(_){}},300);}
+function showApp(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('app').style.display='';updateUserChip();render();updateBadge();updateGreeting();scheduleNotifications();scheduleEmailReminders();scheduleWeeklyReminderNotifs();ensureSubscribed();loadNotifSettings();scheduleSmartPushNotifs();initCalPanel();updatePendingBadge();setTimeout(checkSWShare,800);setTimeout(maybeShowDailyPopup,1200);setTimeout(maybeAutoDriveBackup,3000);setTimeout(maybeShowWeeklyRoutinePattern,2000);setTimeout(maybeShowGEReminder,4000);setTimeout(maybeAlfredWelcome,2500);setTimeout(maybeWeeklyLetter,5000);if(typeof initFabDrag==='function')initFabDrag();setTimeout(()=>{try{startMissedScanLoop();}catch(_){}},6000);setTimeout(()=>{try{notifV2BootSync();}catch(_){}},100);setTimeout(()=>{try{notifV2HandleUrlAction();}catch(_){}},300);}
 function showLogin(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('app').style.display='none'}
 function updateUserChip(){
   if(!gAuth)return;
@@ -5086,10 +5087,26 @@ async function subscribeToPush(){
     return r.ok;
   }catch(e){console.warn('Push subscribe error:',e.name,e.message);return false;}
 }
+// SUBSCRIPTION: one idempotent registration shared by EVERY send/schedule path, memoized ~60s.
+// force=true re-registers now (used to retry once after the worker answers no-subscription 404).
+let _ensureSubP=null,_ensureSubAt=0;
+function ensureSubscribed(force){
+  if(force||!_ensureSubP||Date.now()-_ensureSubAt>60000){_ensureSubAt=Date.now();_ensureSubP=subscribeToPush().catch(()=>false);}
+  return _ensureSubP;
+}
+window.ensureSubscribed=ensureSubscribed;
+// POST to a worker route, and if it answers 404 no-subscription, re-register this device and retry ONCE.
+async function pushPostRetry(path,payload){
+  await ensureSubscribed();
+  let r=await pushFetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(r.status===404){await ensureSubscribed(true);r=await pushFetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});}
+  return r;
+}
+window.pushPostRetry=pushPostRetry;
 async function scheduleToPushServer(notifications){
   if(PUSH_SERVER.includes('REPLACE'))return;
   const userId=gAuth?.email||'anon';
-  try{await pushFetch('/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,notifications})});}
+  try{await ensureSubscribed();await pushFetch('/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,notifications})});}   // SUBSCRIPTION: register before scheduling so the cron has a target at fire time
   catch(e){console.warn('scheduleToPushServer:',e);}
 }
 function scheduleNotifications(){
