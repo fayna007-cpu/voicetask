@@ -1,4 +1,5 @@
 const V = 'alfred-v49';
+// deploy: userId fix (workout push paths use real email, not anon)
 const STATIC = ['./manifest.json', './icon.svg', './hebrew-time.js', './routine-schedule.js', './workout-core.js', './workout.js', './wk-copy.js', './wk-coach.js', './wk-mascot.js', './wk-brief.js', './wk-insights.js', './wk-inbox.js', './workout-live.js', './heebo.woff2', './frank-ruhl.woff2'];
 try { importScripts('./wk-inbox.js'); } catch (e) { }   // J9: the inbox store (WkInbox) is available in the SW too
 
