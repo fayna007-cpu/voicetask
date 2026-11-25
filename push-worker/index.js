@@ -72,7 +72,7 @@ export default {
     // GET /health — capability probe (no secrets); always fresh (no-store via CORS).
     if(path==='/health'){
       if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'method not allowed'},405);
-      return json({version:'2026-11-23',routes:['schedule','cleanup','send-now']});
+      return json({version:'2026-11-25',routes:['subscribe','schedule','cleanup','send-now']});
     }
 
     // the POST endpoints: parse the body ONCE here -> malformed JSON is a 400, never a 500 (W3)
