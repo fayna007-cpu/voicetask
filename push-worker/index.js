@@ -167,8 +167,10 @@ export default {
       if(sub){
         try{
           const r=await sendPush(sub,notif,env);
-          // 410 = subscription expired, 404 = gone — delete subscription too
-          if(r.status===410||r.status===404)await env.KV.delete(`sub:${notif.userId}`);
+          // Delete the subscription ONLY on 410 Gone (the spec-defined "permanently unsubscribed").
+          // A 404 on one send can be transient/gateway-specific; deleting on it wiped a still-valid
+          // registration, so the next /send-now answered 'no subscription' (404 'אין מנוי').
+          if(r.status===410)await env.KV.delete(`sub:${notif.userId}`);
         }catch(e){console.error('sendPush failed:',e);}
       }
       await env.KV.delete(name);
