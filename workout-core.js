@@ -539,7 +539,7 @@
     if (!isPR(set, ex, history)) return null;
     var k = labelKey(ex.label), prev = [], perSession = [];
     (history || []).forEach(function (s) { var hit = (s.exercises || []).filter(function (x) { return labelKey(x.label) === k; }); if (!hit.length) return; var sets = hit.reduce(function (a, x) { return a.concat(x.sets || []); }, []); prev = prev.concat(sets); perSession.push({ date: s.date, sets: sets }); });
-    var kg = ex.unit === 'kg' || (ex.unit === undefined && set.w != null), r = firstR(set), out = { set: setText(set) };
+    var kg = ex.unit === 'kg' || (ex.unit === undefined && set.w != null), r = firstR(set), out = { set: setText(set), kg: kg };   // V47 B: expose the unit so the PR moment can show ק״ג
     if (kg && set.w != null && e1rm(set.w, r) != null) {
       var now = e1rm(set.w, r), was = prev.reduce(function (m, x) { var v = e1rm(x.w, firstR(x)); return v != null && v > m ? v : m; }, 0);
       out.kind = 'e1rm'; out.deltaKg = Math.round((now - was) * 10) / 10; out.prev = was;

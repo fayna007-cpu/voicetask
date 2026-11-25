@@ -2790,3 +2790,33 @@ body.wk-lock .siri-orb, body.wk-lock .siri-orb *, body.wk-lock .siri-bar, body.w
 .wk-st-diag-row{display:flex;justify-content:space-between;gap:10px}
 .wk-st-diag-k{color:var(--lux-mut,#9A968C);flex:0 0 auto}
 .wk-st-diag-v{color:var(--lux-text,#F4F0E8);text-align:end;word-break:break-all;font-variant-numeric:tabular-nums}
+
+/* A2 FONT — form controls do NOT inherit font-family by UA default; on iOS WebKit
+   that renders Hebrew inside buttons/inputs in the system font, not Heebo. Route
+   every control through the app font. Family only (NOT the `font` shorthand) so
+   each control keeps its own size/weight — no visual-freeze regression. */
+button,input,textarea,select,optgroup,option{font-family:inherit}
+
+/* A3 ASSISTANT — the Home mascot stays visible at idle at EVERY scroll position.
+   Append-only overrides (style.css is append-only): same selector + !important,
+   declared later, so they win over the hide rules above without deleting them.
+   - occ: never hide-on-occlusion at idle (visibility wins over never-over-text;
+     the orb is a small inline-end corner FAB). transform left alone so the float
+     animation keeps running.
+   - tuck: do not hide while scrolling either ("remove scroll-direction hiding").
+     transform:none only while the transient tuck class is present (during scroll). */
+.lux .asst-fab.wk-fab-occ{opacity:1 !important;pointer-events:auto !important}
+.lux .asst-fab.wk-fab-tuck{opacity:1 !important;pointer-events:auto !important;transform:none !important}
+
+/* V47 B — PR MOMENT: show the ק״ג unit as a smaller suffix and keep the whole
+   figure on ONE line at phone width. Fluid size (max the original 84px) so a
+   long value like "62.5×9 ק״ג" never wraps. Appended rules win over the 84px
+   above at equal specificity. */
+.wk-prm-n{white-space:nowrap !important;font-size:min(84px,13vw) !important}
+.lux .wk-prm-n{font-size:min(84px,13vw) !important}
+.wk-prm-unit{font-size:.42em;font-weight:700;opacity:.82;margin-inline-start:.14em}
+
+/* V47 C — gold logo orb (header). The home assistant FAB stays lavender; this
+   header identity orb goes gold, matching the gold coach. Append-only override. */
+.logo-orb{background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f3e2ab 48%,#cfa23a 100%) !important;box-shadow:0 3px 10px oklch(0.78 0.14 85 / 0.5),inset 0 -2px 4px oklch(0.6 0.12 85 / 0.3) !important}
+.logo-orb-eye{background:#3a2a05 !important}
