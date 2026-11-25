@@ -51,7 +51,9 @@ async function sendPush(sub,notif,env){
   if(notif.tag)body.tag=notif.tag;
   const payload=JSON.stringify(body);
   const [enc,auth]=await Promise.all([encrypt(sub,payload),vapidAuth(sub.endpoint,env.VAPID_PUBLIC_KEY,env.VAPID_PRIVATE_JWK,env.VAPID_SUBJECT)]);
-  return fetch(sub.endpoint,{method:'POST',headers:{Authorization:auth,'Content-Type':'application/octet-stream','Content-Encoding':'aes128gcm',TTL:'86400'},body:enc});
+  // Urgency 'high' so reminders wake the device promptly (was absent -> 'normal' default, which can let
+  // the push service batch/delay delivery — the ~2-min lateness owners saw). TTL 1 day keeps a sensible window.
+  return fetch(sub.endpoint,{method:'POST',headers:{Authorization:auth,'Content-Type':'application/octet-stream','Content-Encoding':'aes128gcm',TTL:'86400',Urgency:'high'},body:enc});
 }
 
 // Cache-Control:no-store on EVERY response (incl. OPTIONS, /health, errors) so no client ever caches a stale version.
