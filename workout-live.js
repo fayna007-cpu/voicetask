@@ -1951,8 +1951,14 @@
   var njMsgBound = false, njReal = { start: 0, done: false }, njSched = { start: 0, done: false };
   function njHandleMsg(ev) {
     if (!ev || !ev.data || ev.data.type !== 'VT_TEST_PUSH') return;
-    if (!njReal.done && njReal.start) { njReal.done = true; njSet('real', S.njRealOk(Math.round((Date.now() - njReal.start) / 1000)), true); }
-    else if (!njSched.done && njSched.start && Date.now() - njSched.start > 5000) { njSched.done = true; njSet('sched', S.njSchedOk, true); }
+    var nj = ev.data.nj;   // route by which test this push belongs to; the two are otherwise indistinguishable (both payload.test)
+    var markReal = function () { if (!njReal.done && njReal.start) { njReal.done = true; njSet('real', S.njRealOk(Math.round((Date.now() - njReal.start) / 1000)), true); } };
+    var markSched = function () { if (!njSched.done && njSched.start) { njSched.done = true; njSet('sched', S.njSchedOk, true); } };
+    if (nj === 'real') return markReal();
+    if (nj === 'sched') return markSched();
+    // legacy/untagged fallback: immediate first, then the scheduled one (>5s after it started)
+    if (!njReal.done && njReal.start) markReal();
+    else if (!njSched.done && njSched.start && Date.now() - njSched.start > 5000) markSched();
   }
   function njSet(key, text, ok) { var d = $('wkNj_' + key); if (!d) return; var v = d.querySelector('.wk-nj-v'); if (v) { v.textContent = text; v.className = 'wk-nj-v ' + (ok ? 'ok' : 'warn'); } }
   function runNotifJourney() {
@@ -1978,19 +1984,26 @@
       .catch(function () { njSet('cleanup', S.njCleanupBad('רשת'), false); });
     // 5 a REAL push now — the SW posts VT_TEST_PUSH back; 15s timeout -> 'לא התקבלה'
     njReal.start = Date.now();
-    var _realBody = { userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true } };   // SUBSCRIPTION: same register-then-retry path as the ordinary send
+    var _realBody = { userId: userId, title: S.njTestLabel, body: S.testPushBody, payload: { test: true, nj: 'real' } };   // SUBSCRIPTION: same register-then-retry path as the ordinary send
     (window.pushPostRetry ? window.pushPostRetry('/send-now', _realBody) : pf('/send-now', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_realBody) }))
       .then(function (r) { if (!njReal.done) njSet('real', r.ok ? S.njRealSent : S.njRealNo, r.ok); }).catch(function () { njSet('real', S.njRealNo, false); });
-    setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 15000);
+    setTimeout(function () { if (!njReal.done) njSet('real', S.njRealNo, false); }, 240000);   // widen 'on time' to 4 min; a later VT_TEST_PUSH still flips it to 'התקבלה'
     // 6 inbox write — labelled 'בדיקה', never counted as journey/insights, auto-removed after 24h
     try { if (window.WkInbox) { WkInbox.add({ id: 'nj_test_' + Date.now(), category: S.njTestLabel, title: S.njTestLabel, body: S.testPushBody, expireAt: Date.now() + 24 * 3600000 }).then(function (ok) { njSet('inbox', ok ? S.njInboxOk : S.njInboxNo, !!ok); }); } else njSet('inbox', S.njInboxNo, false); }
     catch (_) { njSet('inbox', S.njInboxNo, false); }
     // 7 a REAL scheduled push for +2 min through production /schedule, with a countdown
     var when = Date.now() + 120000; njSched.start = Date.now();
-    var _schedBody = { userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true } }] };   // SUBSCRIPTION: register before scheduling so the cron has a target at fire time
+    var _schedBody = { userId: userId, notifications: [{ id: 'nj_sched_' + Date.now(), title: S.njTestLabel, body: S.testPushBody, fireAt: new Date(when).toISOString(), payload: { test: true, nj: 'sched' } }] };   // SUBSCRIPTION: register before scheduling so the cron has a target at fire time
     (window.pushPostRetry ? window.pushPostRetry('/schedule', _schedBody) : pf('/schedule', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_schedBody) }))
       .then(function (r) { if (!r.ok) { njSet('sched', S.njSchedNo, false); return; }
-        var tick = setInterval(function () { if (njSched.done) { clearInterval(tick); return; } var left = Math.round((when - Date.now()) / 1000); if (left > 0) njSet('sched', S.njSchedWait(left), true); else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); } }, 1000);
+        var deadline = when + 240000;   // 4-minute grace PAST the scheduled fire before declaring it late (push delivery lags)
+        var tick = setInterval(function () {
+          if (njSched.done) { clearInterval(tick); return; }
+          var now = Date.now();
+          if (now < when) njSet('sched', S.njSchedWait(Math.round((when - now) / 1000)), true);      // counting down to fire
+          else if (now < deadline) njSet('sched', S.njSchedLate, true);                              // fired, within grace -> still 'ממתינה', NOT a failure
+          else { clearInterval(tick); if (!njSched.done) njSet('sched', S.njSchedNo, false); }       // only now, after 4 min, call it late
+        }, 1000);
       }).catch(function () { njSet('sched', S.njSchedNo, false); });
   }
   // J2/SM5: client-side 'אימון חדש נקבע' confirmation card, rendered from the saved routine (no AI-worker change).

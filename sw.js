@@ -213,7 +213,7 @@ self.addEventListener('push', e => {
     const bg=(async()=>{
       try{await _swLogPersist('log','[sw] push title='+data.title+' type='+((payload&&payload.type)||'-')+' swallow='+swallow);}catch(_){}
       try{if(payload&&payload.type&&payload.id!=null)await _swIdbPut({key:'meta:lastPushArrival',payload,at:Date.now()});}catch(_){}
-      try{if(payload&&payload.test){const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});cs.forEach(c=>{try{c.postMessage({type:'VT_TEST_PUSH',at:Date.now()});}catch(_){}});}}catch(_){}
+      try{if(payload&&payload.test){const cs=await self.clients.matchAll({type:'window',includeUncontrolled:true});cs.forEach(c=>{try{c.postMessage({type:'VT_TEST_PUSH',at:Date.now(),nj:payload.nj||null});}catch(_){}});}}catch(_){}
       try{if(!swallow&&self.WkInbox&&self.WkInbox.add){const cat=(payload&&payload.type==='workout')?'אימון':(payload&&payload.type==='task')?'משימה':((payload&&payload.type)||'אחר');const id=(payload&&payload.type&&payload.id!=null)?(payload.type+'_'+payload.id+'_'+(payload.stage||'')):((data.tag||'push')+'_'+Date.now());await self.WkInbox.add({id:id,ts:Date.now(),category:cat,title:data.title||'',body:data.body||'',deepLink:(payload&&payload.type==='workout')?'workout':null,test:/בדיקה/.test(data.body||'')});}}catch(_){}
     })();
     if(!swallow){ try{await self.registration.showNotification(data.title,opts);}catch(_){} }   // the guaranteed pop
