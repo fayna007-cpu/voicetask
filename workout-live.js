@@ -649,7 +649,8 @@
   function showPR(info, label) {
     var e = prEl();
     $('wkPrEx').textContent = label;
-    $('wkPrN').textContent = info.set.replace(/[⁦-⁩]/g, '');
+    var _prN = $('wkPrN'); _prN.textContent = info.set.replace(/[⁦-⁩]/g, '');
+    if (info.kg) { var _u = document.createElement('span'); _u.className = 'wk-prm-unit'; _u.textContent = T.unit.kg; _prN.appendChild(_u); }   // V47 B: ק״ג as a smaller suffix; CSS keeps the whole figure on one line
     var d = $('wkPrD'); d.innerHTML = info.kind === 'e1rm' && info.prev > 0 ? S.prDeltaKg(num(info.deltaKg)) : info.kind === 'reps' && info.deltaReps > 0 && info.prev > 0 ? S.prDeltaReps(num(info.deltaReps)) : '';
     d.hidden = !d.innerHTML;
     var sub = $('wkPrSub'); sub.textContent = info.streak >= 2 ? S.prStreak(info.streak) : '';   // only when the streak is real

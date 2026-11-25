@@ -39,18 +39,19 @@
   var HOLD = { rest: 1, wake: 1 };
 
   function head(id) {
-    return '<defs><radialGradient id="b' + id + '" cx="36%" cy="28%" r="85%"><stop offset="0" stop-color="#d9d3f5"/><stop offset=".45" stop-color="#958ddb"/><stop offset=".85" stop-color="#5b53b0"/><stop offset="1" stop-color="#423b8c"/></radialGradient>' +
-      '<radialGradient id="h' + id + '" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d6ccff"/><stop offset="1" stop-color="#6a58dc"/></radialGradient>' +
+    // V47 C — gold coach: the workout mascot is gold (the home assistant orb stays lavender, a separate CSS element)
+    return '<defs><radialGradient id="b' + id + '" cx="36%" cy="28%" r="85%"><stop offset="0" stop-color="#f6ecc4"/><stop offset=".45" stop-color="#e3c871"/><stop offset=".85" stop-color="#c3972f"/><stop offset="1" stop-color="#9c7620"/></radialGradient>' +
+      '<radialGradient id="h' + id + '" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#f8efcf"/><stop offset="1" stop-color="#c99a33"/></radialGradient>' +
       '<radialGradient id="s' + id + '" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
-      '<linearGradient id="r' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#2b1f7a" stop-opacity=".5"/></linearGradient></defs>';
+      '<linearGradient id="r' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#5a3f0a" stop-opacity=".5"/></linearGradient></defs>';
   }
   function svg(id, variant) {
     var acc = variant === 'class'
-      ? '<path d="M27 66 Q25 22 70 19 Q115 22 113 66" fill="none" stroke="#5b52b3" stroke-width="5.5" stroke-linecap="round"/><path d="M27 66 Q25 22 70 19 Q115 22 113 66" fill="none" stroke="#8d82ef" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><g data-r="cupL"><rect x="15" y="58" width="13" height="24" rx="6.5" fill="#4a4194"/><rect x="18" y="64" width="3" height="12" rx="1.5" fill="var(--acc)" opacity=".85"/></g><g data-r="cupR"><rect x="112" y="58" width="13" height="24" rx="6.5" fill="#4a4194"/><rect x="119" y="64" width="3" height="12" rx="1.5" fill="var(--acc)" opacity=".85"/></g>'
-      : '<path d="M27 43 Q70 20 113 43" fill="none" stroke="#2a2550" stroke-width="9" stroke-linecap="round"/><path d="M27 43 Q70 20 113 43" fill="none" stroke="var(--acc)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 7" opacity=".9"/><g data-r="tail"><path d="M112 43 q9 3 12 16" fill="none" stroke="#4a4194" stroke-width="6" stroke-linecap="round"/><path d="M110 45 q2 12 -3 22" fill="none" stroke="#4a4194" stroke-width="5.5" stroke-linecap="round"/></g>';
+      ? '<path d="M27 66 Q25 22 70 19 Q115 22 113 66" fill="none" stroke="#8a6a22" stroke-width="5.5" stroke-linecap="round"/><path d="M27 66 Q25 22 70 19 Q115 22 113 66" fill="none" stroke="#d9b24a" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><g data-r="cupL"><rect x="15" y="58" width="13" height="24" rx="6.5" fill="#6b4e18"/><rect x="18" y="64" width="3" height="12" rx="1.5" fill="var(--acc)" opacity=".85"/></g><g data-r="cupR"><rect x="112" y="58" width="13" height="24" rx="6.5" fill="#6b4e18"/><rect x="119" y="64" width="3" height="12" rx="1.5" fill="var(--acc)" opacity=".85"/></g>'
+      : '<path d="M27 43 Q70 20 113 43" fill="none" stroke="#3b2e10" stroke-width="9" stroke-linecap="round"/><path d="M27 43 Q70 20 113 43" fill="none" stroke="var(--acc)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 7" opacity=".9"/><g data-r="tail"><path d="M112 43 q9 3 12 16" fill="none" stroke="#6b4e18" stroke-width="6" stroke-linecap="round"/><path d="M110 45 q2 12 -3 22" fill="none" stroke="#6b4e18" stroke-width="5.5" stroke-linecap="round"/></g>';
     function arm(s) { return '<path data-r="arm' + s + 'a" fill="none" stroke="#5a49c9" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path data-r="arm' + s + 'b" fill="none" stroke="#8f7df5" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>'; }
     function hand(s) { return '<g data-r="hand' + s + '"><rect data-r="fin' + s + '" x="4" y="-2.2" width="0.01" height="4.4" rx="2.2" fill="#b6a9ff"/><ellipse data-r="th' + s + '" cx="0" cy="-9" rx="3.4" ry="5.4" fill="#b6a9ff" opacity="0"/><circle r="9.2" fill="url(#h' + id + ')"/><ellipse cx="-3" cy="-3.4" rx="3.2" ry="2" fill="#fff" opacity=".35"/></g>'; }
-    return '<svg class="wkm" viewBox="-14 -26 168 176" role="img" aria-label="מאמן" style="overflow:visible;display:block;width:100%;height:100%;--acc:#9d8cff">' + head(id) +
+    return '<svg class="wkm" viewBox="-14 -26 168 176" role="img" aria-label="מאמן" style="overflow:visible;display:block;width:100%;height:100%;--acc:#e9c75a">' + head(id) +
       '<ellipse data-r="shadow" cx="70" cy="126" rx="32" ry="5.2" fill="url(#s' + id + ')"/>' +
       '<g data-r="root"><g data-r="body"><g class="wkm-breath">' +
       '<circle data-r="ring" class="wkm-ring" cx="70" cy="66" r="52" fill="none" stroke="var(--acc)" stroke-width="2"/>' + arm('L') + arm('R') +
@@ -66,7 +67,7 @@
       hand('L') + hand('R') + '</g></g>' +
       '<g data-r="alert" opacity="0"><rect x="-3.2" y="-13" width="6.4" height="14" rx="3.2" fill="var(--acc)"/><circle cx="0" cy="6" r="3.4" fill="var(--acc)"/></g><g data-r="fx"></g></g></svg>';
   }
-  var css = '.wkm-wrap{display:flex;align-items:center;gap:10px;height:100%;direction:rtl;--acc:#9d8cff}.wkm-char{flex:0 0 auto;height:100%;aspect-ratio:1/1;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
+  var css = '.wkm-wrap{display:flex;align-items:center;gap:10px;height:100%;direction:rtl;--acc:#e9c75a}.wkm-char{flex:0 0 auto;height:100%;aspect-ratio:1/1;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
     '.wkm-bubble{flex:1 1 auto;min-width:0;position:relative;box-sizing:border-box;padding:9px 13px;border-radius:16px;color:#ece9ff;font-size:14px;line-height:1.35;background:linear-gradient(180deg,rgba(70,60,150,.55),rgba(36,30,84,.62));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);box-shadow:0 6px 18px rgba(8,6,30,.35);opacity:0;transform:translateY(4px) scale(.98);transition:opacity .25s ease,transform .3s cubic-bezier(.3,1.3,.5,1);pointer-events:none;overflow:hidden}' +
     '.wkm-bubble.on{opacity:1;transform:none;pointer-events:auto}.wkm-bubble:before{content:"";position:absolute;inset-inline-start:-6px;top:50%;width:10px;height:10px;margin-top:-5px;transform:rotate(45deg);background:rgba(58,50,128,.7);border-inline-start:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-block-end:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}' +
     '.wkm-bubble span{opacity:0;transition:opacity .22s ease}.wkm-bubble span.on{opacity:1}' +
@@ -89,7 +90,7 @@
     var R = {}; ['root', 'body', 'shadow', 'ring', 'spec', 'eyes', 'eL', 'eR', 'hL', 'hR', 'bL', 'bR', 'mouth', 'chL', 'chR', 'tail', 'fx', 'cupL', 'cupR', 'armLa', 'armLb', 'armRa', 'armRb', 'handL', 'handR', 'finL', 'finR', 'thL', 'thR', 'sweat', 'alert'].forEach(function (n) { R[n] = q(n); });
     var mode = o.mode || 'coach', S = {}, T = {}, V = {}, base = {}, running = false, last = 0, timers = [], parts = [], destroyed = false, lookUntil = 0, prog = 0, blinkT = 0, sacT = 0, talkT = 0, hideT = 0, wordT = [], talking = false;
     P.forEach(function (p) { S[p] = BASE[p]; V[p] = 0; });
-    function accent(m) { return m === 'fire' ? '#c77dff' : m === 'calm' ? '#8fb4ff' : '#9d8cff'; }
+    function accent(m) { return m === 'fire' ? '#ffcf5a' : m === 'calm' ? '#f0dd9a' : '#e9c75a'; }   // V47 C — gold coach accents per mode
     function rebase() { base = {}; for (var p in BASE) base[p] = BASE[p]; var mb = MODEBASE[mode]; for (var k in mb) base[k] = mb[k]; base.glow = prog * .85; }
     function paintMode() { node.style.setProperty('--bt', mode === 'fire' ? '2.4s' : mode === 'calm' ? '4.8s' : '3.6s'); node.style.setProperty('--rt', mode === 'fire' ? '1.8s' : mode === 'calm' ? '5s' : '3.6s'); node.style.setProperty('--acc', accent(mode)); wrap.style.setProperty('--acc', accent(mode)); }
     rebase(); P.forEach(function (p) { T[p] = base[p]; S[p] = base[p]; }); paintMode();
