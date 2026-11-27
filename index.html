@@ -33,6 +33,9 @@
 (function(){
   if(!document.documentElement.classList.contains('lux'))return;
   var MAP={'📥':'import','🚀':'rocket','🤖':'ai','💳':'card','📋':'clipboard','🔄':'repeat','🏋️':'dumbbell','🏋':'dumbbell','🔔':'bell','⚙️':'gear','⚙':'gear','🚪':'logout','⏰':'clock','▶️':'play','▶':'play','🧪':'flask','🌓':'theme','🌙':'theme','📅':'cal','☁️':'cloud','☁':'cloud','📤':'export','📧':'mail','🐛':'bug','🛡️':'shield','🛡':'shield','🎯':'target','☀️':'sun','📌':'pin','💡':'flask','📈':'rocket','📊':'clipboard','👁️':'eye','👁':'eye'};
+  // V51: chrome symbol glyphs that have no Heebo glyph -> SVG (× · − + ARE in Heebo's latin subset, so they stay as text)
+  var SYM={'↺':'retry','✕':'close','✖':'close','✘':'close','✗':'close','↶':'undo','←':'arrowback','→':'arrowfwd','✓':'check','✔':'check','＋':'plus','▾':'chevdown','▼':'chevdown','⌄':'chevdown','▲':'chevup','⋯':'more','⇄':'swap'};
+  var SYMRE=/[↺✕✖✗✘↶←→✓✔＋▾▼⌄▲⋯⇄]/;
   function wrap(el){
     if(el.querySelector&&el.querySelector('[data-lux-ico]'))return;
     var t=(el.textContent||'').trim(); if(!t)return;
@@ -40,9 +43,35 @@
     if(!key)return;
     el.innerHTML='<span data-lux-ico="'+key+'" aria-hidden="true">'+ch+'</span>';
   }
+  // a standalone symbol icon-button: the ENTIRE content is one symbol glyph -> wrap it (safe; no text lost)
+  function wrapSym(el){
+    if(el.querySelector&&el.querySelector('[data-lux-ico]'))return;
+    var t=(el.textContent||'').trim(); if(Array.from(t).length!==1)return; var key=SYM[t]; if(!key)return;
+    el.innerHTML='<span data-lux-ico="'+key+'" aria-hidden="true">'+t+'</span>';
+  }
+  // an INLINE symbol inside a text button (e.g. "הצג הכל ←", "הבנתי ✓"): replace only the symbol text node run, keep words
+  function convInline(root){
+    var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),n,hits=[];
+    while((n=w.nextNode())){ if(n.parentElement&&n.parentElement.closest('[data-lux-ico]'))continue; if(SYMRE.test(n.nodeValue))hits.push(n); }
+    hits.forEach(function(tn){ var parts=tn.nodeValue.split(new RegExp('('+SYMRE.source+')')); var frag=document.createDocumentFragment();
+      parts.forEach(function(p){ if(SYM[p]){ var s=document.createElement('span'); s.setAttribute('data-lux-ico',SYM[p]); s.setAttribute('aria-hidden','true'); s.textContent=p; frag.appendChild(s); } else if(p){ frag.appendChild(document.createTextNode(p)); } });
+      if(tn.parentNode)tn.parentNode.replaceChild(frag,tn); });
+  }
   function conv(){document.querySelectorAll('.side-item-ico,.settings-row-ico,.alfred-top-ico,.ubb-icon:not([data-lux-ico])').forEach(wrap);
+    document.querySelectorAll('.siri-retry-btn,.ot-add-btn,.ot-empty-arrow,.wpc-close,.mpp-close,.bp-x-btn,.ge-back,.rsheet-close-btn,.wk-lv-x,.rsheet-action-btn,.cal-nav-btn,.edit-cancel').forEach(wrapSym);
+    document.querySelectorAll('.sec-btn,.wpc-ok,.bp-sidebar-add,.edit-save,.pend-btn,.wk-live,.notif-chip,.wk-switch,.wk-pill').forEach(convInline);
+    // leading-emoji chrome labels (emoji + text in one node, e.g. tabs/titles): wrap just the leading glyph
+    document.querySelectorAll('.ge-tab,.ge-title,.wpc-title,.bill-days-badge,.mpp-title').forEach(function(el){
+      if(el.querySelector&&el.querySelector('[data-lux-ico]'))return; var tn=el.firstChild; if(!tn||tn.nodeType!==3)return;
+      var t=tn.nodeValue, ch=Array.from(t.trim())[0], key=MAP[ch]||MAP[t.trim().slice(0,2)]; if(!key)return;
+      var rest=t.replace(/^\s*\S+\s?/, ' '); tn.nodeValue=rest;
+      var s=document.createElement('span'); s.setAttribute('data-lux-ico',key); s.setAttribute('aria-hidden','true'); el.insertBefore(s,tn);
+    });
     // every emoji->SVG icon span is DECORATIVE: hide it from the a11y tree so axe doesn't flag the (invisible) emoji glyph's contrast
-    document.querySelectorAll('[data-lux-ico]:not([aria-hidden])').forEach(function(e){e.setAttribute('aria-hidden','true');});}
+    document.querySelectorAll('[data-lux-ico]:not([aria-hidden])').forEach(function(e){e.setAttribute('aria-hidden','true');});
+    // the emoji glyph is only the non-lux fallback; under lux the SVG is painted via ::before, so drop the hidden
+    // glyph entirely (font-size:0 still makes it count in getPlatformFontsForNode -> a false 'system font' hit).
+    document.querySelectorAll('[data-lux-ico]').forEach(function(e){if(e.textContent)e.textContent='';});}
   conv();
   var pend=0; var mo=new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=0;conv();},40);});
   try{mo.observe(document.body,{childList:true,subtree:true});}catch(e){}
