@@ -83,7 +83,7 @@
     return { sx: sx, sy: sy, ex: sx + a * Math.cos(ang + sg * A), ey: sy + a * Math.sin(ang + sg * A), px: sx + dd * Math.cos(ang), py: sy + dd * Math.sin(ang) };
   }
 
-  function mount(el, o) {
+  function mountChar(el, o) {
     o = o || {}; inject(); var id = ++uid;
     el.innerHTML = '<div class="wkm-wrap"><div class="wkm-char" role="button" tabindex="0" aria-label="מאמן">' + svg(id, o.variant || 'strength') + '</div><div class="wkm-bubble" aria-live="polite"></div></div>';
     var wrap = el.firstChild, charEl = wrap.firstChild, bubble = wrap.lastChild, node = charEl.firstChild, q = function (n) { return node.querySelector('[data-r="' + n + '"]'); };
@@ -160,6 +160,57 @@
     };
     return api;
   }
+  // ── V51 unified luxury orb (gold coach). The CSS lives in style.css (.vt-orb*).
+  //    Same public API as the character; the old headband character survives under vt_ui_lux='0'.
+  function luxOn() { try { return localStorage.getItem('vt_ui_lux') !== '0'; } catch (_) { return true; } }
+  function mountOrb(el, o) {
+    o = o || {};
+    var arcs = '<svg class="vt-arcs" viewBox="0 0 100 100" aria-hidden="true">'
+      + '<path class="vt-arc-happy" d="M26 54 Q34 40 42 54"/><path class="vt-arc-happy" d="M58 54 Q66 40 74 54"/>'
+      + '<path class="vt-arc-done" d="M26 46 Q34 56 42 46"/><path class="vt-arc-done" d="M58 46 Q66 56 74 46"/></svg>';
+    el.innerHTML = '<div class="vtm-wrap">'
+      + '<div class="vt-orb vt-orb--gold" role="button" tabindex="0" aria-label="מאמן">'
+      + '<span class="vt-orb-hi"></span><span class="vt-eyes"><span class="vt-eye vt-eye-l"></span><span class="vt-eye vt-eye-r"></span></span>'
+      + arcs + '<span class="vt-spark"><i></i><i></i><i></i><i></i><i></i></span></div>'
+      + '<div class="vtm-bubble" aria-live="polite"></div></div>';
+    var wrap = el.firstChild, orb = wrap.firstChild, eyes = orb.querySelector('.vt-eyes'), bubble = wrap.lastChild;
+    var hideT = 0, wordT = [], lookT = 0, cur = o.mode || 'coach';
+    // map the coach gesture states onto the four orb states: idle (default) / rest / pr / done
+    function set(state) {
+      orb.classList.remove('is-rest', 'is-pr', 'is-done');
+      if (state === 'rest') orb.classList.add('is-rest');
+      else if (state === 'pr' || state === 'exceed') orb.classList.add('is-pr');
+      else if (state === 'finish' || state === 'done') orb.classList.add('is-done');
+    }
+    function look(x, y, hold) {
+      var dx = Math.max(-1, Math.min(1, x || 0)) * 10, dy = Math.max(-1, Math.min(1, y || 0)) * 8;
+      try { eyes.style.transition = 'transform .25s ease'; eyes.style.transform = 'translate(' + dx + '%,' + dy + '%)'; } catch (_) { }
+      clearTimeout(lookT); lookT = setTimeout(function () { try { eyes.style.transform = ''; } catch (_) { } }, hold || 2200);
+    }
+    function say(text, so) {
+      so = so || {}; clearTimeout(hideT); wordT.forEach(clearTimeout); wordT = [];
+      var words = String(text || '').replace(/(\d+(?:[.,]\d+)?[×xX*]\d+(?:\+\d+)*)/g, '⁦$1⁩').split(/\s+/).filter(Boolean); if (!words.length) return;
+      bubble.innerHTML = ''; var spans = words.map(function (w, i) { var s = document.createElement('span'); s.textContent = w + (i < words.length - 1 ? ' ' : ''); bubble.appendChild(s); return s; }); bubble.classList.add('on');
+      if (so.mood) set(so.mood);
+      if (reduce()) spans.forEach(function (s) { s.classList.add('on'); });
+      else { var step = 120; spans.forEach(function (s, i) { wordT.push(setTimeout(function () { s.classList.add('on'); }, 60 + i * step)); }); }
+      hideT = setTimeout(function () { bubble.classList.remove('on'); }, so.ms || (2600 + String(text).length * 55 + words.length * 120));
+    }
+    function tap() { if (o.onTap) try { o.onTap(api); } catch (e) { } }
+    orb.addEventListener('click', tap);
+    orb.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } });
+    bubble.addEventListener('click', function () { bubble.classList.remove('on'); });
+    var api = {
+      set: set, look: look, say: say,
+      breathe: function (on) { orb.classList.toggle('is-rest', !!on); },   // rest breathing guide (narrowed eyes + slow breathe)
+      progress: function (p) { try { orb.style.setProperty('--glow', String(Math.max(0, Math.min(1, p || 0)))); } catch (_) { } },
+      mode: function (m) { cur = m; api.cur = m; },   // calm/coach/fire fold into the idle baseline; kept for API stability
+      destroy: function () { clearTimeout(hideT); clearTimeout(lookT); wordT.forEach(clearTimeout); try { el.innerHTML = ''; } catch (_) { } },
+      cur: cur
+    };
+    return api;
+  }
+  function mount(el, o) { return luxOn() ? mountOrb(el, o) : mountChar(el, o); }
   root.WkMascot = { mount: mount, STATES: Object.keys(CH) };
   if (typeof module !== 'undefined') module.exports = { mount: mount };
 })(typeof window !== 'undefined' ? window : this);
